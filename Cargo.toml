@@ -8,3 +8,4 @@ edition = "2018"
 
 [dependencies]
 board-game-traits = "0.1"
+smallvec = "1.2"

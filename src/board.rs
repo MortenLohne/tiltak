@@ -3,13 +3,13 @@ const BOARD_SIZE: usize = 5;
 use board_game_traits::board;
 use board_game_traits::board::{Color, GameResult};
 use std::ops::Index;
+use smallvec::SmallVec;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Square(pub u8);
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Piece {
-    Empty,
     WhiteFlat,
     BlackFlat,
     WhiteStanding,
@@ -18,13 +18,7 @@ pub enum Piece {
     BlackCap,
 }
 
-impl Default for Piece {
-    fn default() -> Self {
-        Piece::Empty
-    }
-}
-
-type Cell = [Piece; 10];
+type Cell = SmallVec<[Piece; 4]>;
 
 pub enum Move {
     Place(Piece, Square),
@@ -36,7 +30,7 @@ pub struct Movement {
     pub dest_square: Square,
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Board {
     cells: [[Cell; BOARD_SIZE]; BOARD_SIZE],
     to_move: Color,
