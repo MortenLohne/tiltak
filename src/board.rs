@@ -2,6 +2,10 @@ const BOARD_SIZE: usize = 5;
 
 use board_game_traits::board;
 use board_game_traits::board::{Color, GameResult};
+use std::ops::Index;
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct Square(pub u8);
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Piece {
@@ -22,6 +26,16 @@ impl Default for Piece {
 
 type Cell = [Piece; 10];
 
+pub enum Move {
+    Place(Piece, Square),
+    Move([Movement;5]),
+}
+
+pub struct Movement {
+    pub pieces_to_leave: u8,
+    pub dest_square: Square,
+}
+
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Board {
     cells: [[Cell; BOARD_SIZE]; BOARD_SIZE],
@@ -30,6 +44,14 @@ pub struct Board {
     black_stones_left: u8,
     white_capstones_left: u8,
     black_capstones_left: u8,
+}
+
+impl Index<Square> for Board {
+    type Output = Cell;
+
+    fn index(&self, square: Square) -> &Self::Output {
+        &self.cells[square.0 as usize % BOARD_SIZE][square.0 as usize / BOARD_SIZE]
+    }
 }
 
 impl Default for Board {
