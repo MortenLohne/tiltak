@@ -1,4 +1,5 @@
 extern crate board_game_traits;
+extern crate pgn_traits;
 extern crate rand;
 #[macro_use]
 extern crate smallvec;
@@ -12,7 +13,7 @@ use rand::seq::SliceRandom;
 
 fn main() {
     let mut rng = rand::thread_rng();
-    for j in 0..100 {
+    for _ in 0..10 {
         let mut board = board_mod::Board::default();
         let mut moves = vec![];
         for i in 0.. {

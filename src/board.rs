@@ -5,14 +5,17 @@ use crate::board::Piece::*;
 use crate::board::Role::Flat;
 use crate::board::Role::*;
 use board_game_traits::board;
+use board_game_traits::board::Board as BoardTrait;
 use board_game_traits::board::GameResult::{BlackWin, Draw, WhiteWin};
 use board_game_traits::board::{Color, GameResult};
+use pgn_traits::pgn;
 use smallvec::alloc::fmt::{Error, Formatter};
 use smallvec::SmallVec;
 use std::cmp::Ordering;
 use std::fmt::Debug;
-use std::ops;
+use std::fmt::Write;
 use std::ops::{Index, IndexMut};
+use std::{fmt, ops};
 
 trait ColorTr {
     fn stones_left(board: &Board) -> u8;
@@ -94,7 +97,7 @@ impl ColorTr for BlackTr {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub struct Square(pub u8);
 
 impl Square {
@@ -180,6 +183,27 @@ impl Square {
             }
         }
     }
+
+    fn parse_square(input: &str) -> Square {
+        assert_eq!(input.len(), 2, "Couldn't parse square {}", input);
+        Square(
+            (input.chars().nth(0).unwrap() as u8 - ('a' as u8))
+                + (BOARD_SIZE as u8 + '0' as u8 - input.chars().nth(1).unwrap() as u8) * BOARD_SIZE as u8)
+    }
+}
+
+impl fmt::Display for Square {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
+        write!(f, "{}", (self.file() + 'a' as u8) as char)?;
+        write!(f, "{}", BOARD_SIZE as u8 - self.rank())?;
+        Ok(())
+    }
+}
+
+impl fmt::Debug for Square {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
+        write!(f, "{}", self)
+    }
 }
 
 pub fn board_iterator() -> impl Iterator<Item = Square> {
@@ -230,10 +254,41 @@ impl ops::Not for Piece {
 
 type Cell = SmallVec<[Piece; 4]>;
 
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Eq)]
 pub enum Move {
     Place(Piece, Square),
     Move(Square, Direction, SmallVec<[Movement; 5]>), // Number of stones to take
+}
+
+impl fmt::Display for Move {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
+        match self {
+            Move::Place(piece, square) => match piece {
+                WhiteCap | BlackCap => write!(f, "C{}", square)?,
+                WhiteFlat | BlackFlat => write!(f, "{}", square)?,
+                WhiteStanding | BlackStanding => write!(f, "S{}", square)?,
+            },
+            Move::Move(square, direction, movements) => {
+                write!(f, "{}{}", movements[0].pieces_to_take, square).unwrap();
+                match direction {
+                    North => f.write_char('-')?,
+                    West => f.write_char('<')?,
+                    East => f.write_char('>')?,
+                    South => f.write_char('+')?,
+                }
+                for movement in movements.iter().skip(1) {
+                    write!(f, "{}", movement.pieces_to_take).unwrap();
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
+impl fmt::Debug for Move {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
+        write!(f, "{}", self)
+    }
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -247,6 +302,16 @@ pub enum Direction {
 impl Direction {
     fn all() -> impl Iterator<Item = Direction> {
         [North, East, West, South].iter().cloned()
+    }
+
+    fn parse(ch: char) -> Self {
+        match ch {
+            '-' => North,
+            '<' => West,
+            '>' => East,
+            '+' => South,
+            _ => panic!("Couldn't parse \"{}\" as direction.", ch),
+        }
     }
 }
 
@@ -592,6 +657,72 @@ impl board::Board for Board {
         } else {
             None
         }
+    }
+}
+
+impl pgn_traits::pgn::PgnBoard for Board {
+    fn from_fen(fen: &str) -> Result<Self, pgn::Error> {
+        unimplemented!()
+    }
+
+    fn to_fen(&self) -> String {
+        unimplemented!()
+    }
+
+    fn move_from_san(&self, input: &str) -> Result<Self::Move, pgn::Error> {
+        if input.len() < 2 {
+            return Err(pgn::Error::new(
+                pgn::ErrorKind::ParseError,
+                "Input move too short.",
+            ));
+        }
+        if !input.is_ascii() {
+            return Err(pgn::Error::new(
+                pgn::ErrorKind::ParseError,
+                "Input move contained non-ascii characters.",
+            ));
+        }
+        let first_char = input.chars().next().unwrap();
+        match first_char {
+            'a'..='e' if input.len() == 2 => match self.side_to_move() {
+                Color::White => Ok(Move::Place(WhiteFlat, Square::parse_square(input))),
+                Color::Black => Ok(Move::Place(BlackFlat, Square::parse_square(input))),
+            },
+            'C' if input.len() == 3 => match self.side_to_move() {
+                Color::White => Ok(Move::Place(WhiteCap, Square::parse_square(&input[1..]))),
+                Color::Black => Ok(Move::Place(BlackCap, Square::parse_square(&input[1..]))),
+            },
+            'S' if input.len() == 3 => match self.side_to_move() {
+                Color::White => Ok(Move::Place(WhiteStanding, Square::parse_square(&input[1..]))),
+                Color::Black => Ok(Move::Place(BlackStanding, Square::parse_square(&input[1..]))),
+            },
+            '1'..='5' if input.len() > 3 => {
+                let square = Square::parse_square(&input[1..3]);
+                let direction = Direction::parse(input.chars().nth(3).unwrap());
+                let movements = input.chars().take(1).chain(input.chars().skip(4)).map(|ch| {
+                    Movement { pieces_to_take: ch as u8 - '0' as u8 }
+                });
+                Ok(Move::Move(square, direction, movements.collect()))
+            },
+            _ => Err(pgn::Error::new(
+                pgn::ErrorKind::ParseError,
+                format!("Couldn't parse {}", input),
+            )),
+        }
+    }
+
+    fn move_to_san(&self, mv: &Self::Move) -> String {
+        let mut string = String::new();
+        write!(string, "{}", mv).unwrap();
+        string
+    }
+
+    fn move_from_lan(&self, input: &str) -> Result<Self::Move, pgn::Error> {
+        unimplemented!()
+    }
+
+    fn move_to_lan(&self, mv: &Self::Move) -> String {
+        unimplemented!()
     }
 }
 

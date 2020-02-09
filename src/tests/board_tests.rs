@@ -3,6 +3,7 @@ use crate::board::Piece::WhiteFlat;
 use crate::board::{board_iterator, Direction, Move, Movement, Piece, Square};
 use board_game_traits::board::{Board, GameResult::*};
 use rand::seq::SliceRandom;
+use pgn_traits::pgn::PgnBoard;
 
 #[test]
 fn default_board_test() {
@@ -67,6 +68,7 @@ fn move_gen_test() {
     {
         board.generate_moves(&mut moves);
         assert!(moves.contains(mv));
+        assert_eq!(*mv, board.move_from_san(&board.move_to_san(mv)).unwrap());
         board.do_move(mv.clone());
         moves.clear();
     }
@@ -77,10 +79,12 @@ fn move_gen_test() {
         "Generated wrong moves on board:\n{:?}\nExpected moves: {:?}\nExpected move moves:{:?}",
         board,
         moves,
-        moves.iter().filter(|mv| match mv {
-            Move::Move(_, _, _) => true,
-            _ => false,
-        })
+        moves
+            .iter()
+            .filter(|mv| match mv {
+                Move::Move(_, _, _) => true,
+                _ => false,
+            })
             .collect::<Vec<_>>()
     );
 }

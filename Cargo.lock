@@ -39,6 +39,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d515b1f41455adea1313a4a2ac8a8a477634fbae63cc6100e3aebb207ce61558"
 
 [[package]]
+name = "pgn-traits"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2627241c2a76d1295a910b1d52f00ac471e047667164be587f3376bbb819b1de"
+dependencies = [
+ "board-game-traits",
+]
+
+[[package]]
 name = "ppv-lite86"
 version = "0.2.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -96,6 +105,7 @@ name = "taik"
 version = "0.1.0"
 dependencies = [
  "board-game-traits",
+ "pgn-traits",
  "rand",
  "smallvec",
 ]
