@@ -4,8 +4,10 @@ use crate::board::Piece::{BlackCap, BlackFlat, BlackStanding, WhiteCap, WhiteFla
 use board_game_traits::board;
 use board_game_traits::board::GameResult::{BlackWin, Draw, WhiteWin};
 use board_game_traits::board::{Color, GameResult};
+use smallvec::alloc::fmt::{Error, Formatter};
 use smallvec::SmallVec;
 use std::cmp::Ordering;
+use std::fmt::Debug;
 use std::ops::{Index, IndexMut};
 
 trait ColorTr {
@@ -81,16 +83,44 @@ impl ColorTr for BlackTr {
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Square(pub u8);
 
-pub fn board_iterator() -> impl Iterator<Item = Square> {
-    (0..(BOARD_SIZE * BOARD_SIZE)).map(|i| Square(i as u8))
-}
+impl Square {
+    pub fn rank(self) -> u8 {
+        self.0 / BOARD_SIZE as u8
+    }
 
-pub fn neighbours(square: Square) -> impl Iterator<Item = Square> {
-    [-(BOARD_SIZE as i8), -1, 1, BOARD_SIZE as i8]
-        .iter()
-        .map(move |sq| sq + square.0 as i8)
+    pub fn file(self) -> u8 {
+        self.0 % BOARD_SIZE as u8
+    }
+
+    pub fn neighbours(self) -> impl Iterator<Item = Square> {
+        (if self.0 as usize == 0 {
+            [1, BOARD_SIZE as i8].iter()
+        } else if self.0 as usize == BOARD_SIZE - 1 {
+            [-1, BOARD_SIZE as i8].iter()
+        } else if self.0 as usize == BOARD_SIZE * BOARD_SIZE - BOARD_SIZE {
+            [1, -(BOARD_SIZE as i8)].iter()
+        } else if self.0 as usize == BOARD_SIZE * BOARD_SIZE - 1 {
+            [-1, -(BOARD_SIZE as i8)].iter()
+        } else if self.rank() == 0 {
+            [-1, 1, BOARD_SIZE as i8].iter()
+        } else if self.rank() == BOARD_SIZE as u8 - 1 {
+            [-(BOARD_SIZE as i8), -1, 1].iter()
+        } else if self.file() == 0 {
+            [-(BOARD_SIZE as i8), 1, BOARD_SIZE as i8].iter()
+        } else if self.file() == BOARD_SIZE as u8 - 1 {
+            [-(BOARD_SIZE as i8), -1, BOARD_SIZE as i8].iter()
+        } else {
+            [-(BOARD_SIZE as i8), -1, 1, BOARD_SIZE as i8].iter()
+        })
+        .cloned()
+        .map(move |sq| sq + self.0 as i8)
         .filter(|&sq| sq >= 0 && sq < BOARD_SIZE as i8 * BOARD_SIZE as i8)
         .map(|sq| Square(sq as u8))
+    }
+}
+
+pub fn board_iterator() -> impl Iterator<Item = Square> {
+    (0..(BOARD_SIZE * BOARD_SIZE)).map(|i| Square(i as u8))
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -117,7 +147,7 @@ pub struct Movement {
     pub dest_square: Square,
 }
 
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct Board {
     cells: [[Cell; BOARD_SIZE]; BOARD_SIZE],
     to_move: Color,
@@ -131,13 +161,13 @@ impl Index<Square> for Board {
     type Output = Cell;
 
     fn index(&self, square: Square) -> &Self::Output {
-        &self.cells[square.0 as usize % BOARD_SIZE][square.0 as usize / BOARD_SIZE]
+        &self.cells[square.rank() as usize][square.file() as usize]
     }
 }
 
 impl IndexMut<Square> for Board {
     fn index_mut(&mut self, square: Square) -> &mut Self::Output {
-        &mut self.cells[square.0 as usize % BOARD_SIZE][square.0 as usize / BOARD_SIZE]
+        &mut self.cells[square.rank() as usize][square.file() as usize]
     }
 }
 
@@ -151,6 +181,37 @@ impl Default for Board {
             white_capstones_left: 1,
             black_capstones_left: 1,
         }
+    }
+}
+
+impl Debug for Board {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
+        for row in self.cells.iter() {
+            for cell in row {
+                match cell.iter().last() {
+                    None => write!(f, "[.]")?,
+                    Some(WhiteFlat) => write!(f, "[w]")?,
+                    Some(WhiteStanding) => write!(f, "[W]")?,
+                    Some(WhiteCap) => write!(f, "[C]")?,
+                    Some(BlackFlat) => write!(f, "[b]")?,
+                    Some(BlackStanding) => write!(f, "[B]")?,
+                    Some(BlackCap) => write!(f, "[c]")?,
+                }
+            }
+            writeln!(f)?;
+        }
+        writeln!(
+            f,
+            "Stones left: {}/{}.",
+            self.white_stones_left, self.black_stones_left
+        )?;
+        writeln!(
+            f,
+            "Capstones left: {}/{}.",
+            self.white_capstones_left, self.black_capstones_left
+        )?;
+        writeln!(f, "{} to move.", self.to_move)?;
+        Ok(())
     }
 }
 
@@ -172,7 +233,7 @@ impl Board {
                 }
                 Some(&piece) => {
                     if piece == Colorr::cap_piece() {
-                        for neighbour in neighbours(square) {
+                        for neighbour in square.neighbours() {
                             let mut vec = SmallVec::new();
                             vec.push(Movement {
                                 pieces_to_leave: 0,
@@ -180,10 +241,11 @@ impl Board {
                             });
                             moves.push(Move::Move(square, vec));
                         }
-                    }
-                    else {
-                        for neighbour in neighbours(square) {
-                            if self[neighbour].last() == Some(&WhiteFlat) || self[neighbour].last() == Some(&BlackFlat) {
+                    } else {
+                        for neighbour in square.neighbours() {
+                            if self[neighbour].last() == Some(&WhiteFlat)
+                                || self[neighbour].last() == Some(&BlackFlat)
+                            {
                                 let mut vec = SmallVec::new();
                                 vec.push(Movement {
                                     pieces_to_leave: 0,
@@ -343,8 +405,11 @@ fn connect_component<Color: ColorTr>(
 ) {
     components[square] = id;
     visited[square] = true;
-    for neighbour in neighbours(square) {
-        if !board[neighbour].is_empty() && Color::is_road_stone(*board[neighbour].last().unwrap()) && !visited[neighbour] {
+    for neighbour in square.neighbours() {
+        if !board[neighbour].is_empty()
+            && Color::is_road_stone(*board[neighbour].last().unwrap())
+            && !visited[neighbour]
+        {
             connect_component::<Color>(board, components, visited, neighbour, id);
         }
     }

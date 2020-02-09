@@ -1,10 +1,57 @@
-use crate::board::{board_iterator, Board, Piece, Square, BOARD_SIZE};
-use smallvec::SmallVec;
+use crate::board as board_mod;
+use crate::board::board_iterator;
+use board_game_traits::board::{Board, GameResult::*};
+use rand::seq::SliceRandom;
 
 #[test]
 fn default_board_test() {
-    let board = Board::default();
+    let board = board_mod::Board::default();
     for square in board_iterator() {
         assert!(board[square].is_empty());
     }
+}
+
+#[test]
+fn play_random_games_test() {
+    let mut white_wins = 0;
+    let mut black_wins = 0;
+    let mut draws = 0;
+    let mut duration = 0;
+
+    let mut rng = rand::thread_rng();
+    for _ in 0..10000 {
+        let mut board = board_mod::Board::default();
+        let mut moves = vec![];
+        for i in 0.. {
+            moves.clear();
+            board.generate_moves(&mut moves);
+            let mv = moves
+                .choose(&mut rng)
+                .unwrap_or_else(|| panic!("No legal moves on board\n{:?}", board))
+                .clone();
+            board.do_move(mv);
+            match board.game_result() {
+                None => (),
+                Some(WhiteWin) => {
+                    white_wins += 1;
+                    duration += i;
+                    break;
+                }
+                Some(BlackWin) => {
+                    black_wins += 1;
+                    duration += i;
+                    break;
+                }
+                Some(Draw) => {
+                    draws += 1;
+                    duration += i;
+                    break;
+                }
+            }
+        }
+    }
+    println!(
+        "{} white wins, {} black wins, {} draws, {} moves played.",
+        white_wins, black_wins, draws, duration
+    )
 }
