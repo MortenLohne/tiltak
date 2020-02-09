@@ -133,45 +133,45 @@ impl Square {
 
     pub fn directions(self) -> impl Iterator<Item = Direction> {
         (if self.0 as usize == 0 {
-            [EAST, SOUTH].iter()
+            [East, South].iter()
         } else if self.0 as usize == BOARD_SIZE - 1 {
-            [WEST, SOUTH].iter()
+            [West, South].iter()
         } else if self.0 as usize == BOARD_SIZE * BOARD_SIZE - BOARD_SIZE {
-            [EAST, NORTH].iter()
+            [East, North].iter()
         } else if self.0 as usize == BOARD_SIZE * BOARD_SIZE - 1 {
-            [WEST, NORTH].iter()
+            [West, North].iter()
         } else if self.rank() == 0 {
-            [WEST, EAST, SOUTH].iter()
+            [West, East, South].iter()
         } else if self.rank() == BOARD_SIZE as u8 - 1 {
-            [NORTH, WEST, EAST].iter()
+            [North, West, East].iter()
         } else if self.file() == 0 {
-            [NORTH, EAST, SOUTH].iter()
+            [North, East, South].iter()
         } else if self.file() == BOARD_SIZE as u8 - 1 {
-            [NORTH, WEST, SOUTH].iter()
+            [North, West, South].iter()
         } else {
-            [NORTH, WEST, EAST, SOUTH].iter()
+            [North, West, East, South].iter()
         })
         .cloned()
     }
 
     pub fn go_direction(self, direction: Direction) -> Option<Self> {
         match direction {
-            NORTH => self.0.checked_sub(BOARD_SIZE as u8).map(Square),
-            WEST => {
+            North => self.0.checked_sub(BOARD_SIZE as u8).map(Square),
+            West => {
                 if self.file() == 0 {
                     None
                 } else {
                     Some(Square(self.0 - 1))
                 }
             }
-            EAST => {
+            East => {
                 if self.file() == BOARD_SIZE as u8 - 1 {
                     None
                 } else {
                     Some(Square(self.0 + 1))
                 }
             }
-            SOUTH => {
+            South => {
                 if self.0 as usize + BOARD_SIZE >= BOARD_SIZE * BOARD_SIZE {
                     None
                 } else {
@@ -238,15 +238,15 @@ pub enum Move {
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Direction {
-    NORTH,
-    WEST,
-    EAST,
-    SOUTH,
+    North,
+    West,
+    East,
+    South,
 }
 
 impl Direction {
     fn all() -> impl Iterator<Item = Direction> {
-        [NORTH, EAST, WEST, SOUTH].iter().cloned()
+        [North, East, West, South].iter().cloned()
     }
 }
 
@@ -310,7 +310,6 @@ impl Debug for Board {
                     }
                     write!(f, " ")?;
                 }
-
                 writeln!(f)?;
             }
         }
@@ -367,7 +366,8 @@ impl Board {
                                 &mut movements,
                             );
                         }
-                        for movement in movements.into_iter().filter(|mv| mv.len() > 0) { // TODO
+                        for movement in movements.into_iter().filter(|mv| mv.len() > 0) {
+                            // TODO
                             moves.push(Move::Move(square, direction, movement));
                         }
                     }
@@ -397,9 +397,9 @@ impl Board {
                 return;
             }
             if neighbour_piece.map(Piece::role) == Some(Standing) && max_pieces_to_take > 0 {
-                    let mut new_movement = partial_movement.clone();
-                    new_movement.push(Movement { pieces_to_take: 1 });
-                    movements.push(new_movement);
+                let mut new_movement = partial_movement.clone();
+                new_movement.push(Movement { pieces_to_take: 1 });
+                movements.push(new_movement);
             } else {
                 for pieces_to_take in 1..=max_pieces_to_take {
                     let mut new_movement = partial_movement.clone();
@@ -506,7 +506,9 @@ impl board::Board for Board {
                             BlackStanding => *piece = BlackFlat,
                             _ => (),
                         }
-                        debug_assert!(piece.role() != Standing || self[from].last().unwrap().role() == Cap);
+                        debug_assert!(
+                            piece.role() != Standing || self[from].last().unwrap().role() == Cap
+                        );
                     }
                     let pieces_to_leave = self[from].len() - pieces_to_take as usize;
                     let pieces_to_take: Vec<_> = self[from].drain(pieces_to_leave..).collect();

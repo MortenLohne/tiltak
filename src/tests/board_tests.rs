@@ -1,5 +1,6 @@
 use crate::board as board_mod;
-use crate::board::board_iterator;
+use crate::board::Piece::WhiteFlat;
+use crate::board::{board_iterator, Direction, Move, Movement, Piece, Square};
 use board_game_traits::board::{Board, GameResult::*};
 use rand::seq::SliceRandom;
 
@@ -27,6 +28,64 @@ fn go_in_directions_test() {
 }
 
 #[test]
+fn start_board_move_gen_test() {
+    let mut board = board_mod::Board::default();
+    let mut moves = vec![];
+    board.generate_moves(&mut moves);
+    assert_eq!(moves.len(), 75);
+    for mv in moves {
+        let reverse_move = board.do_move(mv);
+        let mut moves = vec![];
+        board.generate_moves(&mut moves);
+        assert_eq!(moves.len(), 72);
+        board.reverse_move(reverse_move);
+    }
+}
+
+#[test]
+fn move_gen_test() {
+    let mut board = board_mod::Board::default();
+    let mut moves = vec![];
+
+    for mv in [
+        Move::Place(Piece::WhiteFlat, Square(12)),
+        Move::Place(Piece::BlackFlat, Square(13)),
+        Move::Place(Piece::WhiteFlat, Square(17)),
+        Move::Move(
+            Square(13),
+            Direction::West,
+            smallvec![Movement { pieces_to_take: 1 }],
+        ),
+        Move::Move(
+            Square(17),
+            Direction::North,
+            smallvec![Movement { pieces_to_take: 1 }],
+        ),
+        Move::Place(Piece::BlackStanding, Square(17)),
+    ]
+    .iter()
+    {
+        board.generate_moves(&mut moves);
+        assert!(moves.contains(mv));
+        board.do_move(mv.clone());
+        moves.clear();
+    }
+    board.generate_moves(&mut moves);
+    assert_eq!(
+        moves.len(),
+        69 + 18,
+        "Generated wrong moves on board:\n{:?}\nExpected moves: {:?}\nExpected move moves:{:?}",
+        board,
+        moves,
+        moves.iter().filter(|mv| match mv {
+            Move::Move(_, _, _) => true,
+            _ => false,
+        })
+            .collect::<Vec<_>>()
+    );
+}
+
+#[test]
 fn play_random_games_test() {
     let mut white_wins = 0;
     let mut black_wins = 0;
@@ -34,7 +93,7 @@ fn play_random_games_test() {
     let mut duration = 0;
 
     let mut rng = rand::thread_rng();
-    for _ in 0..100000 {
+    for _ in 0..1000 {
         let mut board = board_mod::Board::default();
         let mut moves = vec![];
         for i in 0.. {

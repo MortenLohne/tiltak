@@ -11,8 +11,6 @@ use board_game_traits::board::Board;
 use rand::seq::SliceRandom;
 
 fn main() {
-
-
     let mut rng = rand::thread_rng();
     for j in 0..100 {
         let mut board = board_mod::Board::default();
