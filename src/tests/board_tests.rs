@@ -12,6 +12,21 @@ fn default_board_test() {
 }
 
 #[test]
+fn go_in_directions_test() {
+    for square in board_iterator() {
+        assert_eq!(square.directions().count(), square.neighbours().count());
+        for direction in square.directions() {
+            assert!(
+                square.go_direction(direction).is_some(),
+                "Failed to go in direction {:?} from {:?}",
+                direction,
+                square
+            )
+        }
+    }
+}
+
+#[test]
 fn play_random_games_test() {
     let mut white_wins = 0;
     let mut black_wins = 0;
@@ -19,7 +34,7 @@ fn play_random_games_test() {
     let mut duration = 0;
 
     let mut rng = rand::thread_rng();
-    for _ in 0..10000 {
+    for _ in 0..100000 {
         let mut board = board_mod::Board::default();
         let mut moves = vec![];
         for i in 0.. {

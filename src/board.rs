@@ -1,6 +1,9 @@
 pub const BOARD_SIZE: usize = 5;
 
-use crate::board::Piece::{BlackCap, BlackFlat, BlackStanding, WhiteCap, WhiteFlat, WhiteStanding};
+use crate::board::Direction::*;
+use crate::board::Piece::*;
+use crate::board::Role::Flat;
+use crate::board::Role::*;
 use board_game_traits::board;
 use board_game_traits::board::GameResult::{BlackWin, Draw, WhiteWin};
 use board_game_traits::board::{Color, GameResult};
@@ -8,6 +11,7 @@ use smallvec::alloc::fmt::{Error, Formatter};
 use smallvec::SmallVec;
 use std::cmp::Ordering;
 use std::fmt::Debug;
+use std::ops;
 use std::ops::{Index, IndexMut};
 
 trait ColorTr {
@@ -22,6 +26,8 @@ trait ColorTr {
     fn cap_piece() -> Piece;
 
     fn is_road_stone(piece: Piece) -> bool;
+
+    fn piece_is_ours(piece: Piece) -> bool;
 }
 
 struct WhiteTr {}
@@ -50,6 +56,10 @@ impl ColorTr for WhiteTr {
     fn is_road_stone(piece: Piece) -> bool {
         piece == WhiteFlat || piece == WhiteCap
     }
+
+    fn piece_is_ours(piece: Piece) -> bool {
+        piece == WhiteFlat || piece == WhiteStanding || piece == WhiteCap
+    }
 }
 
 struct BlackTr {}
@@ -77,6 +87,10 @@ impl ColorTr for BlackTr {
 
     fn is_road_stone(piece: Piece) -> bool {
         piece == BlackFlat || piece == BlackCap
+    }
+
+    fn piece_is_ours(piece: Piece) -> bool {
+        piece == BlackFlat || piece == BlackCap || piece == BlackStanding
     }
 }
 
@@ -114,13 +128,69 @@ impl Square {
         })
         .cloned()
         .map(move |sq| sq + self.0 as i8)
-        .filter(|&sq| sq >= 0 && sq < BOARD_SIZE as i8 * BOARD_SIZE as i8)
         .map(|sq| Square(sq as u8))
+    }
+
+    pub fn directions(self) -> impl Iterator<Item = Direction> {
+        (if self.0 as usize == 0 {
+            [EAST, SOUTH].iter()
+        } else if self.0 as usize == BOARD_SIZE - 1 {
+            [WEST, SOUTH].iter()
+        } else if self.0 as usize == BOARD_SIZE * BOARD_SIZE - BOARD_SIZE {
+            [EAST, NORTH].iter()
+        } else if self.0 as usize == BOARD_SIZE * BOARD_SIZE - 1 {
+            [WEST, NORTH].iter()
+        } else if self.rank() == 0 {
+            [WEST, EAST, SOUTH].iter()
+        } else if self.rank() == BOARD_SIZE as u8 - 1 {
+            [NORTH, WEST, EAST].iter()
+        } else if self.file() == 0 {
+            [NORTH, EAST, SOUTH].iter()
+        } else if self.file() == BOARD_SIZE as u8 - 1 {
+            [NORTH, WEST, SOUTH].iter()
+        } else {
+            [NORTH, WEST, EAST, SOUTH].iter()
+        })
+        .cloned()
+    }
+
+    pub fn go_direction(self, direction: Direction) -> Option<Self> {
+        match direction {
+            NORTH => self.0.checked_sub(BOARD_SIZE as u8).map(Square),
+            WEST => {
+                if self.file() == 0 {
+                    None
+                } else {
+                    Some(Square(self.0 - 1))
+                }
+            }
+            EAST => {
+                if self.file() == BOARD_SIZE as u8 - 1 {
+                    None
+                } else {
+                    Some(Square(self.0 + 1))
+                }
+            }
+            SOUTH => {
+                if self.0 as usize + BOARD_SIZE >= BOARD_SIZE * BOARD_SIZE {
+                    None
+                } else {
+                    Some(Square(self.0 + BOARD_SIZE as u8))
+                }
+            }
+        }
     }
 }
 
 pub fn board_iterator() -> impl Iterator<Item = Square> {
     (0..(BOARD_SIZE * BOARD_SIZE)).map(|i| Square(i as u8))
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Role {
+    Flat,
+    Standing,
+    Cap,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -133,18 +203,56 @@ pub enum Piece {
     BlackCap,
 }
 
+impl Piece {
+    fn role(self) -> Role {
+        match self {
+            WhiteFlat | BlackFlat => Flat,
+            WhiteStanding | BlackStanding => Standing,
+            WhiteCap | BlackCap => Cap,
+        }
+    }
+}
+
+impl ops::Not for Piece {
+    type Output = Self;
+
+    fn not(self) -> Self::Output {
+        match self {
+            WhiteFlat => BlackFlat,
+            BlackFlat => WhiteFlat,
+            WhiteStanding => BlackStanding,
+            BlackStanding => WhiteStanding,
+            WhiteCap => BlackCap,
+            BlackCap => WhiteCap,
+        }
+    }
+}
+
 type Cell = SmallVec<[Piece; 4]>;
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub enum Move {
     Place(Piece, Square),
-    Move(Square, SmallVec<[Movement; 5]>),
+    Move(Square, Direction, SmallVec<[Movement; 5]>), // Number of stones to take
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Direction {
+    NORTH,
+    WEST,
+    EAST,
+    SOUTH,
+}
+
+impl Direction {
+    fn all() -> impl Iterator<Item = Direction> {
+        [NORTH, EAST, WEST, SOUTH].iter().cloned()
+    }
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Movement {
-    pub pieces_to_leave: u8,
-    pub dest_square: Square,
+    pub pieces_to_take: u8,
 }
 
 #[derive(Clone, PartialEq, Eq)]
@@ -186,19 +294,25 @@ impl Default for Board {
 
 impl Debug for Board {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        for row in self.cells.iter() {
-            for cell in row {
-                match cell.iter().last() {
-                    None => write!(f, "[.]")?,
-                    Some(WhiteFlat) => write!(f, "[w]")?,
-                    Some(WhiteStanding) => write!(f, "[W]")?,
-                    Some(WhiteCap) => write!(f, "[C]")?,
-                    Some(BlackFlat) => write!(f, "[b]")?,
-                    Some(BlackStanding) => write!(f, "[B]")?,
-                    Some(BlackCap) => write!(f, "[c]")?,
+        for y in 0..BOARD_SIZE {
+            for print_row in 0..3 {
+                for x in 0..BOARD_SIZE {
+                    for print_column in 0..3 {
+                        match self.cells[y][x].get(print_column * 3 + print_row) {
+                            None => write!(f, "[.]")?,
+                            Some(WhiteFlat) => write!(f, "[w]")?,
+                            Some(WhiteStanding) => write!(f, "[W]")?,
+                            Some(WhiteCap) => write!(f, "[C]")?,
+                            Some(BlackFlat) => write!(f, "[b]")?,
+                            Some(BlackStanding) => write!(f, "[B]")?,
+                            Some(BlackCap) => write!(f, "[c]")?,
+                        }
+                    }
+                    write!(f, " ")?;
                 }
+
+                writeln!(f)?;
             }
-            writeln!(f)?;
         }
         writeln!(
             f,
@@ -231,33 +345,120 @@ impl Board {
                         moves.push(Move::Place(Colorr::cap_piece(), square));
                     }
                 }
-                Some(&piece) => {
-                    if piece == Colorr::cap_piece() {
-                        for neighbour in square.neighbours() {
-                            let mut vec = SmallVec::new();
-                            vec.push(Movement {
-                                pieces_to_leave: 0,
-                                dest_square: neighbour,
-                            });
-                            moves.push(Move::Move(square, vec));
+                Some(&piece) if Colorr::piece_is_ours(piece) => {
+                    for direction in square.directions() {
+                        let mut movements = vec![];
+                        if piece == Colorr::cap_piece() {
+                            self.generate_moving_moves_cap::<Colorr>(
+                                direction,
+                                square,
+                                square,
+                                self[square].len() as u8,
+                                &smallvec![],
+                                &mut movements,
+                            );
+                        } else if Colorr::piece_is_ours(piece) {
+                            self.generate_moving_moves_non_cap::<Colorr>(
+                                direction,
+                                square,
+                                square,
+                                self[square].len() as u8,
+                                &smallvec![],
+                                &mut movements,
+                            );
                         }
-                    } else {
-                        for neighbour in square.neighbours() {
-                            if self[neighbour].last() == Some(&WhiteFlat)
-                                || self[neighbour].last() == Some(&BlackFlat)
-                            {
-                                let mut vec = SmallVec::new();
-                                vec.push(Movement {
-                                    pieces_to_leave: 0,
-                                    dest_square: neighbour,
-                                });
-                                moves.push(Move::Move(square, vec));
-                            }
+                        for movement in movements.into_iter().filter(|mv| mv.len() > 0) { // TODO
+                            moves.push(Move::Move(square, direction, movement));
                         }
                     }
                 }
+                Some(_) => (),
             }
         }
+    }
+
+    fn generate_moving_moves_cap<Colorr: ColorTr>(
+        &self,
+        direction: Direction,
+        origin_square: Square,
+        square: Square,
+        pieces_carried: u8,
+        partial_movement: &SmallVec<[Movement; 5]>,
+        movements: &mut Vec<SmallVec<[Movement; 5]>>,
+    ) {
+        if let Some(neighbour) = square.go_direction(direction) {
+            let max_pieces_to_take = if square == origin_square {
+                pieces_carried
+            } else {
+                pieces_carried - 1
+            };
+            let neighbour_piece = self[neighbour].last().cloned();
+            if neighbour_piece.map(Piece::role) == Some(Cap) {
+                return;
+            }
+            if neighbour_piece.map(Piece::role) == Some(Standing) && max_pieces_to_take > 0 {
+                    let mut new_movement = partial_movement.clone();
+                    new_movement.push(Movement { pieces_to_take: 1 });
+                    movements.push(new_movement);
+            } else {
+                for pieces_to_take in 1..=max_pieces_to_take {
+                    let mut new_movement = partial_movement.clone();
+                    new_movement.push(Movement { pieces_to_take });
+
+                    self.generate_moving_moves_cap::<Colorr>(
+                        direction,
+                        origin_square,
+                        neighbour,
+                        pieces_to_take,
+                        &new_movement,
+                        movements,
+                    );
+                    movements.push(new_movement);
+                }
+            }
+        }
+    }
+
+    fn generate_moving_moves_non_cap<Colorr: ColorTr>(
+        &self,
+        direction: Direction,
+        origin_square: Square,
+        square: Square,
+        pieces_carried: u8,
+        partial_movement: &SmallVec<[Movement; 5]>,
+        movements: &mut Vec<SmallVec<[Movement; 5]>>,
+    ) {
+        if let Some(neighbour) = square.go_direction(direction) {
+            let neighbour_piece = self[neighbour].last().cloned();
+            if neighbour_piece.is_some() && neighbour_piece.unwrap().role() != Flat {
+                return;
+            }
+
+            let neighbour = square.go_direction(direction).unwrap();
+            let max_pieces_to_take = if square == origin_square {
+                pieces_carried
+            } else {
+                pieces_carried - 1
+            };
+            for pieces_to_take in 1..=max_pieces_to_take {
+                let mut new_movement = partial_movement.clone();
+                new_movement.push(Movement { pieces_to_take });
+
+                self.generate_moving_moves_non_cap::<Colorr>(
+                    direction,
+                    origin_square,
+                    neighbour,
+                    pieces_to_take,
+                    &new_movement,
+                    movements,
+                );
+                movements.push(new_movement);
+            }
+        }
+    }
+
+    fn count_all_stones(&self) -> u8 {
+        self.cells.iter().flatten().flatten().count() as u8
     }
 }
 
@@ -295,22 +496,35 @@ impl board::Board for Board {
                     _ => unreachable!(),
                 }
             }
-            Move::Move(mut from, movements) => {
-                self[from].truncate(movements[0].pieces_to_leave as usize);
-                for Movement {
-                    pieces_to_leave,
-                    dest_square,
-                } in movements
-                {
-                    self[dest_square] = self[from].clone();
-                    for _ in 0..pieces_to_leave {
-                        let piece = self[dest_square].remove(0);
-                        self[from].push(piece);
+            Move::Move(mut from, direction, movements) => {
+                // self[from].truncate(movements[0].pieces_to_leave as usize);
+                for Movement { pieces_to_take } in movements {
+                    let to = from.go_direction(direction).unwrap();
+                    if let Some(piece) = self[to].last_mut() {
+                        match piece {
+                            WhiteStanding => *piece = WhiteFlat,
+                            BlackStanding => *piece = BlackFlat,
+                            _ => (),
+                        }
+                        debug_assert!(piece.role() != Standing || self[from].last().unwrap().role() == Cap);
                     }
-                    from = dest_square;
+                    let pieces_to_leave = self[from].len() - pieces_to_take as usize;
+                    let pieces_to_take: Vec<_> = self[from].drain(pieces_to_leave..).collect();
+                    self[to].extend(pieces_to_take);
+
+                    from = to;
                 }
             }
         }
+        debug_assert_eq!(
+            44 - self.white_stones_left
+                - self.black_stones_left
+                - self.white_capstones_left
+                - self.black_capstones_left,
+            self.count_all_stones(),
+            "Wrong number of stones on board:\n{:?}",
+            self
+        );
         self.to_move = !self.to_move;
         reverse_move
     }
