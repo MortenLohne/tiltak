@@ -1,7 +1,6 @@
 use crate::board as board_mod;
-use crate::board::Piece::WhiteFlat;
 use crate::board::{board_iterator, Direction, Move, Movement, Piece, Square};
-use board_game_traits::board::{Board, GameResult::*};
+use board_game_traits::board::{Board, GameResult, GameResult::*};
 use pgn_traits::pgn::PgnBoard;
 use rand::seq::SliceRandom;
 
@@ -132,4 +131,48 @@ fn play_random_games_test() {
         "{} white wins, {} black wins, {} draws, {} moves played.",
         white_wins, black_wins, draws, duration
     )
+}
+
+#[test]
+fn game_win_test() {
+    let mut board = board_mod::Board::default();
+    for mv in [
+        Move::Place(Piece::WhiteFlat, Square(12)),
+        Move::Place(Piece::BlackFlat, Square(13)),
+        Move::Place(Piece::WhiteFlat, Square(7)),
+        Move::Place(Piece::BlackFlat, Square(14)),
+        Move::Place(Piece::WhiteFlat, Square(2)),
+        Move::Place(Piece::BlackFlat, Square(11)),
+        Move::Place(Piece::WhiteFlat, Square(17)),
+        Move::Place(Piece::BlackFlat, Square(10)),
+    ]
+    .iter()
+    {
+        board.do_move(mv.clone());
+        assert!(board.game_result().is_none());
+    }
+    board.do_move(Move::Place(Piece::WhiteFlat, Square(22)));
+    assert_eq!(board.game_result(), Some(GameResult::WhiteWin));
+}
+
+#[test]
+fn game_win_test2() {
+    let mut board = board_mod::Board::default();
+    for mv in [
+        Move::Place(Piece::WhiteFlat, Square(12)),
+        Move::Place(Piece::BlackFlat, Square(7)),
+        Move::Place(Piece::WhiteFlat, Square(14)),
+        Move::Place(Piece::BlackFlat, Square(2)),
+        Move::Place(Piece::WhiteFlat, Square(13)),
+        Move::Place(Piece::BlackFlat, Square(17)),
+        Move::Place(Piece::WhiteFlat, Square(11)),
+        Move::Place(Piece::BlackFlat, Square(22)),
+    ]
+    .iter()
+    {
+        board.do_move(mv.clone());
+        assert!(board.game_result().is_none());
+    }
+    board.do_move(Move::Place(Piece::WhiteFlat, Square(10)));
+    assert_eq!(board.game_result(), Some(GameResult::WhiteWin));
 }

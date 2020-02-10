@@ -1,5 +1,5 @@
 use board_game_traits::board::EvalBoard;
-use board_game_traits::board::{Board, Color, GameResult};
+use board_game_traits::board::{Color, GameResult};
 
 pub fn minmax<B: EvalBoard>(board: &mut B, depth: u16) -> (Option<B::Move>, f32) {
     match board.game_result() {

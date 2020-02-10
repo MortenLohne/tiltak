@@ -237,6 +237,13 @@ impl Piece {
             WhiteCap | BlackCap => Cap,
         }
     }
+
+    fn color(self) -> Color {
+        match self {
+            WhiteFlat | WhiteStanding | WhiteCap => Color::White,
+            BlackFlat | BlackStanding | BlackCap => Color::Black,
+        }
+    }
 }
 
 impl ops::Not for Piece {
@@ -621,8 +628,10 @@ impl board::Board for Board {
 
         // Check if any components cross the board
         for id in 1..id {
-            if components.0[0].iter().any(|&cell| cell == id)
-                && components.0[BOARD_SIZE - 1].iter().any(|&cell| cell == id)
+            if (components.0[0].iter().any(|&cell| cell == id)
+                && components.0[BOARD_SIZE - 1].iter().any(|&cell| cell == id))
+                || ((0..BOARD_SIZE).any(|y| components.0[y][0] == id)
+                    && (0..BOARD_SIZE).any(|y| components.0[y][BOARD_SIZE - 1] == id))
             {
                 let square = board_iterator()
                     .find(|&square| components[square] == id)
@@ -664,18 +673,37 @@ impl board::Board for Board {
 
 impl EvalBoardTrait for Board {
     fn static_eval(&self) -> f32 {
-        self.all_top_stones()
+        let material = self
+            .all_top_stones()
             .map(|piece| match piece {
                 WhiteFlat => 1.0,
                 BlackFlat => -1.0,
                 _ => 0.0,
             })
-            .sum::<f32>()
-            + if self.side_to_move() == Color::White {
-                0.5
-            } else {
-                -0.5
+            .sum::<f32>();
+
+        let to_move = match self.side_to_move() {
+            Color::White => 0.5,
+            Color::Black => -0.5,
+        };
+
+        let mut centre = 0.0;
+        for x in 1..4 {
+            for y in 1..4 {
+                match self.cells[y][x].last().cloned().map(Piece::color) {
+                    Some(Color::White) => centre += 0.2,
+                    Some(Color::Black) => centre -= 0.2,
+                    None => (),
+                }
             }
+        }
+        match self.cells[2][2].last().cloned().map(Piece::color) {
+            Some(Color::White) => centre += 0.1,
+            Some(Color::Black) => centre -= 0.1,
+            None => (),
+        }
+
+        material + to_move + centre
     }
 }
 
