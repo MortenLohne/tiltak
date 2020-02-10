@@ -5,8 +5,8 @@ use crate::board::Piece::*;
 use crate::board::Role::Flat;
 use crate::board::Role::*;
 use board_game_traits::board;
-use board_game_traits::board::Board as BoardTrait;
 use board_game_traits::board::GameResult::{BlackWin, Draw, WhiteWin};
+use board_game_traits::board::{Board as BoardTrait, EvalBoard as EvalBoardTrait};
 use board_game_traits::board::{Color, GameResult};
 use pgn_traits::pgn;
 use smallvec::alloc::fmt::{Error, Formatter};
@@ -188,7 +188,9 @@ impl Square {
         assert_eq!(input.len(), 2, "Couldn't parse square {}", input);
         Square(
             (input.chars().nth(0).unwrap() as u8 - ('a' as u8))
-                + (BOARD_SIZE as u8 + '0' as u8 - input.chars().nth(1).unwrap() as u8) * BOARD_SIZE as u8)
+                + (BOARD_SIZE as u8 + '0' as u8 - input.chars().nth(1).unwrap() as u8)
+                    * BOARD_SIZE as u8,
+        )
     }
 }
 
@@ -300,10 +302,6 @@ pub enum Direction {
 }
 
 impl Direction {
-    fn all() -> impl Iterator<Item = Direction> {
-        [North, East, West, South].iter().cloned()
-    }
-
     fn parse(ch: char) -> Self {
         match ch {
             '-' => North,
@@ -525,6 +523,10 @@ impl Board {
     fn count_all_stones(&self) -> u8 {
         self.cells.iter().flatten().flatten().count() as u8
     }
+
+    fn all_top_stones(&self) -> impl Iterator<Item = &Piece> {
+        self.cells.iter().flatten().filter_map(|cell| cell.last())
+    }
 }
 
 impl board::Board for Board {
@@ -660,6 +662,23 @@ impl board::Board for Board {
     }
 }
 
+impl EvalBoardTrait for Board {
+    fn static_eval(&self) -> f32 {
+        self.all_top_stones()
+            .map(|piece| match piece {
+                WhiteFlat => 1.0,
+                BlackFlat => -1.0,
+                _ => 0.0,
+            })
+            .sum::<f32>()
+            + if self.side_to_move() == Color::White {
+                0.5
+            } else {
+                -0.5
+            }
+    }
+}
+
 impl pgn_traits::pgn::PgnBoard for Board {
     fn from_fen(fen: &str) -> Result<Self, pgn::Error> {
         unimplemented!()
@@ -693,17 +712,27 @@ impl pgn_traits::pgn::PgnBoard for Board {
                 Color::Black => Ok(Move::Place(BlackCap, Square::parse_square(&input[1..]))),
             },
             'S' if input.len() == 3 => match self.side_to_move() {
-                Color::White => Ok(Move::Place(WhiteStanding, Square::parse_square(&input[1..]))),
-                Color::Black => Ok(Move::Place(BlackStanding, Square::parse_square(&input[1..]))),
+                Color::White => Ok(Move::Place(
+                    WhiteStanding,
+                    Square::parse_square(&input[1..]),
+                )),
+                Color::Black => Ok(Move::Place(
+                    BlackStanding,
+                    Square::parse_square(&input[1..]),
+                )),
             },
             '1'..='5' if input.len() > 3 => {
                 let square = Square::parse_square(&input[1..3]);
                 let direction = Direction::parse(input.chars().nth(3).unwrap());
-                let movements = input.chars().take(1).chain(input.chars().skip(4)).map(|ch| {
-                    Movement { pieces_to_take: ch as u8 - '0' as u8 }
-                });
+                let movements = input
+                    .chars()
+                    .take(1)
+                    .chain(input.chars().skip(4))
+                    .map(|ch| Movement {
+                        pieces_to_take: ch as u8 - '0' as u8,
+                    });
                 Ok(Move::Move(square, direction, movements.collect()))
-            },
+            }
             _ => Err(pgn::Error::new(
                 pgn::ErrorKind::ParseError,
                 format!("Couldn't parse {}", input),

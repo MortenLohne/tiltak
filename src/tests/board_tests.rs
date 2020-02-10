@@ -2,8 +2,8 @@ use crate::board as board_mod;
 use crate::board::Piece::WhiteFlat;
 use crate::board::{board_iterator, Direction, Move, Movement, Piece, Square};
 use board_game_traits::board::{Board, GameResult::*};
-use rand::seq::SliceRandom;
 use pgn_traits::pgn::PgnBoard;
+use rand::seq::SliceRandom;
 
 #[test]
 fn default_board_test() {
