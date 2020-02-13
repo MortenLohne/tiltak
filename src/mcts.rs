@@ -14,6 +14,14 @@ pub struct Tree {
 
 // TODO: Winning percentage should be always be interpreted from the side to move's perspective
 
+pub(crate) fn mcts(board: Board, nodes: u64) -> (Move, f64) {
+    let mut tree = Tree::new_root();
+    for _ in 0..nodes {
+        tree.select(&mut board.clone());
+    }
+    tree.best_move()
+}
+
 impl Tree {
     pub(crate) fn new_root() -> Self {
         Tree {
@@ -27,8 +35,8 @@ impl Tree {
 
     pub fn print_info(&self) {
         let mut best_children = self.children.clone();
-        best_children.sort_by_key(|(child, _)| (child.mean_action_value * 100.0) as u64);
-
+        best_children.sort_by_key(|(child, _)| child.visits);
+        best_children.reverse();
         let parent_visits = self.visits;
 
         best_children.iter().take(8).for_each(|(child, mv)| {
@@ -39,12 +47,12 @@ impl Tree {
         });
     }
 
-    pub fn best_move(&self) -> (f64, Move) {
+    pub fn best_move(&self) -> (Move, f64) {
         let mut best_children = self.children.clone();
         best_children.sort_by_key(|(child, _)| (child.mean_action_value * 100.0) as u64);
         (
-            best_children[0].0.mean_action_value,
             best_children[0].1.clone(),
+            best_children[0].0.mean_action_value,
         )
     }
 
@@ -83,15 +91,19 @@ impl Tree {
     }
 
     fn expand(&mut self, board: &mut Board) -> f64 {
-        // TODO: Check for game termination
-        debug_assert_eq!(self.visits, 0);
         debug_assert!(self.children.is_empty());
 
-        match board.game_result() {
-            Some(GameResult::Draw) => return 0.5,
-            Some(GameResult::WhiteWin) => return 0.0, // The side to move has lost
-            Some(GameResult::BlackWin) => return 0.0, // The side to move has lost
-            None => (),
+        let game_result = board.game_result();
+        if game_result.is_some() {
+            let result = match board.game_result().unwrap() {
+                GameResult::Draw => 0.5,
+                GameResult::WhiteWin => 0.0, // The side to move has lost
+                GameResult::BlackWin => 0.0, // The side to move has lost
+            };
+            self.visits += 1;
+            self.mean_action_value = result;
+            self.total_action_value += result;
+            return result;
         }
 
         let mut moves = vec![];
