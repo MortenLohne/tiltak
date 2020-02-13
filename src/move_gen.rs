@@ -1,6 +1,6 @@
-use crate::board::{Board, Move, board_iterator, Direction, Square, Movement, Piece, ColorTr};
-use smallvec::SmallVec;
 use crate::board::Role::*;
+use crate::board::{board_iterator, Board, ColorTr, Direction, Move, Movement, Piece, Square};
+use smallvec::SmallVec;
 
 impl Board {
     pub fn generate_moves_colortr<Colorr: ColorTr>(

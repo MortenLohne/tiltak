@@ -5,9 +5,10 @@ extern crate rand;
 extern crate smallvec;
 
 mod board;
+mod mcts;
 mod minmax;
-mod tests;
 mod move_gen;
+mod tests;
 
 use std::io;
 
@@ -18,10 +19,19 @@ use rand::seq::SliceRandom;
 
 fn main() {
     let mut board = board_mod::Board::default();
+    mcts(board.clone());
     for d in 1..5 {
         println!("{:?}", minmax::minmax(&mut board, d));
     }
     play_human(board);
+}
+
+fn mcts(board: board_mod::Board) {
+    let mut tree = mcts::Tree::new_root();
+    for _ in 0..1000_000 {
+        tree.select(&mut board.clone());
+        println!("{} visits, val={}", tree.visits, tree.mean_action_value);
+    }
 }
 
 fn play_random_game(mut board: board_mod::Board) {

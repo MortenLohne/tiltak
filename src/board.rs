@@ -398,6 +398,15 @@ impl Debug for Board {
     }
 }
 
+impl Board {
+    pub fn generate_moves_with_probabilities(&self, moves: &mut Vec<(Move, f64)>) {
+        let mut simple_moves = vec![];
+        self.generate_moves(&mut simple_moves);
+        let average = 1.0 / simple_moves.len() as f64;
+        moves.extend(simple_moves.drain(..).map(|mv| (mv, average)));
+    }
+}
+
 impl board::Board for Board {
     type Move = Move;
     type ReverseMove = Self;
