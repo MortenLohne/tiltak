@@ -1,7 +1,7 @@
 use crate::board::{Board, Move};
 use board_game_traits::board::{Board as BoardTrait, Color, EvalBoard, GameResult};
 
-const C_PUCT: f64 = 15.0;
+const C_PUCT: f64 = 2.0;
 
 #[derive(Clone, PartialEq, Debug)]
 pub struct Tree {
