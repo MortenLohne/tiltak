@@ -484,6 +484,8 @@ impl board::Board for Board {
         let mut components: AbstractBoard<u8> = Default::default();
         let mut visited: AbstractBoard<bool> = Default::default();
         let mut id = 1;
+
+        // Find white roads
         for square in board_iterator() {
             if !visited[square]
                 && self[square]
@@ -493,6 +495,20 @@ impl board::Board for Board {
                     .unwrap_or_default()
             {
                 connect_component::<WhiteTr>(&self, &mut components, &mut visited, square, id);
+                id += 1;
+            }
+        }
+
+        // Find black roads
+        for square in board_iterator() {
+            if !visited[square]
+                && self[square]
+                .last()
+                .cloned()
+                .map(BlackTr::is_road_stone)
+                .unwrap_or_default()
+            {
+                connect_component::<BlackTr>(&self, &mut components, &mut visited, square, id);
                 id += 1;
             }
         }
