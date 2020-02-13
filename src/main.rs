@@ -19,6 +19,7 @@ use rand::seq::SliceRandom;
 
 fn main() {
     let mut board = board_mod::Board::default();
+    test_position();
     mcts(board.clone());
     for d in 1..5 {
         println!("{:?}", minmax::minmax(&mut board, d));
@@ -26,11 +27,47 @@ fn main() {
     play_human(board);
 }
 
+fn test_position() {
+    let mut board = board_mod::Board::default();
+    let mut moves = vec![];
+
+    for mv_san in [
+        "c3", "e5",
+        "c2", "d5",
+        "c1", "c5",
+        "d3", "a4",
+        "e3"]
+        .iter()
+    {
+        let mv = board.move_from_san(&mv_san).unwrap();
+        board.generate_moves(&mut moves);
+        assert!(moves.contains(&mv));
+        board.do_move(mv);
+        moves.clear();
+    }
+
+    println!("{:?}", board);
+
+    let (best_move, score) = minmax::minmax(&mut board, 3);
+
+    println!("Minmax played {:?} with score {}", best_move, score);
+
+    let mut tree = mcts::Tree::new_root();
+    for i in 0..500_000 {
+        tree.select(&mut board.clone());
+        if i % 10000 == 0 {
+            println!("{} visits, val={}", tree.visits, tree.mean_action_value);
+        }
+    }
+}
+
 fn mcts(board: board_mod::Board) {
     let mut tree = mcts::Tree::new_root();
-    for _ in 0..1000_000 {
+    for i in 0..100_000 {
         tree.select(&mut board.clone());
-        println!("{} visits, val={}", tree.visits, tree.mean_action_value);
+        if i % 10000 == 0 {
+            println!("{} visits, val={}", tree.visits, tree.mean_action_value);
+        }
     }
 }
 
