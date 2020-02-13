@@ -31,14 +31,7 @@ fn test_position() {
     let mut board = board_mod::Board::default();
     let mut moves = vec![];
 
-    for mv_san in [
-        "c3", "e5",
-        "c2", "d5",
-        "c1", "c5",
-        "d3", "a4",
-        "e3"]
-        .iter()
-    {
+    for mv_san in ["a1", "c3", "e5", "c2", "d5", "c1", "c5", "d3", "a4", "e3"].iter() {
         let mv = board.move_from_san(&mv_san).unwrap();
         board.generate_moves(&mut moves);
         assert!(moves.contains(&mv));
@@ -53,10 +46,11 @@ fn test_position() {
     println!("Minmax played {:?} with score {}", best_move, score);
 
     let mut tree = mcts::Tree::new_root();
-    for i in 0..500_000 {
+    for i in 0.. {
         tree.select(&mut board.clone());
         if i % 10000 == 0 {
             println!("{} visits, val={}", tree.visits, tree.mean_action_value);
+            tree.print_info();
         }
     }
 }
@@ -67,6 +61,7 @@ fn mcts(board: board_mod::Board) {
         tree.select(&mut board.clone());
         if i % 10000 == 0 {
             println!("{} visits, val={}", tree.visits, tree.mean_action_value);
+            tree.print_info();
         }
     }
 }

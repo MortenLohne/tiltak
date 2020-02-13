@@ -503,10 +503,10 @@ impl board::Board for Board {
         for square in board_iterator() {
             if !visited[square]
                 && self[square]
-                .last()
-                .cloned()
-                .map(BlackTr::is_road_stone)
-                .unwrap_or_default()
+                    .last()
+                    .cloned()
+                    .map(BlackTr::is_road_stone)
+                    .unwrap_or_default()
             {
                 connect_component::<BlackTr>(&self, &mut components, &mut visited, square, id);
                 id += 1;

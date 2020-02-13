@@ -48,13 +48,9 @@ fn black_can_win_with_road_test() {
     let mut moves = vec![];
 
     for mv_san in [
-        "c3", "e5",
-        "c2", "d5",
-        "c1", "c5",
-        "d3", "a4",
-        "e3", "b5",
-        "b1", "a5"]
-        .iter()
+        "c3", "e5", "c2", "d5", "c1", "c5", "d3", "a4", "e3", "b5", "b1", "a5",
+    ]
+    .iter()
     {
         let mv = board.move_from_san(&mv_san).unwrap();
         board.generate_moves(&mut moves);
