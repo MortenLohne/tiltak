@@ -40,7 +40,7 @@ impl Board {
                                 &mut movements,
                             );
                         }
-                        for movement in movements.into_iter().filter(|mv| mv.len() > 0) {
+                        for movement in movements.into_iter().filter(|mv| !mv.is_empty()) {
                             // TODO
                             moves.push(Move::Move(square, direction, movement));
                         }

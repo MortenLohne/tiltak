@@ -187,8 +187,8 @@ impl Square {
     fn parse_square(input: &str) -> Square {
         assert_eq!(input.len(), 2, "Couldn't parse square {}", input);
         Square(
-            (input.chars().nth(0).unwrap() as u8 - ('a' as u8))
-                + (BOARD_SIZE as u8 + '0' as u8 - input.chars().nth(1).unwrap() as u8)
+            (input.chars().nth(0).unwrap() as u8 - b'a')
+                + (BOARD_SIZE as u8 + b'0' - input.chars().nth(1).unwrap() as u8)
                     * BOARD_SIZE as u8,
         )
     }
@@ -196,7 +196,7 @@ impl Square {
 
 impl fmt::Display for Square {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        write!(f, "{}", (self.file() + 'a' as u8) as char)?;
+        write!(f, "{}", (self.file() + b'a') as char)?;
         write!(f, "{}", BOARD_SIZE as u8 - self.rank())?;
         Ok(())
     }
@@ -570,7 +570,7 @@ impl EvalBoardTrait for Board {
 }
 
 impl pgn_traits::pgn::PgnBoard for Board {
-    fn from_fen(fen: &str) -> Result<Self, pgn::Error> {
+    fn from_fen(_fen: &str) -> Result<Self, pgn::Error> {
         unimplemented!()
     }
 
@@ -619,7 +619,7 @@ impl pgn_traits::pgn::PgnBoard for Board {
                     .take(1)
                     .chain(input.chars().skip(4))
                     .map(|ch| Movement {
-                        pieces_to_take: ch as u8 - '0' as u8,
+                        pieces_to_take: ch as u8 - b'0',
                     });
                 Ok(Move::Move(square, direction, movements.collect()))
             }
@@ -636,11 +636,11 @@ impl pgn_traits::pgn::PgnBoard for Board {
         string
     }
 
-    fn move_from_lan(&self, input: &str) -> Result<Self::Move, pgn::Error> {
+    fn move_from_lan(&self, _input: &str) -> Result<Self::Move, pgn::Error> {
         unimplemented!()
     }
 
-    fn move_to_lan(&self, mv: &Self::Move) -> String {
+    fn move_to_lan(&self, _mv: &Self::Move) -> String {
         unimplemented!()
     }
 }
