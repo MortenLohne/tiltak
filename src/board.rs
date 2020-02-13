@@ -636,12 +636,12 @@ impl pgn_traits::pgn::PgnBoard for Board {
         string
     }
 
-    fn move_from_lan(&self, _input: &str) -> Result<Self::Move, pgn::Error> {
-        unimplemented!()
+    fn move_from_lan(&self, input: &str) -> Result<Self::Move, pgn::Error> {
+        self.move_from_san(input)
     }
 
-    fn move_to_lan(&self, _mv: &Self::Move) -> String {
-        unimplemented!()
+    fn move_to_lan(&self, mv: &Self::Move) -> String {
+        self.move_to_san(mv)
     }
 }
 
