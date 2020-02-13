@@ -13,25 +13,45 @@ mod tests;
 use std::io;
 
 use board as board_mod;
-use board_game_traits::board::{Board, GameResult};
+use board_game_traits::board::{Board, Color, GameResult};
 use pgn_traits::pgn::PgnBoard;
-use rand::seq::SliceRandom;
+use std::io::Write;
 
 fn main() {
-    let mut board = board_mod::Board::default();
     test_position();
-    mcts(board.clone());
-    for d in 1..5 {
-        println!("{:?}", minmax::minmax(&mut board, d));
+
+    for i in 1..10 {
+        mcts_vs_minmax(3, 10000 * i);
     }
-    play_human(board);
+}
+
+fn mcts_vs_minmax(minmax_depth: u16, mcts_nodes: u64) {
+    let mut board = board_mod::Board::default();
+    while board.game_result().is_none() {
+        match board.side_to_move() {
+            Color::White => {
+                let (best_move, score) = minmax::minmax(&mut board, minmax_depth);
+                board.do_move(best_move.clone().unwrap());
+                print!("{}: {}, ", best_move.unwrap(), score);
+                io::stdout().flush().unwrap();
+            }
+
+            Color::Black => {
+                let (best_move, score) = mcts::mcts(board.clone(), mcts_nodes);
+                board.do_move(best_move.clone());
+                println!("{} {}", best_move, score);
+                // println!("{:?}", board);
+            }
+        }
+    }
+    println!("\n{:?}\nResult: {:?}", board, board.game_result().unwrap());
 }
 
 fn test_position() {
     let mut board = board_mod::Board::default();
     let mut moves = vec![];
 
-    for mv_san in ["a1", "c3", "e5", "c2", "d5", "c1", "c5", "d3", "a4", "e3"].iter() {
+    for mv_san in ["c2", "b4", "d2", "c4", "b2", "d4", "e2", "c3"].iter() {
         let mv = board.move_from_san(&mv_san).unwrap();
         board.generate_moves(&mut moves);
         assert!(moves.contains(&mv));
@@ -62,32 +82,6 @@ fn mcts(board: board_mod::Board) {
         if i % 10000 == 0 {
             println!("{} visits, val={}", tree.visits, tree.mean_action_value);
             tree.print_info();
-        }
-    }
-}
-
-fn play_random_game(mut board: board_mod::Board) {
-    let mut rng = rand::thread_rng();
-    let mut moves = vec![];
-    for i in 0.. {
-        moves.clear();
-        board.generate_moves(&mut moves);
-        println!("Moves: {:?}", moves);
-        println!("Board:\n{:?}", board);
-        let mv = moves
-            .choose(&mut rng)
-            .expect("No legal moves available")
-            .clone();
-        println!("Doing move {:?}", mv);
-        board.do_move(mv);
-        if board.game_result().is_some() {
-            println!("Board:\n{:?}", board);
-            println!(
-                "Game ended with {:?} after {} moves",
-                board.game_result(),
-                i
-            );
-            break;
         }
     }
 }
