@@ -7,6 +7,7 @@ extern crate smallvec;
 mod board;
 mod minmax;
 mod tests;
+mod move_gen;
 
 use std::io;
 
@@ -17,7 +18,7 @@ use rand::seq::SliceRandom;
 
 fn main() {
     let mut board = board_mod::Board::default();
-    for d in 1..4 {
+    for d in 1..5 {
         println!("{:?}", minmax::minmax(&mut board, d));
     }
     play_human(board);

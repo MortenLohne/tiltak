@@ -17,7 +17,7 @@ use std::fmt::Write;
 use std::ops::{Index, IndexMut};
 use std::{fmt, ops};
 
-trait ColorTr {
+pub trait ColorTr {
     fn stones_left(board: &Board) -> u8;
 
     fn capstones_left(board: &Board) -> u8;
@@ -230,7 +230,7 @@ pub enum Piece {
 }
 
 impl Piece {
-    fn role(self) -> Role {
+    pub fn role(self) -> Role {
         match self {
             WhiteFlat | BlackFlat => Flat,
             WhiteStanding | BlackStanding => Standing,
@@ -238,7 +238,7 @@ impl Piece {
         }
     }
 
-    fn color(self) -> Color {
+    pub fn color(self) -> Color {
         match self {
             WhiteFlat | WhiteStanding | WhiteCap => Color::White,
             BlackFlat | BlackStanding | BlackCap => Color::Black,
@@ -327,7 +327,7 @@ pub struct Movement {
 
 #[derive(Clone, PartialEq, Eq)]
 pub struct Board {
-    cells: [[Cell; BOARD_SIZE]; BOARD_SIZE],
+    pub cells: [[Cell; BOARD_SIZE]; BOARD_SIZE],
     to_move: Color,
     white_stones_left: u8,
     black_stones_left: u8,
@@ -395,144 +395,6 @@ impl Debug for Board {
         )?;
         writeln!(f, "{} to move.", self.to_move)?;
         Ok(())
-    }
-}
-
-impl Board {
-    fn generate_moves_colortr<Colorr: ColorTr>(
-        &self,
-        moves: &mut Vec<<Board as board_game_traits::board::Board>::Move>,
-    ) {
-        for square in board_iterator() {
-            match self[square].last() {
-                None => {
-                    if Colorr::stones_left(&self) > 0 {
-                        moves.push(Move::Place(Colorr::flat_piece(), square));
-                        moves.push(Move::Place(Colorr::standing_piece(), square));
-                    }
-                    if Colorr::capstones_left(&self) > 0 {
-                        moves.push(Move::Place(Colorr::cap_piece(), square));
-                    }
-                }
-                Some(&piece) if Colorr::piece_is_ours(piece) => {
-                    for direction in square.directions() {
-                        let mut movements = vec![];
-                        if piece == Colorr::cap_piece() {
-                            self.generate_moving_moves_cap::<Colorr>(
-                                direction,
-                                square,
-                                square,
-                                self[square].len() as u8,
-                                &smallvec![],
-                                &mut movements,
-                            );
-                        } else if Colorr::piece_is_ours(piece) {
-                            self.generate_moving_moves_non_cap::<Colorr>(
-                                direction,
-                                square,
-                                square,
-                                self[square].len() as u8,
-                                &smallvec![],
-                                &mut movements,
-                            );
-                        }
-                        for movement in movements.into_iter().filter(|mv| mv.len() > 0) {
-                            // TODO
-                            moves.push(Move::Move(square, direction, movement));
-                        }
-                    }
-                }
-                Some(_) => (),
-            }
-        }
-    }
-
-    fn generate_moving_moves_cap<Colorr: ColorTr>(
-        &self,
-        direction: Direction,
-        origin_square: Square,
-        square: Square,
-        pieces_carried: u8,
-        partial_movement: &SmallVec<[Movement; 5]>,
-        movements: &mut Vec<SmallVec<[Movement; 5]>>,
-    ) {
-        if let Some(neighbour) = square.go_direction(direction) {
-            let max_pieces_to_take = if square == origin_square {
-                pieces_carried
-            } else {
-                pieces_carried - 1
-            };
-            let neighbour_piece = self[neighbour].last().cloned();
-            if neighbour_piece.map(Piece::role) == Some(Cap) {
-                return;
-            }
-            if neighbour_piece.map(Piece::role) == Some(Standing) && max_pieces_to_take > 0 {
-                let mut new_movement = partial_movement.clone();
-                new_movement.push(Movement { pieces_to_take: 1 });
-                movements.push(new_movement);
-            } else {
-                for pieces_to_take in 1..=max_pieces_to_take {
-                    let mut new_movement = partial_movement.clone();
-                    new_movement.push(Movement { pieces_to_take });
-
-                    self.generate_moving_moves_cap::<Colorr>(
-                        direction,
-                        origin_square,
-                        neighbour,
-                        pieces_to_take,
-                        &new_movement,
-                        movements,
-                    );
-                    movements.push(new_movement);
-                }
-            }
-        }
-    }
-
-    fn generate_moving_moves_non_cap<Colorr: ColorTr>(
-        &self,
-        direction: Direction,
-        origin_square: Square,
-        square: Square,
-        pieces_carried: u8,
-        partial_movement: &SmallVec<[Movement; 5]>,
-        movements: &mut Vec<SmallVec<[Movement; 5]>>,
-    ) {
-        if let Some(neighbour) = square.go_direction(direction) {
-            let neighbour_piece = self[neighbour].last().cloned();
-            if neighbour_piece.is_some() && neighbour_piece.unwrap().role() != Flat {
-                return;
-            }
-
-            let neighbour = square.go_direction(direction).unwrap();
-            let max_pieces_to_take = if square == origin_square {
-                pieces_carried
-            } else {
-                pieces_carried - 1
-            };
-            for pieces_to_take in 1..=max_pieces_to_take {
-                let mut new_movement = partial_movement.clone();
-                new_movement.push(Movement { pieces_to_take });
-
-                self.generate_moving_moves_non_cap::<Colorr>(
-                    direction,
-                    origin_square,
-                    neighbour,
-                    pieces_to_take,
-                    &new_movement,
-                    movements,
-                );
-                movements.push(new_movement);
-            }
-        }
-    }
-
-    fn count_all_stones(&self) -> u8 {
-        self.cells.iter().flatten().flatten().count() as u8
-    }
-
-    fn all_top_stones(&self) -> impl Iterator<Item = &Piece> {
-        self.cells.iter().flatten().filter_map(|cell| cell.last())
     }
 }
 
