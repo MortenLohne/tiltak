@@ -43,6 +43,29 @@ fn start_board_move_gen_test() {
 }
 
 #[test]
+fn black_can_win_with_road_test() {
+    let mut board = board_mod::Board::default();
+    let mut moves = vec![];
+
+    for mv_san in [
+        "c3", "e5",
+        "c2", "d5",
+        "c1", "c5",
+        "d3", "a4",
+        "e3", "b5",
+        "b1", "a5"]
+        .iter()
+    {
+        let mv = board.move_from_san(&mv_san).unwrap();
+        board.generate_moves(&mut moves);
+        assert!(moves.contains(&mv));
+        board.do_move(mv);
+        moves.clear();
+    }
+    assert_eq!(board.game_result(), Some(GameResult::BlackWin));
+}
+
+#[test]
 fn move_gen_test() {
     let mut board = board_mod::Board::default();
     let mut moves = vec![];
@@ -96,7 +119,7 @@ fn play_random_games_test() {
     let mut duration = 0;
 
     let mut rng = rand::thread_rng();
-    for _ in 0..1000 {
+    for _ in 0..10000 {
         let mut board = board_mod::Board::default();
         let mut moves = vec![];
         for i in 0.. {
