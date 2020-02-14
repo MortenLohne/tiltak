@@ -26,20 +26,21 @@ fn main() {
 }
 
 fn mcts_vs_minmax(minmax_depth: u16, mcts_nodes: u64) {
+    println!("Minmax depth {} vs mcts {} nodes", minmax_depth, mcts_nodes);
     let mut board = board_mod::Board::default();
     while board.game_result().is_none() {
         match board.side_to_move() {
             Color::White => {
                 let (best_move, score) = minmax::minmax(&mut board, minmax_depth);
                 board.do_move(best_move.clone().unwrap());
-                print!("{}: {}, ", best_move.unwrap(), score);
+                print!("{:6}: {:.2}, ", best_move.unwrap(), score);
                 io::stdout().flush().unwrap();
             }
 
             Color::Black => {
                 let (best_move, score) = mcts::mcts(board.clone(), mcts_nodes);
                 board.do_move(best_move.clone());
-                println!("{} {}", best_move, score);
+                println!("{:6}: {:.3}", best_move, score);
                 // println!("{:?}", board);
             }
         }
@@ -51,7 +52,12 @@ fn test_position() {
     let mut board = board_mod::Board::default();
     let mut moves = vec![];
 
-    for mv_san in ["c2", "b4", "d2", "c4", "b2", "d4", "e2", "c3"].iter() {
+    for mv_san in [
+        "c2", "c3", "d2", "d3", "1d2-", "c4", "d2", "b4", "1c2-", "1c4+", "2d3<", "d4", "b2", "a5",
+        "c2", "a2", "b1", "1a2>", "1b1-", "1d4+", "5c3>3",
+    ]
+    .iter()
+    {
         let mv = board.move_from_san(&mv_san).unwrap();
         board.generate_moves(&mut moves);
         assert!(moves.contains(&mv));

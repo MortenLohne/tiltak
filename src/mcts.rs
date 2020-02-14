@@ -41,8 +41,10 @@ impl Tree {
 
         best_children.iter().take(8).for_each(|(child, mv)| {
             println!(
-                "Move {}: {} visits, {:.3} mean action value, {:.3} static score, {:.3} exploration value",
-                mv, child.visits, child.mean_action_value, child.heuristic_score, child.exploration_value(parent_visits)
+                "Move {}: {} visits, {:.3} mean action value, {:.3} static score, {:.3} exploration value, best reply {:?}",
+                mv, child.visits, child.mean_action_value, child.heuristic_score,
+                child.exploration_value(parent_visits),
+                if child.children.is_empty() { "".to_string() } else { format!("{:?}", child.best_move().0) }
             )
         });
     }
