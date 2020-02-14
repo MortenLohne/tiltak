@@ -112,3 +112,33 @@ fn black_avoid_loss_in_one_test() {
         board
     );
 }
+
+#[test]
+fn black_avoid_loss_in_one_test2() {
+    let mut board = board_mod::Board::default();
+    let mut moves = vec![];
+
+    for mv_san in [
+        "c2", "b4", "d2", "d4", "b2", "c4", "e2", "a2", "c3", "b3", "1b2-", "1c4+", "1c2-", "b2",
+        "b1", "d1", "c2", "a3", "2b3+", "1a2>", "1b1-",
+    ]
+    .iter()
+    {
+        let mv = board.move_from_san(&mv_san).unwrap();
+        board.generate_moves(&mut moves);
+        assert!(
+            moves.contains(&mv),
+            "Move {} was not among legal moves: {:?}\n{:?}",
+            board.move_to_san(&mv),
+            moves,
+            board
+        );
+        board.do_move(mv);
+        moves.clear();
+    }
+    let (best_move, _score) = mcts::mcts(board.clone(), 30_000);
+    assert_eq!(best_move, board.move_from_san("1d1-").unwrap(),
+        "Black didn't avoid loss on board:\n{:?}",
+        board
+    );
+}
