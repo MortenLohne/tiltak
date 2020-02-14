@@ -137,7 +137,41 @@ fn black_avoid_loss_in_one_test2() {
         moves.clear();
     }
     let (best_move, _score) = mcts::mcts(board.clone(), 30_000);
-    assert_eq!(best_move, board.move_from_san("1d1-").unwrap(),
+    assert_eq!(
+        best_move,
+        board.move_from_san("1d1-").unwrap(),
+        "Black didn't avoid loss on board:\n{:?}",
+        board
+    );
+}
+
+#[test]
+fn black_avoid_loss_in_one_test3() {
+    let mut board = board_mod::Board::default();
+    let mut moves = vec![];
+
+    for mv_san in [
+        "c2", "c3", "d2", "d3", "1d2-", "c4", "d2", "b4", "1c2-", "1c4+", "2d3<", "d4", "b2", "a5",
+        "c2", "a2", "b1", "1a2>", "1b1-", "1d4+", "5c3>3", "c3",
+    ]
+    .iter()
+    {
+        let mv = board.move_from_san(&mv_san).unwrap();
+        board.generate_moves(&mut moves);
+        assert!(
+            moves.contains(&mv),
+            "Move {} was not among legal moves: {:?}\n{:?}",
+            board.move_to_san(&mv),
+            moves,
+            board
+        );
+        board.do_move(mv);
+        moves.clear();
+    }
+    let (best_move, _score) = mcts::mcts(board.clone(), 30_000);
+    assert!(
+        best_move == board.move_from_san("Ca2").unwrap()
+            || best_move == board.move_from_san("Sa2").unwrap(),
         "Black didn't avoid loss on board:\n{:?}",
         board
     );
