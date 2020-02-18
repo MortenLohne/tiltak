@@ -18,7 +18,7 @@ use pgn_traits::pgn::PgnBoard;
 use std::io::Write;
 
 fn main() {
-    test_position();
+    // test_position();
 
     for i in 1..10 {
         mcts_vs_minmax(3, 10000 * i);
@@ -28,11 +28,13 @@ fn main() {
 fn mcts_vs_minmax(minmax_depth: u16, mcts_nodes: u64) {
     println!("Minmax depth {} vs mcts {} nodes", minmax_depth, mcts_nodes);
     let mut board = board_mod::Board::default();
+    let mut moves = vec![];
     while board.game_result().is_none() {
         match board.side_to_move() {
             Color::White => {
                 let (best_move, score) = minmax::minmax(&mut board, minmax_depth);
                 board.do_move(best_move.clone().unwrap());
+                moves.push(best_move.clone().unwrap());
                 print!("{:6}: {:.2}, ", best_move.unwrap(), score);
                 io::stdout().flush().unwrap();
             }
@@ -40,11 +42,17 @@ fn mcts_vs_minmax(minmax_depth: u16, mcts_nodes: u64) {
             Color::Black => {
                 let (best_move, score) = mcts::mcts(board.clone(), mcts_nodes);
                 board.do_move(best_move.clone());
+                moves.push(best_move.clone());
                 println!("{:6}: {:.3}", best_move, score);
                 // println!("{:?}", board);
             }
         }
     }
+    print!("\n[");
+    for mv in moves {
+        print!("\"{:?}\", ", mv);
+    }
+    print!("]");
     println!("\n{:?}\nResult: {:?}", board, board.game_result().unwrap());
 }
 
