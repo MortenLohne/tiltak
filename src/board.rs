@@ -38,7 +38,9 @@ pub trait ColorTr {
 struct WhiteTr {}
 
 impl ColorTr for WhiteTr {
-    fn color() -> Color { Color::White }
+    fn color() -> Color {
+        Color::White
+    }
 
     fn stones_left(board: &Board) -> u8 {
         board.white_stones_left
@@ -72,7 +74,9 @@ impl ColorTr for WhiteTr {
 struct BlackTr {}
 
 impl ColorTr for BlackTr {
-    fn color() -> Color { Color::Black }
+    fn color() -> Color {
+        Color::Black
+    }
 
     fn stones_left(board: &Board) -> u8 {
         board.black_stones_left
@@ -643,7 +647,7 @@ impl pgn_traits::pgn::PgnBoard for Board {
                     Square::parse_square(&input[1..]),
                 )),
             },
-            '1'..='5' if input.len() > 3 => {
+            '1'..='9' if input.len() > 3 => {
                 let square = Square::parse_square(&input[1..3]);
                 let direction = Direction::parse(input.chars().nth(3).unwrap());
                 let movements = input

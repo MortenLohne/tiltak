@@ -60,7 +60,11 @@ fn test_position() {
     let mut board = board_mod::Board::default();
     let mut moves = vec![];
 
-    for mv_san in ["c2", "b3", "d2", "c3", "b2", "d4", "1b2-", "d3", "1d2-", "1c3>", "Cc3", "b4", "1c3>", "d2", "2d3+", "b2", "1c2<", "1b4+", "2b2-", "c2", "3d2<", "d1", "b2", "c4", "2d3-", "1c4>", "e1", "c4", "b4", "3d4<2", "d2", "1d1-", "4c2>", "3b4+", "1b2-", "1d4+", "3b3+2"]
+    for mv_san in [
+        "c2", "b3", "d2", "c3", "b2", "d4", "1b2-", "d3", "1d2-", "1c3>", "Cc3", "b4", "1c3>",
+        "d2", "2d3+", "b2", "1c2<", "1b4+", "2b2-", "c2", "3d2<", "d1", "b2", "c4", "2d3-", "1c4>",
+        "e1", "c4", "b4", "3d4<2", "d2", "1d1-", "4c2>", "3b4+", "1b2-", "1d4+", "3b3+2",
+    ]
     .iter()
     {
         let mv = board.move_from_san(&mv_san).unwrap();

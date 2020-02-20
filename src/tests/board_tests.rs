@@ -108,6 +108,34 @@ fn move_gen_test() {
 }
 
 #[test]
+fn respect_carry_limit_test() {
+    let mut board = board_mod::Board::default();
+    let mut moves = vec![];
+
+    for move_string in [
+        "c3", "c2", "d3", "b3", "c4", "1c2-", "1d3<", "1b3>", "1c4+", "Cc2", "a1", "1c2-", "a2",
+    ]
+    .iter()
+    {
+        let mv = board.move_from_san(move_string).unwrap();
+        board.generate_moves(&mut moves);
+        assert!(moves.contains(&mv));
+        board.do_move(mv);
+        moves.clear();
+    }
+    board.generate_moves(&mut moves);
+    assert!(
+        moves.contains(&board.move_from_san("5c3>").unwrap()),
+        "5c3> was not a legal move among {:?} on board\n{:?}",
+        moves,
+        board
+    );
+
+    assert!(!moves.contains(&board.move_from_san("6c3>").unwrap()),
+    "6c3> was a legal move among {:?} on board\n{:?}", moves, board);
+}
+
+#[test]
 fn play_random_games_test() {
     let mut white_wins = 0;
     let mut black_wins = 0;
