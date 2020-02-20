@@ -18,6 +18,8 @@ use std::ops::{Index, IndexMut};
 use std::{fmt, ops};
 
 pub trait ColorTr {
+    fn color() -> Color;
+
     fn stones_left(board: &Board) -> u8;
 
     fn capstones_left(board: &Board) -> u8;
@@ -36,6 +38,8 @@ pub trait ColorTr {
 struct WhiteTr {}
 
 impl ColorTr for WhiteTr {
+    fn color() -> Color { Color::White }
+
     fn stones_left(board: &Board) -> u8 {
         board.white_stones_left
     }
@@ -68,6 +72,8 @@ impl ColorTr for WhiteTr {
 struct BlackTr {}
 
 impl ColorTr for BlackTr {
+    fn color() -> Color { Color::Black }
+
     fn stones_left(board: &Board) -> u8 {
         board.black_stones_left
     }
@@ -320,6 +326,7 @@ impl Direction {
     }
 }
 
+/// Moving a stack of pieces consists of one or more `Movement`s
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Movement {
     pub pieces_to_take: u8,

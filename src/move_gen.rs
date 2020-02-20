@@ -1,6 +1,8 @@
 use crate::board::Role::*;
 use crate::board::{board_iterator, Board, ColorTr, Direction, Move, Movement, Piece, Square};
 use smallvec::SmallVec;
+use board_game_traits::board::{Color, GameResult};
+use board_game_traits::board::Board as BoardTrait;
 
 impl Board {
     pub fn generate_moves_colortr<Colorr: ColorTr>(
@@ -41,8 +43,24 @@ impl Board {
                             );
                         }
                         for movement in movements.into_iter().filter(|mv| !mv.is_empty()) {
-                            // TODO
-                            moves.push(Move::Move(square, direction, movement));
+                            let mv = Move::Move(square, direction, movement);
+                            if self[square].iter().any(|piece: &Piece| !Colorr::piece_is_ours(*piece)) {
+                                let mut new_board = self.clone();
+                                new_board.do_move(mv.clone());
+                                match new_board.game_result() {
+                                    Some(GameResult::WhiteWin) => if Colorr::color() == Color::White {
+                                        moves.push(mv);
+                                    },
+                                    Some(GameResult::BlackWin) => if Colorr::color() == Color::Black {
+                                        moves.push(mv);
+                                    },
+                                    Some(GameResult::Draw) => moves.push(mv),
+                                    None => moves.push(mv),
+                                };
+                            }
+                            else {
+                                moves.push(mv);
+                            }
                         }
                     }
                 }
