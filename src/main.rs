@@ -18,10 +18,24 @@ use pgn_traits::pgn::PgnBoard;
 use std::io::Write;
 
 fn main() {
-    test_position();
+    println!("play: Play against the minmax AI");
+    println!("aimatch: Watch the minmax and mcts AIs play");
+    println!("analyze: Mcts analysis of a hardcoded position");
 
-    for i in 3..10 {
-        mcts_vs_minmax(3, 10000 * i);
+    let mut input = String::new();
+    io::stdin().read_line(&mut input).unwrap();
+    match input.trim() {
+        "play" => {
+            let board = board_mod::Board::default();
+            play_human(board);
+        }
+        "aimatch" => {
+            for i in 1..10 {
+                mcts_vs_minmax(3, 10000 * i);
+            }
+        }
+        "analyze" => test_position(),
+        s => println!("Unknown option \"{}\"", s),
     }
 }
 
@@ -31,18 +45,19 @@ fn mcts_vs_minmax(minmax_depth: u16, mcts_nodes: u64) {
     let mut moves = vec![];
     while board.game_result().is_none() {
         match board.side_to_move() {
-            Color::White => {
+            Color::Black => {
                 let (best_move, score) = mcts::mcts(board.clone(), mcts_nodes);
                 board.do_move(best_move.clone());
                 moves.push(best_move.clone());
-                print!("{:6}: {:.3}, ", best_move, score);
+                println!("{:6}: {:.3}", best_move, score);
+                io::stdout().flush().unwrap();
             }
 
-            Color::Black => {
+            Color::White => {
                 let (best_move, score) = minmax::minmax(&mut board, minmax_depth);
                 board.do_move(best_move.clone().unwrap());
                 moves.push(best_move.clone().unwrap());
-                println!("{:6}: {:.2}", best_move.unwrap(), score);
+                print!("{:6}: {:.2}, ", best_move.unwrap(), score);
                 io::stdout().flush().unwrap();
             }
         }
@@ -60,9 +75,10 @@ fn test_position() {
     let mut moves = vec![];
 
     for mv_san in [
-        "c2", "b4", "d2", "c4", "b2", "c3", "d3", "b3", "1c2-", "1b3>", "1d3<", "1c4+", "d4",
-        "4c3<2", "c2", "c4", "1d4<", "1b4>", "d3", "b4", "b1", "d4", "1b2-", "2a3>", "e1", "5b3+3",
-        "b3", "d1", "1e1<", "a5", "e1", "b5", "1b3-", "2c4<", "1e1-",
+        "c3", "c4", "b4", "1c4+", "d2", "b5", "b3", "1b5+", "1b3>", "d4", "2c3+", "c4", "d3",
+        "1d4+", "d4", "1c4+", "b2", "c4", "1d4+", "2c3>", "1d2-", "Sb3", "5d3+3", "1b3+", "d4",
+        "2b2>1", "3c2-1", "b3", "b2", "1b3+", "c2", "b3", "c5", "2b2>", "b2", "1b3+", "b3", "2b4+",
+        "d5", "b4", "2c4<", "3b3-", "2c3+", "2b2>", "3d1<", "3c2+", "d1", "5b4+4",
     ]
     .iter()
     {
@@ -94,17 +110,6 @@ fn test_position() {
     }
 }
 
-fn mcts(board: board_mod::Board) {
-    let mut tree = mcts::Tree::new_root();
-    for i in 0..100_000 {
-        tree.select(&mut board.clone());
-        if i % 10000 == 0 {
-            println!("{} visits, val={}", tree.visits, tree.mean_action_value);
-            tree.print_info();
-        }
-    }
-}
-
 /// Play a game against the engine through stdin
 fn play_human(mut board: board_mod::Board) {
     match board.game_result() {
@@ -113,7 +118,7 @@ fn play_human(mut board: board_mod::Board) {
             println!("Board:\n{:?}", board);
             // If black, play as human
             if board.side_to_move() == White {
-                println!("Type your move as long algebraic notation (e2e4):");
+                println!("Type your move in algebraic notation (c3):");
 
                 let reader = io::stdin();
                 let mut input_str = "".to_string();
@@ -144,7 +149,7 @@ fn play_human(mut board: board_mod::Board) {
                 board.do_move(c_move);
                 play_human(board);
             } else {
-                let (best_move, score) = minmax::minmax(&mut board, 4);
+                let (best_move, score) = minmax::minmax(&mut board, 3);
 
                 println!("Computer played {:?} with score {}", best_move, score);
                 board.do_move(best_move.unwrap());
