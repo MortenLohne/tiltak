@@ -20,7 +20,7 @@ use std::io::Write;
 fn main() {
     test_position();
 
-    for i in 1..10 {
+    for i in 3..10 {
         mcts_vs_minmax(3, 10000 * i);
     }
 }
@@ -32,19 +32,18 @@ fn mcts_vs_minmax(minmax_depth: u16, mcts_nodes: u64) {
     while board.game_result().is_none() {
         match board.side_to_move() {
             Color::White => {
-                let (best_move, score) = minmax::minmax(&mut board, minmax_depth);
-                board.do_move(best_move.clone().unwrap());
-                moves.push(best_move.clone().unwrap());
-                print!("{:6}: {:.2}, ", best_move.unwrap(), score);
-                io::stdout().flush().unwrap();
-            }
-
-            Color::Black => {
                 let (best_move, score) = mcts::mcts(board.clone(), mcts_nodes);
                 board.do_move(best_move.clone());
                 moves.push(best_move.clone());
-                println!("{:6}: {:.3}", best_move, score);
-                // println!("{:?}", board);
+                print!("{:6}: {:.3}, ", best_move, score);
+            }
+
+            Color::Black => {
+                let (best_move, score) = minmax::minmax(&mut board, minmax_depth);
+                board.do_move(best_move.clone().unwrap());
+                moves.push(best_move.clone().unwrap());
+                println!("{:6}: {:.2}", best_move.unwrap(), score);
+                io::stdout().flush().unwrap();
             }
         }
     }
@@ -61,9 +60,9 @@ fn test_position() {
     let mut moves = vec![];
 
     for mv_san in [
-        "c2", "b3", "d2", "c3", "b2", "d4", "1b2-", "d3", "1d2-", "1c3>", "Cc3", "b4", "1c3>",
-        "d2", "2d3+", "b2", "1c2<", "1b4+", "2b2-", "c2", "3d2<", "d1", "b2", "c4", "2d3-", "1c4>",
-        "e1", "c4", "b4", "3d4<2", "d2", "1d1-", "4c2>", "3b4+", "1b2-", "1d4+", "3b3+2",
+        "c2", "b4", "d2", "c4", "b2", "c3", "d3", "b3", "1c2-", "1b3>", "1d3<", "1c4+", "d4",
+        "4c3<2", "c2", "c4", "1d4<", "1b4>", "d3", "b4", "b1", "d4", "1b2-", "2a3>", "e1", "5b3+3",
+        "b3", "d1", "1e1<", "a5", "e1", "b5", "1b3-", "2c4<", "1e1-",
     ]
     .iter()
     {
@@ -76,9 +75,14 @@ fn test_position() {
 
     println!("{:?}", board);
 
-    let (best_move, score) = minmax::minmax(&mut board, 3);
+    for d in 1..=3 {
+        let (best_move, score) = minmax::minmax(&mut board, d);
 
-    println!("Minmax played {:?} with score {}", best_move, score);
+        println!(
+            "Depth {}: minmax played {:?} with score {}",
+            d, best_move, score
+        );
+    }
 
     let mut tree = mcts::Tree::new_root();
     for i in 0.. {
