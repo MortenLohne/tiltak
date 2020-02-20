@@ -131,8 +131,12 @@ fn respect_carry_limit_test() {
         board
     );
 
-    assert!(!moves.contains(&board.move_from_san("6c3>").unwrap()),
-    "6c3> was a legal move among {:?} on board\n{:?}", moves, board);
+    assert!(
+        !moves.contains(&board.move_from_san("6c3>").unwrap()),
+        "6c3> was a legal move among {:?} on board\n{:?}",
+        moves,
+        board
+    );
 }
 
 #[test]

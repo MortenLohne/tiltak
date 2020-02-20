@@ -1,5 +1,7 @@
 use crate::board::Role::*;
-use crate::board::{board_iterator, Board, ColorTr, Direction, Move, Movement, Piece, Square, BOARD_SIZE};
+use crate::board::{
+    board_iterator, Board, ColorTr, Direction, Move, Movement, Piece, Square, BOARD_SIZE,
+};
 use board_game_traits::board::Board as BoardTrait;
 use board_game_traits::board::{Color, GameResult};
 use smallvec::SmallVec;
