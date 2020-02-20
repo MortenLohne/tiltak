@@ -21,7 +21,10 @@ fn black_win_in_one_move_test() {
         "b3", "d1", "1e1<", "a5", "e1", "b5", "1b3-", "2c4<", "1e1-",
     ];
 
-    plays_correct_move_property(&move_strings, TacticAnswer::PlayMoves(&["3b4+", "b3", "Cb3", "e4", "Ce4", "1c3<"]));
+    plays_correct_move_property(
+        &move_strings,
+        TacticAnswer::PlayMoves(&["3b4+", "b3", "Cb3", "e4", "Ce4", "1c3<"]),
+    );
 }
 
 #[test]
