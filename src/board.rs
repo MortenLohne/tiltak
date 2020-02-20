@@ -601,7 +601,30 @@ impl EvalBoardTrait for Board {
             None => (),
         }
 
-        material + to_move + centre
+        let stacks: f32 = board_iterator()
+            .map(|sq| &self[sq])
+            .filter(|stack| stack.len() > 1)
+            .map(|stack| {
+                let controlling_player = stack.last().unwrap().color();
+                let val = stack
+                    .iter()
+                    .take(stack.len() - 1)
+                    .map(|piece| {
+                        if piece.color() == controlling_player {
+                            0.8
+                        } else {
+                            -0.4
+                        }
+                    })
+                    .sum::<f32>();
+                match controlling_player {
+                    Color::White => val,
+                    Color::Black => val * -1.0,
+                }
+            })
+            .sum();
+
+        material + to_move + centre + stacks
     }
 }
 
