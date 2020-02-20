@@ -60,17 +60,6 @@ fn black_avoid_loss_in_one_test3() {
 }
 
 #[test]
-fn black_avoid_loss_in_one_test4() {
-    let moves_strings = [
-        "c2", "c3", "d2", "b4", "1c2-", "d4", "c2", "b2", "1c2<", "d5", "c2", "a3", "e2", "a2",
-        "b1", "a1", "d3", "c4", "2c3-", "1d4<", "Cc3", "3c4>2", "1c3-", "e1", "c3", "1a1>", "d1",
-        "c5", "b5", "1b4-", "1d3-",
-    ];
-
-    plays_correct_move_property(&moves_strings, TacticAnswer::AvoidMoves(&["2b5>1"]));
-}
-
-#[test]
 fn black_avoid_less_in_one_test5() {
     let move_strings = [
         "c2", "b3", "d2", "c3", "b2", "d4", "1b2-", "d3", "1d2-", "1c3>", "Cc3", "b4", "1c3>",
@@ -138,6 +127,17 @@ fn do_not_suicide_as_black_test2() {
     plays_correct_move_property(&move_strings, TacticAnswer::AvoidMoves(&["2c5>1"]));
 }
 
+#[test]
+fn do_not_suicide_as_black_test3() {
+    let moves_strings = [
+        "c2", "c3", "d2", "b4", "1c2-", "d4", "c2", "b2", "1c2<", "d5", "c2", "a3", "e2", "a2",
+        "b1", "a1", "d3", "c4", "2c3-", "1d4<", "Cc3", "3c4>2", "1c3-", "e1", "c3", "1a1>", "d1",
+        "c5", "b5", "1b4-", "1d3-",
+    ];
+
+    plays_correct_move_property(&moves_strings, TacticAnswer::AvoidMoves(&["2b5>1"]));
+}
+
 /// The correct answer to a tactic can be either a lost of winning/non-losing moves, or simply a list of moves to specifically avoid
 enum TacticAnswer {
     AvoidMoves(&'static [&'static str]),
@@ -164,6 +164,20 @@ fn plays_correct_move_property(move_strings: &[&str], correct_moves: TacticAnswe
 
     board.generate_moves(&mut moves);
     let mut mcts = mcts::Tree::new_root();
+
+    let relevant_moves = match correct_moves {
+        TacticAnswer::AvoidMoves(a) | TacticAnswer::PlayMoves(a) => a,
+    };
+
+    for move_string in relevant_moves {
+        assert!(
+            moves.contains(&board.move_from_san(move_string).unwrap()),
+            "Candidate move {} was not among legal moves {:?} on board\n{:?}",
+            move_string,
+            moves,
+            board
+        );
+    }
 
     for i in 1..50000 {
         mcts.select(&mut board.clone());
