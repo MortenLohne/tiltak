@@ -1,5 +1,6 @@
+use crate::board::Board;
 use crate::{board_mod, mcts};
-use board_game_traits::board::Board;
+use board_game_traits::board::Board as BoardTrait;
 use pgn_traits::pgn::PgnBoard;
 
 #[test]
@@ -112,7 +113,12 @@ fn do_not_suicide_as_black_test() {
         "1c4<", "3c3+", "e5", "e2",
     ];
 
-    plays_correct_move_property(&move_strings, TacticAnswer::AvoidMoves(&["2a3+1"]));
+    let mut board = Board::default();
+    do_moves_and_check_validity(&mut board, &move_strings);
+
+    let mut moves = vec![];
+    board.generate_moves(&mut moves);
+    assert!(!moves.contains(&board.move_from_san("2a3+1").unwrap()));
 }
 
 #[test]
@@ -124,18 +130,29 @@ fn do_not_suicide_as_black_test2() {
         "2a2>", "d2", "3b2<", "1d2<", "2b2>", "d4", "d2", "5d3+4",
     ];
 
-    plays_correct_move_property(&move_strings, TacticAnswer::AvoidMoves(&["2c5>1"]));
+    let mut board = Board::default();
+    do_moves_and_check_validity(&mut board, &move_strings);
+
+    let mut moves = vec![];
+    board.generate_moves(&mut moves);
+    assert!(!moves.contains(&board.move_from_san("2c5>1").unwrap()));
 }
 
 #[test]
 fn do_not_suicide_as_black_test3() {
-    let moves_strings = [
+    let move_strings = [
         "c2", "c3", "d2", "b4", "1c2-", "d4", "c2", "b2", "1c2<", "d5", "c2", "a3", "e2", "a2",
         "b1", "a1", "d3", "c4", "2c3-", "1d4<", "Cc3", "3c4>2", "1c3-", "e1", "c3", "1a1>", "d1",
         "c5", "b5", "1b4-", "1d3-",
     ];
 
-    plays_correct_move_property(&moves_strings, TacticAnswer::AvoidMoves(&["2b5>1"]));
+    let mut board = Board::default();
+    do_moves_and_check_validity(&mut board, &move_strings);
+
+    let mut moves = vec![];
+    board.generate_moves(&mut moves);
+    assert!(!moves.contains(&board.move_from_san("2b5>1").unwrap()));
+    // plays_correct_move_property(&moves_strings, TacticAnswer::AvoidMoves(&["2b5>1"]));
 }
 
 /// The correct answer to a tactic can be either a lost of winning/non-losing moves, or simply a list of moves to specifically avoid
@@ -144,10 +161,8 @@ enum TacticAnswer {
     PlayMoves(&'static [&'static str]),
 }
 
-fn plays_correct_move_property(move_strings: &[&str], correct_moves: TacticAnswer) {
-    let mut board = board_mod::Board::default();
+fn do_moves_and_check_validity(board: &mut Board, move_strings: &[&str]) {
     let mut moves = vec![];
-
     for mv_san in move_strings.iter() {
         let mv = board.move_from_san(&mv_san).unwrap();
         board.generate_moves(&mut moves);
@@ -161,6 +176,13 @@ fn plays_correct_move_property(move_strings: &[&str], correct_moves: TacticAnswe
         board.do_move(mv);
         moves.clear();
     }
+}
+
+fn plays_correct_move_property(move_strings: &[&str], correct_moves: TacticAnswer) {
+    let mut board = board_mod::Board::default();
+    let mut moves = vec![];
+
+    do_moves_and_check_validity(&mut board, move_strings);
 
     board.generate_moves(&mut moves);
     let mut mcts = mcts::Tree::new_root();
