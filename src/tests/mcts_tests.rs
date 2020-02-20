@@ -79,14 +79,14 @@ fn black_avoid_less_in_one_test5() {
 
 #[test]
 fn do_not_suicide_as_black_test() {
-    let move_strings = ["c2", "c4", "d2", "c3", "b2", "d3", "1d2-", "b3", "d2", "b4", "1c2-", "1b3>", "2d3<", "1c4+", "d4", "5c3<3", "c2", "c4", "1d4<", "d3", "1d2-", "1c3-", "Cc3", "2c4>", "1c3<", "d2", "c3", "1d2-", "1c3-", "1b4>", "2b3>1", "3c4+2", "d2", "c4", "b4", "c5", "1b3>", "1c4<", "3c3+", "e5", "e2", "2a3+1"];
+    let move_strings = ["c2", "c4", "d2", "c3", "b2", "d3", "1d2-", "b3", "d2", "b4", "1c2-", "1b3>", "2d3<", "1c4+", "d4", "5c3<3", "c2", "c4", "1d4<", "d3", "1d2-", "1c3-", "Cc3", "2c4>", "1c3<", "d2", "c3", "1d2-", "1c3-", "1b4>", "2b3>1", "3c4+2", "d2", "c4", "b4", "c5", "1b3>", "1c4<", "3c3+", "e5", "e2"];
 
     plays_correct_move_property(&move_strings, TacticAnswer::AvoidMoves(&["2a3+1"]));
 }
 
 #[test]
 fn do_not_suicide_as_black_test2() {
-    let move_strings = ["c2", "d3", "d2", "c3", "1d2-", "c4", "d2", "b3", "1c2-", "1b3>", "2d3<", "1c4+", "b2", "5c3-3", "c2", "d3", "1d2-", "b4", "d2", "d4", "2d3-", "b3", "1b2-", "1b4+", "d3", "b2", "b1", "1b2>", "1d2<", "1c3+", "c1", "3b3>2", "1c1-", "1c3+", "3d4+", "4c2<2", "1b1-", "2a2>", "d2", "3b2<", "1d2<", "2b2>", "d4", "d2", "5d3+4", "2c5>1"];
+    let move_strings = ["c2", "d3", "d2", "c3", "1d2-", "c4", "d2", "b3", "1c2-", "1b3>", "2d3<", "1c4+", "b2", "5c3-3", "c2", "d3", "1d2-", "b4", "d2", "d4", "2d3-", "b3", "1b2-", "1b4+", "d3", "b2", "b1", "1b2>", "1d2<", "1c3+", "c1", "3b3>2", "1c1-", "1c3+", "3d4+", "4c2<2", "1b1-", "2a2>", "d2", "3b2<", "1d2<", "2b2>", "d4", "d2", "5d3+4"];
 
     plays_correct_move_property(&move_strings, TacticAnswer::AvoidMoves(&["2c5>1"]));
 }
