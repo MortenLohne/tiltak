@@ -115,7 +115,7 @@ fn play_random_games_test() {
     let mut duration = 0;
 
     let mut rng = rand::thread_rng();
-    for _ in 0..1000 {
+    for _ in 0..2000 {
         let mut board = board_mod::Board::default();
         let mut moves = vec![];
         for i in 0.. {
