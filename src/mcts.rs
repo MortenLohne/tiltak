@@ -133,5 +133,5 @@ impl Tree {
 }
 
 pub fn cp_to_win_percentage(cp: f32) -> f64 {
-    1.0 / (1.0 + f64::powf(10.0, -cp as f64 / 20.0))
+    1.0 / (1.0 + f64::powf(10.0, -cp as f64 / 10.0))
 }
