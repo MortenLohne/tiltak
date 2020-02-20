@@ -1,5 +1,5 @@
 use crate::board::Role::*;
-use crate::board::{board_iterator, Board, ColorTr, Direction, Move, Movement, Piece, Square};
+use crate::board::{board_iterator, Board, ColorTr, Direction, Move, Movement, Piece, Square, BOARD_SIZE};
 use board_game_traits::board::Board as BoardTrait;
 use board_game_traits::board::{Color, GameResult};
 use smallvec::SmallVec;
@@ -44,6 +44,7 @@ impl Board {
                         }
                         for movement in movements.into_iter().filter(|mv| !mv.is_empty()) {
                             let mv = Move::Move(square, direction, movement);
+                            // Check that moves are not suicide moves
                             if self[square]
                                 .iter()
                                 .any(|piece: &Piece| !Colorr::piece_is_ours(*piece))
@@ -86,9 +87,9 @@ impl Board {
     ) {
         if let Some(neighbour) = square.go_direction(direction) {
             let max_pieces_to_take = if square == origin_square {
-                pieces_carried
+                pieces_carried.min(BOARD_SIZE as u8)
             } else {
-                pieces_carried - 1
+                (pieces_carried - 1).min(BOARD_SIZE as u8)
             };
             let neighbour_piece = self[neighbour].last().cloned();
             if neighbour_piece.map(Piece::role) == Some(Cap) {
@@ -134,9 +135,9 @@ impl Board {
 
             let neighbour = square.go_direction(direction).unwrap();
             let max_pieces_to_take = if square == origin_square {
-                pieces_carried
+                pieces_carried.min(BOARD_SIZE as u8)
             } else {
-                pieces_carried - 1
+                (pieces_carried - 1).min(BOARD_SIZE as u8)
             };
             for pieces_to_take in 1..=max_pieces_to_take {
                 let mut new_movement = partial_movement.clone();
