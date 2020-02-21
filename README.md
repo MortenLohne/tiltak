@@ -1,6 +1,6 @@
 # Taik
 
-Taik is a simple AI for the board game [Tak](https://en.wikipedia.org/wiki/Tak_(game\)). The project contains a move generator and two different search algorithms, Minmax and Monte Carlo Tree Search.
+Taik is a simple AI for the board game [Tak](https://en.wikipedia.org/wiki/Tak_(game)). The project contains a move generator and two different search algorithms, Minmax and Monte Carlo Tree Search.
 
 # Usage
 
