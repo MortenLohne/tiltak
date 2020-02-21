@@ -23,3 +23,7 @@ cargo run --release
 # Tests
 
 Use `cargo test` to run tests, `cargo test --release` to run without debugging checks (recommended).
+
+# License
+
+This project is licensed under the GPLv3 (or any later version at your option). See the LICENSE file for the full license text.
