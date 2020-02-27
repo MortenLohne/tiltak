@@ -175,5 +175,8 @@ fn mem_usage() {
     let mut board = board::Board::default();
     let mut tree = mcts::Tree::new_root();
     tree.select(&mut board);
-    println!("MCTS node's children: {} bytes.", tree.children.len() * mem::size_of::<(mcts::Tree, board::Move)>());
+    println!(
+        "MCTS node's children: {} bytes.",
+        tree.children.len() * mem::size_of::<(mcts::Tree, board::Move)>()
+    );
 }
