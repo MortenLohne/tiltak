@@ -95,3 +95,35 @@ fn respect_carry_limit_test() {
         board
     );
 }
+
+#[test]
+pub fn start_pos_perf_test() {
+    let mut board = Board::default();
+    perft_check_answers(&mut board, &[1, 75, 5400, 348_080, 21_536_636]);
+}
+
+pub fn perft(board: &mut Board, depth: u16) -> u64 {
+    if depth == 0 {
+        1
+    } else {
+        let mut moves = vec![];
+        board.generate_moves(&mut moves);
+        moves
+            .into_iter()
+            .map(|mv| {
+                let reverse_move = board.do_move(mv);
+                let num_moves = perft(board, depth - 1);
+                board.reverse_move(reverse_move);
+                num_moves
+            })
+            .sum()
+    }
+}
+
+#[cfg(test)]
+/// Verifies the perft result of a position against a known answer
+pub fn perft_check_answers(board: &mut Board, answers: &[u64]) {
+    for (depth, &answer) in answers.iter().enumerate() {
+        assert_eq!(perft(board, depth as u16), answer);
+    }
+}
