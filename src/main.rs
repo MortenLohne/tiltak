@@ -212,7 +212,7 @@ fn bench() {
 fn mem_usage() {
     use std::mem;
     println!("Tak board: {} bytes", mem::size_of::<board::Board>());
-    println!("Tak board cell: {} bytes", mem::size_of::<board::Cell>());
+    println!("Tak board cell: {} bytes", mem::size_of::<board::Stack>());
     println!("Tak move: {} bytes", mem::size_of::<board::Move>());
 
     println!("MCTS node: {} bytes.", mem::size_of::<mcts::Tree>());

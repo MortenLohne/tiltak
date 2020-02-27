@@ -271,12 +271,12 @@ impl ops::Not for Piece {
     }
 }
 
-pub type Cell = SmallVec<[Piece; 4]>;
+pub type Stack = SmallVec<[Piece; 4]>;
 
 #[derive(Clone, PartialEq, Eq)]
 pub enum Move {
     Place(Piece, Square),
-    Move(Square, Direction, SmallVec<[Movement; 5]>), // Number of stones to take
+    Move(Square, Direction, StackMovement), // Number of stones to take
 }
 
 impl fmt::Display for Move {
@@ -287,15 +287,20 @@ impl fmt::Display for Move {
                 WhiteFlat | BlackFlat => write!(f, "{}", square)?,
                 WhiteStanding | BlackStanding => write!(f, "S{}", square)?,
             },
-            Move::Move(square, direction, movements) => {
-                write!(f, "{}{}", movements[0].pieces_to_take, square).unwrap();
+            Move::Move(square, direction, stack_movements) => {
+                write!(
+                    f,
+                    "{}{}",
+                    stack_movements.movements[0].pieces_to_take, square
+                )
+                .unwrap();
                 match direction {
                     North => f.write_char('-')?,
                     West => f.write_char('<')?,
                     East => f.write_char('>')?,
                     South => f.write_char('+')?,
                 }
-                for movement in movements.iter().skip(1) {
+                for movement in stack_movements.movements.iter().skip(1) {
                     write!(f, "{}", movement.pieces_to_take).unwrap();
                 }
             }
@@ -330,6 +335,11 @@ impl Direction {
     }
 }
 
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct StackMovement {
+    pub movements: SmallVec<[Movement; 5]>,
+}
+
 /// Moving a stack of pieces consists of one or more `Movement`s
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Movement {
@@ -338,7 +348,7 @@ pub struct Movement {
 
 #[derive(Clone, PartialEq, Eq)]
 pub struct Board {
-    pub cells: [[Cell; BOARD_SIZE]; BOARD_SIZE],
+    pub cells: [[Stack; BOARD_SIZE]; BOARD_SIZE],
     to_move: Color,
     white_stones_left: u8,
     black_stones_left: u8,
@@ -347,7 +357,7 @@ pub struct Board {
 }
 
 impl Index<Square> for Board {
-    type Output = Cell;
+    type Output = Stack;
 
     fn index(&self, square: Square) -> &Self::Output {
         &self.cells[square.rank() as usize][square.file() as usize]
@@ -452,9 +462,9 @@ impl board::Board for Board {
                     _ => unreachable!(),
                 }
             }
-            Move::Move(mut from, direction, movements) => {
+            Move::Move(mut from, direction, stack_movement) => {
                 // self[from].truncate(movements[0].pieces_to_leave as usize);
-                for Movement { pieces_to_take } in movements {
+                for Movement { pieces_to_take } in stack_movement.movements {
                     let to = from.go_direction(direction).unwrap();
                     if let Some(piece) = self[to].last_mut() {
                         match piece {
@@ -673,14 +683,17 @@ impl pgn_traits::pgn::PgnBoard for Board {
             '1'..='9' if input.len() > 3 => {
                 let square = Square::parse_square(&input[1..3]);
                 let direction = Direction::parse(input.chars().nth(3).unwrap());
-                let movements = input
-                    .chars()
-                    .take(1)
-                    .chain(input.chars().skip(4))
-                    .map(|ch| Movement {
-                        pieces_to_take: ch as u8 - b'0',
-                    });
-                Ok(Move::Move(square, direction, movements.collect()))
+                let movements = StackMovement {
+                    movements: input
+                        .chars()
+                        .take(1)
+                        .chain(input.chars().skip(4))
+                        .map(|ch| Movement {
+                            pieces_to_take: ch as u8 - b'0',
+                        })
+                        .collect(),
+                };
+                Ok(Move::Move(square, direction, movements))
             }
             _ => Err(pgn::Error::new(
                 pgn::ErrorKind::ParseError,
