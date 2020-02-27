@@ -1,5 +1,8 @@
 use crate::board::Role::*;
-use crate::board::{board_iterator, Board, ColorTr, Direction, Move, Movement, Piece, Square, BOARD_SIZE, StackMovement};
+use crate::board::{
+    board_iterator, Board, ColorTr, Direction, Move, Movement, Piece, Square, StackMovement,
+    BOARD_SIZE,
+};
 use board_game_traits::board::Board as BoardTrait;
 use board_game_traits::board::{Color, GameResult};
 use smallvec::SmallVec;
@@ -43,7 +46,7 @@ impl Board {
                             );
                         }
                         for movements in movements.into_iter().filter(|mv| !mv.is_empty()) {
-                            let mv = Move::Move(square, direction, StackMovement{ movements } );
+                            let mv = Move::Move(square, direction, StackMovement { movements });
                             // Check that moves are not suicide moves
                             if self[square]
                                 .iter()
@@ -154,13 +157,5 @@ impl Board {
                 movements.push(new_movement);
             }
         }
-    }
-
-    pub fn count_all_stones(&self) -> u8 {
-        self.cells.iter().flatten().flatten().count() as u8
-    }
-
-    pub fn all_top_stones(&self) -> impl Iterator<Item = &Piece> {
-        self.cells.iter().flatten().filter_map(|cell| cell.last())
     }
 }

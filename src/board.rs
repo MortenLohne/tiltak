@@ -348,7 +348,7 @@ pub struct Movement {
 
 #[derive(Clone, PartialEq, Eq)]
 pub struct Board {
-    pub cells: [[Stack; BOARD_SIZE]; BOARD_SIZE],
+    pub cells: AbstractBoard<Stack>,
     to_move: Color,
     white_stones_left: u8,
     black_stones_left: u8,
@@ -360,13 +360,13 @@ impl Index<Square> for Board {
     type Output = Stack;
 
     fn index(&self, square: Square) -> &Self::Output {
-        &self.cells[square.rank() as usize][square.file() as usize]
+        &self.cells[square]
     }
 }
 
 impl IndexMut<Square> for Board {
     fn index_mut(&mut self, square: Square) -> &mut Self::Output {
-        &mut self.cells[square.rank() as usize][square.file() as usize]
+        &mut self.cells[square]
     }
 }
 
@@ -389,7 +389,7 @@ impl Debug for Board {
             for print_row in 0..3 {
                 for x in 0..BOARD_SIZE {
                     for print_column in 0..3 {
-                        match self.cells[y][x].get(print_column * 3 + print_row) {
+                        match self.cells.raw[y][x].get(print_column * 3 + print_row) {
                             None => write!(f, "[.]")?,
                             Some(WhiteFlat) => write!(f, "[w]")?,
                             Some(WhiteStanding) => write!(f, "[W]")?,
@@ -425,6 +425,53 @@ impl Board {
         self.generate_moves(&mut simple_moves);
         let average = 1.0 / simple_moves.len() as f64;
         moves.extend(simple_moves.drain(..).map(|mv| (mv, average)));
+    }
+
+    pub fn count_all_stones(&self) -> u8 {
+        self.cells.raw.iter().flatten().flatten().count() as u8
+    }
+
+    pub fn all_top_stones(&self) -> impl Iterator<Item = &Piece> {
+        self.cells
+            .raw
+            .iter()
+            .flatten()
+            .filter_map(|cell| cell.last())
+    }
+
+    pub fn connected_components_graph(&self) -> (AbstractBoard<u8>, u8) {
+        let mut components: AbstractBoard<u8> = Default::default();
+        let mut visited: AbstractBoard<bool> = Default::default();
+        let mut id = 1;
+
+        // Find white roads
+        for square in board_iterator() {
+            if !visited[square]
+                && self[square]
+                    .last()
+                    .cloned()
+                    .map(WhiteTr::is_road_stone)
+                    .unwrap_or_default()
+            {
+                connect_component::<WhiteTr>(&self, &mut components, &mut visited, square, id);
+                id += 1;
+            }
+        }
+
+        // Find black roads
+        for square in board_iterator() {
+            if !visited[square]
+                && self[square]
+                    .last()
+                    .cloned()
+                    .map(BlackTr::is_road_stone)
+                    .unwrap_or_default()
+            {
+                connect_component::<BlackTr>(&self, &mut components, &mut visited, square, id);
+                id += 1;
+            }
+        }
+        (components, id)
     }
 }
 
@@ -502,44 +549,16 @@ impl board::Board for Board {
     }
 
     fn game_result(&self) -> Option<GameResult> {
-        let mut components: AbstractBoard<u8> = Default::default();
-        let mut visited: AbstractBoard<bool> = Default::default();
-        let mut id = 1;
-
-        // Find white roads
-        for square in board_iterator() {
-            if !visited[square]
-                && self[square]
-                    .last()
-                    .cloned()
-                    .map(WhiteTr::is_road_stone)
-                    .unwrap_or_default()
-            {
-                connect_component::<WhiteTr>(&self, &mut components, &mut visited, square, id);
-                id += 1;
-            }
-        }
-
-        // Find black roads
-        for square in board_iterator() {
-            if !visited[square]
-                && self[square]
-                    .last()
-                    .cloned()
-                    .map(BlackTr::is_road_stone)
-                    .unwrap_or_default()
-            {
-                connect_component::<BlackTr>(&self, &mut components, &mut visited, square, id);
-                id += 1;
-            }
-        }
+        let (components, highest_component_id) = self.connected_components_graph();
 
         // Check if any components cross the board
-        for id in 1..id {
-            if (components.0[0].iter().any(|&cell| cell == id)
-                && components.0[BOARD_SIZE - 1].iter().any(|&cell| cell == id))
-                || ((0..BOARD_SIZE).any(|y| components.0[y][0] == id)
-                    && (0..BOARD_SIZE).any(|y| components.0[y][BOARD_SIZE - 1] == id))
+        for id in 1..highest_component_id {
+            if (components.raw[0].iter().any(|&cell| cell == id)
+                && components.raw[BOARD_SIZE - 1]
+                    .iter()
+                    .any(|&cell| cell == id))
+                || ((0..BOARD_SIZE).any(|y| components.raw[y][0] == id)
+                    && (0..BOARD_SIZE).any(|y| components.raw[y][BOARD_SIZE - 1] == id))
             {
                 let square = board_iterator()
                     .find(|&square| components[square] == id)
@@ -598,14 +617,14 @@ impl EvalBoardTrait for Board {
         let mut centre = 0.0;
         for x in 1..4 {
             for y in 1..4 {
-                match self.cells[y][x].last().cloned().map(Piece::color) {
+                match self.cells.raw[y][x].last().cloned().map(Piece::color) {
                     Some(Color::White) => centre += 0.2,
                     Some(Color::Black) => centre -= 0.2,
                     None => (),
                 }
             }
         }
-        match self.cells[2][2].last().cloned().map(Piece::color) {
+        match self.cells.raw[2][2].last().cloned().map(Piece::color) {
             Some(Color::White) => centre += 0.1,
             Some(Color::Black) => centre -= 0.1,
             None => (),
@@ -717,20 +736,36 @@ impl pgn_traits::pgn::PgnBoard for Board {
     }
 }
 
-#[derive(Debug, Default, PartialEq, Eq)]
-struct AbstractBoard<T>([[T; BOARD_SIZE]; BOARD_SIZE]);
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct AbstractBoard<T> {
+    raw: [[T; BOARD_SIZE]; BOARD_SIZE],
+}
+
+impl<T> AbstractBoard<T> {
+    fn map<F, U>(&self, f: F) -> AbstractBoard<U>
+    where
+        F: Fn(&T) -> U,
+        U: Default,
+    {
+        let mut new_board = AbstractBoard::default();
+        for square in board_iterator() {
+            new_board[square] = f(&self[square]);
+        }
+        new_board
+    }
+}
 
 impl<T> Index<Square> for AbstractBoard<T> {
     type Output = T;
 
     fn index(&self, square: Square) -> &Self::Output {
-        &self.0[square.0 as usize % BOARD_SIZE][square.0 as usize / BOARD_SIZE]
+        &self.raw[square.0 as usize % BOARD_SIZE][square.0 as usize / BOARD_SIZE]
     }
 }
 
 impl<T> IndexMut<Square> for AbstractBoard<T> {
     fn index_mut(&mut self, square: Square) -> &mut Self::Output {
-        &mut self.0[square.0 as usize % BOARD_SIZE][square.0 as usize / BOARD_SIZE]
+        &mut self.raw[square.0 as usize % BOARD_SIZE][square.0 as usize / BOARD_SIZE]
     }
 }
 
