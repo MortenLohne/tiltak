@@ -12,8 +12,10 @@ mod tests;
 
 use std::io;
 
-use board as board_mod;
-use board_game_traits::board::{Board, Color, GameResult};
+use crate::tests::do_moves_and_check_validity;
+use board::Board;
+use board_game_traits::board::Board as BoardTrait;
+use board_game_traits::board::{Color, GameResult};
 use pgn_traits::pgn::PgnBoard;
 use std::io::Write;
 
@@ -26,7 +28,7 @@ fn main() {
     io::stdin().read_line(&mut input).unwrap();
     match input.trim() {
         "play" => {
-            let board = board_mod::Board::default();
+            let board = Board::default();
             play_human(board);
         }
         "aimatch" => {
@@ -36,13 +38,14 @@ fn main() {
         }
         "analyze" => test_position(),
         "mem usage" => mem_usage(),
+        "bench" => bench(),
         s => println!("Unknown option \"{}\"", s),
     }
 }
 
 fn mcts_vs_minmax(minmax_depth: u16, mcts_nodes: u64) {
     println!("Minmax depth {} vs mcts {} nodes", minmax_depth, mcts_nodes);
-    let mut board = board_mod::Board::default();
+    let mut board = Board::default();
     let mut moves = vec![];
     while board.game_result().is_none() {
         match board.side_to_move() {
@@ -72,7 +75,7 @@ fn mcts_vs_minmax(minmax_depth: u16, mcts_nodes: u64) {
 }
 
 fn test_position() {
-    let mut board = board_mod::Board::default();
+    let mut board = Board::default();
     let mut moves = vec![];
 
     for mv_san in [
@@ -112,7 +115,7 @@ fn test_position() {
 }
 
 /// Play a game against the engine through stdin
-fn play_human(mut board: board_mod::Board) {
+fn play_human(mut board: Board) {
     match board.game_result() {
         None => {
             use board_game_traits::board::Color::*;
@@ -164,6 +167,47 @@ fn play_human(mut board: board_mod::Board) {
     }
 }
 
+fn bench() {
+    use std::time;
+    const NODES: u64 = 100_000;
+    let start_time = time::Instant::now();
+    {
+        let board = Board::default();
+
+        let (_move, score) = mcts::mcts(board, NODES);
+        print!("{:.3}, ", score);
+    }
+
+    {
+        let mut board = Board::default();
+
+        do_moves_and_check_validity(&mut board, &["c3", "d3", "c4", "1d3<", "1c4+", "Sc4"]);
+
+        let (_move, score) = mcts::mcts(board, NODES);
+        print!("{:.3}, ", score);
+    }
+    {
+        let mut board = Board::default();
+
+        do_moves_and_check_validity(
+            &mut board,
+            &[
+                "c3", "c2", "d3", "b3", "c4", "1c2-", "1d3<", "1b3>", "1c4+", "Cc2", "a1", "1c2-",
+                "a2",
+            ],
+        );
+
+        let (_move, score) = mcts::mcts(board, NODES);
+        println!("{:.3}", score);
+    }
+    let time_taken = start_time.elapsed();
+    println!(
+        "{} nodes in {} ms, {:.1} knps",
+        NODES * 3,
+        time_taken.as_millis(),
+        NODES as f64 * 3.0 / (1000.0 * time_taken.as_secs_f64())
+    );
+}
 /// Print memory usage of various data types in the project, for debugging purposes
 fn mem_usage() {
     use std::mem;
