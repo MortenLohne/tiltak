@@ -99,6 +99,20 @@ fn perf_test3() {
     perft_check_answers(&mut board, &[1, 104, 7743, 592_645]);
 }
 
+#[test]
+fn suicide_perf_test() {
+    let move_strings = [
+        "c2", "c4", "d2", "c3", "b2", "d3", "1d2-", "b3", "d2", "b4", "1c2-", "1b3>", "2d3<",
+        "1c4+", "d4", "5c3<3", "c2", "c4", "1d4<", "d3", "1d2-", "1c3-", "Cc3", "2c4>", "1c3<",
+        "d2", "c3", "1d2-", "1c3-", "1b4>", "2b3>1", "3c4+2", "d2", "c4", "b4", "c5", "1b3>",
+        "1c4<", "3c3+", "e5", "e2",
+    ];
+
+    let mut board = Board::default();
+    do_moves_and_check_validity(&mut board, &move_strings);
+    perft_check_answers(&mut board, &[1, 83, 11_204, 955_070]);
+}
+
 pub fn perft(board: &mut Board, depth: u16) -> u64 {
     if depth == 0 {
         1

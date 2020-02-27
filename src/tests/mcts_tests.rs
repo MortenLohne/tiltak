@@ -1,6 +1,6 @@
 use crate::board::Board;
 use crate::tests::do_moves_and_check_validity;
-use crate::{board_mod, mcts};
+use crate::mcts;
 use board_game_traits::board::Board as BoardTrait;
 use pgn_traits::pgn::PgnBoard;
 
@@ -166,7 +166,7 @@ enum TacticAnswer {
 }
 
 fn plays_correct_move_property(move_strings: &[&str], correct_moves: TacticAnswer) {
-    let mut board = board_mod::Board::default();
+    let mut board = Board::default();
     let mut moves = vec![];
 
     do_moves_and_check_validity(&mut board, move_strings);
