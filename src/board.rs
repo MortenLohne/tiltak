@@ -271,7 +271,7 @@ impl ops::Not for Piece {
     }
 }
 
-type Cell = SmallVec<[Piece; 4]>;
+pub type Cell = SmallVec<[Piece; 4]>;
 
 #[derive(Clone, PartialEq, Eq)]
 pub enum Move {
