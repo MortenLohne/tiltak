@@ -71,9 +71,32 @@ fn respect_carry_limit_test() {
 }
 
 #[test]
-pub fn start_pos_perf_test() {
+fn start_pos_perf_test() {
     let mut board = Board::default();
     perft_check_answers(&mut board, &[1, 75, 5400, 348_080, 21_536_636]);
+}
+
+#[test]
+fn perf_test2() {
+    let mut board = Board::default();
+
+    do_moves_and_check_validity(&mut board, &["c3", "d3", "c4", "1d3<", "1c4+", "Sc4"]);
+
+    perft_check_answers(&mut board, &[1, 87, 6155, 461_800]);
+}
+
+#[test]
+fn perf_test3() {
+    let mut board = Board::default();
+
+    do_moves_and_check_validity(
+        &mut board,
+        &[
+            "c3", "c2", "d3", "b3", "c4", "1c2-", "1d3<", "1b3>", "1c4+", "Cc2", "a1", "1c2-", "a2",
+        ],
+    );
+
+    perft_check_answers(&mut board, &[1, 104, 7743, 592_645]);
 }
 
 pub fn perft(board: &mut Board, depth: u16) -> u64 {
