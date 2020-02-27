@@ -35,6 +35,7 @@ fn main() {
             }
         }
         "analyze" => test_position(),
+        "mem usage" => mem_usage(),
         s => println!("Unknown option \"{}\"", s),
     }
 }
@@ -161,4 +162,18 @@ fn play_human(mut board: board_mod::Board) {
         Some(GameResult::BlackWin) => println!("Black won! Board:\n{:?}", board),
         Some(GameResult::Draw) => println!("The game was drawn! Board:\n{:?}", board),
     }
+}
+
+/// Print memory usage of various data types in the project, for debugging purposes
+fn mem_usage() {
+    use std::mem;
+    println!("Tak board: {} bytes", mem::size_of::<board::Board>());
+    println!("Tak board cell: {} bytes", mem::size_of::<board::Cell>());
+    println!("Tak move: {} bytes", mem::size_of::<board::Move>());
+
+    println!("MCTS node: {} bytes.", mem::size_of::<mcts::Tree>());
+    let mut board = board::Board::default();
+    let mut tree = mcts::Tree::new_root();
+    tree.select(&mut board);
+    println!("MCTS node's children: {} bytes.", tree.children.len() * mem::size_of::<(mcts::Tree, board::Move)>());
 }

@@ -5,7 +5,7 @@ const C_PUCT: f64 = 2.0;
 
 #[derive(Clone, PartialEq, Debug)]
 pub struct Tree {
-    children: Vec<(Tree, Move)>,
+    pub children: Vec<(Tree, Move)>,
     pub visits: u64,
     pub total_action_value: f64,
     pub mean_action_value: f64,
