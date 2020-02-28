@@ -286,7 +286,7 @@ impl Stack {
         self.pieces.last().cloned()
     }
 
-    pub fn last_mut<'a>(&'a mut self) -> Option<&'a mut Piece> {
+    pub fn top_stone_mut<'a>(&'a mut self) -> Option<&'a mut Piece> {
         self.pieces.last_mut()
     }
 
@@ -601,7 +601,7 @@ impl board::Board for Board {
                 // self[from].truncate(movements[0].pieces_to_leave as usize);
                 for Movement { pieces_to_take } in stack_movement.movements {
                     let to = from.go_direction(direction).unwrap();
-                    if let Some(piece) = self[to].last_mut() {
+                    if let Some(piece) = self[to].top_stone_mut() {
                         match piece {
                             WhiteStanding => *piece = WhiteFlat,
                             BlackStanding => *piece = BlackFlat,
