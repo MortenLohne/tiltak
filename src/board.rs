@@ -515,6 +515,12 @@ impl board::Board for Board {
     }
 
     fn generate_moves(&self, moves: &mut Vec<Self::Move>) {
+        debug_assert!(
+            self.game_result().is_none(),
+            "Tried to generate moves on position with {:?} on\n{:?}",
+            self.game_result(),
+            self
+        );
         match self.side_to_move() {
             Color::White => self.generate_moves_colortr::<WhiteTr>(moves),
             Color::Black => self.generate_moves_colortr::<BlackTr>(moves),
@@ -536,7 +542,11 @@ impl board::Board for Board {
                     (Color::Black, BlackFlat) => self.black_stones_left -= 1,
                     (Color::Black, BlackStanding) => self.black_stones_left -= 1,
                     (Color::Black, BlackCap) => self.black_capstones_left -= 1,
-                    _ => unreachable!("Tried to place {} stone on {}'s move", piece.color(), self.side_to_move()),
+                    _ => unreachable!(
+                        "Tried to place {} stone on {}'s move",
+                        piece.color(),
+                        self.side_to_move()
+                    ),
                 }
             }
             Move::Move(mut from, direction, stack_movement) => {
@@ -587,7 +597,7 @@ impl board::Board for Board {
                     BlackCap => self.black_capstones_left += 1,
                 };
                 self.to_move = !self.to_move;
-            },
+            }
             ReverseMove::Move(old_board) => *self = old_board,
         }
     }
