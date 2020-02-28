@@ -543,9 +543,13 @@ impl Debug for Board {
 }
 
 impl Board {
-    pub fn generate_moves_with_probabilities(&self, moves: &mut Vec<(Move, f64)>) {
-        let mut simple_moves = vec![];
-        self.generate_moves(&mut simple_moves);
+    pub fn generate_moves_with_probabilities(
+        &self,
+        simple_moves: &mut Vec<Move>,
+        moves: &mut Vec<(Move, f64)>,
+    ) {
+        debug_assert!(simple_moves.is_empty());
+        self.generate_moves(simple_moves);
         let average = 1.0 / simple_moves.len() as f64;
         moves.extend(simple_moves.drain(..).map(|mv| (mv, average)));
     }
@@ -667,7 +671,7 @@ impl board::Board for Board {
                 ReverseMove::Place(to)
             }
             Move::Move(mut from, direction, stack_movement) => {
-                let mut pieces_left_behind = vec![];
+                let mut pieces_left_behind: ArrayVec<[u8; BOARD_SIZE - 1]> = ArrayVec::new();
                 let mut flattens_stone = false;
                 for Movement { pieces_to_take } in stack_movement.movements {
                     let to = from.go_direction(direction).unwrap();

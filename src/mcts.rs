@@ -17,8 +17,10 @@ pub struct Tree {
 
 pub(crate) fn mcts(board: Board, nodes: u64) -> (Move, f64) {
     let mut tree = Tree::new_root();
+    let mut moves = vec![];
+    let mut simple_moves = vec![];
     for _ in 0..nodes {
-        tree.select(&mut board.clone());
+        tree.select(&mut board.clone(), &mut simple_moves, &mut moves);
     }
     tree.best_move()
 }
@@ -71,7 +73,12 @@ impl Tree {
         }
     }
 
-    pub fn select(&mut self, board: &mut Board) -> f64 {
+    pub fn select(
+        &mut self,
+        board: &mut Board,
+        simple_moves: &mut Vec<Move>,
+        moves: &mut Vec<(Move, f64)>,
+    ) -> f64 {
         if self.is_terminal {
             self.visits += 1;
             self.total_action_value += self.mean_action_value;
@@ -81,10 +88,9 @@ impl Tree {
         } else {
             // Only generate child moves on the 2nd visit
             if self.visits == 1 {
-                let mut moves = vec![];
-                board.generate_moves_with_probabilities(&mut moves);
+                board.generate_moves_with_probabilities(simple_moves, moves);
                 self.children.reserve_exact(moves.len());
-                for (mv, heuristic_score) in moves {
+                for (mv, heuristic_score) in moves.drain(..) {
                     self.children
                         .push((Tree::new_node(heuristic_score), mv.clone()));
                 }
@@ -101,7 +107,7 @@ impl Tree {
                 })
                 .unwrap();
             board.do_move(mv.clone());
-            let result = 1.0 - child.select(board);
+            let result = 1.0 - child.select(board, simple_moves, moves);
             self.visits += 1;
             self.total_action_value += result;
             self.mean_action_value = self.total_action_value / self.visits as f64;

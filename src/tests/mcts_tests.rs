@@ -187,9 +187,11 @@ fn plays_correct_move_property(move_strings: &[&str], correct_moves: TacticAnswe
             board
         );
     }
+    let mut moves = vec![];
+    let mut simple_moves = vec![];
 
     for i in 1..50000 {
-        mcts.select(&mut board.clone());
+        mcts.select(&mut board.clone(), &mut simple_moves, &mut moves);
         if i % 10000 == 0 {
             let (best_move, _score) = mcts.best_move();
             match correct_moves {

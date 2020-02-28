@@ -107,8 +107,10 @@ fn test_position() {
     }
 
     let mut tree = mcts::Tree::new_root();
+    let mut simple_moves = vec![];
+    let mut moves = vec![];
     for i in 0.. {
-        tree.select(&mut board.clone());
+        tree.select(&mut board.clone(), &mut simple_moves, &mut moves);
         if i % 10000 == 0 {
             println!("{} visits, val={}", tree.visits, tree.mean_action_value);
             tree.print_info();
@@ -220,7 +222,7 @@ fn mem_usage() {
     println!("MCTS node: {} bytes.", mem::size_of::<mcts::Tree>());
     let mut board = board::Board::default();
     let mut tree = mcts::Tree::new_root();
-    tree.select(&mut board);
+    tree.select(&mut board, &mut vec![], &mut vec![]);
     println!(
         "MCTS node's children: {} bytes.",
         tree.children.len() * mem::size_of::<(mcts::Tree, board::Move)>()
