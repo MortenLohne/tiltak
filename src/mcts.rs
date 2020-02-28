@@ -92,6 +92,8 @@ impl Tree {
         }
     }
 
+    // Never inline, for profiling purposes
+    #[inline(never)]
     fn expand(&mut self, board: &mut Board) -> f64 {
         debug_assert!(self.children.is_empty());
 
