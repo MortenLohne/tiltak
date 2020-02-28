@@ -7,6 +7,9 @@ repository = "https://github.com/MortenLohne/taik/"
 readme = "README.md"
 license = "GPL-3.0-or-later"
 
+[profile.release]
+debug = true
+
 [dependencies]
 board-game-traits = "0.1"
 pgn-traits = "0.1"
