@@ -15,7 +15,7 @@ use smallvec::SmallVec;
 use std::cmp::Ordering;
 use std::fmt::Debug;
 use std::fmt::Write;
-use std::ops::{Index, IndexMut, RangeBounds};
+use std::ops::{Index, IndexMut};
 use std::{fmt, ops};
 
 pub trait ColorTr {
@@ -298,12 +298,8 @@ impl Stack {
         self.pieces.pop()
     }
 
-    pub fn drain<R: RangeBounds<usize>>(&mut self, r: R) -> smallvec::Drain<[Piece; 4]> {
-        self.pieces.drain(r)
-    }
-
-    pub fn extend<I: IntoIterator<Item = Piece>>(&mut self, iter: I) {
-        self.pieces.extend(iter);
+    pub fn remove(&mut self, i: usize) -> Piece {
+        self.pieces.remove(i)
     }
 
     pub fn is_empty(&self) -> bool {
@@ -608,12 +604,17 @@ impl board::Board for Board {
                             _ => (),
                         }
                         debug_assert!(
-                            piece.role() != Standing || self[from].top_stone().unwrap().role() == Cap
+                            piece.role() != Standing
+                                || self[from].top_stone().unwrap().role() == Cap
                         );
                     }
                     let pieces_to_leave = self[from].len() - pieces_to_take as usize;
-                    let pieces_to_take: Vec<_> = self[from].drain(pieces_to_leave..).collect();
-                    self[to].extend(pieces_to_take);
+
+                    for _ in pieces_to_leave..self[from].len() {
+                        let piece = self[from].get(pieces_to_leave).unwrap();
+                        self[to].push(piece);
+                        self[from].remove(pieces_to_leave);
+                    }
 
                     from = to;
                 }
