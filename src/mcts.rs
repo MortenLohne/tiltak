@@ -37,8 +37,24 @@ impl Tree {
         }
     }
 
+    /// Clones this node, but does not clone its children
+    pub fn shallow_clone(&self) -> Self {
+        Tree {
+            children: vec![],
+            visits: self.visits,
+            total_action_value: self.total_action_value,
+            mean_action_value: self.mean_action_value,
+            heuristic_score: self.heuristic_score,
+            is_terminal: self.is_terminal,
+        }
+    }
+
     pub fn print_info(&self) {
-        let mut best_children = self.children.clone();
+        let mut best_children: Vec<(Tree, Move)> = self
+            .children
+            .iter()
+            .map(|(tree, mv)| (tree.shallow_clone(), mv.clone()))
+            .collect();
         best_children.sort_by_key(|(child, _)| child.visits);
         best_children.reverse();
         let parent_visits = self.visits;
