@@ -282,8 +282,8 @@ impl Stack {
         self.pieces.get(i)
     }
 
-    pub fn last<'a>(&'a self) -> Option<&'a Piece> {
-        self.pieces.last()
+    pub fn top_stone(&self) -> Option<Piece> {
+        self.pieces.last().cloned()
     }
 
     pub fn last_mut<'a>(&'a mut self) -> Option<&'a mut Piece> {
@@ -488,12 +488,12 @@ impl Board {
         self.cells.raw.iter().flatten().cloned().flatten().count() as u8
     }
 
-    pub fn all_top_stones(&self) -> impl Iterator<Item = &Piece> {
+    pub fn all_top_stones<'a>(&'a self) -> impl Iterator<Item = Piece> + 'a {
         self.cells
             .raw
             .iter()
             .flatten()
-            .filter_map(|cell| cell.last())
+            .filter_map(|cell| cell.top_stone())
     }
 
     /// An iterator over the top stones left behind after a stack movement
@@ -513,7 +513,7 @@ impl Board {
                     Some(*self[square].get(piece_index - 1).unwrap())
                 }
             })
-            .chain(std::iter::once(self[square].last().cloned()))
+            .chain(std::iter::once(self[square].top_stone()))
     }
 
     pub fn connected_components_graph(&self) -> (AbstractBoard<u8>, u8) {
@@ -525,8 +525,7 @@ impl Board {
         for square in board_iterator() {
             if !visited[square]
                 && self[square]
-                    .last()
-                    .cloned()
+                    .top_stone()
                     .map(WhiteTr::is_road_stone)
                     .unwrap_or_default()
             {
@@ -539,8 +538,7 @@ impl Board {
         for square in board_iterator() {
             if !visited[square]
                 && self[square]
-                    .last()
-                    .cloned()
+                    .top_stone()
                     .map(BlackTr::is_road_stone)
                     .unwrap_or_default()
             {
@@ -610,7 +608,7 @@ impl board::Board for Board {
                             _ => (),
                         }
                         debug_assert!(
-                            piece.role() != Standing || self[from].last().unwrap().role() == Cap
+                            piece.role() != Standing || self[from].top_stone().unwrap().role() == Cap
                         );
                     }
                     let pieces_to_leave = self[from].len() - pieces_to_take as usize;
@@ -667,7 +665,7 @@ impl board::Board for Board {
                 let square = board_iterator()
                     .find(|&square| components[square] == id)
                     .unwrap();
-                let &piece = self[square].last().unwrap();
+                let piece = self[square].top_stone().unwrap();
                 if piece == Piece::WhiteCap || piece == Piece::WhiteFlat {
                     return Some(GameResult::WhiteWin);
                 } else if piece == Piece::BlackCap || piece == Piece::BlackFlat {
@@ -685,7 +683,7 @@ impl board::Board for Board {
             let mut white_points = 0;
             let mut black_points = 0;
             for square in board_iterator() {
-                match self[square].last() {
+                match self[square].top_stone() {
                     Some(WhiteFlat) | Some(WhiteCap) => white_points += 1,
                     Some(BlackFlat) | Some(BlackCap) => black_points += 1,
                     _ => (),
@@ -721,14 +719,14 @@ impl EvalBoardTrait for Board {
         let mut centre = 0.0;
         for x in 1..4 {
             for y in 1..4 {
-                match self.cells.raw[y][x].last().cloned().map(Piece::color) {
+                match self.cells.raw[y][x].top_stone().map(Piece::color) {
                     Some(Color::White) => centre += 0.2,
                     Some(Color::Black) => centre -= 0.2,
                     None => (),
                 }
             }
         }
-        match self.cells.raw[2][2].last().cloned().map(Piece::color) {
+        match self.cells.raw[2][2].top_stone().map(Piece::color) {
             Some(Color::White) => centre += 0.1,
             Some(Color::Black) => centre -= 0.1,
             None => (),
@@ -738,7 +736,7 @@ impl EvalBoardTrait for Board {
             .map(|sq| &self[sq])
             .filter(|stack| stack.len() > 1)
             .map(|stack| {
-                let controlling_player = stack.last().unwrap().color();
+                let controlling_player = stack.top_stone().unwrap().color();
                 let val = stack
                     .clone()
                     .into_iter()
@@ -885,7 +883,7 @@ fn connect_component<Color: ColorTr>(
     visited[square] = true;
     for neighbour in square.neighbours() {
         if !board[neighbour].is_empty()
-            && Color::is_road_stone(*board[neighbour].last().unwrap())
+            && Color::is_road_stone(board[neighbour].top_stone().unwrap())
             && !visited[neighbour]
         {
             connect_component::<Color>(board, components, visited, neighbour, id);

@@ -13,7 +13,7 @@ impl Board {
         moves: &mut Vec<<Board as board_game_traits::board::Board>::Move>,
     ) {
         for square in board_iterator() {
-            match self[square].last() {
+            match self[square].top_stone() {
                 None => {
                     if Colorr::stones_left(&self) > 0 {
                         moves.push(Move::Place(Colorr::flat_piece(), square));
@@ -23,7 +23,7 @@ impl Board {
                         moves.push(Move::Place(Colorr::cap_piece(), square));
                     }
                 }
-                Some(&piece) if Colorr::piece_is_ours(piece) => {
+                Some(piece) if Colorr::piece_is_ours(piece) => {
                     for direction in square.directions() {
                         let mut movements = vec![];
                         if piece == Colorr::cap_piece() {
@@ -99,7 +99,7 @@ impl Board {
             } else {
                 (pieces_carried - 1).min(BOARD_SIZE as u8)
             };
-            let neighbour_piece = self[neighbour].last().cloned();
+            let neighbour_piece = self[neighbour].top_stone();
             if neighbour_piece.map(Piece::role) == Some(Cap) {
                 return;
             }
@@ -136,7 +136,7 @@ impl Board {
         movements: &mut Vec<ArrayVec<[Movement; BOARD_SIZE]>>,
     ) {
         if let Some(neighbour) = square.go_direction(direction) {
-            let neighbour_piece = self[neighbour].last().cloned();
+            let neighbour_piece = self[neighbour].top_stone();
             if neighbour_piece.is_some() && neighbour_piece.unwrap().role() != Flat {
                 return;
             }
