@@ -90,8 +90,8 @@ impl Board {
         origin_square: Square,
         square: Square,
         pieces_carried: u8,
-        partial_movement: &ArrayVec<[Movement; BOARD_SIZE]>,
-        movements: &mut Vec<ArrayVec<[Movement; BOARD_SIZE]>>,
+        partial_movement: &ArrayVec<[Movement; BOARD_SIZE - 1]>,
+        movements: &mut Vec<ArrayVec<[Movement; BOARD_SIZE - 1]>>,
     ) {
         if let Some(neighbour) = square.go_direction(direction) {
             let max_pieces_to_take = if square == origin_square {
@@ -132,8 +132,8 @@ impl Board {
         origin_square: Square,
         square: Square,
         pieces_carried: u8,
-        partial_movement: &ArrayVec<[Movement; BOARD_SIZE]>,
-        movements: &mut Vec<ArrayVec<[Movement; BOARD_SIZE]>>,
+        partial_movement: &ArrayVec<[Movement; BOARD_SIZE - 1]>,
+        movements: &mut Vec<ArrayVec<[Movement; BOARD_SIZE - 1]>>,
     ) {
         if let Some(neighbour) = square.go_direction(direction) {
             let neighbour_piece = self[neighbour].top_stone();

@@ -122,9 +122,15 @@ pub fn perft(board: &mut Board, depth: u16) -> u64 {
         moves
             .into_iter()
             .map(|mv| {
-                let reverse_move = board.do_move(mv);
+                let old_board = board.clone();
+                let reverse_move = board.do_move(mv.clone());
                 let num_moves = perft(board, depth - 1);
                 board.reverse_move(reverse_move);
+                debug_assert_eq!(
+                    *board, old_board,
+                    "Failed to restore old board after {:?} on\n{:?}",
+                    mv, old_board
+                );
                 num_moves
             })
             .sum()

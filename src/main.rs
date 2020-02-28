@@ -5,6 +5,7 @@ extern crate rand;
 extern crate smallvec;
 extern crate arrayvec;
 
+mod bitboard;
 mod board;
 mod mcts;
 mod minmax;

@@ -1,5 +1,6 @@
 pub const BOARD_SIZE: usize = 5;
 
+use crate::bitboard::BitBoard;
 use crate::board::Direction::*;
 use crate::board::Piece::*;
 use crate::board::Role::Flat;
@@ -11,7 +12,6 @@ use board_game_traits::board::{Board as BoardTrait, EvalBoard as EvalBoardTrait}
 use board_game_traits::board::{Color, GameResult};
 use pgn_traits::pgn;
 use smallvec::alloc::fmt::{Error, Formatter};
-use smallvec::SmallVec;
 use std::cmp::Ordering;
 use std::fmt::Debug;
 use std::fmt::Write;
@@ -274,49 +274,110 @@ impl ops::Not for Piece {
 
 #[derive(Clone, PartialEq, Eq, Debug, Default)]
 pub struct Stack {
-    pieces: SmallVec<[Piece; 4]>,
+    top_stone: Option<Piece>,
+    bitboard: BitBoard,
+    height: u8,
 }
 
 impl Stack {
-    pub fn get<'a>(&'a self, i: usize) -> Option<Piece> {
-        self.pieces.get(i).cloned()
+    /// Get a piece by index. 0 is the bottom of the stack
+    pub fn get(&self, i: u8) -> Option<Piece> {
+        if i >= self.height {
+            None
+        } else if i == self.height - 1 {
+            self.top_stone
+        } else if self.bitboard.get(i) {
+            Some(WhiteFlat)
+        } else {
+            Some(BlackFlat)
+        }
     }
 
     pub fn top_stone(&self) -> Option<Piece> {
-        self.pieces.last().cloned()
-    }
-
-    pub fn top_stone_mut<'a>(&'a mut self) -> Option<&'a mut Piece> {
-        self.pieces.last_mut()
+        self.top_stone
     }
 
     pub fn push(&mut self, piece: Piece) {
-        self.pieces.push(piece);
+        if self.height > 0 && self.top_stone.unwrap().color() == Color::White {
+            self.bitboard = self.bitboard.set(self.height - 1);
+        }
+        self.top_stone = Some(piece);
+        self.height += 1;
     }
 
     pub fn pop(&mut self) -> Option<Piece> {
-        self.pieces.pop()
+        debug_assert_ne!(self.height, 0);
+        let old_piece = self.top_stone;
+        if self.height > 1 {
+            let piece = if self.bitboard.get(self.height - 2) {
+                Piece::WhiteFlat
+            } else {
+                Piece::BlackFlat
+            };
+            self.bitboard = self.bitboard.clear(self.height - 2);
+            self.top_stone = Some(piece);
+        } else {
+            self.top_stone = None;
+        }
+        self.height -= 1;
+        old_piece
     }
 
-    pub fn remove(&mut self, i: usize) -> Piece {
-        self.pieces.remove(i)
+    pub fn replace_top(&mut self, piece: Piece) -> Option<Piece> {
+        self.top_stone.replace(piece)
+    }
+
+    pub fn remove(&mut self, i: u8) -> Piece {
+        if i == self.height - 1 {
+            self.pop().expect("Tried to remove from empty stack")
+        } else {
+            let piece = if self.bitboard.get(i) {
+                Piece::WhiteFlat
+            } else {
+                Piece::BlackFlat
+            };
+            let pieces_below = self.bitboard & BitBoard::lower_n_bits(i);
+            let pieces_above = self.bitboard & !BitBoard::lower_n_bits(i + 1);
+            self.bitboard = pieces_below
+                | BitBoard {
+                    board: pieces_above.board >> 1,
+                };
+            self.height -= 1;
+            piece
+        }
     }
 
     pub fn is_empty(&self) -> bool {
-        self.pieces.is_empty()
+        self.height == 0
     }
 
-    pub fn len(&self) -> usize {
-        self.pieces.len()
+    pub fn len(&self) -> u8 {
+        self.height
+    }
+}
+
+pub struct StackIterator {
+    stack: Stack,
+}
+
+impl Iterator for StackIterator {
+    type Item = Piece;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.stack.is_empty() {
+            None
+        } else {
+            Some(self.stack.remove(0))
+        }
     }
 }
 
 impl IntoIterator for Stack {
     type Item = Piece;
-    type IntoIter = smallvec::IntoIter<[Piece; 4]>;
+    type IntoIter = StackIterator;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.pieces.into_iter()
+        StackIterator { stack: self }
     }
 }
 
@@ -365,7 +426,7 @@ impl fmt::Debug for Move {
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub enum ReverseMove {
     Place(Square),
-    Move(Board),
+    Move(Square, Direction, StackMovement, bool),
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -377,6 +438,15 @@ pub enum Direction {
 }
 
 impl Direction {
+    fn reverse(self) -> Direction {
+        match self {
+            North => South,
+            West => East,
+            East => West,
+            South => North,
+        }
+    }
+
     fn parse(ch: char) -> Self {
         match ch {
             '-' => North,
@@ -390,7 +460,7 @@ impl Direction {
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct StackMovement {
-    pub movements: ArrayVec<[Movement; BOARD_SIZE]>,
+    pub movements: ArrayVec<[Movement; BOARD_SIZE - 1]>,
 }
 
 /// Moving a stack of pieces consists of one or more `Movement`s
@@ -481,7 +551,12 @@ impl Board {
     }
 
     pub fn count_all_stones(&self) -> u8 {
-        self.cells.raw.iter().flatten().cloned().flatten().count() as u8
+        self.cells
+            .raw
+            .iter()
+            .flatten()
+            .map(|stack: &Stack| stack.len())
+            .sum()
     }
 
     pub fn all_top_stones<'a>(&'a self) -> impl Iterator<Item = Piece> + 'a {
@@ -502,7 +577,7 @@ impl Board {
             .movements
             .iter()
             .map(move |Movement { pieces_to_take }| {
-                let piece_index = self[square].len() - *pieces_to_take as usize;
+                let piece_index = self[square].len() - *pieces_to_take;
                 if piece_index == 0 {
                     None
                 } else {
@@ -573,10 +648,6 @@ impl board::Board for Board {
 
     fn do_move(&mut self, mv: Self::Move) -> Self::ReverseMove {
         let reverse_move = match mv {
-            Move::Place(_piece, to) => ReverseMove::Place(to),
-            Move::Move(_, _, _) => ReverseMove::Move(self.clone()),
-        };
-        match mv {
             Move::Place(piece, to) => {
                 self[to].push(piece);
                 match (self.side_to_move(), piece) {
@@ -587,20 +658,30 @@ impl board::Board for Board {
                     (Color::Black, BlackStanding) => self.black_stones_left -= 1,
                     (Color::Black, BlackCap) => self.black_capstones_left -= 1,
                     _ => unreachable!(
-                        "Tried to place {} stone on {}'s move",
+                        "Tried to place {} stone on {}'s move\n{:?}",
                         piece.color(),
-                        self.side_to_move()
+                        self.side_to_move(),
+                        self
                     ),
                 }
+                ReverseMove::Place(to)
             }
             Move::Move(mut from, direction, stack_movement) => {
-                // self[from].truncate(movements[0].pieces_to_leave as usize);
+                let mut pieces_left_behind = vec![];
+                let mut flattens_stone = false;
                 for Movement { pieces_to_take } in stack_movement.movements {
                     let to = from.go_direction(direction).unwrap();
-                    if let Some(piece) = self[to].top_stone_mut() {
+                    if let Some(piece) = self[to].top_stone() {
+                        // Flatten top stone, if needed
                         match piece {
-                            WhiteStanding => *piece = WhiteFlat,
-                            BlackStanding => *piece = BlackFlat,
+                            WhiteStanding => {
+                                self[to].replace_top(Piece::WhiteFlat);
+                                flattens_stone = true;
+                            }
+                            BlackStanding => {
+                                self[to].replace_top(Piece::BlackFlat);
+                                flattens_stone = true;
+                            }
                             _ => (),
                         }
                         debug_assert!(
@@ -608,18 +689,31 @@ impl board::Board for Board {
                                 || self[from].top_stone().unwrap().role() == Cap
                         );
                     }
-                    let pieces_to_leave = self[from].len() - pieces_to_take as usize;
+                    let pieces_to_leave = self[from].len() - pieces_to_take;
+                    pieces_left_behind.push(pieces_to_take);
 
                     for _ in pieces_to_leave..self[from].len() {
                         let piece = self[from].get(pieces_to_leave).unwrap();
                         self[to].push(piece);
                         self[from].remove(pieces_to_leave);
                     }
-
                     from = to;
                 }
+
+                pieces_left_behind.reverse();
+                ReverseMove::Move(
+                    from,
+                    direction.reverse(),
+                    StackMovement {
+                        movements: pieces_left_behind
+                            .iter()
+                            .map(|&pieces_to_take| Movement { pieces_to_take })
+                            .collect(),
+                    },
+                    flattens_stone,
+                )
             }
-        }
+        };
 
         debug_assert_eq!(
             44 - self.white_stones_left
@@ -630,6 +724,7 @@ impl board::Board for Board {
             "Wrong number of stones on board:\n{:?}",
             self
         );
+
         self.to_move = !self.to_move;
         reverse_move
     }
@@ -645,10 +740,31 @@ impl board::Board for Board {
                     BlackFlat | BlackStanding => self.black_stones_left += 1,
                     BlackCap => self.black_capstones_left += 1,
                 };
-                self.to_move = !self.to_move;
             }
-            ReverseMove::Move(old_board) => *self = old_board,
+
+            ReverseMove::Move(from, direction, stack_movement, flattens_wall) => {
+                let mut square = from;
+                for Movement { pieces_to_take } in stack_movement.movements {
+                    let to = square.go_direction(direction).unwrap();
+
+                    let pieces_to_leave = self[square].len() - pieces_to_take;
+
+                    for _ in pieces_to_leave..self[square].len() {
+                        let piece = self[square].get(pieces_to_leave).unwrap();
+                        self[to].push(piece);
+                        self[square].remove(pieces_to_leave);
+                    }
+                    square = to;
+                }
+                if flattens_wall {
+                    match self[from].top_stone().unwrap().color() {
+                        Color::White => self[from].replace_top(WhiteStanding),
+                        Color::Black => self[from].replace_top(BlackStanding),
+                    };
+                };
+            }
         }
+        self.to_move = !self.to_move;
     }
 
     fn game_result(&self) -> Option<GameResult> {
@@ -741,7 +857,7 @@ impl EvalBoardTrait for Board {
                 let val = stack
                     .clone()
                     .into_iter()
-                    .take(stack.len() - 1)
+                    .take(stack.len() as usize - 1)
                     .map(|piece| {
                         if piece.color() == controlling_player {
                             0.8

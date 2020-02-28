@@ -97,9 +97,8 @@ impl Tree {
     fn expand(&mut self, board: &mut Board) -> f64 {
         debug_assert!(self.children.is_empty());
 
-        let game_result = board.game_result();
-        if game_result.is_some() {
-            let result = match board.game_result().unwrap() {
+        if let Some(game_result) = board.game_result() {
+            let result = match game_result {
                 GameResult::Draw => 0.5,
                 GameResult::WhiteWin => 0.0, // The side to move has lost
                 GameResult::BlackWin => 0.0, // The side to move has lost

@@ -1,4 +1,5 @@
 use crate::board as board_mod;
+use crate::board::Piece::{BlackFlat, WhiteFlat, WhiteStanding};
 use crate::board::{board_iterator, Board, Move, Piece, Square};
 use crate::tests::do_moves_and_check_validity;
 use board_game_traits::board::Board as BoardTrait;
@@ -26,6 +27,45 @@ fn go_in_directions_test() {
                 square
             )
         }
+    }
+}
+
+#[test]
+fn get_set_test() {
+    let pieces = vec![WhiteFlat, BlackFlat, BlackFlat, WhiteStanding];
+    let mut board = Board::default();
+    for &piece in pieces.iter() {
+        board[Square(12)].push(piece);
+    }
+    assert_eq!(board[Square(12)].len(), 4);
+    assert_eq!(board[Square(12)].top_stone(), Some(WhiteStanding));
+
+    for (i, &piece) in pieces.iter().enumerate() {
+        assert_eq!(
+            Some(piece),
+            board[Square(12)].get(i as u8),
+            "{:?}",
+            board[Square(12)]
+        );
+    }
+
+    for &piece in pieces.iter().rev() {
+        assert_eq!(Some(piece), board[Square(12)].pop(), "{:?}", board);
+    }
+
+    assert!(board[Square(12)].is_empty());
+
+    for &piece in pieces.iter() {
+        board[Square(12)].push(piece);
+    }
+
+    for &piece in pieces.iter() {
+        assert_eq!(
+            piece,
+            board[Square(12)].remove(0),
+            "{:?}",
+            board[Square(12)]
+        );
     }
 }
 
