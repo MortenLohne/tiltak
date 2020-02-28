@@ -10,6 +10,7 @@ pub struct Tree {
     pub total_action_value: f64,
     pub mean_action_value: f64,
     pub heuristic_score: f64,
+    pub is_terminal: bool,
 }
 
 // TODO: Winning percentage should be always be interpreted from the side to move's perspective
@@ -30,6 +31,7 @@ impl Tree {
             total_action_value: 0.0,
             mean_action_value: 0.5,
             heuristic_score: 0.0,
+            is_terminal: false,
         }
     }
 
@@ -65,13 +67,28 @@ impl Tree {
             total_action_value: 0.0,
             mean_action_value: 0.5,
             heuristic_score,
+            is_terminal: false,
         }
     }
 
     pub fn select(&mut self, board: &mut Board) -> f64 {
-        if self.children.is_empty() {
+        if self.is_terminal {
+            self.visits += 1;
+            self.total_action_value += self.mean_action_value;
+            self.mean_action_value
+        } else if self.visits == 0 {
             self.expand(board)
         } else {
+            // Only generate child moves on the 2nd visit
+            if self.visits == 1 {
+                let mut moves = vec![];
+                board.generate_moves_with_probabilities(&mut moves);
+                self.children.reserve_exact(moves.len());
+                for (mv, heuristic_score) in moves {
+                    self.children
+                        .push((Tree::new_node(heuristic_score), mv.clone()));
+                }
+            }
             let visits = self.visits;
             let (child, mv) = self
                 .children
@@ -103,18 +120,13 @@ impl Tree {
                 GameResult::WhiteWin => 0.0, // The side to move has lost
                 GameResult::BlackWin => 0.0, // The side to move has lost
             };
+            self.is_terminal = true;
             self.visits += 1;
             self.mean_action_value = result;
             self.total_action_value += result;
             return result;
         }
 
-        let mut moves = vec![];
-        board.generate_moves_with_probabilities(&mut moves);
-        for (mv, heuristic_score) in moves {
-            self.children
-                .push((Tree::new_node(heuristic_score), mv.clone()));
-        }
         let mut static_eval = cp_to_win_percentage(board.static_eval());
         if board.side_to_move() == Color::Black {
             static_eval = 1.0 - static_eval;
