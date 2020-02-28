@@ -15,7 +15,7 @@ use smallvec::SmallVec;
 use std::cmp::Ordering;
 use std::fmt::Debug;
 use std::fmt::Write;
-use std::ops::{Index, IndexMut};
+use std::ops::{Index, IndexMut, RangeBounds};
 use std::{fmt, ops};
 
 pub trait ColorTr {
@@ -272,7 +272,57 @@ impl ops::Not for Piece {
     }
 }
 
-pub type Stack = SmallVec<[Piece; 4]>;
+#[derive(Clone, PartialEq, Eq, Debug, Default)]
+pub struct Stack {
+    pieces: SmallVec<[Piece; 4]>,
+}
+
+impl Stack {
+    pub fn get<'a>(&'a self, i: usize) -> Option<&'a Piece> {
+        self.pieces.get(i)
+    }
+
+    pub fn last<'a>(&'a self) -> Option<&'a Piece> {
+        self.pieces.last()
+    }
+
+    pub fn last_mut<'a>(&'a mut self) -> Option<&'a mut Piece> {
+        self.pieces.last_mut()
+    }
+
+    pub fn push(&mut self, piece: Piece) {
+        self.pieces.push(piece);
+    }
+
+    pub fn pop(&mut self) -> Option<Piece> {
+        self.pieces.pop()
+    }
+
+    pub fn drain<R: RangeBounds<usize>>(&mut self, r: R) -> smallvec::Drain<[Piece; 4]> {
+        self.pieces.drain(r)
+    }
+
+    pub fn extend<I: IntoIterator<Item = Piece>>(&mut self, iter: I) {
+        self.pieces.extend(iter);
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.pieces.is_empty()
+    }
+
+    pub fn len(&self) -> usize {
+        self.pieces.len()
+    }
+}
+
+impl IntoIterator for Stack {
+    type Item = Piece;
+    type IntoIter = smallvec::IntoIter<[Piece; 4]>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.pieces.into_iter()
+    }
+}
 
 #[derive(Clone, PartialEq, Eq)]
 pub enum Move {
@@ -435,7 +485,7 @@ impl Board {
     }
 
     pub fn count_all_stones(&self) -> u8 {
-        self.cells.raw.iter().flatten().flatten().count() as u8
+        self.cells.raw.iter().flatten().cloned().flatten().count() as u8
     }
 
     pub fn all_top_stones(&self) -> impl Iterator<Item = &Piece> {
@@ -460,7 +510,7 @@ impl Board {
                 if piece_index == 0 {
                     None
                 } else {
-                    Some(self[square][piece_index - 1].clone())
+                    Some(*self[square].get(piece_index - 1).unwrap())
                 }
             })
             .chain(std::iter::once(self[square].last().cloned()))
@@ -690,7 +740,8 @@ impl EvalBoardTrait for Board {
             .map(|stack| {
                 let controlling_player = stack.last().unwrap().color();
                 let val = stack
-                    .iter()
+                    .clone()
+                    .into_iter()
                     .take(stack.len() - 1)
                     .map(|piece| {
                         if piece.color() == controlling_player {
