@@ -50,13 +50,12 @@ impl Tree {
     }
 
     pub fn best_move(&self) -> (Move, f64) {
-        let mut best_children = self.children.clone();
-        best_children.sort_by_key(|(child, _)| child.visits);
-        best_children.reverse();
-        (
-            best_children[0].1.clone(),
-            best_children[0].0.mean_action_value,
-        )
+        let (tree, mv) = self
+            .children
+            .iter()
+            .max_by_key(|(child, _)| child.visits)
+            .unwrap();
+        (mv.clone(), tree.mean_action_value)
     }
 
     fn new_node(heuristic_score: f64) -> Self {
