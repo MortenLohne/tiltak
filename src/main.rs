@@ -3,6 +3,7 @@ extern crate pgn_traits;
 extern crate rand;
 #[macro_use]
 extern crate smallvec;
+extern crate arrayvec;
 
 mod board;
 mod mcts;

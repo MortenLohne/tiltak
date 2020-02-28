@@ -3,9 +3,9 @@ use crate::board::{
     board_iterator, Board, ColorTr, Direction, Move, Movement, Piece, Square, StackMovement,
     BOARD_SIZE,
 };
+use arrayvec::ArrayVec;
 use board_game_traits::board::Board as BoardTrait;
 use board_game_traits::board::{Color, GameResult};
-use smallvec::SmallVec;
 
 impl Board {
     pub fn generate_moves_colortr<Colorr: ColorTr>(
@@ -32,7 +32,7 @@ impl Board {
                                 square,
                                 square,
                                 self[square].len() as u8,
-                                &smallvec![],
+                                &ArrayVec::new(),
                                 &mut movements,
                             );
                         } else if Colorr::piece_is_ours(piece) {
@@ -41,7 +41,7 @@ impl Board {
                                 square,
                                 square,
                                 self[square].len() as u8,
-                                &smallvec![],
+                                &ArrayVec::new(),
                                 &mut movements,
                             );
                         }
@@ -85,8 +85,8 @@ impl Board {
         origin_square: Square,
         square: Square,
         pieces_carried: u8,
-        partial_movement: &SmallVec<[Movement; 5]>,
-        movements: &mut Vec<SmallVec<[Movement; 5]>>,
+        partial_movement: &ArrayVec<[Movement; BOARD_SIZE]>,
+        movements: &mut Vec<ArrayVec<[Movement; BOARD_SIZE]>>,
     ) {
         if let Some(neighbour) = square.go_direction(direction) {
             let max_pieces_to_take = if square == origin_square {
@@ -127,8 +127,8 @@ impl Board {
         origin_square: Square,
         square: Square,
         pieces_carried: u8,
-        partial_movement: &SmallVec<[Movement; 5]>,
-        movements: &mut Vec<SmallVec<[Movement; 5]>>,
+        partial_movement: &ArrayVec<[Movement; BOARD_SIZE]>,
+        movements: &mut Vec<ArrayVec<[Movement; BOARD_SIZE]>>,
     ) {
         if let Some(neighbour) = square.go_direction(direction) {
             let neighbour_piece = self[neighbour].last().cloned();

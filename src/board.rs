@@ -4,6 +4,7 @@ use crate::board::Direction::*;
 use crate::board::Piece::*;
 use crate::board::Role::Flat;
 use crate::board::Role::*;
+use arrayvec::ArrayVec;
 use board_game_traits::board;
 use board_game_traits::board::GameResult::{BlackWin, Draw, WhiteWin};
 use board_game_traits::board::{Board as BoardTrait, EvalBoard as EvalBoardTrait};
@@ -337,7 +338,7 @@ impl Direction {
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct StackMovement {
-    pub movements: SmallVec<[Movement; 5]>,
+    pub movements: ArrayVec<[Movement; BOARD_SIZE]>,
 }
 
 /// Moving a stack of pieces consists of one or more `Movement`s
