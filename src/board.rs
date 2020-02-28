@@ -316,6 +316,12 @@ impl fmt::Debug for Move {
     }
 }
 
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub enum ReverseMove {
+    Place(Square),
+    Move(Board),
+}
+
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Direction {
     North,
@@ -498,7 +504,7 @@ impl Board {
 
 impl board::Board for Board {
     type Move = Move;
-    type ReverseMove = Self;
+    type ReverseMove = ReverseMove;
 
     fn start_board() -> Self {
         Self::default()
@@ -516,7 +522,10 @@ impl board::Board for Board {
     }
 
     fn do_move(&mut self, mv: Self::Move) -> Self::ReverseMove {
-        let reverse_move = self.clone();
+        let reverse_move = match mv {
+            Move::Place(_piece, to) => ReverseMove::Place(to),
+            Move::Move(_, _, _) => ReverseMove::Move(self.clone()),
+        };
         match mv {
             Move::Place(piece, to) => {
                 self[to].push(piece);
@@ -527,7 +536,7 @@ impl board::Board for Board {
                     (Color::Black, BlackFlat) => self.black_stones_left -= 1,
                     (Color::Black, BlackStanding) => self.black_stones_left -= 1,
                     (Color::Black, BlackCap) => self.black_capstones_left -= 1,
-                    _ => unreachable!(),
+                    _ => unreachable!("Tried to place {} stone on {}'s move", piece.color(), self.side_to_move()),
                 }
             }
             Move::Move(mut from, direction, stack_movement) => {
@@ -567,7 +576,20 @@ impl board::Board for Board {
     }
 
     fn reverse_move(&mut self, reverse_move: Self::ReverseMove) {
-        *self = reverse_move
+        match reverse_move {
+            ReverseMove::Place(square) => {
+                let piece = self[square].pop().unwrap();
+                debug_assert_eq!(piece.color(), !self.side_to_move());
+                match piece {
+                    WhiteFlat | WhiteStanding => self.white_stones_left += 1,
+                    WhiteCap => self.white_capstones_left += 1,
+                    BlackFlat | BlackStanding => self.black_stones_left += 1,
+                    BlackCap => self.black_capstones_left += 1,
+                };
+                self.to_move = !self.to_move;
+            },
+            ReverseMove::Move(old_board) => *self = old_board,
+        }
     }
 
     fn game_result(&self) -> Option<GameResult> {
