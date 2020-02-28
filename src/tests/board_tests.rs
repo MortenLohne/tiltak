@@ -1,6 +1,8 @@
 use crate::board as board_mod;
-use crate::board::{board_iterator, Move, Piece, Square};
-use board_game_traits::board::{Board, GameResult, GameResult::*};
+use crate::board::{board_iterator, Board, Move, Piece, Square};
+use crate::tests::do_moves_and_check_validity;
+use board_game_traits::board::Board as BoardTrait;
+use board_game_traits::board::{GameResult, GameResult::*};
 use pgn_traits::pgn::PgnBoard;
 use rand::seq::SliceRandom;
 
@@ -24,6 +26,41 @@ fn go_in_directions_test() {
                 square
             )
         }
+    }
+}
+
+#[test]
+fn stones_left_behind_by_stack_movement_test() {
+    let mut board: Board = Board::default();
+
+    do_moves_and_check_validity(&mut board, &["c3", "d3", "c4", "1d3<", "1c4+", "Sc4"]);
+
+    let mv = board.move_from_san("2c3<1").unwrap();
+    if let Move::Move(square, _direction, stack_movement) = mv {
+        assert_eq!(
+            board
+                .top_stones_left_behind_by_move(square, &stack_movement)
+                .collect::<Vec<_>>(),
+            vec![
+                Some(Piece::WhiteFlat),
+                Some(Piece::BlackFlat),
+                Some(Piece::WhiteFlat)
+            ]
+        );
+    } else {
+        panic!()
+    }
+
+    let mv = board.move_from_san("3c3<1").unwrap();
+    if let Move::Move(square, _direction, stack_movement) = mv {
+        assert_eq!(
+            board
+                .top_stones_left_behind_by_move(square, &stack_movement)
+                .collect::<Vec<_>>(),
+            vec![None, Some(Piece::BlackFlat), Some(Piece::WhiteFlat)]
+        );
+    } else {
+        panic!()
     }
 }
 

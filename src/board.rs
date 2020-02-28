@@ -439,6 +439,26 @@ impl Board {
             .filter_map(|cell| cell.last())
     }
 
+    /// An iterator over the top stones left behind after a stack movement
+    pub fn top_stones_left_behind_by_move<'a>(
+        &'a self,
+        square: Square,
+        stack_movement: &'a StackMovement,
+    ) -> impl Iterator<Item = Option<Piece>> + 'a {
+        stack_movement
+            .movements
+            .iter()
+            .map(move |Movement { pieces_to_take }| {
+                let piece_index = self[square].len() - *pieces_to_take as usize;
+                if piece_index == 0 {
+                    None
+                } else {
+                    Some(self[square][piece_index - 1].clone())
+                }
+            })
+            .chain(std::iter::once(self[square].last().cloned()))
+    }
+
     pub fn connected_components_graph(&self) -> (AbstractBoard<u8>, u8) {
         let mut components: AbstractBoard<u8> = Default::default();
         let mut visited: AbstractBoard<bool> = Default::default();
@@ -531,6 +551,7 @@ impl board::Board for Board {
                 }
             }
         }
+
         debug_assert_eq!(
             44 - self.white_stones_left
                 - self.black_stones_left
