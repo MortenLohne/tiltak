@@ -278,8 +278,8 @@ pub struct Stack {
 }
 
 impl Stack {
-    pub fn get<'a>(&'a self, i: usize) -> Option<&'a Piece> {
-        self.pieces.get(i)
+    pub fn get<'a>(&'a self, i: usize) -> Option<Piece> {
+        self.pieces.get(i).cloned()
     }
 
     pub fn top_stone(&self) -> Option<Piece> {
@@ -510,7 +510,7 @@ impl Board {
                 if piece_index == 0 {
                     None
                 } else {
-                    Some(*self[square].get(piece_index - 1).unwrap())
+                    Some(self[square].get(piece_index - 1).unwrap())
                 }
             })
             .chain(std::iter::once(self[square].top_stone()))
