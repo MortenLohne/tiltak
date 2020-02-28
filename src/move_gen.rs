@@ -46,14 +46,11 @@ impl Board {
                             );
                         }
                         for movements in movements.into_iter().filter(|mv| !mv.is_empty()) {
-                            let stack_movement = StackMovement { movements };
-                            let mv = Move::Move(square, direction, stack_movement.clone());
+                            let mv = Move::Move(square, direction, StackMovement { movements });
                             // Check that moves are not suicide moves
-                            if self
-                                .top_stones_left_behind_by_move(square, &stack_movement)
-                                .any(|piece| {
-                                    piece.is_some() && !Colorr::piece_is_ours(piece.unwrap())
-                                })
+                            if self[square]
+                                .iter()
+                                .any(|piece: &Piece| !Colorr::piece_is_ours(*piece))
                             {
                                 let mut new_board = self.clone();
                                 new_board.do_move(mv.clone());
