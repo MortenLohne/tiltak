@@ -1,7 +1,7 @@
-use crate::board as board_mod;
-use crate::board::Piece::{BlackFlat, WhiteFlat, WhiteStanding};
+use crate::board::Piece::{BlackCap, BlackFlat, WhiteFlat, WhiteStanding};
 use crate::board::{board_iterator, Board, Move, Piece, Square};
 use crate::tests::do_moves_and_check_validity;
+use crate::{board as board_mod, board};
 use board_game_traits::board::Board as BoardTrait;
 use board_game_traits::board::{GameResult, GameResult::*};
 use pgn_traits::pgn::PgnBoard;
@@ -67,6 +67,16 @@ fn get_set_test() {
             board[Square(12)]
         );
     }
+}
+
+#[test]
+fn flatten_stack_test() {
+    let mut stack = board::Stack::default();
+    stack.push(WhiteStanding);
+    stack.push(BlackCap);
+    assert_eq!(stack.get(0), Some(WhiteFlat));
+    assert_eq!(stack.pop(), Some(BlackCap));
+    assert_eq!(stack.pop(), Some(WhiteFlat));
 }
 
 #[test]

@@ -297,6 +297,8 @@ impl Stack {
         self.top_stone
     }
 
+    /// Push a new piece to the top of the stack
+    /// Any piece already on the stack will be flattened, including capstones
     pub fn push(&mut self, piece: Piece) {
         if self.height > 0 && self.top_stone.unwrap().color() == Color::White {
             self.bitboard = self.bitboard.set(self.height - 1);
@@ -675,24 +677,12 @@ impl board::Board for Board {
                 let mut flattens_stone = false;
                 for Movement { pieces_to_take } in stack_movement.movements {
                     let to = from.go_direction(direction).unwrap();
-                    if let Some(piece) = self[to].top_stone() {
-                        // Flatten top stone, if needed
-                        match piece {
-                            WhiteStanding => {
-                                self[to].replace_top(Piece::WhiteFlat);
-                                flattens_stone = true;
-                            }
-                            BlackStanding => {
-                                self[to].replace_top(Piece::BlackFlat);
-                                flattens_stone = true;
-                            }
-                            _ => (),
-                        }
-                        debug_assert!(
-                            piece.role() != Standing
-                                || self[from].top_stone().unwrap().role() == Cap
-                        );
+
+                    if self[to].top_stone.map(Piece::role) == Some(Standing) {
+                        flattens_stone = true;
+                        debug_assert!(self[from].top_stone().unwrap().role() == Cap);
                     }
+
                     let pieces_to_leave = self[from].len() - pieces_to_take;
                     pieces_left_behind.push(pieces_to_take);
 
