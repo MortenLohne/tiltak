@@ -471,7 +471,7 @@ pub struct Movement {
 
 #[derive(Clone, PartialEq, Eq)]
 pub struct Board {
-    pub cells: AbstractBoard<Stack>,
+    cells: AbstractBoard<Stack>,
     to_move: Color,
     white_stones_left: u8,
     black_stones_left: u8,
