@@ -63,7 +63,7 @@ impl Tree {
             println!(
                 "Move {}: {} visits, {:.3} mean action value, {:.3} static score, {:.3} exploration value, best reply {:?}",
                 mv, child.visits, child.mean_action_value, child.heuristic_score,
-                child.exploration_value(parent_visits),
+                child.exploration_value((parent_visits as f64).sqrt()),
                 if child.children.is_empty() { "".to_string() } else { format!("{:?}", child.best_move().0) }
             )
         });
@@ -107,11 +107,13 @@ impl Tree {
                 self.init_children(&board, simple_moves, moves);
             }
 
-            let mut best_exploration_value = self.children[0].0.exploration_value(self.visits);
+            let visits_sqrt = (self.visits as f64).sqrt();
+
+            let mut best_exploration_value = self.children[0].0.exploration_value(visits_sqrt);
             let mut best_child_node_index = 0;
 
             for (i, (child, _)) in self.children.iter().enumerate() {
-                let child_exploration_value = child.exploration_value(self.visits);
+                let child_exploration_value = child.exploration_value(visits_sqrt);
                 if child_exploration_value >= best_exploration_value {
                     best_child_node_index = i;
                     best_exploration_value = child_exploration_value;
@@ -175,10 +177,9 @@ impl Tree {
     }
 
     #[inline]
-    fn exploration_value(&self, parent_visits: u64) -> f64 {
+    fn exploration_value(&self, parent_visits_sqrt: f64) -> f64 {
         (1.0 - self.mean_action_value)
-            + C_PUCT * self.heuristic_score * (parent_visits as f64).sqrt()
-                / (1 + self.visits) as f64
+            + C_PUCT * self.heuristic_score * parent_visits_sqrt / (1 + self.visits) as f64
     }
 }
 
