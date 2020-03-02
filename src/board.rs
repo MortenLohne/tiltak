@@ -1063,11 +1063,9 @@ pub fn connected_components_graph(road_pieces: BitBoard) -> (AbstractBoard<u8>, 
     let mut id = 1;
 
     for square in board_iterator() {
-        if components[square] == 0 {
-            if road_pieces.get(square.0) {
+        if components[square] == 0 && road_pieces.get(square.0) {
                 connect_component(road_pieces, &mut components, square, id);
                 id += 1;
-            }
         }
     }
     (components, id)

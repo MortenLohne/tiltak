@@ -175,36 +175,7 @@ impl Board {
                 let (their_components, their_highest_component_id) =
                     board::connected_components_graph(their_road_pieces);
 
-                return board::is_win_by_road(&their_components, their_highest_component_id)
-                    .is_some();
-            /*
-            if let Some(winning_square) = board::is_win_by_road(&their_components, their_highest_component_id) {
-                println!("Found suicide move {:?}", mv);
-                let mut sq = *square;
-                // First check if the winning square is among those used by the move
-                // We cannot use self, since the move hasn't been played on self
-                for top_piece in self.top_stones_left_behind_by_move(*square, &stack_movement) {
-                    if sq == winning_square {
-                        return Them::piece_is_ours(top_piece.unwrap());
-                    }
-                    sq = sq.go_direction(*direction).unwrap_or(sq);
-                }
-                // The winning square is not among the squares touched by the move
-                // Now we can safely use self to check
-                for sq in board::board_iterator() {
-                    if sq == winning_square {
-                        let top_piece = self[sq].top_stone().unwrap();
-                        return Them::piece_is_ours(top_piece);
-                    }
-                }
-                unreachable!(
-                    "Couldn't find the winning square {} for move {:?} on board\n{:?}",
-                    winning_square, mv, self
-                );
-            } else {
-                false
-            }
-            */
+                board::is_win_by_road(&their_components, their_highest_component_id).is_some()
             } else {
                 false
             }

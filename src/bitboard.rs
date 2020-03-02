@@ -92,11 +92,6 @@ impl BitBoard {
     }
 
     #[inline]
-    pub const fn is_empty(self) -> bool {
-        self.board == 0
-    }
-
-    #[inline]
     pub const fn popcount(self) -> u32 {
         self.board.count_ones()
     }
