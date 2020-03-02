@@ -870,9 +870,13 @@ impl board::Board for Board {
 
         if let Some(square) = is_win_by_road(&components, highest_component_id) {
             debug_assert!(self[square].top_stone().unwrap().is_road_piece());
-            return match self[square].top_stone().unwrap().color() {
-                Color::White => Some(WhiteWin),
-                Color::Black => Some(BlackWin),
+            debug_assert_ne!(
+                self[square].top_stone().unwrap().color(),
+                self.side_to_move()
+            );
+            return match self.side_to_move() {
+                Color::White => Some(BlackWin),
+                Color::Black => Some(WhiteWin),
             };
         };
 
