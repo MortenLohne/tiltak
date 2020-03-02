@@ -104,12 +104,7 @@ impl Tree {
         } else {
             // Only generate child moves on the 2nd visit
             if self.visits == 1 {
-                board.generate_moves_with_probabilities(simple_moves, moves);
-                self.children.reserve_exact(moves.len());
-                for (mv, heuristic_score) in moves.drain(..) {
-                    self.children
-                        .push((Tree::new_node(heuristic_score), mv.clone()));
-                }
+                self.init_children(&board, simple_moves, moves);
             }
             let visits = self.visits;
             let (child, mv) = self
@@ -157,6 +152,23 @@ impl Tree {
         self.total_action_value = static_eval;
         self.mean_action_value = static_eval;
         static_eval
+    }
+
+    /// Do not initialize children in the expansion phase, for better fperformance
+    /// Never inline, for profiling purposes
+    #[inline(never)]
+    fn init_children(
+        &mut self,
+        board: &Board,
+        simple_moves: &mut Vec<Move>,
+        moves: &mut Vec<(Move, f64)>,
+    ) {
+        board.generate_moves_with_probabilities(simple_moves, moves);
+        self.children.reserve_exact(moves.len());
+        for (mv, heuristic_score) in moves.drain(..) {
+            self.children
+                .push((Tree::new_node(heuristic_score), mv.clone()));
+        }
     }
 
     fn exploration_value(&self, parent_visits: u64) -> f64 {
