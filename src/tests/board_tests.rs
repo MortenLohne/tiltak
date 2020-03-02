@@ -253,3 +253,30 @@ fn game_win_test2() {
     board.do_move(Move::Place(Piece::WhiteFlat, Square(10)));
     assert_eq!(board.game_result(), Some(GameResult::WhiteWin));
 }
+
+#[test]
+fn double_road_wins_test() {
+    let mut board = Board::default();
+    let mut moves = vec![];
+
+    let move_strings = [
+        "a5", "a4", "b5", "b4", "c5", "c4", "1c5-", "d4", "d5", "e4", "e5", "c3",
+    ];
+    do_moves_and_check_validity(&mut board, &move_strings);
+
+    board.generate_moves(&mut moves);
+    assert!(moves.contains(&board.move_from_san(&"1c4+").unwrap()));
+    moves.clear();
+
+    let reverse_move = board.do_move(board.move_from_san(&"1c4+").unwrap());
+    assert_eq!(board.game_result(), Some(WhiteWin));
+    board.reverse_move(reverse_move);
+
+    board = board.flip_board_y();
+
+    board.generate_moves(&mut moves);
+    assert!(moves.contains(&board.move_from_san(&"1c2-").unwrap()));
+
+    board.do_move(board.move_from_san(&"1c2-").unwrap());
+    assert_eq!(board.game_result(), Some(WhiteWin));
+}

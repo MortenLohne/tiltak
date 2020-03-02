@@ -627,14 +627,6 @@ impl Board {
             .sum()
     }
 
-    pub fn white_road_pieces(&self) -> BitBoard {
-        self.white_road_pieces
-    }
-
-    pub fn black_road_pieces(&self) -> BitBoard {
-        self.black_road_pieces
-    }
-
     fn white_road_pieces_from_scratch(&self) -> BitBoard {
         let mut bitboard = BitBoard::empty();
         for square in board_iterator() {
@@ -696,8 +688,8 @@ impl board::Board for Board {
             self
         );
         match self.side_to_move() {
-            Color::White => self.generate_moves_colortr::<WhiteTr>(moves),
-            Color::Black => self.generate_moves_colortr::<BlackTr>(moves),
+            Color::White => self.generate_moves_colortr::<WhiteTr, BlackTr>(moves),
+            Color::Black => self.generate_moves_colortr::<BlackTr, WhiteTr>(moves),
         }
     }
 
@@ -871,8 +863,10 @@ impl board::Board for Board {
     }
 
     fn game_result(&self) -> Option<GameResult> {
-        let (components, highest_component_id) =
-            connected_components_graph(WhiteTr::road_stones(self), BlackTr::road_stones(self));
+        let (components, highest_component_id) = match self.side_to_move() {
+            Color::White => connected_components_graph(self.black_road_pieces),
+            Color::Black => connected_components_graph(self.white_road_pieces),
+        };
 
         if let Some(square) = is_win_by_road(&components, highest_component_id) {
             debug_assert!(self[square].top_stone().unwrap().is_road_piece());
@@ -1060,22 +1054,14 @@ impl<T> IndexMut<Square> for AbstractBoard<T> {
     }
 }
 
-pub fn connected_components_graph(
-    white_road_pieces: BitBoard,
-    black_road_pieces: BitBoard,
-) -> (AbstractBoard<u8>, u8) {
-    debug_assert!((white_road_pieces & black_road_pieces).is_empty());
-
+pub fn connected_components_graph(road_pieces: BitBoard) -> (AbstractBoard<u8>, u8) {
     let mut components: AbstractBoard<u8> = Default::default();
     let mut id = 1;
 
     for square in board_iterator() {
         if components[square] == 0 {
-            if white_road_pieces.get(square.0) {
-                connect_component(white_road_pieces, &mut components, square, id);
-                id += 1;
-            } else if black_road_pieces.get(square.0) {
-                connect_component(black_road_pieces, &mut components, square, id);
+            if road_pieces.get(square.0) {
+                connect_component(road_pieces, &mut components, square, id);
                 id += 1;
             }
         }
