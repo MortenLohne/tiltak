@@ -25,6 +25,8 @@ pub trait ColorTr {
 
     fn capstones_left(board: &Board) -> u8;
 
+    fn road_stones(board: &Board) -> BitBoard;
+
     fn flat_piece() -> Piece;
 
     fn standing_piece() -> Piece;
@@ -49,6 +51,10 @@ impl ColorTr for WhiteTr {
 
     fn capstones_left(board: &Board) -> u8 {
         board.white_capstones_left
+    }
+
+    fn road_stones(board: &Board) -> BitBoard {
+        board.white_road_pieces
     }
 
     fn flat_piece() -> Piece {
@@ -85,6 +91,10 @@ impl ColorTr for BlackTr {
 
     fn capstones_left(board: &Board) -> u8 {
         board.black_capstones_left
+    }
+
+    fn road_stones(board: &Board) -> BitBoard {
+        board.black_road_pieces
     }
 
     fn flat_piece() -> Piece {
@@ -475,6 +485,8 @@ pub struct Movement {
 pub struct Board {
     cells: AbstractBoard<Stack>,
     to_move: Color,
+    white_road_pieces: BitBoard,
+    black_road_pieces: BitBoard,
     white_stones_left: u8,
     black_stones_left: u8,
     white_capstones_left: u8,
@@ -500,6 +512,8 @@ impl Default for Board {
         Board {
             cells: Default::default(),
             to_move: Color::White,
+            white_road_pieces: BitBoard::default(),
+            black_road_pieces: BitBoard::default(),
             white_stones_left: 21,
             black_stones_left: 21,
             white_capstones_left: 1,
@@ -540,6 +554,8 @@ impl Debug for Board {
             self.white_capstones_left, self.black_capstones_left
         )?;
         writeln!(f, "{} to move.", self.to_move)?;
+        writeln!(f, "White road stones: {:b}", self.white_road_pieces.board)?;
+        writeln!(f, "Black road stones: {:b}", self.black_road_pieces.board)?;
         Ok(())
     }
 }
@@ -573,6 +589,26 @@ impl Board {
             .filter_map(|cell| cell.top_stone())
     }
 
+    fn white_road_pieces_from_scratch(&self) -> BitBoard {
+        let mut bitboard = BitBoard::empty();
+        for square in board_iterator() {
+            if self[square].top_stone.map(WhiteTr::is_road_stone) == Some(true) {
+                bitboard = bitboard.set(square.0);
+            }
+        }
+        bitboard
+    }
+
+    fn black_road_pieces_from_scratch(&self) -> BitBoard {
+        let mut bitboard = BitBoard::empty();
+        for square in board_iterator() {
+            if self[square].top_stone.map(BlackTr::is_road_stone) == Some(true) {
+                bitboard = bitboard.set(square.0);
+            }
+        }
+        bitboard
+    }
+
     /// An iterator over the top stones left behind after a stack movement
     pub fn top_stones_left_behind_by_move<'a>(
         &'a self,
@@ -591,39 +627,6 @@ impl Board {
                 }
             })
             .chain(std::iter::once(self[square].top_stone()))
-    }
-
-    pub fn connected_components_graph(&self) -> (AbstractBoard<u8>, u8) {
-        let mut components: AbstractBoard<u8> = Default::default();
-        let mut visited: AbstractBoard<bool> = Default::default();
-        let mut id = 1;
-
-        // Find white roads
-        for square in board_iterator() {
-            if !visited[square]
-                && self[square]
-                    .top_stone()
-                    .map(WhiteTr::is_road_stone)
-                    .unwrap_or_default()
-            {
-                connect_component::<WhiteTr>(&self, &mut components, &mut visited, square, id);
-                id += 1;
-            }
-        }
-
-        // Find black roads
-        for square in board_iterator() {
-            if !visited[square]
-                && self[square]
-                    .top_stone()
-                    .map(BlackTr::is_road_stone)
-                    .unwrap_or_default()
-            {
-                connect_component::<BlackTr>(&self, &mut components, &mut visited, square, id);
-                id += 1;
-            }
-        }
-        (components, id)
     }
 }
 
@@ -653,9 +656,16 @@ impl board::Board for Board {
     }
 
     fn do_move(&mut self, mv: Self::Move) -> Self::ReverseMove {
-        let reverse_move = match mv {
+        let reverse_move = match mv.clone() {
             Move::Place(piece, to) => {
                 self[to].push(piece);
+                if piece.role() != Standing {
+                    match self.side_to_move() {
+                        Color::White => self.white_road_pieces = self.white_road_pieces.set(to.0),
+                        Color::Black => self.black_road_pieces = self.black_road_pieces.set(to.0),
+                    };
+                }
+
                 match (self.side_to_move(), piece) {
                     (Color::White, WhiteFlat) => self.white_stones_left -= 1,
                     (Color::White, WhiteStanding) => self.white_stones_left -= 1,
@@ -691,8 +701,12 @@ impl board::Board for Board {
                         self[to].push(piece);
                         self[from].remove(pieces_to_leave);
                     }
+
                     from = to;
                 }
+
+                self.white_road_pieces = self.white_road_pieces_from_scratch();
+                self.black_road_pieces = self.black_road_pieces_from_scratch();
 
                 pieces_left_behind.reverse();
                 ReverseMove::Move(
@@ -719,15 +733,34 @@ impl board::Board for Board {
             self
         );
 
+        debug_assert_eq!(
+            self.white_road_pieces,
+            self.white_road_pieces_from_scratch(),
+            "Wrong white road pieces after {:?} on\n{:?}",
+            mv,
+            self
+        );
+        debug_assert_eq!(
+            self.black_road_pieces,
+            self.black_road_pieces_from_scratch(),
+            "Wrong black road pieces after {:?} on\n{:?}",
+            mv,
+            self
+        );
+
         self.to_move = !self.to_move;
         reverse_move
     }
 
     fn reverse_move(&mut self, reverse_move: Self::ReverseMove) {
-        match reverse_move {
+        match reverse_move.clone() {
             ReverseMove::Place(square) => {
                 let piece = self[square].pop().unwrap();
                 debug_assert_eq!(piece.color(), !self.side_to_move());
+
+                self.white_road_pieces = self.white_road_pieces.clear(square.0);
+                self.black_road_pieces = self.black_road_pieces.clear(square.0);
+
                 match piece {
                     WhiteFlat | WhiteStanding => self.white_stones_left += 1,
                     WhiteCap => self.white_capstones_left += 1,
@@ -748,21 +781,52 @@ impl board::Board for Board {
                         self[to].push(piece);
                         self[square].remove(pieces_to_leave);
                     }
+                    self.white_road_pieces = self.white_road_pieces.clear(square.0);
+                    self.black_road_pieces = self.black_road_pieces.clear(square.0);
+
+                    if self[square].top_stone().is_some() {
+                        match self.side_to_move() {
+                            Color::White => {
+                                self.white_road_pieces = self.white_road_pieces.set(square.0)
+                            }
+                            Color::Black => {
+                                self.black_road_pieces = self.black_road_pieces.set(square.0)
+                            }
+                        };
+                    }
                     square = to;
                 }
+
                 if flattens_wall {
                     match self[from].top_stone().unwrap().color() {
                         Color::White => self[from].replace_top(WhiteStanding),
                         Color::Black => self[from].replace_top(BlackStanding),
                     };
                 };
+                self.white_road_pieces = self.white_road_pieces_from_scratch();
+                self.black_road_pieces = self.black_road_pieces_from_scratch();
             }
         }
+        debug_assert_eq!(
+            self.white_road_pieces,
+            self.white_road_pieces_from_scratch(),
+            "Wrong white road pieces after undoing {:?} on\n{:?}",
+            reverse_move,
+            self
+        );
+        debug_assert_eq!(
+            self.black_road_pieces,
+            self.black_road_pieces_from_scratch(),
+            "Wrong black road pieces after undoing {:?} on\n{:?}",
+            reverse_move,
+            self
+        );
         self.to_move = !self.to_move;
     }
 
     fn game_result(&self) -> Option<GameResult> {
-        let (components, highest_component_id) = self.connected_components_graph();
+        let (components, highest_component_id) =
+            connected_components_graph(WhiteTr::road_stones(self), BlackTr::road_stones(self));
 
         // Check if any components cross the board
         for id in 1..highest_component_id {
@@ -983,8 +1047,46 @@ impl<T> IndexMut<Square> for AbstractBoard<T> {
     }
 }
 
+pub fn connected_components_graph(
+    white_road_pieces: BitBoard,
+    black_road_pieces: BitBoard,
+) -> (AbstractBoard<u8>, u8) {
+    let mut components: AbstractBoard<u8> = Default::default();
+    let mut visited: AbstractBoard<bool> = Default::default();
+    let mut id = 1;
+
+    // Find white roads
+    for square in board_iterator() {
+        if !visited[square] && white_road_pieces.get(square.0) {
+            connect_component::<WhiteTr>(
+                white_road_pieces,
+                &mut components,
+                &mut visited,
+                square,
+                id,
+            );
+            id += 1;
+        }
+    }
+
+    // Find black roads
+    for square in board_iterator() {
+        if !visited[square] && black_road_pieces.get(square.0) {
+            connect_component::<BlackTr>(
+                black_road_pieces,
+                &mut components,
+                &mut visited,
+                square,
+                id,
+            );
+            id += 1;
+        }
+    }
+    (components, id)
+}
+
 fn connect_component<Color: ColorTr>(
-    board: &Board,
+    road_pieces: BitBoard,
     components: &mut AbstractBoard<u8>,
     visited: &mut AbstractBoard<bool>,
     square: Square,
@@ -993,11 +1095,8 @@ fn connect_component<Color: ColorTr>(
     components[square] = id;
     visited[square] = true;
     for neighbour in square.neighbours() {
-        if !board[neighbour].is_empty()
-            && Color::is_road_stone(board[neighbour].top_stone().unwrap())
-            && !visited[neighbour]
-        {
-            connect_component::<Color>(board, components, visited, neighbour, id);
+        if road_pieces.get(neighbour.0) && !visited[neighbour] {
+            connect_component::<Color>(road_pieces, components, visited, neighbour, id);
         }
     }
 }
