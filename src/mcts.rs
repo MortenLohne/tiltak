@@ -106,17 +106,20 @@ impl Tree {
             if self.visits == 1 {
                 self.init_children(&board, simple_moves, moves);
             }
-            let visits = self.visits;
-            let (child, mv) = self
-                .children
-                .iter_mut()
-                .max_by(|(child1, _), (child2, _)| {
-                    child1
-                        .exploration_value(visits)
-                        .partial_cmp(&child2.exploration_value(visits))
-                        .unwrap()
-                })
-                .unwrap();
+
+            let mut best_exploration_value = self.children[0].0.exploration_value(self.visits);
+            let mut best_child_node_index = 0;
+
+            for (i, (child, _)) in self.children.iter().enumerate() {
+                let child_exploration_value = child.exploration_value(self.visits);
+                if child_exploration_value >= best_exploration_value {
+                    best_child_node_index = i;
+                    best_exploration_value = child_exploration_value;
+                }
+            }
+
+            let (child, mv) = self.children.get_mut(best_child_node_index).unwrap();
+
             board.do_move(mv.clone());
             let result = 1.0 - child.select(board, simple_moves, moves);
             self.visits += 1;
