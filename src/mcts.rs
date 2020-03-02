@@ -171,6 +171,7 @@ impl Tree {
         }
     }
 
+    #[inline]
     fn exploration_value(&self, parent_visits: u64) -> f64 {
         (1.0 - self.mean_action_value)
             + C_PUCT * self.heuristic_score * (parent_visits as f64).sqrt()
