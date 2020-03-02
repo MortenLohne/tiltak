@@ -24,7 +24,7 @@ fn move_stack_test() {
     let mut board = Board::default();
     let mut moves = vec![];
 
-    do_moves_and_check_validity(&mut board, &["c3", "d3", "c4", "1d3<", "1c4+", "Sc4"]);
+    do_moves_and_check_validity(&mut board, &["c3", "d3", "c4", "1d3<", "1c4-", "Sc4"]);
 
     board.generate_moves(&mut moves);
     assert_eq!(
@@ -51,7 +51,7 @@ fn respect_carry_limit_test() {
     do_moves_and_check_validity(
         &mut board,
         &[
-            "c3", "c2", "d3", "b3", "c4", "1c2-", "1d3<", "1b3>", "1c4+", "Cc2", "a1", "1c2-", "a2",
+            "c3", "c2", "d3", "b3", "c4", "1c2+", "1d3<", "1b3>", "1c4+", "Cc2", "a1", "1c2+", "a2",
         ],
     );
     board.generate_moves(&mut moves);
@@ -80,7 +80,7 @@ fn start_pos_perf_test() {
 fn perf_test2() {
     let mut board = Board::default();
 
-    do_moves_and_check_validity(&mut board, &["c3", "d3", "c4", "1d3<", "1c4+", "Sc4"]);
+    do_moves_and_check_validity(&mut board, &["c3", "d3", "c4", "1d3<", "1c4-", "Sc4"]);
 
     perft_check_answers(&mut board, &[1, 87, 6155, 461_800]);
 }
@@ -92,7 +92,7 @@ fn perf_test3() {
     do_moves_and_check_validity(
         &mut board,
         &[
-            "c3", "c2", "d3", "b3", "c4", "1c2-", "1d3<", "1b3>", "1c4+", "Cc2", "a1", "1c2-", "a2",
+            "c3", "c2", "d3", "b3", "c4", "1c2+", "1d3<", "1b3>", "1c4-", "Cc2", "a1", "1c2+", "a2",
         ],
     );
 
@@ -102,15 +102,16 @@ fn perf_test3() {
 #[test]
 fn suicide_perf_test() {
     let move_strings = [
-        "c2", "c4", "d2", "c3", "b2", "d3", "1d2-", "b3", "d2", "b4", "1c2-", "1b3>", "2d3<",
-        "1c4+", "d4", "5c3<3", "c2", "c4", "1d4<", "d3", "1d2-", "1c3-", "Cc3", "2c4>", "1c3<",
-        "d2", "c3", "1d2-", "1c3-", "1b4>", "2b3>1", "3c4+2", "d2", "c4", "b4", "c5", "1b3>",
-        "1c4<", "3c3+", "e5", "e2",
+        "c2", "c4", "d2", "c3", "b2", "d3", "1d2+", "b3", "d2", "b4", "1c2+", "1b3>", "2d3<",
+        "1c4-", "d4", "5c3<3", "c2", "c4", "1d4<", "d3", "1d2+", "1c3+", "Cc3", "2c4>", "1c3<",
+        "d2", "c3", "1d2+", "1c3+", "1b4>", "2b3>1", "3c4-2", "d2", "c4", "b4", "c5", "1b3>",
+        "1c4<", "3c3-", "e5", "e2",
     ];
 
     let mut board = Board::default();
     do_moves_and_check_validity(&mut board, &move_strings);
-    perft_check_answers(&mut board, &[1, 83, 11_204, 942_217]);
+    perft_check_answers(&mut board, &[1, 83, 11_204]);
+    // perft_check_answers(&mut board, &[1, 83, 11_204, 942_217]);
 }
 
 pub fn perft(board: &mut Board, depth: u16) -> u64 {
@@ -143,6 +144,39 @@ pub fn perft_check_answers(board: &mut Board, answers: &[u64]) {
     for (depth, &answer) in answers.iter().enumerate() {
         assert_eq!(
             perft(board, depth as u16),
+            answer,
+            "Wrong perft result on\n{:?}",
+            board
+        );
+        assert_eq!(
+            perft(&mut board.flip_board_x(), depth as u16),
+            answer,
+            "Wrong perft result on\n{:?}",
+            board
+        );
+        assert_eq!(
+            perft(&mut board.flip_board_y(), depth as u16),
+            answer,
+            "Wrong perft result on\n{:?}",
+            board
+        );
+        assert_eq!(
+            perft(&mut board.rotate_board(), depth as u16),
+            answer,
+            "Wrong perft result on\n{:?}",
+            board
+        );
+        assert_eq!(
+            perft(&mut board.rotate_board().rotate_board(), depth as u16),
+            answer,
+            "Wrong perft result on\n{:?}",
+            board
+        );
+        assert_eq!(
+            perft(
+                &mut board.rotate_board().rotate_board().rotate_board(),
+                depth as u16
+            ),
             answer,
             "Wrong perft result on\n{:?}",
             board

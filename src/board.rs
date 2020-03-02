@@ -419,10 +419,10 @@ impl fmt::Display for Move {
                 )
                 .unwrap();
                 match direction {
-                    North => f.write_char('-')?,
+                    North => f.write_char('+')?,
                     West => f.write_char('<')?,
                     East => f.write_char('>')?,
-                    South => f.write_char('+')?,
+                    South => f.write_char('-')?,
                 }
                 for movement in stack_movements.movements.iter().skip(1) {
                     write!(f, "{}", movement.pieces_to_take).unwrap();
@@ -465,10 +465,10 @@ impl Direction {
 
     fn parse(ch: char) -> Self {
         match ch {
-            '-' => North,
+            '+' => North,
             '<' => West,
             '>' => East,
-            '+' => South,
+            '-' => South,
             _ => panic!("Couldn't parse \"{}\" as direction.", ch),
         }
     }
@@ -565,6 +565,48 @@ impl Debug for Board {
 }
 
 impl Board {
+    #[cfg(test)]
+    pub fn flip_board_y(&self) -> Board {
+        let mut new_board = self.clone();
+        for x in 0..BOARD_SIZE as u8 {
+            for y in 0..BOARD_SIZE as u8 {
+                new_board[Square(y * BOARD_SIZE as u8 + x)] =
+                    self[Square((BOARD_SIZE as u8 - y - 1) * BOARD_SIZE as u8 + x)].clone();
+            }
+        }
+        new_board.black_road_pieces = new_board.black_road_pieces_from_scratch();
+        new_board.white_road_pieces = new_board.white_road_pieces_from_scratch();
+        new_board
+    }
+
+    #[cfg(test)]
+    pub fn flip_board_x(&self) -> Board {
+        let mut new_board = self.clone();
+        for x in 0..BOARD_SIZE as u8 {
+            for y in 0..BOARD_SIZE as u8 {
+                new_board[Square(y * BOARD_SIZE as u8 + x)] =
+                    self[Square(y * BOARD_SIZE as u8 + (BOARD_SIZE as u8 - x - 1))].clone();
+            }
+        }
+        new_board.black_road_pieces = new_board.black_road_pieces_from_scratch();
+        new_board.white_road_pieces = new_board.white_road_pieces_from_scratch();
+        new_board
+    }
+
+    #[cfg(test)]
+    pub fn rotate_board(&self) -> Board {
+        let mut new_board = self.clone();
+        for x in 0..BOARD_SIZE as u8 {
+            for y in 0..BOARD_SIZE as u8 {
+                new_board[Square(y * BOARD_SIZE as u8 + x)] =
+                    self[Square(x * BOARD_SIZE as u8 + y)].clone();
+            }
+        }
+        new_board.black_road_pieces = new_board.black_road_pieces_from_scratch();
+        new_board.white_road_pieces = new_board.white_road_pieces_from_scratch();
+        new_board
+    }
+
     pub fn generate_moves_with_probabilities(
         &self,
         simple_moves: &mut Vec<Move>,

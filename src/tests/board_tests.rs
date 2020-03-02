@@ -1,5 +1,5 @@
 use crate::board::Piece::{BlackCap, BlackFlat, WhiteFlat, WhiteStanding};
-use crate::board::{board_iterator, Board, Move, Piece, Square};
+use crate::board::{board_iterator, Board, Direction::*, Move, Piece, Square};
 use crate::tests::do_moves_and_check_validity;
 use crate::{board as board_mod, board};
 use board_game_traits::board::Board as BoardTrait;
@@ -80,10 +80,42 @@ fn flatten_stack_test() {
 }
 
 #[test]
+fn correct_number_of_direction_test() {
+    assert_eq!(
+        board_iterator()
+            .flat_map(|square| square.directions())
+            .count(),
+        4 * 2 + 12 * 3 + 9 * 4
+    );
+}
+
+#[test]
+fn correct_number_of_neighbours_test() {
+    assert_eq!(
+        board_iterator()
+            .flat_map(|square| square.neighbours())
+            .count(),
+        4 * 2 + 12 * 3 + 9 * 4
+    );
+}
+
+#[test]
+fn correct_number_of_legal_directions_test() {
+    assert_eq!(
+        board_iterator()
+            .flat_map(|square| [North, South, East, West]
+                .iter()
+                .filter_map(move |&direction| square.go_direction(direction)))
+            .count(),
+        4 * 2 + 12 * 3 + 9 * 4
+    );
+}
+
+#[test]
 fn stones_left_behind_by_stack_movement_test() {
     let mut board: Board = Board::default();
 
-    do_moves_and_check_validity(&mut board, &["c3", "d3", "c4", "1d3<", "1c4+", "Sc4"]);
+    do_moves_and_check_validity(&mut board, &["c3", "d3", "c4", "1d3<", "1c4-", "Sc4"]);
 
     let mv = board.move_from_san("2c3<1").unwrap();
     if let Move::Move(square, _direction, stack_movement) = mv {
