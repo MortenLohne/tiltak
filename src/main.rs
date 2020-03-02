@@ -173,7 +173,7 @@ fn play_human(mut board: Board) {
 
 fn bench() {
     use std::time;
-    const NODES: u64 = 1000_000;
+    const NODES: u64 = 1_000_000;
     let start_time = time::Instant::now();
     {
         let board = Board::default();

@@ -585,14 +585,6 @@ impl Board {
             .sum()
     }
 
-    pub fn all_top_stones<'a>(&'a self) -> impl Iterator<Item = Piece> + 'a {
-        self.cells
-            .raw
-            .iter()
-            .flatten()
-            .filter_map(|cell| cell.top_stone())
-    }
-
     pub fn white_road_pieces(&self) -> BitBoard {
         self.white_road_pieces
     }
@@ -1010,20 +1002,6 @@ impl pgn_traits::pgn::PgnBoard for Board {
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct AbstractBoard<T> {
     raw: [[T; BOARD_SIZE]; BOARD_SIZE],
-}
-
-impl<T> AbstractBoard<T> {
-    fn map<F, U>(&self, f: F) -> AbstractBoard<U>
-    where
-        F: Fn(&T) -> U,
-        U: Default,
-    {
-        let mut new_board = AbstractBoard::default();
-        for square in board_iterator() {
-            new_board[square] = f(&self[square]);
-        }
-        new_board
-    }
 }
 
 impl<T> Index<Square> for AbstractBoard<T> {
