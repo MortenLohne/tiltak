@@ -17,6 +17,7 @@ use std::fmt::Debug;
 use std::fmt::Write;
 use std::ops::{Index, IndexMut};
 use std::{fmt, ops};
+use crate::mcts;
 
 pub trait ColorTr {
     fn color() -> Color;
@@ -610,11 +611,11 @@ impl Board {
     pub fn generate_moves_with_probabilities(
         &self,
         simple_moves: &mut Vec<Move>,
-        moves: &mut Vec<(Move, f64)>,
+        moves: &mut Vec<(Move, mcts::Score)>,
     ) {
         debug_assert!(simple_moves.is_empty());
         self.generate_moves(simple_moves);
-        let average = 1.0 / simple_moves.len() as f64;
+        let average = 1.0 / simple_moves.len() as mcts::Score;
         moves.extend(simple_moves.drain(..).map(|mv| (mv, average)));
     }
 

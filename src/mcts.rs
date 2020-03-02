@@ -1,21 +1,23 @@
 use crate::board::{Board, Move};
 use board_game_traits::board::{Board as BoardTrait, Color, EvalBoard, GameResult};
 
-const C_PUCT: f64 = 2.0;
+const C_PUCT: Score = 2.0;
+
+pub type Score = f32;
 
 #[derive(Clone, PartialEq, Debug)]
 pub struct Tree {
     pub children: Vec<(Tree, Move)>,
     pub visits: u64,
-    pub total_action_value: f64,
-    pub mean_action_value: f64,
-    pub heuristic_score: f64,
+    pub total_action_value: Score,
+    pub mean_action_value: Score,
+    pub heuristic_score: Score,
     pub is_terminal: bool,
 }
 
 // TODO: Winning percentage should be always be interpreted from the side to move's perspective
 
-pub(crate) fn mcts(board: Board, nodes: u64) -> (Move, f64) {
+pub(crate) fn mcts(board: Board, nodes: u64) -> (Move, Score) {
     let mut tree = Tree::new_root();
     let mut moves = vec![];
     let mut simple_moves = vec![];
@@ -63,13 +65,13 @@ impl Tree {
             println!(
                 "Move {}: {} visits, {:.3} mean action value, {:.3} static score, {:.3} exploration value, best reply {:?}",
                 mv, child.visits, child.mean_action_value, child.heuristic_score,
-                child.exploration_value((parent_visits as f64).sqrt()),
+                child.exploration_value((parent_visits as Score).sqrt()),
                 if child.children.is_empty() { "".to_string() } else { format!("{:?}", child.best_move().0) }
             )
         });
     }
 
-    pub fn best_move(&self) -> (Move, f64) {
+    pub fn best_move(&self) -> (Move, Score) {
         let (tree, mv) = self
             .children
             .iter()
@@ -78,7 +80,7 @@ impl Tree {
         (mv.clone(), tree.mean_action_value)
     }
 
-    fn new_node(heuristic_score: f64) -> Self {
+    fn new_node(heuristic_score: Score) -> Self {
         Tree {
             children: vec![],
             visits: 0,
@@ -93,8 +95,8 @@ impl Tree {
         &mut self,
         board: &mut Board,
         simple_moves: &mut Vec<Move>,
-        moves: &mut Vec<(Move, f64)>,
-    ) -> f64 {
+        moves: &mut Vec<(Move, Score)>,
+    ) -> Score {
         if self.is_terminal {
             self.visits += 1;
             self.total_action_value += self.mean_action_value;
@@ -107,7 +109,7 @@ impl Tree {
                 self.init_children(&board, simple_moves, moves);
             }
 
-            let visits_sqrt = (self.visits as f64).sqrt();
+            let visits_sqrt = (self.visits as Score).sqrt();
 
             let mut best_exploration_value = self.children[0].0.exploration_value(visits_sqrt);
             let mut best_child_node_index = 0;
@@ -126,14 +128,14 @@ impl Tree {
             let result = 1.0 - child.select(board, simple_moves, moves);
             self.visits += 1;
             self.total_action_value += result;
-            self.mean_action_value = self.total_action_value / self.visits as f64;
+            self.mean_action_value = self.total_action_value / self.visits as Score;
             result
         }
     }
 
     // Never inline, for profiling purposes
     #[inline(never)]
-    fn expand(&mut self, board: &mut Board) -> f64 {
+    fn expand(&mut self, board: &mut Board) -> Score {
         debug_assert!(self.children.is_empty());
 
         if let Some(game_result) = board.game_result() {
@@ -166,7 +168,7 @@ impl Tree {
         &mut self,
         board: &Board,
         simple_moves: &mut Vec<Move>,
-        moves: &mut Vec<(Move, f64)>,
+        moves: &mut Vec<(Move, Score)>,
     ) {
         board.generate_moves_with_probabilities(simple_moves, moves);
         self.children.reserve_exact(moves.len());
@@ -177,12 +179,12 @@ impl Tree {
     }
 
     #[inline]
-    fn exploration_value(&self, parent_visits_sqrt: f64) -> f64 {
+    fn exploration_value(&self, parent_visits_sqrt: Score) -> Score {
         (1.0 - self.mean_action_value)
-            + C_PUCT * self.heuristic_score * parent_visits_sqrt / (1 + self.visits) as f64
+            + C_PUCT * self.heuristic_score * parent_visits_sqrt / (1 + self.visits) as Score
     }
 }
 
-pub fn cp_to_win_percentage(cp: f32) -> f64 {
-    1.0 / (1.0 + f64::powf(10.0, -cp as f64 / 10.0))
+pub fn cp_to_win_percentage(cp: f32) -> Score {
+    1.0 / (1.0 + Score::powf(10.0, -cp as Score / 10.0))
 }
