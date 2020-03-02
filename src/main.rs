@@ -111,7 +111,7 @@ fn test_position() {
     let mut moves = vec![];
     for i in 0.. {
         tree.select(&mut board.clone(), &mut simple_moves, &mut moves);
-        if i % 10000 == 0 {
+        if i % 100_000 == 0 {
             println!("{} visits, val={}", tree.visits, tree.mean_action_value);
             tree.print_info();
         }
@@ -173,7 +173,7 @@ fn play_human(mut board: Board) {
 
 fn bench() {
     use std::time;
-    const NODES: u64 = 100_000;
+    const NODES: u64 = 1000_000;
     let start_time = time::Instant::now();
     {
         let board = Board::default();
