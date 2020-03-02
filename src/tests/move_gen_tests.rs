@@ -110,7 +110,7 @@ fn suicide_perf_test() {
 
     let mut board = Board::default();
     do_moves_and_check_validity(&mut board, &move_strings);
-    perft_check_answers(&mut board, &[1, 83, 11_204, 942_205]);
+    perft_check_answers(&mut board, &[1, 83, 11_204, 942_217]);
 }
 
 pub fn perft(board: &mut Board, depth: u16) -> u64 {
@@ -141,6 +141,11 @@ pub fn perft(board: &mut Board, depth: u16) -> u64 {
 /// Verifies the perft result of a position against a known answer
 pub fn perft_check_answers(board: &mut Board, answers: &[u64]) {
     for (depth, &answer) in answers.iter().enumerate() {
-        assert_eq!(perft(board, depth as u16), answer);
+        assert_eq!(
+            perft(board, depth as u16),
+            answer,
+            "Wrong perft result on\n{:?}",
+            board
+        );
     }
 }

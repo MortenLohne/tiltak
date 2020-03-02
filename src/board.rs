@@ -1048,53 +1048,35 @@ pub fn connected_components_graph(
     white_road_pieces: BitBoard,
     black_road_pieces: BitBoard,
 ) -> (AbstractBoard<u8>, u8) {
+    debug_assert!((white_road_pieces & black_road_pieces).is_empty());
 
     let mut components: AbstractBoard<u8> = Default::default();
-    let mut visited: AbstractBoard<bool> = Default::default();
     let mut id = 1;
 
-    // Find white roads
     for square in board_iterator() {
-        if !visited[square] && white_road_pieces.get(square.0) {
-            connect_component::<WhiteTr>(
-                white_road_pieces,
-                &mut components,
-                &mut visited,
-                square,
-                id,
-            );
-            id += 1;
-        }
-    }
-
-    // Find black roads
-    for square in board_iterator() {
-        if !visited[square] && black_road_pieces.get(square.0) {
-            connect_component::<BlackTr>(
-                black_road_pieces,
-                &mut components,
-                &mut visited,
-                square,
-                id,
-            );
-            id += 1;
+        if components[square] == 0 {
+            if white_road_pieces.get(square.0) {
+                connect_component(white_road_pieces, &mut components, square, id);
+                id += 1;
+            } else if black_road_pieces.get(square.0) {
+                connect_component(black_road_pieces, &mut components, square, id);
+                id += 1;
+            }
         }
     }
     (components, id)
 }
 
-fn connect_component<Color: ColorTr>(
+fn connect_component(
     road_pieces: BitBoard,
     components: &mut AbstractBoard<u8>,
-    visited: &mut AbstractBoard<bool>,
     square: Square,
     id: u8,
 ) {
     components[square] = id;
-    visited[square] = true;
     for neighbour in square.neighbours() {
-        if road_pieces.get(neighbour.0) && !visited[neighbour] {
-            connect_component::<Color>(road_pieces, components, visited, neighbour, id);
+        if road_pieces.get(neighbour.0) && components[neighbour] == 0 {
+            connect_component(road_pieces, components, neighbour, id);
         }
     }
 }
