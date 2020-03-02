@@ -35,7 +35,7 @@ fn main() {
         }
         "aimatch" => {
             for i in 1..10 {
-                mcts_vs_minmax(3, 10000 * i);
+                mcts_vs_minmax(3, 50000 * i);
             }
         }
         "analyze" => test_position(),
@@ -50,6 +50,12 @@ fn mcts_vs_minmax(minmax_depth: u16, mcts_nodes: u64) {
     let mut board = Board::default();
     let mut moves = vec![];
     while board.game_result().is_none() {
+        let num_moves = moves.len();
+        if num_moves > 10 {
+            if (1..5).all(|i| moves[num_moves - i] == moves[num_moves - i - 4]) {
+                break;
+            }
+        }
         match board.side_to_move() {
             Color::Black => {
                 let (best_move, score) = mcts::mcts(board.clone(), mcts_nodes);
@@ -73,7 +79,7 @@ fn mcts_vs_minmax(minmax_depth: u16, mcts_nodes: u64) {
         print!("\"{:?}\", ", mv);
     }
     print!("]");
-    println!("\n{:?}\nResult: {:?}", board, board.game_result().unwrap());
+    println!("\n{:?}\nResult: {:?}", board, board.game_result());
 }
 
 fn test_position() {
