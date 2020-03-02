@@ -265,6 +265,10 @@ impl Piece {
             BlackFlat | BlackStanding | BlackCap => Color::Black,
         }
     }
+
+    pub fn is_road_piece(self) -> bool {
+        WhiteTr::is_road_stone(self) || BlackTr::is_road_stone(self)
+    }
 }
 
 impl ops::Not for Piece {
@@ -589,6 +593,14 @@ impl Board {
             .filter_map(|cell| cell.top_stone())
     }
 
+    pub fn white_road_pieces(&self) -> BitBoard {
+        self.white_road_pieces
+    }
+
+    pub fn black_road_pieces(&self) -> BitBoard {
+        self.black_road_pieces
+    }
+
     fn white_road_pieces_from_scratch(&self) -> BitBoard {
         let mut bitboard = BitBoard::empty();
         for square in board_iterator() {
@@ -828,28 +840,13 @@ impl board::Board for Board {
         let (components, highest_component_id) =
             connected_components_graph(WhiteTr::road_stones(self), BlackTr::road_stones(self));
 
-        // Check if any components cross the board
-        for id in 1..highest_component_id {
-            if (components.raw[0].iter().any(|&cell| cell == id)
-                && components.raw[BOARD_SIZE - 1]
-                    .iter()
-                    .any(|&cell| cell == id))
-                || ((0..BOARD_SIZE).any(|y| components.raw[y][0] == id)
-                    && (0..BOARD_SIZE).any(|y| components.raw[y][BOARD_SIZE - 1] == id))
-            {
-                let square = board_iterator()
-                    .find(|&square| components[square] == id)
-                    .unwrap();
-                let piece = self[square].top_stone().unwrap();
-                if piece == Piece::WhiteCap || piece == Piece::WhiteFlat {
-                    return Some(GameResult::WhiteWin);
-                } else if piece == Piece::BlackCap || piece == Piece::BlackFlat {
-                    return Some(GameResult::BlackWin);
-                } else {
-                    unreachable!();
-                }
-            }
-        }
+        if let Some(square) = is_win_by_road(&components, highest_component_id) {
+            debug_assert!(self[square].top_stone().unwrap().is_road_piece());
+            return match self[square].top_stone().unwrap().color() {
+                Color::White => Some(WhiteWin),
+                Color::Black => Some(BlackWin),
+            };
+        };
 
         if (self.white_stones_left == 0 && self.white_capstones_left == 0)
             || (self.black_stones_left == 0 && self.black_capstones_left == 0)
@@ -1051,6 +1048,7 @@ pub fn connected_components_graph(
     white_road_pieces: BitBoard,
     black_road_pieces: BitBoard,
 ) -> (AbstractBoard<u8>, u8) {
+
     let mut components: AbstractBoard<u8> = Default::default();
     let mut visited: AbstractBoard<bool> = Default::default();
     let mut id = 1;
@@ -1099,4 +1097,22 @@ fn connect_component<Color: ColorTr>(
             connect_component::<Color>(road_pieces, components, visited, neighbour, id);
         }
     }
+}
+
+/// Check if either side has completed a road
+/// Returns one of the winning squares in the road
+pub fn is_win_by_road(components: &AbstractBoard<u8>, highest_component_id: u8) -> Option<Square> {
+    for id in 1..highest_component_id {
+        if (components.raw[0].iter().any(|&cell| cell == id)
+            && components.raw[BOARD_SIZE - 1]
+                .iter()
+                .any(|&cell| cell == id))
+            || ((0..BOARD_SIZE).any(|y| components.raw[y][0] == id)
+                && (0..BOARD_SIZE).any(|y| components.raw[y][BOARD_SIZE - 1] == id))
+        {
+            let square = board_iterator().find(|&sq| components[sq] == id).unwrap();
+            return Some(square);
+        }
+    }
+    None
 }

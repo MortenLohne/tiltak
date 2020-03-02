@@ -1,11 +1,9 @@
 use crate::board::Role::*;
 use crate::board::{
-    board_iterator, Board, ColorTr, Direction, Move, Movement, Piece, Square, StackMovement,
-    BOARD_SIZE,
+    board_iterator, connected_components_graph, is_win_by_road, Board, ColorTr, Direction, Move,
+    Movement, Piece, Square, StackMovement, BOARD_SIZE,
 };
 use arrayvec::ArrayVec;
-use board_game_traits::board::Board as BoardTrait;
-use board_game_traits::board::{Color, GameResult};
 
 impl Board {
     pub fn generate_moves_colortr<Colorr: ColorTr>(
@@ -48,32 +46,7 @@ impl Board {
                         for movements in movements.into_iter().filter(|mv| !mv.is_empty()) {
                             let stack_movement = StackMovement { movements };
                             let mv = Move::Move(square, direction, stack_movement.clone());
-                            // Check that moves are not suicide moves
-                            // Moves that don't give the opponent a new road stone,
-                            // can trivially be ruled out
-                            if self
-                                .top_stones_left_behind_by_move(square, &stack_movement)
-                                .any(|piece| {
-                                    piece.is_some() && !Colorr::piece_is_ours(piece.unwrap())
-                                })
-                            {
-                                let mut new_board = self.clone();
-                                new_board.do_move(mv.clone());
-                                match new_board.game_result() {
-                                    Some(GameResult::WhiteWin) => {
-                                        if Colorr::color() == Color::White {
-                                            moves.push(mv);
-                                        }
-                                    }
-                                    Some(GameResult::BlackWin) => {
-                                        if Colorr::color() == Color::Black {
-                                            moves.push(mv);
-                                        }
-                                    }
-                                    Some(GameResult::Draw) => moves.push(mv),
-                                    None => moves.push(mv),
-                                };
-                            } else {
+                            if !self.move_is_suicide::<Colorr>(&mv) {
                                 moves.push(mv);
                             }
                         }
@@ -161,6 +134,69 @@ impl Board {
                 );
                 movements.push(new_movement);
             }
+        }
+    }
+
+    // Never inline, for profiling purposes
+    #[inline(never)]
+    pub fn move_is_suicide<Colorr: ColorTr>(&self, mv: &Move) -> bool {
+        if let Move::Move(square, direction, stack_movement) = mv {
+            // Stack moves that don't give the opponent a new road stone,
+            // can trivially be ruled out
+            if self
+                .top_stones_left_behind_by_move(*square, &stack_movement)
+                .any(|piece| piece.is_some() && !Colorr::piece_is_ours(piece.unwrap()))
+            {
+                let mut white_road = self.white_road_pieces();
+                let mut black_road = self.black_road_pieces();
+                let mut sq = *square;
+
+                for new_top_piece in self.top_stones_left_behind_by_move(*square, &stack_movement) {
+                    white_road = white_road.clear(sq.0);
+                    black_road = black_road.clear(sq.0);
+                    if let Some(piece) = new_top_piece {
+                        match piece {
+                            Piece::WhiteFlat | Piece::WhiteCap => white_road = white_road.set(sq.0),
+                            Piece::BlackFlat | Piece::BlackCap => black_road = black_road.set(sq.0),
+                            Piece::WhiteStanding | Piece::BlackStanding => (),
+                        }
+                    }
+                    sq = sq.go_direction(*direction).unwrap_or(sq);
+                }
+
+                let (components, highest_component_id) =
+                    connected_components_graph(white_road, black_road);
+
+                if let Some(winning_square) = is_win_by_road(&components, highest_component_id) {
+                    let mut sq = *square;
+                    // First check if the winning square is among those used by the move
+                    // We cannot use self, since the move hasn't been played on self
+                    for top_piece in self.top_stones_left_behind_by_move(*square, &stack_movement) {
+                        if sq == winning_square {
+                            return !Colorr::piece_is_ours(top_piece.unwrap());
+                        }
+                        sq = sq.go_direction(*direction).unwrap_or(sq);
+                    }
+                    // The winning square is not among the squares touched by the move
+                    // Now we can safely use self to check
+                    for sq in board_iterator() {
+                        if sq == winning_square {
+                            let top_piece = self[sq].top_stone().unwrap();
+                            return !Colorr::piece_is_ours(top_piece);
+                        }
+                    }
+                    unreachable!(
+                        "Couldn't find the winning square {} for move {:?} on board\n{:?}",
+                        winning_square, mv, self
+                    );
+                } else {
+                    false
+                }
+            } else {
+                false
+            }
+        } else {
+            false
         }
     }
 }
