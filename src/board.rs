@@ -874,14 +874,10 @@ impl board::Board for Board {
 
 impl EvalBoardTrait for Board {
     fn static_eval(&self) -> f32 {
-        let material = self
-            .all_top_stones()
-            .map(|piece| match piece {
-                WhiteFlat => 1.0,
-                BlackFlat => -1.0,
-                _ => 0.0,
-            })
-            .sum::<f32>();
+        let material = (self.white_road_pieces.popcount() as i64
+            - self.black_road_pieces.popcount() as i64
+            + self.white_capstones_left as i64
+            - self.black_capstones_left as i64) as f32;
 
         let to_move = match self.side_to_move() {
             Color::White => 0.5,
