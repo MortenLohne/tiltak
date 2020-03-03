@@ -533,7 +533,7 @@ impl Debug for Board {
             for print_row in 0..3 {
                 for x in 0..BOARD_SIZE {
                     for print_column in 0..3 {
-                        match self.cells.raw[y][x].get(print_column * 3 + print_row) {
+                        match self.cells.raw[x][y].get(print_column * 3 + print_row) {
                             None => write!(f, "[.]")?,
                             Some(WhiteFlat) => write!(f, "[w]")?,
                             Some(WhiteStanding) => write!(f, "[W]")?,
