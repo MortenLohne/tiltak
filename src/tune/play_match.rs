@@ -1,4 +1,5 @@
-use crate::board::{Board, Move, Piece};
+use crate::board::Piece::{BlackFlat, WhiteFlat};
+use crate::board::{board_iterator, Board, Move, Square};
 use crate::mcts;
 use crate::tune::pgn_parse;
 use crate::tune::pgn_parse::Game;
@@ -6,32 +7,24 @@ use board_game_traits::board::Board as BoardTrait;
 use board_game_traits::board::Color;
 use std::io;
 
-fn openings() -> impl Iterator<Item = Board> {
-    let board = Board::default();
-    let mut moves = vec![];
-    board.generate_moves(&mut moves);
-    moves.into_iter().flat_map(move |mv| {
-        let mut board2 = board.clone();
-        board2.do_move(mv);
-        let mut moves2 = vec![];
-        board2.generate_moves(&mut moves2);
-        moves2.into_iter().filter_map(move |mv| {
-            if let Move::Place(Piece::WhiteFlat, _) | Move::Place(Piece::BlackFlat, _) = mv {
-                let mut board3 = board2.clone();
-                board3.do_move(mv);
-                Some(board3)
-            } else {
-                None
-            }
-        })
+fn openings() -> impl Iterator<Item = [Move; 2]> {
+    [0, 1, 2, 6, 7, 8].iter().flat_map(move |i| {
+        let move1 = Move::Place(BlackFlat, Square(*i));
+        board_iterator()
+            .filter(move |square| *square != Square(*i))
+            .map(|square| Move::Place(WhiteFlat, square))
+            .map(move |move2| [move1.clone(), move2])
     })
 }
 
 pub fn play_match() -> impl Iterator<Item = Game<Board>> {
     const MCTS_NODES: u64 = 10_000;
-    openings().map(|start_board| {
-        let mut board = start_board.clone();
-        let mut game_moves = vec![];
+    openings().map(|opening_moves| {
+        let mut board = Board::start_board();
+        let mut game_moves = opening_moves.to_vec();
+        for mv in opening_moves.iter() {
+            board.do_move(mv.clone());
+        }
         while board.game_result().is_none() {
             let num_moves = game_moves.len();
             if num_moves > 10
@@ -54,7 +47,7 @@ pub fn play_match() -> impl Iterator<Item = Game<Board>> {
             }
         }
         Game {
-            start_board,
+            start_board: Board::default(),
             moves: game_moves
                 .into_iter()
                 .map(|mv| (mv, String::new()))

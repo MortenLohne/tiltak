@@ -1,3 +1,4 @@
+use crate::board::BOARD_SIZE;
 use board_game_traits::board::Board as BoardTrait;
 use board_game_traits::board::{Color, GameResult};
 use pgn_traits::pgn::PgnBoard;
@@ -33,6 +34,7 @@ pub fn game_to_pgn<W: Write, B: PgnBoard>(
     writeln!(f, "[Round \"{}\"]", round)?;
     writeln!(f, "[White \"{}\"]", white)?;
     writeln!(f, "[Black \"{}\"]", black)?;
+    writeln!(f, "[Size \"{}\"]", BOARD_SIZE)?;
     writeln!(
         f,
         "[Result \"{}\"]",
@@ -57,13 +59,26 @@ pub fn game_to_pgn<W: Write, B: PgnBoard>(
         } else if board.side_to_move() == Color::White {
             write!(
                 f,
-                "{}. {} {{{}}} ",
+                "{}. {} {}",
                 (i + 1) / 2 + 1,
                 board.move_to_san(&mv),
-                comment
+                if comment.is_empty() {
+                    "".to_string()
+                } else {
+                    "{".to_string() + comment + "} "
+                }
             )?;
         } else {
-            write!(f, "{} {{{}}} ", board.move_to_san(&mv), comment)?;
+            write!(
+                f,
+                "{} {}",
+                board.move_to_san(&mv),
+                if comment.is_empty() {
+                    "".to_string()
+                } else {
+                    "{".to_string() + comment + "} "
+                }
+            )?;
         }
         board.do_move(mv.clone());
     }
@@ -146,7 +161,7 @@ pub fn parse_pgn<B: PgnBoard + Debug + Clone>(
                         &i[0..100]
                     )?,
                     nom::Err::Error(nom::Context::List(errs)) => {
-                        write!(io::stderr(), "Parse error: {:?}\n", errs)?
+                        writeln!(io::stderr(), "Parse error: {:?}", errs)?
                     }
                     nom::Err::Failure(nom::Context::Code(i, error_kind)) => writeln!(
                         io::stderr(),

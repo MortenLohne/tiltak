@@ -709,19 +709,13 @@ impl board::Board for Board {
                     };
                 }
 
-                match (self.side_to_move(), piece) {
-                    (Color::White, WhiteFlat) => self.white_stones_left -= 1,
-                    (Color::White, WhiteStanding) => self.white_stones_left -= 1,
-                    (Color::White, WhiteCap) => self.white_capstones_left -= 1,
-                    (Color::Black, BlackFlat) => self.black_stones_left -= 1,
-                    (Color::Black, BlackStanding) => self.black_stones_left -= 1,
-                    (Color::Black, BlackCap) => self.black_capstones_left -= 1,
-                    _ => unreachable!(
-                        "Tried to place {} stone on {}'s move\n{:?}",
-                        piece.color(),
-                        self.side_to_move(),
-                        self
-                    ),
+                match piece {
+                    WhiteFlat => self.white_stones_left -= 1,
+                    WhiteStanding => self.white_stones_left -= 1,
+                    WhiteCap => self.white_capstones_left -= 1,
+                    BlackFlat => self.black_stones_left -= 1,
+                    BlackStanding => self.black_stones_left -= 1,
+                    BlackCap => self.black_capstones_left -= 1,
                 }
                 ReverseMove::Place(to)
             }
