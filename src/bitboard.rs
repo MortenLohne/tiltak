@@ -58,7 +58,7 @@ impl BitBoard {
 
     #[inline]
     pub fn lower_n_bits(n: u8) -> Self {
-        if n >= 32 {
+        if n >= 64 {
             Self::full()
         } else {
             BitBoard {
