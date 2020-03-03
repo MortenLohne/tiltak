@@ -4,6 +4,10 @@ extern crate rand;
 #[macro_use]
 extern crate smallvec;
 extern crate arrayvec;
+#[macro_use]
+extern crate log;
+#[macro_use]
+extern crate nom;
 
 mod bitboard;
 mod board;
@@ -11,6 +15,7 @@ mod mcts;
 mod minmax;
 mod move_gen;
 mod tests;
+mod tune;
 
 use std::io;
 

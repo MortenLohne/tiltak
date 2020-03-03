@@ -6,6 +6,7 @@ use crate::board::Piece::*;
 use crate::board::Role::Flat;
 use crate::board::Role::*;
 use crate::mcts;
+use crate::tune::auto_tune::TunableBoard;
 use arrayvec::ArrayVec;
 use board_game_traits::board;
 use board_game_traits::board::GameResult::{BlackWin, Draw, WhiteWin};
@@ -885,29 +886,38 @@ impl board::Board for Board {
 
 impl EvalBoardTrait for Board {
     fn static_eval(&self) -> f32 {
+        self.static_eval_with_params(Self::PARAMS)
+    }
+}
+
+impl TunableBoard for Board {
+
+    const PARAMS : &'static [f32] = &[0.5, 0.2, 0.1, 0.8, 0.4, 0.5];
+
+    fn static_eval_with_params(&self, params: &[f32]) -> f32 {
         let material = (self.white_road_pieces.popcount() as i64
             - self.black_road_pieces.popcount() as i64
             + self.white_capstones_left as i64
             - self.black_capstones_left as i64) as f32;
 
         let to_move = match self.side_to_move() {
-            Color::White => 0.5,
-            Color::Black => -0.5,
+            Color::White => params[0],
+            Color::Black => - params[0],
         };
 
         let mut centre = 0.0;
         for x in 1..4 {
             for y in 1..4 {
                 match self.cells.raw[y][x].top_stone().map(Piece::color) {
-                    Some(Color::White) => centre += 0.2,
-                    Some(Color::Black) => centre -= 0.2,
+                    Some(Color::White) => centre += params[1],
+                    Some(Color::Black) => centre -= params[1],
                     None => (),
                 }
             }
         }
         match self.cells.raw[2][2].top_stone().map(Piece::color) {
-            Some(Color::White) => centre += 0.1,
-            Some(Color::Black) => centre -= 0.1,
+            Some(Color::White) => centre += params[2],
+            Some(Color::Black) => centre -= params[2],
             None => (),
         }
 
@@ -923,9 +933,9 @@ impl EvalBoardTrait for Board {
                     .take(stack.len() as usize - 1)
                     .map(|piece| {
                         if piece.color() == controlling_player {
-                            0.8
+                            params[3]
                         } else {
-                            -0.4
+                            -params[4]
                         }
                     })
                     .sum::<f32>();
@@ -934,16 +944,16 @@ impl EvalBoardTrait for Board {
                 if top_stone.role() == Cap
                     && stack.get(stack.len() - 2).unwrap().color() == controlling_player
                 {
-                    val += 0.5;
+                    val += params[6];
                 }
 
                 match top_stone {
-                    WhiteCap => val * 2.0,
-                    BlackCap => val * -2.0,
+                    WhiteCap => val + params[5],
+                    BlackCap => (val + params[5]) * -1.0,
                     WhiteFlat => val,
                     BlackFlat => val * -1.0,
-                    WhiteStanding => val * 1.5,
-                    BlackStanding => val * -1.5,
+                    WhiteStanding => val + params[6],
+                    BlackStanding => (val + params[6]) * -1.5,
                 }
             })
             .sum();
