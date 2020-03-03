@@ -4,7 +4,6 @@ use crate::mcts;
 use crate::tune::pgn_parse;
 use crate::tune::pgn_parse::Game;
 use board_game_traits::board::Board as BoardTrait;
-use board_game_traits::board::Color;
 use rayon::prelude::*;
 use std::io;
 
@@ -37,21 +36,14 @@ pub fn play_match() -> impl ParallelIterator<Item = Game<Board>> {
                 {
                     break;
                 }
-                match board.side_to_move() {
-                    Color::Black => {
-                        let (best_move, _score) =
-                            mcts::mcts(board.clone(), MCTS_NODES, TEMPERATURE);
-                        board.do_move(best_move.clone());
-                        game_moves.push(best_move);
-                    }
-
-                    Color::White => {
-                        let (best_move, _score) =
-                            mcts::mcts(board.clone(), MCTS_NODES, TEMPERATURE);
-                        board.do_move(best_move.clone());
-                        game_moves.push(best_move);
-                    }
-                }
+                // Turn off temperature in the middle-game, when all games are expected to be unique
+                let (best_move, _score) = if num_plies < 20 {
+                    mcts::mcts(board.clone(), MCTS_NODES, TEMPERATURE)
+                } else {
+                    mcts::mcts(board.clone(), MCTS_NODES, 0.0)
+                };
+                board.do_move(best_move.clone());
+                game_moves.push(best_move);
             }
             Game {
                 start_board: Board::default(),
