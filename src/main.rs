@@ -232,7 +232,10 @@ fn bench() {
 }
 
 fn tune() {
-    let outfile = fs::OpenOptions::new().append(true).open("output.ptn").unwrap();
+    let outfile = fs::OpenOptions::new()
+        .append(true)
+        .open("output.ptn")
+        .unwrap();
     let locked_writer = sync::Mutex::new(io::BufWriter::new(outfile));
 
     use std::sync::atomic::AtomicU64;

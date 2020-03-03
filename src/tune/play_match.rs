@@ -31,9 +31,9 @@ pub fn play_match() -> impl ParallelIterator<Item = Game<Board>> {
                 board.do_move(mv.clone());
             }
             while board.game_result().is_none() {
-                let num_moves = game_moves.len();
-                if num_moves > 10
-                    && (1..5).all(|i| game_moves[num_moves - i] == game_moves[num_moves - i - 4])
+                let num_plies = game_moves.len();
+                if num_plies > 10
+                    && (1..5).all(|i| game_moves[num_plies - i] == game_moves[num_plies - i - 4])
                 {
                     break;
                 }

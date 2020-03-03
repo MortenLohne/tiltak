@@ -1,22 +1,14 @@
-use crate::mcts::Score;
+use crate::mcts;
 use board_game_traits::board::Board as BoardTrait;
 use board_game_traits::board::GameResult;
 use pgn_traits::pgn::PgnBoard;
 use rayon::prelude::*;
 use std::fmt::Debug;
-use crate::mcts;
 
 pub trait TunableBoard {
     const PARAMS: &'static [f32];
 
     fn static_eval_with_params(&self, params: &[f32]) -> f32;
-}
-
-pub fn get_critical_positions<B>(positions: &[B], params: &[f32]) -> Vec<B>
-where
-    B: TunableBoard + BoardTrait + PgnBoard + Send + Sync + Clone,
-{
-    positions.to_vec()
 }
 
 pub fn gradient_descent<B>(
@@ -74,7 +66,9 @@ where
         if error < lowest_error {
             lowest_error = error;
             best_params = new_params.to_vec();
-        } else if errors.len() >= MAX_TRIES && (1..=MAX_TRIES).all(|i| errors[errors.len() - i] > lowest_error) {
+        } else if errors.len() >= MAX_TRIES
+            && (1..=MAX_TRIES).all(|i| errors[errors.len() - i] > lowest_error)
+        {
             if eta < 0.005 {
                 return best_params;
             } else {
@@ -94,8 +88,6 @@ pub fn calc_slope<B>(positions: &[B], results: &[GameResult], params: &[f32]) ->
 where
     B: TunableBoard + BoardTrait + PgnBoard + Send + Sync + Clone,
 {
-    let critical_positions = get_critical_positions(positions, params);
-
     const EPSILON: f32 = 0.001;
 
     params
@@ -104,7 +96,7 @@ where
         .map(|(i, p)| {
             let mut params_hat: Vec<f32> = params.to_vec();
             params_hat[i] = p + EPSILON;
-            critical_positions
+            positions
                 .iter()
                 .zip(results)
                 .map(|(board, &game_result)| {
@@ -126,10 +118,8 @@ where
         .into_par_iter()
         .zip(results)
         .map(|(board, game_result)| {
-            let color = board.side_to_move();
-            let (qsearc_eval, _) = qsearch(board, params);
-            let eval = qsearc_eval * color.multiplier() as f32;
-            error(qsearc_eval, *game_result)
+            let eval = board.static_eval_with_params(params);
+            error(eval, *game_result)
         })
         .sum::<f32>()
         / (positions.len() as f32)
@@ -147,12 +137,4 @@ pub fn error(eval: f32, game_result: GameResult) -> f32 {
 
 pub fn sigmoid(eval: f32) -> f32 {
     mcts::cp_to_win_percentage(eval)
-}
-
-/// Run quiescence search and returns a score from the side to move's perspective
-fn qsearch<B: BoardTrait>(board: &B, params: &[f32]) -> (Score, Vec<B::Move>)
-where
-    B: TunableBoard + BoardTrait,
-{
-    (board.static_eval_with_params(params), vec![])
 }

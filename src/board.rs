@@ -891,7 +891,7 @@ impl TunableBoard for Board {
         let material = (self.white_road_pieces.popcount() as f32) * params[0]
             - (self.black_road_pieces.popcount() as f32) * params[0];
 
-        let reserve_capstones= self.white_capstones_left as f32 * params[1]
+        let reserve_capstones = self.white_capstones_left as f32 * params[1]
             - (self.black_capstones_left as f32) * params[1];
 
         let to_move = match self.side_to_move() {
@@ -944,7 +944,7 @@ impl TunableBoard for Board {
                 match top_stone.role() {
                     Cap => val += params[8],
                     Flat => (),
-                    Standing => val += params[9]
+                    Standing => val += params[9],
                 }
 
                 match top_stone.color() {
