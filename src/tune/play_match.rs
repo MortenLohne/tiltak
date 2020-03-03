@@ -20,6 +20,7 @@ fn openings() -> impl Iterator<Item = [Move; 2]> {
 
 pub fn play_match() -> impl ParallelIterator<Item = Game<Board>> {
     const MCTS_NODES: u64 = 10_000;
+    const TEMPERATURE: f64 = 1.0;
     openings()
         .collect::<Vec<_>>()
         .into_par_iter()
@@ -38,13 +39,15 @@ pub fn play_match() -> impl ParallelIterator<Item = Game<Board>> {
                 }
                 match board.side_to_move() {
                     Color::Black => {
-                        let (best_move, _score) = mcts::mcts(board.clone(), MCTS_NODES);
+                        let (best_move, _score) =
+                            mcts::mcts(board.clone(), MCTS_NODES, TEMPERATURE);
                         board.do_move(best_move.clone());
                         game_moves.push(best_move);
                     }
 
                     Color::White => {
-                        let (best_move, _score) = mcts::mcts(board.clone(), MCTS_NODES);
+                        let (best_move, _score) =
+                            mcts::mcts(board.clone(), MCTS_NODES, TEMPERATURE);
                         board.do_move(best_move.clone());
                         game_moves.push(best_move);
                     }

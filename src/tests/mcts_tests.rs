@@ -194,7 +194,7 @@ fn plays_correct_move_property(move_strings: &[&str], correct_moves: TacticAnswe
     for i in 1..50000 {
         mcts.select(&mut board.clone(), &mut simple_moves, &mut moves);
         if i % 10000 == 0 {
-            let (best_move, _score) = mcts.best_move();
+            let (best_move, _score) = mcts.best_move(0.1);
             match correct_moves {
                 TacticAnswer::AvoidMoves(moves) =>
                     assert!(moves

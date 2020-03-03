@@ -1,5 +1,6 @@
 use crate::board::{Board, Move};
 use board_game_traits::board::{Board as BoardTrait, Color, EvalBoard, GameResult};
+use rand::Rng;
 
 const C_PUCT: Score = 2.0;
 
@@ -17,14 +18,14 @@ pub struct Tree {
 
 // TODO: Winning percentage should be always be interpreted from the side to move's perspective
 
-pub(crate) fn mcts(board: Board, nodes: u64) -> (Move, Score) {
+pub(crate) fn mcts(board: Board, nodes: u64, temperature: f64) -> (Move, Score) {
     let mut tree = Tree::new_root();
     let mut moves = vec![];
     let mut simple_moves = vec![];
     for _ in 0..nodes {
         tree.select(&mut board.clone(), &mut simple_moves, &mut moves);
     }
-    tree.best_move()
+    tree.best_move(temperature)
 }
 
 impl Tree {
@@ -66,18 +67,28 @@ impl Tree {
                 "Move {}: {} visits, {:.3} mean action value, {:.3} static score, {:.3} exploration value, best reply {:?}",
                 mv, child.visits, child.mean_action_value, child.heuristic_score,
                 child.exploration_value((parent_visits as Score).sqrt()),
-                if child.children.is_empty() { "".to_string() } else { format!("{:?}", child.best_move().0) }
+                if child.children.is_empty() { "".to_string() } else { format!("{:?}", child.best_move(0.1).0) }
             )
         });
     }
 
-    pub fn best_move(&self) -> (Move, Score) {
-        let (tree, mv) = self
-            .children
-            .iter()
-            .max_by_key(|(child, _)| child.visits)
-            .unwrap();
-        (mv.clone(), tree.mean_action_value)
+    pub fn best_move(&self, temperature: f64) -> (Move, Score) {
+        let mut rng = rand::thread_rng();
+        let mut move_probabilities = vec![];
+        let mut cumulative_prob = 0.0;
+
+        for (child, mv) in self.children.iter() {
+            cumulative_prob += (child.visits as f64).powf(1.0 / temperature) / self.visits as f64;
+            move_probabilities.push((mv, child.mean_action_value, cumulative_prob));
+        }
+
+        let p = rng.gen_range(0.0, cumulative_prob);
+        for (mv, action_value, p2) in move_probabilities {
+            if p2 > p {
+                return (mv.clone(), action_value);
+            }
+        }
+        unreachable!()
     }
 
     fn new_node(heuristic_score: Score) -> Self {

@@ -64,7 +64,7 @@ fn mcts_vs_minmax(minmax_depth: u16, mcts_nodes: u64) {
         }
         match board.side_to_move() {
             Color::Black => {
-                let (best_move, score) = mcts::mcts(board.clone(), mcts_nodes);
+                let (best_move, score) = mcts::mcts(board.clone(), mcts_nodes, 0.1);
                 board.do_move(best_move.clone());
                 moves.push(best_move.clone());
                 println!("{:6}: {:.3}", best_move, score);
@@ -102,14 +102,7 @@ fn test_position() {
     let mut board = Board::default();
     let mut moves = vec![];
 
-    for mv_san in [
-        "c3", "c4", "b4", "1c4+", "d2", "b5", "b3", "1b5+", "1b3>", "d4", "2c3+", "c4", "d3",
-        "1d4+", "d4", "1c4+", "b2", "c4", "1d4+", "2c3>", "1d2-", "Sb3", "5d3+3", "1b3+", "d4",
-        "2b2>1", "3c2-1", "b3", "b2", "1b3+", "c2", "b3", "c5", "2b2>", "b2", "1b3+", "b3", "2b4+",
-        "d5", "b4", "2c4<", "3b3-", "2c3+", "2b2>", "3d1<", "3c2+", "d1", "5b4+4",
-    ]
-    .iter()
-    {
+    for mv_san in ["c3"].iter() {
         let mv = board.move_from_san(&mv_san).unwrap();
         board.generate_moves(&mut moves);
         assert!(moves.contains(&mv));
@@ -136,6 +129,9 @@ fn test_position() {
         if i % 100_000 == 0 {
             println!("{} visits, val={}", tree.visits, tree.mean_action_value);
             tree.print_info();
+            if i > 0 {
+                println!("A good move: {}", tree.best_move(1.0).0);
+            }
         }
     }
 }
@@ -200,7 +196,7 @@ fn bench() {
     {
         let board = Board::default();
 
-        let (_move, score) = mcts::mcts(board, NODES);
+        let (_move, score) = mcts::mcts(board, NODES, 0.1);
         print!("{:.3}, ", score);
     }
 
@@ -209,7 +205,7 @@ fn bench() {
 
         do_moves_and_check_validity(&mut board, &["c3", "d3", "c4", "1d3<", "1c4+", "Sc4"]);
 
-        let (_move, score) = mcts::mcts(board, NODES);
+        let (_move, score) = mcts::mcts(board, NODES, 0.1);
         print!("{:.3}, ", score);
     }
     {
@@ -223,7 +219,7 @@ fn bench() {
             ],
         );
 
-        let (_move, score) = mcts::mcts(board, NODES);
+        let (_move, score) = mcts::mcts(board, NODES, 0.1);
         println!("{:.3}", score);
     }
     let time_taken = start_time.elapsed();
