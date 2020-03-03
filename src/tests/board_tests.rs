@@ -117,7 +117,7 @@ fn stones_left_behind_by_stack_movement_test() {
 
     do_moves_and_check_validity(&mut board, &["c3", "d3", "c4", "1d3<", "1c4-", "Sc4"]);
 
-    let mv = board.move_from_san("2c3<1").unwrap();
+    let mv = board.move_from_san("2c3<11").unwrap();
     if let Move::Move(square, _direction, stack_movement) = mv {
         assert_eq!(
             board
@@ -133,7 +133,7 @@ fn stones_left_behind_by_stack_movement_test() {
         panic!()
     }
 
-    let mv = board.move_from_san("3c3<1").unwrap();
+    let mv = board.move_from_san("3c3<21").unwrap();
     if let Move::Move(square, _direction, stack_movement) = mv {
         assert_eq!(
             board
@@ -183,6 +183,7 @@ fn play_random_games_test() {
                 .choose(&mut rng)
                 .unwrap_or_else(|| panic!("No legal moves on board\n{:?}", board))
                 .clone();
+            assert_eq!(mv, board.move_from_san(&board.move_to_san(&mv)).unwrap());
             board.do_move(mv);
             match board.game_result() {
                 None => (),

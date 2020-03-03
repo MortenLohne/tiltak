@@ -413,20 +413,22 @@ impl fmt::Display for Move {
                 WhiteStanding | BlackStanding => write!(f, "S{}", square)?,
             },
             Move::Move(square, direction, stack_movements) => {
-                write!(
-                    f,
-                    "{}{}",
-                    stack_movements.movements[0].pieces_to_take, square
-                )
-                .unwrap();
+                let mut pieces_held = stack_movements.movements[0].pieces_to_take;
+                write!(f, "{}{}", pieces_held, square).unwrap();
                 match direction {
                     North => f.write_char('+')?,
                     West => f.write_char('<')?,
                     East => f.write_char('>')?,
                     South => f.write_char('-')?,
                 }
-                for movement in stack_movements.movements.iter().skip(1) {
-                    write!(f, "{}", movement.pieces_to_take).unwrap();
+                // Omit number of pieces dropped, if all stones are dropped immediately
+                if stack_movements.movements.len() > 1 {
+                    for movement in stack_movements.movements.iter().skip(1) {
+                        let pieces_to_drop = pieces_held - movement.pieces_to_take;
+                        write!(f, "{}", pieces_to_drop).unwrap();
+                        pieces_held -= pieces_to_drop;
+                    }
+                    write!(f, "{}", pieces_held).unwrap();
                 }
             }
         }
@@ -995,17 +997,28 @@ impl pgn_traits::pgn::PgnBoard for Board {
             '1'..='9' if input.len() > 3 => {
                 let square = Square::parse_square(&input[1..3]);
                 let direction = Direction::parse(input.chars().nth(3).unwrap());
-                let movements = StackMovement {
-                    movements: input
-                        .chars()
-                        .take(1)
-                        .chain(input.chars().skip(4))
-                        .map(|ch| Movement {
-                            pieces_to_take: ch as u8 - b'0',
-                        })
-                        .collect(),
-                };
-                Ok(Move::Move(square, direction, movements))
+                let pieces_taken = first_char.to_digit(10).unwrap() as u8;
+                let mut pieces_held = pieces_taken;
+
+                let mut amounts_to_drop = input
+                    .chars()
+                    .skip(4)
+                    .map(|ch| ch.to_digit(10).unwrap() as u8)
+                    .collect::<Vec<u8>>();
+                amounts_to_drop.pop(); //
+
+                let mut movements = ArrayVec::new();
+                movements.push(Movement {
+                    pieces_to_take: pieces_taken,
+                });
+
+                for amount_to_drop in amounts_to_drop {
+                    movements.push(Movement {
+                        pieces_to_take: pieces_held - amount_to_drop,
+                    });
+                    pieces_held -= amount_to_drop;
+                }
+                Ok(Move::Move(square, direction, StackMovement { movements }))
             }
             _ => Err(pgn::Error::new(
                 pgn::ErrorKind::ParseError,
