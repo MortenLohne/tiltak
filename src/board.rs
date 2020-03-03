@@ -937,8 +937,9 @@ impl EvalBoardTrait for Board {
             .map(|sq| &self[sq])
             .filter(|stack| stack.len() > 1)
             .map(|stack| {
-                let controlling_player = stack.top_stone().unwrap().color();
-                let val = stack
+                let top_stone = stack.top_stone().unwrap();
+                let controlling_player = top_stone.color();
+                let mut val = stack
                     .clone()
                     .into_iter()
                     .take(stack.len() as usize - 1)
@@ -950,9 +951,21 @@ impl EvalBoardTrait for Board {
                         }
                     })
                     .sum::<f32>();
-                match controlling_player {
-                    Color::White => val,
-                    Color::Black => val * -1.0,
+
+                // Extra bonus for having your capstone over your own piece
+                if top_stone.role() == Cap
+                    && stack.get(stack.len() - 2).unwrap().color() == controlling_player
+                {
+                    val += 0.5;
+                }
+
+                match top_stone {
+                    WhiteCap => val * 2.0,
+                    BlackCap => val * -2.0,
+                    WhiteFlat => val,
+                    BlackFlat => val * -1.0,
+                    WhiteStanding => val * 1.5,
+                    BlackStanding => val * -1.5,
                 }
             })
             .sum();
