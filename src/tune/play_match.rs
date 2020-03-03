@@ -64,7 +64,7 @@ pub fn play_match() -> impl ParallelIterator<Item = Game<Board>> {
             }
         })
 }
-pub fn game_to_pgn(game: &Game<Board>) -> Result<(), io::Error> {
+pub fn game_to_pgn<W: io::Write>(game: &Game<Board>, writer: &mut W) -> Result<(), io::Error> {
     let Game {
         start_board,
         moves,
@@ -90,6 +90,6 @@ pub fn game_to_pgn(game: &Game<Board>) -> Result<(), io::Error> {
         "",
         *game_result,
         &[],
-        &mut io::stdout(),
+        writer,
     )
 }

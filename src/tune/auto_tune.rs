@@ -4,6 +4,7 @@ use board_game_traits::board::GameResult;
 use pgn_traits::pgn::PgnBoard;
 use rayon::prelude::*;
 use std::fmt::Debug;
+use crate::mcts;
 
 pub trait TunableBoard {
     const PARAMS: &'static [f32];
@@ -33,6 +34,8 @@ where
 
     let mut eta = 0.1;
     let beta = 0.8;
+
+    const MAX_TRIES: usize = 8;
 
     let initial_error = average_error(test_positions, test_results, params);
     println!(
@@ -71,7 +74,7 @@ where
         if error < lowest_error {
             lowest_error = error;
             best_params = new_params.to_vec();
-        } else if errors.len() >= 5 && (1..=5).all(|i| errors[errors.len() - i] > lowest_error) {
+        } else if errors.len() >= MAX_TRIES && (1..=MAX_TRIES).all(|i| errors[errors.len() - i] > lowest_error) {
             if eta < 0.005 {
                 return best_params;
             } else {
@@ -126,7 +129,7 @@ where
             let color = board.side_to_move();
             let (qsearc_eval, _) = qsearch(board, params);
             let eval = qsearc_eval * color.multiplier() as f32;
-            error(eval, *game_result)
+            error(qsearc_eval, *game_result)
         })
         .sum::<f32>()
         / (positions.len() as f32)
@@ -143,8 +146,7 @@ pub fn error(eval: f32, game_result: GameResult) -> f32 {
 }
 
 pub fn sigmoid(eval: f32) -> f32 {
-    let k = 0.97;
-    1.0 / (1.0 + 10.0_f32.powf(-k * eval / 4.0))
+    mcts::cp_to_win_percentage(eval)
 }
 
 /// Run quiescence search and returns a score from the side to move's perspective

@@ -15,7 +15,7 @@ mod move_gen;
 mod tests;
 mod tune;
 
-use std::{error, fs, io};
+use std::{error, fs, io, sync};
 
 use crate::tests::do_moves_and_check_validity;
 use crate::tune::auto_tune::TunableBoard;
@@ -232,36 +232,42 @@ fn bench() {
 }
 
 fn tune() {
-    let games = tune::play_match::play_match();
+    let outfile = fs::OpenOptions::new().append(true).open("output.ptn").unwrap();
+    let locked_writer = sync::Mutex::new(io::BufWriter::new(outfile));
 
     use std::sync::atomic::AtomicU64;
     use std::sync::atomic::Ordering;
 
-    let white_wins: AtomicU64 = AtomicU64::new(0);
-    let draws = AtomicU64::new(0);
-    let black_wins = AtomicU64::new(0);
-    let aborted = AtomicU64::new(0);
-
-    games.for_each(|ref game| {
-        tune::play_match::game_to_pgn(game).unwrap();
-        match game.game_result {
-            None => aborted.fetch_add(1, Ordering::Relaxed),
-            Some(GameResult::WhiteWin) => white_wins.fetch_add(1, Ordering::Relaxed),
-            Some(GameResult::BlackWin) => black_wins.fetch_add(1, Ordering::Relaxed),
-            Some(GameResult::Draw) => draws.fetch_add(1, Ordering::Relaxed),
-        };
-    });
-    println!(
-        "{} white wins, {} draws, {} black wins, {} aborted.",
-        white_wins.into_inner(),
-        draws.into_inner(),
-        black_wins.into_inner(),
-        aborted.into_inner()
-    );
+    let mut white_wins: AtomicU64 = AtomicU64::new(0);
+    let mut draws = AtomicU64::new(0);
+    let mut black_wins = AtomicU64::new(0);
+    let mut aborted = AtomicU64::new(0);
+    loop {
+        let games = tune::play_match::play_match();
+        games.for_each(|ref game| {
+            {
+                let mut writer = locked_writer.lock().unwrap();
+                tune::play_match::game_to_pgn(game, &mut *writer).unwrap();
+            }
+            match game.game_result {
+                None => aborted.fetch_add(1, Ordering::Relaxed),
+                Some(GameResult::WhiteWin) => white_wins.fetch_add(1, Ordering::Relaxed),
+                Some(GameResult::BlackWin) => black_wins.fetch_add(1, Ordering::Relaxed),
+                Some(GameResult::Draw) => draws.fetch_add(1, Ordering::Relaxed),
+            };
+        });
+        println!(
+            "{} white wins, {} draws, {} black wins, {} aborted.",
+            white_wins.get_mut(),
+            draws.get_mut(),
+            black_wins.get_mut(),
+            aborted.get_mut()
+        );
+    }
 }
 
 fn tune_from_file() -> Result<(), Box<dyn error::Error>> {
-    let mut file = fs::File::open("out.pgn")?;
+    let mut file = fs::File::open("output.ptn")?;
     let mut input = String::new();
     file.read_to_string(&mut input)?;
     let games: Vec<Game<Board>> = tune::pgn_parse::parse_pgn(&input)?;
@@ -279,7 +285,7 @@ fn tune_from_file() -> Result<(), Box<dyn error::Error>> {
 
     let middle_index = positions.len() / 2;
 
-    let params = [1.0; Board::PARAMS.len()];
+    let params = [0.01; Board::PARAMS.len()];
 
     println!(
         "Final parameters: {:?}",

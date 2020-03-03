@@ -885,32 +885,33 @@ impl EvalBoardTrait for Board {
 }
 
 impl TunableBoard for Board {
-    const PARAMS: &'static [f32] = &[0.5, 0.2, 0.1, 0.8, 0.4, 0.5, 0.5, 1.0];
+    const PARAMS: &'static [f32] = &[1.0, 1.0, 0.5, 0.2, 0.1, 0.8, 0.4, 0.5, 0.5, 1.0];
 
     fn static_eval_with_params(&self, params: &[f32]) -> f32 {
-        let material = (self.white_road_pieces.popcount() as i64
-            - self.black_road_pieces.popcount() as i64
-            + self.white_capstones_left as i64
-            - self.black_capstones_left as i64) as f32;
+        let material = (self.white_road_pieces.popcount() as f32) * params[0]
+            - (self.black_road_pieces.popcount() as f32) * params[0];
+
+        let reserve_capstones= self.white_capstones_left as f32 * params[1]
+            - (self.black_capstones_left as f32) * params[1];
 
         let to_move = match self.side_to_move() {
-            Color::White => params[0],
-            Color::Black => -params[0],
+            Color::White => params[2],
+            Color::Black => -params[2],
         };
 
         let mut centre = 0.0;
         for x in 1..4 {
             for y in 1..4 {
                 match self.cells.raw[y][x].top_stone().map(Piece::color) {
-                    Some(Color::White) => centre += params[1],
-                    Some(Color::Black) => centre -= params[1],
+                    Some(Color::White) => centre += params[3],
+                    Some(Color::Black) => centre -= params[3],
                     None => (),
                 }
             }
         }
         match self.cells.raw[2][2].top_stone().map(Piece::color) {
-            Some(Color::White) => centre += params[2],
-            Some(Color::Black) => centre -= params[2],
+            Some(Color::White) => centre += params[4],
+            Some(Color::Black) => centre -= params[4],
             None => (),
         }
 
@@ -926,9 +927,9 @@ impl TunableBoard for Board {
                     .take(stack.len() as usize - 1)
                     .map(|piece| {
                         if piece.color() == controlling_player {
-                            params[3]
+                            params[5]
                         } else {
-                            -params[4]
+                            -params[6]
                         }
                     })
                     .sum::<f32>();
@@ -937,21 +938,23 @@ impl TunableBoard for Board {
                 if top_stone.role() == Cap
                     && stack.get(stack.len() - 2).unwrap().color() == controlling_player
                 {
-                    val += params[5];
+                    val += params[7];
                 }
 
-                match top_stone {
-                    WhiteCap => val + params[6],
-                    BlackCap => (val + params[6]) * -1.0,
-                    WhiteFlat => val,
-                    BlackFlat => val * -1.0,
-                    WhiteStanding => val + params[7],
-                    BlackStanding => (val + params[7]) * -1.5,
+                match top_stone.role() {
+                    Cap => val += params[8],
+                    Flat => (),
+                    Standing => val += params[9]
+                }
+
+                match top_stone.color() {
+                    Color::White => val,
+                    Color::Black => val * -1.0,
                 }
             })
             .sum();
 
-        material + to_move + centre + stacks
+        material + reserve_capstones + to_move + centre + stacks
     }
 }
 

@@ -197,5 +197,5 @@ impl Tree {
 }
 
 pub fn cp_to_win_percentage(cp: f32) -> Score {
-    1.0 / (1.0 + Score::powf(10.0, -cp as Score / 10.0))
+    1.0 / (1.0 + Score::powf(10.0, -cp as Score / 4.0))
 }
