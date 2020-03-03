@@ -1,11 +1,10 @@
-use crate::board::{Board, Move};
+use crate::board::{Board, Move, Piece};
 use crate::mcts;
 use crate::tune::pgn_parse;
 use crate::tune::pgn_parse::Game;
 use board_game_traits::board::Board as BoardTrait;
 use board_game_traits::board::Color;
 use std::io;
-use std::io::Write;
 
 fn openings() -> impl Iterator<Item = Board> {
     let board = Board::default();
@@ -16,10 +15,14 @@ fn openings() -> impl Iterator<Item = Board> {
         board2.do_move(mv);
         let mut moves2 = vec![];
         board2.generate_moves(&mut moves2);
-        moves2.into_iter().map(move |mv| {
-            let mut board3 = board2.clone();
-            board3.do_move(mv);
-            board3
+        moves2.into_iter().filter_map(move |mv| {
+            if let Move::Place(Piece::WhiteFlat, _) | Move::Place(Piece::BlackFlat, _) = mv {
+                let mut board3 = board2.clone();
+                board3.do_move(mv);
+                Some(board3)
+            } else {
+                None
+            }
         })
     })
 }
@@ -63,13 +66,13 @@ pub fn play_match() -> impl Iterator<Item = Game<Board>> {
 }
 pub fn game_to_pgn(game: Game<Board>) -> Result<(), io::Error> {
     let Game {
-        start_board,
+        mut start_board,
         moves,
         game_result,
         tags,
     } = game;
     pgn_parse::game_to_pgn(
-        &mut start_board.clone(),
+        &mut start_board,
         &moves,
         "",
         "",

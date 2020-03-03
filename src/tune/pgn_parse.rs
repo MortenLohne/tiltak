@@ -48,12 +48,12 @@ pub fn game_to_pgn<W: Write, B: PgnBoard>(
         writeln!(f, "[FEN \"{}\"", board.to_fen())?;
     }
 
-    for (i, (mv, comment)) in moves.into_iter().enumerate() {
+    for (i, (mv, comment)) in moves.iter().enumerate() {
         if i % 12 == 0 {
             writeln!(f)?;
         }
         if i == 0 && board.side_to_move() == Color::Black {
-            write!(f, "{}... {} {{{}}} ", 1, board.move_to_san(&mv), comment)?;
+            write!(f, "1... {} {{{}}} ", board.move_to_san(&mv), comment)?;
         } else if board.side_to_move() == Color::White {
             write!(
                 f,
@@ -112,7 +112,7 @@ pub fn parse_pgn<B: PgnBoard + Debug + Clone>(
 
                 let tags: Vec<(String, String)> = tag_pairs
                     .iter()
-                    .map(|(a, b)| (a.to_string(), b.to_string()))
+                    .map(|(a, b)| ((*a).to_string(), (*b).to_string()))
                     .collect();
 
                 let game_result =
@@ -137,25 +137,25 @@ pub fn parse_pgn<B: PgnBoard + Debug + Clone>(
             Err(err) => {
                 match err {
                     nom::Err::Incomplete(i) => {
-                        write!(io::stderr(), "Couldn't parse incomplete game: {:?}\n", i)?
+                        writeln!(io::stderr(), "Couldn't parse incomplete game: {:?}", i)?
                     }
-                    nom::Err::Error(nom::Context::Code(i, error_kind)) => write!(
+                    nom::Err::Error(nom::Context::Code(i, error_kind)) => writeln!(
                         io::stderr(),
-                        "Parse error of kind {:?} around {}\n",
+                        "Parse error of kind {:?} around {}",
                         error_kind,
                         &i[0..100]
                     )?,
                     nom::Err::Error(nom::Context::List(errs)) => {
                         write!(io::stderr(), "Parse error: {:?}\n", errs)?
                     }
-                    nom::Err::Failure(nom::Context::Code(i, error_kind)) => write!(
+                    nom::Err::Failure(nom::Context::Code(i, error_kind)) => writeln!(
                         io::stderr(),
-                        "Parse failure of kind {:?} around {}\n",
+                        "Parse failure of kind {:?} around {}",
                         error_kind,
                         i
                     )?,
                     nom::Err::Failure(nom::Context::List(errs)) => {
-                        write!(io::stderr(), "Parse failure: {:?}\n", errs)?
+                        writeln!(io::stderr(), "Parse failure: {:?}", errs)?
                     }
                 }
                 break;

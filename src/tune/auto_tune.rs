@@ -15,7 +15,7 @@ pub fn get_critical_positions<B>(positions: &[B], params: &[f32]) -> Vec<B>
 where
     B: TunableBoard + BoardTrait + PgnBoard + Send + Sync + Clone,
 {
-    positions.iter().cloned().collect()
+    positions.to_vec()
 }
 
 pub fn gradient_descent<B>(
@@ -70,7 +70,7 @@ where
             if eta < 0.005 {
                 return best_params;
             } else {
-                eta = eta / 10.0;
+                eta /= 10.0;
                 paramss = vec![best_params.clone()];
                 errors = vec![lowest_error];
                 println!("Reduced eta to {}\n", eta);
@@ -94,7 +94,7 @@ where
         .par_iter()
         .enumerate()
         .map(|(i, p)| {
-            let mut params_hat: Vec<f32> = params.iter().cloned().collect();
+            let mut params_hat: Vec<f32> = params.to_vec();
             params_hat[i] = p + EPSILON;
             critical_positions
                 .iter()
@@ -119,9 +119,9 @@ where
         .zip(results)
         .map(|(board, game_result)| {
             let color = board.side_to_move();
-            let (qsearc_eval, _) = qsearch(board.clone(), params);
+            let (qsearc_eval, _) = qsearch(board, params);
             let eval = qsearc_eval * color.multiplier() as f32;
-            error(eval, game_result.clone())
+            error(eval, *game_result)
         })
         .sum::<f32>()
         / (positions.len() as f32)
@@ -134,8 +134,7 @@ pub fn error(eval: f32, game_result: GameResult) -> f32 {
         GameResult::BlackWin => 0.0,
     };
 
-    let error = f32::powf(answer - sigmoid(eval), 2.0);
-    error
+    f32::powf(answer - sigmoid(eval), 2.0)
 }
 
 pub fn sigmoid(eval: f32) -> f32 {

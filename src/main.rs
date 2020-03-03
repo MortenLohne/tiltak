@@ -5,8 +5,6 @@ extern crate rand;
 extern crate smallvec;
 extern crate arrayvec;
 #[macro_use]
-extern crate log;
-#[macro_use]
 extern crate nom;
 
 mod bitboard;

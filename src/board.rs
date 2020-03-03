@@ -970,15 +970,18 @@ impl pgn_traits::pgn::PgnBoard for Board {
         let mut f = String::new();
         board_iterator()
             .map(|square| self[square].clone())
-            .for_each(|stack: Stack| (match stack.top_stone() {
-                None => write!(f, "-"),
-                Some(WhiteFlat) => write!(f, "w"),
-                Some(WhiteStanding) => write!(f, "W"),
-                Some(WhiteCap) => write!(f, "C"),
-                Some(BlackFlat) => write!(f, "b"),
-                Some(BlackStanding) => write!(f, "B"),
-                Some(BlackCap) => write!(f, "c"),
-            }).unwrap());
+            .for_each(|stack: Stack| {
+                (match stack.top_stone() {
+                    None => write!(f, "-"),
+                    Some(WhiteFlat) => write!(f, "w"),
+                    Some(WhiteStanding) => write!(f, "W"),
+                    Some(WhiteCap) => write!(f, "C"),
+                    Some(BlackFlat) => write!(f, "b"),
+                    Some(BlackStanding) => write!(f, "B"),
+                    Some(BlackCap) => write!(f, "c"),
+                })
+                .unwrap()
+            });
         f
     }
 
