@@ -90,11 +90,6 @@ impl BitBoard {
         debug_assert!(i < BOARD_SIZE as u8 * BOARD_SIZE as u8);
         BitBoard::from_u64(self.board & !(1 << i))
     }
-
-    #[inline]
-    pub const fn popcount(self) -> u32 {
-        self.board.count_ones()
-    }
 }
 
 impl fmt::Debug for BitBoard {
