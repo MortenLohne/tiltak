@@ -1,9 +1,9 @@
-use board_game_traits::board::GameResult;
+use crate::mcts::Score;
 use board_game_traits::board::Board as BoardTrait;
+use board_game_traits::board::GameResult;
+use pgn_traits::pgn::PgnBoard;
 use rayon::prelude::*;
 use std::fmt::Debug;
-use pgn_traits::pgn::PgnBoard;
-use crate::mcts::Score;
 
 pub trait TunableBoard {
     const PARAMS: &'static [f32];
@@ -12,14 +12,22 @@ pub trait TunableBoard {
 }
 
 pub fn get_critical_positions<B>(positions: &[B], params: &[f32]) -> Vec<B>
-    where B: TunableBoard + BoardTrait + PgnBoard + Send + Sync + Clone {
+where
+    B: TunableBoard + BoardTrait + PgnBoard + Send + Sync + Clone,
+{
     positions.iter().cloned().collect()
 }
 
-pub fn gradient_descent<B>(positions: &[B], results: &[GameResult],
-                           test_positions: &[B], test_results: &[GameResult],
-                           params: &[f32]) -> Vec<f32>
-    where B: TunableBoard +BoardTrait + PgnBoard + Send + Debug + Sync + Clone {
+pub fn gradient_descent<B>(
+    positions: &[B],
+    results: &[GameResult],
+    test_positions: &[B],
+    test_results: &[GameResult],
+    params: &[f32],
+) -> Vec<f32>
+where
+    B: TunableBoard + BoardTrait + PgnBoard + Send + Debug + Sync + Clone,
+{
     assert_eq!(positions.len(), results.len());
     assert_eq!(test_positions.len(), test_results.len());
 
@@ -38,13 +46,15 @@ pub fn gradient_descent<B>(positions: &[B], results: &[GameResult],
     loop {
         let last_params = paramss.last().unwrap().clone();
         let slopes = calc_slope(positions, results, &last_params);
-        gradients = gradients.iter()
+        gradients = gradients
+            .iter()
             .zip(slopes)
             .map(|(gradient, slope)| beta * gradient + (1.0 - beta) * slope)
             .collect();
         println!("Gradients: {:?}", gradients);
 
-        let new_params: Vec<f32> = last_params.iter()
+        let new_params: Vec<f32> = last_params
+            .iter()
             .zip(gradients.iter())
             .map(|(param, gradient)| param + gradient * eta)
             .collect();
@@ -56,14 +66,10 @@ pub fn gradient_descent<B>(positions: &[B], results: &[GameResult],
         if error < lowest_error {
             lowest_error = error;
             best_params = new_params.to_vec();
-        }
-        else if errors.len() >= 5
-            && (1..=5).all(|i| errors[errors.len() - i] > lowest_error)
-        {
+        } else if errors.len() >= 5 && (1..=5).all(|i| errors[errors.len() - i] > lowest_error) {
             if eta < 0.005 {
-                return best_params
-            }
-            else {
+                return best_params;
+            } else {
                 eta = eta / 10.0;
                 paramss = vec![best_params.clone()];
                 errors = vec![lowest_error];
@@ -77,17 +83,21 @@ pub fn gradient_descent<B>(positions: &[B], results: &[GameResult],
 }
 
 pub fn calc_slope<B>(positions: &[B], results: &[GameResult], params: &[f32]) -> Vec<f32>
-    where B: TunableBoard +BoardTrait + PgnBoard + Send + Sync + Clone {
-
+where
+    B: TunableBoard + BoardTrait + PgnBoard + Send + Sync + Clone,
+{
     let critical_positions = get_critical_positions(positions, params);
 
-    const EPSILON : f32 = 0.001;
+    const EPSILON: f32 = 0.001;
 
-    params.par_iter().enumerate()
+    params
+        .par_iter()
+        .enumerate()
         .map(|(i, p)| {
             let mut params_hat: Vec<f32> = params.iter().cloned().collect();
             params_hat[i] = p + EPSILON;
-            critical_positions.iter()
+            critical_positions
+                .iter()
                 .zip(results)
                 .map(|(board, &game_result)| {
                     let score1 = board.static_eval_with_params(params);
@@ -100,18 +110,21 @@ pub fn calc_slope<B>(positions: &[B], results: &[GameResult], params: &[f32]) ->
 }
 
 pub fn average_error<B>(positions: &[B], results: &[GameResult], params: &[f32]) -> f32
-    where B: TunableBoard + BoardTrait + PgnBoard + Send + Debug + Sync {
+where
+    B: TunableBoard + BoardTrait + PgnBoard + Send + Debug + Sync,
+{
     assert_eq!(positions.len(), results.len());
-    positions.into_par_iter().zip(results)
+    positions
+        .into_par_iter()
+        .zip(results)
         .map(|(board, game_result)| {
             let color = board.side_to_move();
             let (qsearc_eval, _) = qsearch(board.clone(), params);
             let eval = qsearc_eval * color.multiplier() as f32;
             error(eval, game_result.clone())
-
         })
-        .sum::<f32>() / (positions.len() as f32)
-
+        .sum::<f32>()
+        / (positions.len() as f32)
 }
 
 pub fn error(eval: f32, game_result: GameResult) -> f32 {
@@ -131,8 +144,9 @@ pub fn sigmoid(eval: f32) -> f32 {
 }
 
 /// Run quiescence search and returns a score from the side to move's perspective
-fn qsearch<B:BoardTrait>(board: &B, params: &[f32])
-                             -> (Score, Vec<B::Move>)
-    where B: TunableBoard + BoardTrait {
+fn qsearch<B: BoardTrait>(board: &B, params: &[f32]) -> (Score, Vec<B::Move>)
+where
+    B: TunableBoard + BoardTrait,
+{
     (board.static_eval_with_params(params), vec![])
 }

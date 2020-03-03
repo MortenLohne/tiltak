@@ -1,10 +1,10 @@
-use std::io::Write;
-use std::io;
 use board_game_traits::board::Board as BoardTrait;
+use board_game_traits::board::{Color, GameResult};
 use pgn_traits::pgn::PgnBoard;
-use board_game_traits::board::{GameResult, Color};
 use std::error;
 use std::fmt::Debug;
+use std::io;
+use std::io::Write;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Game<B: BoardTrait> {
@@ -14,24 +14,37 @@ pub struct Game<B: BoardTrait> {
     pub tags: Vec<(String, String)>,
 }
 
-pub fn game_to_pgn<W: Write, B: PgnBoard>(board: &mut B, moves: &[(B::Move, String)], event: &str, site: &str, date: &str,
-                                          round: &str, white: &str, black: &str, result: Option<GameResult>,
-                                          tags_pairs: &[(&str, &str)], f: &mut W) -> Result<(), io::Error> {
+pub fn game_to_pgn<W: Write, B: PgnBoard>(
+    board: &mut B,
+    moves: &[(B::Move, String)],
+    event: &str,
+    site: &str,
+    date: &str,
+    round: &str,
+    white: &str,
+    black: &str,
+    result: Option<GameResult>,
+    tags_pairs: &[(&str, &str)],
+    f: &mut W,
+) -> Result<(), io::Error> {
     writeln!(f, "[Event \"{}\"]", event)?;
     writeln!(f, "[Site \"{}\"]", site)?;
     writeln!(f, "[Date \"{}\"]", date)?;
     writeln!(f, "[Round \"{}\"]", round)?;
     writeln!(f, "[White \"{}\"]", white)?;
     writeln!(f, "[Black \"{}\"]", black)?;
-    writeln!(f, "[Result \"{}\"]", match result {
-        None => "*",
-        Some(GameResult::WhiteWin) => "1-0",
-        Some(GameResult::BlackWin) => "0-1",
-        Some(GameResult::Draw) => "1/2-1/2",
-    })?;
+    writeln!(
+        f,
+        "[Result \"{}\"]",
+        match result {
+            None => "*",
+            Some(GameResult::WhiteWin) => "1-0",
+            Some(GameResult::BlackWin) => "0-1",
+            Some(GameResult::Draw) => "1/2-1/2",
+        }
+    )?;
 
-    if tags_pairs.iter().find(|(tag, _)| *tag == "FEN" ).is_none()
-        && *board != B::start_board() {
+    if tags_pairs.iter().find(|(tag, _)| *tag == "FEN").is_none() && *board != B::start_board() {
         writeln!(f, "[FEN \"{}\"", board.to_fen())?;
     }
 
@@ -41,29 +54,38 @@ pub fn game_to_pgn<W: Write, B: PgnBoard>(board: &mut B, moves: &[(B::Move, Stri
         }
         if i == 0 && board.side_to_move() == Color::Black {
             write!(f, "{}... {} {{{}}} ", 1, board.move_to_san(&mv), comment)?;
-        }
-        else if board.side_to_move() == Color::White {
-            write!(f, "{}. {} {{{}}} ", (i + 1) / 2 + 1, board.move_to_san(&mv), comment)?;
-        }
-        else {
+        } else if board.side_to_move() == Color::White {
+            write!(
+                f,
+                "{}. {} {{{}}} ",
+                (i + 1) / 2 + 1,
+                board.move_to_san(&mv),
+                comment
+            )?;
+        } else {
             write!(f, "{} {{{}}} ", board.move_to_san(&mv), comment)?;
         }
         board.do_move(mv.clone());
     }
 
-    write!(f, "{}", match result {
-        None => "*",
-        Some(GameResult::WhiteWin) => "1-0",
-        Some(GameResult::BlackWin) => "0-1",
-        Some(GameResult::Draw) => "1/2-1/2",
-    })?;
+    write!(
+        f,
+        "{}",
+        match result {
+            None => "*",
+            Some(GameResult::WhiteWin) => "1-0",
+            Some(GameResult::BlackWin) => "0-1",
+            Some(GameResult::Draw) => "1/2-1/2",
+        }
+    )?;
     writeln!(f)?;
     writeln!(f)?;
     Ok(())
 }
 
-pub fn parse_pgn<B: PgnBoard + Debug + Clone>(mut input: &str) -> Result<Vec<Game<B>>, Box<dyn error::Error>> {
-
+pub fn parse_pgn<B: PgnBoard + Debug + Clone>(
+    mut input: &str,
+) -> Result<Vec<Game<B>>, Box<dyn error::Error>> {
     let mut games = vec![];
 
     loop {
@@ -78,24 +100,25 @@ pub fn parse_pgn<B: PgnBoard + Debug + Clone>(mut input: &str) -> Result<Vec<Gam
                         Err(err) => {
                             println!("{:?}\n{}", board, err);
                             return Err(err.into());
-                        },
+                        }
                         Ok(mv) => {
                             board.do_move(mv.clone());
                             moves.push((mv, comment.unwrap_or("").to_string()));
                         }
                     }
-
                 }
 
                 input = rem_input;
 
-                let tags: Vec<(String, String)> = tag_pairs.iter()
-                    .map(|(a, b)| (a.to_string(), b.to_string())).collect();
+                let tags: Vec<(String, String)> = tag_pairs
+                    .iter()
+                    .map(|(a, b)| (a.to_string(), b.to_string()))
+                    .collect();
 
-                let game_result = tags.iter()
-                    .find(|(name, _)| name == "Result")
-                    .map(|(_, result)|
-                        match result.as_ref() {
+                let game_result =
+                    tags.iter()
+                        .find(|(name, _)| name == "Result")
+                        .map(|(_, result)| match result.as_ref() {
                             "1-0" => GameResult::WhiteWin,
                             "1/2-1/2" => GameResult::Draw,
                             "0-1" => GameResult::BlackWin,
@@ -110,22 +133,33 @@ pub fn parse_pgn<B: PgnBoard + Debug + Clone>(mut input: &str) -> Result<Vec<Gam
                 };
 
                 games.push(game);
-            },
+            }
             Err(err) => {
                 match err {
-                    nom::Err::Incomplete(i) =>
-                        write!(io::stderr(), "Couldn't parse incomplete game: {:?}\n", i)?,
-                    nom::Err::Error(nom::Context::Code(i, error_kind)) =>
-                        write!(io::stderr(), "Parse error of kind {:?} around {}\n", error_kind, &i[0..100])?,
-                    nom::Err::Error(nom::Context::List(errs)) =>
-                        write!(io::stderr(), "Parse error: {:?}\n", errs)?,
-                    nom::Err::Failure(nom::Context::Code(i, error_kind)) =>
-                        write!(io::stderr(), "Parse failure of kind {:?} around {}\n", error_kind, i)?,
-                    nom::Err::Failure(nom::Context::List(errs)) =>
-                        write!(io::stderr(), "Parse failure: {:?}\n", errs)?,
+                    nom::Err::Incomplete(i) => {
+                        write!(io::stderr(), "Couldn't parse incomplete game: {:?}\n", i)?
+                    }
+                    nom::Err::Error(nom::Context::Code(i, error_kind)) => write!(
+                        io::stderr(),
+                        "Parse error of kind {:?} around {}\n",
+                        error_kind,
+                        &i[0..100]
+                    )?,
+                    nom::Err::Error(nom::Context::List(errs)) => {
+                        write!(io::stderr(), "Parse error: {:?}\n", errs)?
+                    }
+                    nom::Err::Failure(nom::Context::Code(i, error_kind)) => write!(
+                        io::stderr(),
+                        "Parse failure of kind {:?} around {}\n",
+                        error_kind,
+                        i
+                    )?,
+                    nom::Err::Failure(nom::Context::List(errs)) => {
+                        write!(io::stderr(), "Parse failure: {:?}\n", errs)?
+                    }
                 }
                 break;
-            },
+            }
         }
     }
 
@@ -141,7 +175,6 @@ named!(parse_game<&str, (Vec<(&str, &str)>, Vec<(&str, Option<&str>)>)>,
         ((tag_pairs, moves))
     )
 );
-
 
 named!(parse_game_movetext<&str, Vec<(&str, Option<&str>)>>,
     do_parse!(

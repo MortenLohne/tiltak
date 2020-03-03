@@ -891,8 +891,7 @@ impl EvalBoardTrait for Board {
 }
 
 impl TunableBoard for Board {
-
-    const PARAMS : &'static [f32] = &[0.5, 0.2, 0.1, 0.8, 0.4, 0.5];
+    const PARAMS: &'static [f32] = &[0.5, 0.2, 0.1, 0.8, 0.4, 0.5, 0.5, 1.0];
 
     fn static_eval_with_params(&self, params: &[f32]) -> f32 {
         let material = (self.white_road_pieces.popcount() as i64
@@ -902,7 +901,7 @@ impl TunableBoard for Board {
 
         let to_move = match self.side_to_move() {
             Color::White => params[0],
-            Color::Black => - params[0],
+            Color::Black => -params[0],
         };
 
         let mut centre = 0.0;
@@ -944,16 +943,16 @@ impl TunableBoard for Board {
                 if top_stone.role() == Cap
                     && stack.get(stack.len() - 2).unwrap().color() == controlling_player
                 {
-                    val += params[6];
+                    val += params[5];
                 }
 
                 match top_stone {
-                    WhiteCap => val + params[5],
-                    BlackCap => (val + params[5]) * -1.0,
+                    WhiteCap => val + params[6],
+                    BlackCap => (val + params[6]) * -1.0,
                     WhiteFlat => val,
                     BlackFlat => val * -1.0,
-                    WhiteStanding => val + params[6],
-                    BlackStanding => (val + params[6]) * -1.5,
+                    WhiteStanding => val + params[7],
+                    BlackStanding => (val + params[7]) * -1.5,
                 }
             })
             .sum();
@@ -968,7 +967,19 @@ impl pgn_traits::pgn::PgnBoard for Board {
     }
 
     fn to_fen(&self) -> String {
-        unimplemented!()
+        let mut f = String::new();
+        board_iterator()
+            .map(|square| self[square].clone())
+            .for_each(|stack: Stack| (match stack.top_stone() {
+                None => write!(f, "-"),
+                Some(WhiteFlat) => write!(f, "w"),
+                Some(WhiteStanding) => write!(f, "W"),
+                Some(WhiteCap) => write!(f, "C"),
+                Some(BlackFlat) => write!(f, "b"),
+                Some(BlackStanding) => write!(f, "B"),
+                Some(BlackCap) => write!(f, "c"),
+            }).unwrap());
+        f
     }
 
     fn move_from_san(&self, input: &str) -> Result<Self::Move, pgn::Error> {

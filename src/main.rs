@@ -46,6 +46,7 @@ fn main() {
         "analyze" => test_position(),
         "mem usage" => mem_usage(),
         "bench" => bench(),
+        "tune" => tune(),
         s => println!("Unknown option \"{}\"", s),
     }
 }
@@ -231,6 +232,15 @@ fn bench() {
         NODES as f64 * 3.0 / (1000.0 * time_taken.as_secs_f64())
     );
 }
+
+fn tune() {
+    let games = tune::play_match::play_match();
+
+    for game in games {
+        tune::play_match::game_to_pgn(game).unwrap();
+    }
+}
+
 /// Print memory usage of various data types in the project, for debugging purposes
 fn mem_usage() {
     use std::mem;

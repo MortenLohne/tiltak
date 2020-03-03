@@ -1,2 +1,3 @@
-pub(crate) mod auto_tune;
-mod pgn_parse;
+pub mod auto_tune;
+pub mod pgn_parse;
+pub mod play_match;
