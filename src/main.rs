@@ -73,10 +73,20 @@ fn mcts_vs_minmax(minmax_depth: u16, mcts_nodes: u64) {
         }
     }
     print!("\n[");
-    for mv in moves {
+    for mv in moves.iter() {
         print!("\"{:?}\", ", mv);
     }
-    print!("]");
+    println!("]");
+
+    for (ply, mv) in moves.iter().enumerate() {
+        if ply % 2 == 0 {
+            print!("{}. {:?} ", ply / 2 + 1, mv);
+        } else {
+            println!("{:?}", mv);
+        }
+    }
+    println!();
+
     println!("\n{:?}\nResult: {:?}", board, board.game_result());
 }
 
