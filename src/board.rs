@@ -884,36 +884,66 @@ impl EvalBoardTrait for Board {
     }
 }
 
+const SQUARE_SYMMETRIES: [usize; 25] = [
+    0, 1, 2, 1, 0, 1, 3, 4, 3, 1, 2, 4, 5, 4, 2, 1, 3, 4, 3, 1, 0, 1, 2, 1, 0,
+];
+
 impl TunableBoard for Board {
-    const PARAMS: &'static [f32] = &[1.0, 1.0, 0.5, 0.2, 0.1, 0.8, 0.4, 0.5, 0.5, 1.0];
+    const PARAMS: &'static [f32] = &[
+        0.87371606,
+        0.95238113,
+        0.99058855,
+        1.0976756,
+        1.0636576,
+        1.3487933,
+        -0.051901408,
+        -0.054143623,
+        0.01323513,
+        0.07595758,
+        0.007053354,
+        -0.23994748,
+        0.5516118,
+        0.8862478,
+        1.1440177,
+        1.4815855,
+        1.5163803,
+        1.5401062,
+        0.4029237,
+        0.80013245,
+        0.38806546,
+        0.26992443,
+        0.46978328,
+        0.6241998,
+    ];
 
     fn static_eval_with_params(&self, params: &[f32]) -> f32 {
-        let material = (self.white_road_pieces.popcount() as f32) * params[0]
-            - (self.black_road_pieces.popcount() as f32) * params[0];
+        const FLAT_PSQT: usize = 0;
+        const STAND_PSQT: usize = FLAT_PSQT + 6;
+        const CAP_PSQT: usize = STAND_PSQT + 6;
 
-        let reserve_capstones = self.white_capstones_left as f32 * params[1]
-            - (self.black_capstones_left as f32) * params[1];
-
-        let to_move = match self.side_to_move() {
-            Color::White => params[2],
-            Color::Black => -params[2],
-        };
-
-        let mut centre = 0.0;
-        for x in 1..4 {
-            for y in 1..4 {
-                match self.cells.raw[y][x].top_stone().map(Piece::color) {
-                    Some(Color::White) => centre += params[3],
-                    Some(Color::Black) => centre -= params[3],
-                    None => (),
+        let mut material_psqt = 0.0;
+        for square in board_iterator() {
+            if let Some(piece) = self[square].top_stone() {
+                let i = square.0 as usize;
+                material_psqt += match piece {
+                    WhiteFlat => params[FLAT_PSQT + SQUARE_SYMMETRIES[i]],
+                    BlackFlat => params[FLAT_PSQT + SQUARE_SYMMETRIES[i]] * -1.0,
+                    WhiteStanding => params[STAND_PSQT + SQUARE_SYMMETRIES[i]],
+                    BlackStanding => params[STAND_PSQT + SQUARE_SYMMETRIES[i]] * -1.0,
+                    WhiteCap => params[CAP_PSQT + SQUARE_SYMMETRIES[i]],
+                    BlackCap => params[CAP_PSQT + SQUARE_SYMMETRIES[i]] * -1.0,
                 }
             }
         }
-        match self.cells.raw[2][2].top_stone().map(Piece::color) {
-            Some(Color::White) => centre += params[4],
-            Some(Color::Black) => centre -= params[4],
-            None => (),
-        }
+
+        const TO_MOVE: usize = CAP_PSQT + 6;
+
+        let to_move = match self.side_to_move() {
+            Color::White => params[TO_MOVE],
+            Color::Black => -params[TO_MOVE],
+        };
+
+        const STACK: usize = TO_MOVE + 1;
 
         let stacks: f32 = board_iterator()
             .map(|sq| &self[sq])
@@ -927,9 +957,9 @@ impl TunableBoard for Board {
                     .take(stack.len() as usize - 1)
                     .map(|piece| {
                         if piece.color() == controlling_player {
-                            params[5]
+                            params[STACK]
                         } else {
-                            -params[6]
+                            -params[STACK + 1]
                         }
                     })
                     .sum::<f32>();
@@ -938,13 +968,13 @@ impl TunableBoard for Board {
                 if top_stone.role() == Cap
                     && stack.get(stack.len() - 2).unwrap().color() == controlling_player
                 {
-                    val += params[7];
+                    val += params[STACK + 2];
                 }
 
                 match top_stone.role() {
-                    Cap => val += params[8],
+                    Cap => val += params[STACK + 3],
                     Flat => (),
-                    Standing => val += params[9],
+                    Standing => val += params[STACK + 4],
                 }
 
                 match top_stone.color() {
@@ -954,7 +984,7 @@ impl TunableBoard for Board {
             })
             .sum();
 
-        material + reserve_capstones + to_move + centre + stacks
+        material_psqt + to_move + stacks
     }
 }
 
