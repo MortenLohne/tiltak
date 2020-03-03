@@ -695,8 +695,9 @@ impl board::Board for Board {
     }
 
     fn do_move(&mut self, mv: Self::Move) -> Self::ReverseMove {
-        let reverse_move = match mv.clone() {
+        let reverse_move = match mv {
             Move::Place(piece, to) => {
+                debug_assert!(self[to].is_empty());
                 self[to].push(piece);
                 if piece.role() != Standing {
                     match self.side_to_move() {
@@ -774,17 +775,11 @@ impl board::Board for Board {
 
         debug_assert_eq!(
             self.white_road_pieces,
-            self.white_road_pieces_from_scratch(),
-            "Wrong white road pieces after {:?} on\n{:?}",
-            mv,
-            self
+            self.white_road_pieces_from_scratch()
         );
         debug_assert_eq!(
             self.black_road_pieces,
-            self.black_road_pieces_from_scratch(),
-            "Wrong black road pieces after {:?} on\n{:?}",
-            mv,
-            self
+            self.black_road_pieces_from_scratch()
         );
 
         self.to_move = !self.to_move;
@@ -792,7 +787,7 @@ impl board::Board for Board {
     }
 
     fn reverse_move(&mut self, reverse_move: Self::ReverseMove) {
-        match reverse_move.clone() {
+        match reverse_move {
             ReverseMove::Place(square) => {
                 let piece = self[square].pop().unwrap();
                 debug_assert_eq!(piece.color(), !self.side_to_move());
@@ -820,19 +815,6 @@ impl board::Board for Board {
                         self[to].push(piece);
                         self[square].remove(pieces_to_leave);
                     }
-                    self.white_road_pieces = self.white_road_pieces.clear(square.0);
-                    self.black_road_pieces = self.black_road_pieces.clear(square.0);
-
-                    if self[square].top_stone().is_some() {
-                        match self.side_to_move() {
-                            Color::White => {
-                                self.white_road_pieces = self.white_road_pieces.set(square.0)
-                            }
-                            Color::Black => {
-                                self.black_road_pieces = self.black_road_pieces.set(square.0)
-                            }
-                        };
-                    }
                     square = to;
                 }
 
@@ -848,17 +830,11 @@ impl board::Board for Board {
         }
         debug_assert_eq!(
             self.white_road_pieces,
-            self.white_road_pieces_from_scratch(),
-            "Wrong white road pieces after undoing {:?} on\n{:?}",
-            reverse_move,
-            self
+            self.white_road_pieces_from_scratch()
         );
         debug_assert_eq!(
             self.black_road_pieces,
-            self.black_road_pieces_from_scratch(),
-            "Wrong black road pieces after undoing {:?} on\n{:?}",
-            reverse_move,
-            self
+            self.black_road_pieces_from_scratch()
         );
         self.to_move = !self.to_move;
     }
