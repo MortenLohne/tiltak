@@ -51,10 +51,8 @@ fn mcts_vs_minmax(minmax_depth: u16, mcts_nodes: u64) {
     let mut moves = vec![];
     while board.game_result().is_none() {
         let num_moves = moves.len();
-        if num_moves > 10 {
-            if (1..5).all(|i| moves[num_moves - i] == moves[num_moves - i - 4]) {
-                break;
-            }
+        if num_moves > 10 && (1..5).all(|i| moves[num_moves - i] == moves[num_moves - i - 4]) {
+            break;
         }
         match board.side_to_move() {
             Color::Black => {
