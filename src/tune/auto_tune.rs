@@ -35,6 +35,11 @@ where
     let beta = 0.8;
 
     let initial_error = average_error(test_positions, test_results, params);
+    println!(
+        "Running gradient descent on {} positions and {} test positions",
+        positions.len(),
+        test_positions.len()
+    );
     println!("Initial error: {}", initial_error);
 
     let mut errors = vec![initial_error];

@@ -5,6 +5,7 @@ use crate::tune::pgn_parse;
 use crate::tune::pgn_parse::Game;
 use board_game_traits::board::Board as BoardTrait;
 use board_game_traits::board::Color;
+use rayon::prelude::*;
 use std::io;
 
 fn openings() -> impl Iterator<Item = [Move; 2]> {
@@ -17,55 +18,58 @@ fn openings() -> impl Iterator<Item = [Move; 2]> {
     })
 }
 
-pub fn play_match() -> impl Iterator<Item = Game<Board>> {
+pub fn play_match() -> impl ParallelIterator<Item = Game<Board>> {
     const MCTS_NODES: u64 = 10_000;
-    openings().map(|opening_moves| {
-        let mut board = Board::start_board();
-        let mut game_moves = opening_moves.to_vec();
-        for mv in opening_moves.iter() {
-            board.do_move(mv.clone());
-        }
-        while board.game_result().is_none() {
-            let num_moves = game_moves.len();
-            if num_moves > 10
-                && (1..5).all(|i| game_moves[num_moves - i] == game_moves[num_moves - i - 4])
-            {
-                break;
+    openings()
+        .collect::<Vec<_>>()
+        .into_par_iter()
+        .map(|opening_moves| {
+            let mut board = Board::start_board();
+            let mut game_moves = opening_moves.to_vec();
+            for mv in opening_moves.iter() {
+                board.do_move(mv.clone());
             }
-            match board.side_to_move() {
-                Color::Black => {
-                    let (best_move, score) = mcts::mcts(board.clone(), MCTS_NODES);
-                    board.do_move(best_move.clone());
-                    game_moves.push(best_move);
+            while board.game_result().is_none() {
+                let num_moves = game_moves.len();
+                if num_moves > 10
+                    && (1..5).all(|i| game_moves[num_moves - i] == game_moves[num_moves - i - 4])
+                {
+                    break;
                 }
+                match board.side_to_move() {
+                    Color::Black => {
+                        let (best_move, _score) = mcts::mcts(board.clone(), MCTS_NODES);
+                        board.do_move(best_move.clone());
+                        game_moves.push(best_move);
+                    }
 
-                Color::White => {
-                    let (best_move, score) = mcts::mcts(board.clone(), MCTS_NODES);
-                    board.do_move(best_move.clone());
-                    game_moves.push(best_move);
+                    Color::White => {
+                        let (best_move, _score) = mcts::mcts(board.clone(), MCTS_NODES);
+                        board.do_move(best_move.clone());
+                        game_moves.push(best_move);
+                    }
                 }
             }
-        }
-        Game {
-            start_board: Board::default(),
-            moves: game_moves
-                .into_iter()
-                .map(|mv| (mv, String::new()))
-                .collect::<Vec<_>>(),
-            game_result: board.game_result(),
-            tags: vec![],
-        }
-    })
+            Game {
+                start_board: Board::default(),
+                moves: game_moves
+                    .into_iter()
+                    .map(|mv| (mv, String::new()))
+                    .collect::<Vec<_>>(),
+                game_result: board.game_result(),
+                tags: vec![],
+            }
+        })
 }
-pub fn game_to_pgn(game: Game<Board>) -> Result<(), io::Error> {
+pub fn game_to_pgn(game: &Game<Board>) -> Result<(), io::Error> {
     let Game {
-        mut start_board,
+        start_board,
         moves,
         game_result,
         tags,
     } = game;
     pgn_parse::game_to_pgn(
-        &mut start_board,
+        &mut start_board.clone(),
         &moves,
         "",
         "",
@@ -81,7 +85,7 @@ pub fn game_to_pgn(game: Game<Board>) -> Result<(), io::Error> {
             })
             .unwrap_or(&String::new()),
         "",
-        game_result,
+        *game_result,
         &[],
         &mut io::stdout(),
     )

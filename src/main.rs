@@ -15,14 +15,17 @@ mod move_gen;
 mod tests;
 mod tune;
 
-use std::io;
+use std::{error, fs, io};
 
 use crate::tests::do_moves_and_check_validity;
+use crate::tune::auto_tune::TunableBoard;
+use crate::tune::pgn_parse::Game;
 use board::Board;
 use board_game_traits::board::Board as BoardTrait;
 use board_game_traits::board::{Color, GameResult};
 use pgn_traits::pgn::PgnBoard;
-use std::io::Write;
+use rayon::prelude::*;
+use std::io::{Read, Write};
 
 fn main() {
     println!("play: Play against the minmax AI");
@@ -45,6 +48,7 @@ fn main() {
         "mem usage" => mem_usage(),
         "bench" => bench(),
         "tune" => tune(),
+        "tune_from_file" => tune_from_file().unwrap(),
         s => println!("Unknown option \"{}\"", s),
     }
 }
@@ -234,9 +238,65 @@ fn bench() {
 fn tune() {
     let games = tune::play_match::play_match();
 
-    for game in games {
+    use std::sync::atomic::AtomicU64;
+    use std::sync::atomic::Ordering;
+
+    let white_wins: AtomicU64 = AtomicU64::new(0);
+    let draws = AtomicU64::new(0);
+    let black_wins = AtomicU64::new(0);
+    let aborted = AtomicU64::new(0);
+
+    games.for_each(|ref game| {
         tune::play_match::game_to_pgn(game).unwrap();
+        match game.game_result {
+            None => aborted.fetch_add(1, Ordering::Relaxed),
+            Some(GameResult::WhiteWin) => white_wins.fetch_add(1, Ordering::Relaxed),
+            Some(GameResult::BlackWin) => black_wins.fetch_add(1, Ordering::Relaxed),
+            Some(GameResult::Draw) => draws.fetch_add(1, Ordering::Relaxed),
+        };
+    });
+    println!(
+        "{} white wins, {} draws, {} black wins, {} aborted.",
+        white_wins.into_inner(),
+        draws.into_inner(),
+        black_wins.into_inner(),
+        aborted.into_inner()
+    );
+}
+
+fn tune_from_file() -> Result<(), Box<dyn error::Error>> {
+    let mut file = fs::File::open("out.pgn")?;
+    let mut input = String::new();
+    file.read_to_string(&mut input)?;
+    let games: Vec<Game<Board>> = tune::pgn_parse::parse_pgn(&input)?;
+
+    let mut positions = vec![];
+    let mut results = vec![];
+    for game in games.into_iter().filter(|game| game.game_result.is_some()) {
+        let mut board = game.start_board;
+        for (mv, _) in game.moves {
+            board.do_move(mv);
+            positions.push(board.clone());
+            results.push(game.game_result.unwrap());
+        }
     }
+
+    let middle_index = positions.len() / 2;
+
+    let params = [1.0; Board::PARAMS.len()];
+
+    println!(
+        "Final parameters: {:?}",
+        tune::auto_tune::gradient_descent(
+            &positions[0..middle_index],
+            &results[0..middle_index],
+            &positions[middle_index..],
+            &results[middle_index..],
+            &params,
+        )
+    );
+
+    Ok(())
 }
 
 /// Print memory usage of various data types in the project, for debugging purposes
