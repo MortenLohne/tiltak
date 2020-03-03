@@ -5,6 +5,7 @@ use crate::board::Direction::*;
 use crate::board::Piece::*;
 use crate::board::Role::Flat;
 use crate::board::Role::*;
+use crate::mcts;
 use arrayvec::ArrayVec;
 use board_game_traits::board;
 use board_game_traits::board::GameResult::{BlackWin, Draw, WhiteWin};
@@ -17,7 +18,6 @@ use std::fmt::Debug;
 use std::fmt::Write;
 use std::ops::{Index, IndexMut};
 use std::{fmt, ops};
-use crate::mcts;
 
 pub trait ColorTr {
     fn color() -> Color;
@@ -1065,8 +1065,8 @@ pub fn connected_components_graph(road_pieces: BitBoard) -> (AbstractBoard<u8>, 
 
     for square in board_iterator() {
         if components[square] == 0 && road_pieces.get(square.0) {
-                connect_component(road_pieces, &mut components, square, id);
-                id += 1;
+            connect_component(road_pieces, &mut components, square, id);
+            id += 1;
         }
     }
     (components, id)
