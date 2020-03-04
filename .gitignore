@@ -1,2 +1,6 @@
+# cargo output folder
 /target
+# Jetbrains IDE folder
 .idea
+# Emacs temp files
+*~
