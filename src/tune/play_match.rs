@@ -31,16 +31,14 @@ pub fn play_match() -> impl ParallelIterator<Item = Game<Board>> {
             }
             while board.game_result().is_none() {
                 let num_plies = game_moves.len();
-                if num_plies > 10
-                    && (1..5).all(|i| game_moves[num_plies - i] == game_moves[num_plies - i - 4])
-                {
+                if num_plies > 200 {
                     break;
                 }
                 // Turn off temperature in the middle-game, when all games are expected to be unique
                 let (best_move, _score) = if num_plies < 20 {
                     mcts::mcts(board.clone(), MCTS_NODES, TEMPERATURE)
                 } else {
-                    mcts::mcts(board.clone(), MCTS_NODES, 0.0)
+                    mcts::mcts(board.clone(), MCTS_NODES, 0.1)
                 };
                 board.do_move(best_move.clone());
                 game_moves.push(best_move);
