@@ -889,6 +889,7 @@ const SQUARE_SYMMETRIES: [usize; 25] = [
 ];
 
 impl TunableBoard for Board {
+    #[allow(clippy::unreadable_literal)]
     const PARAMS: &'static [f32] = &[
         1.0883423,
         1.1453367,
