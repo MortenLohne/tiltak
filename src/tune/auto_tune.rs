@@ -27,7 +27,8 @@ where
     let mut eta = 0.1;
     let beta = 0.8;
 
-    const MAX_TRIES: usize = 8;
+    // If error is not reduced this number of times, reduce eta, or abort if eta is already low
+    const MAX_TRIES: usize = 5;
 
     let initial_error = average_error(test_positions, test_results, params);
     println!(
@@ -38,12 +39,13 @@ where
     println!("Initial error: {}", initial_error);
 
     let mut errors = vec![initial_error];
+    let mut best_iteration = 0;
     let mut lowest_error = initial_error;
     let mut paramss: Vec<Vec<f32>> = vec![params.to_vec()];
     let mut best_params = params.to_vec();
     let mut gradients = vec![0.0; params.len()];
 
-    loop {
+    for i in 0.. {
         let last_params = paramss.last().unwrap().clone();
         let slopes = calc_slope(positions, results, &last_params);
         gradients = gradients
@@ -66,22 +68,23 @@ where
         if error < lowest_error {
             lowest_error = error;
             best_params = new_params.to_vec();
-        } else if errors.len() >= MAX_TRIES
-            && (1..=MAX_TRIES).all(|i| errors[errors.len() - i] > lowest_error)
-        {
+            best_iteration = i;
+        } else if i - best_iteration > MAX_TRIES {
             if eta < 0.005 {
                 return best_params;
             } else {
                 eta /= 10.0;
                 paramss = vec![best_params.clone()];
                 errors = vec![lowest_error];
-                println!("Reduced eta to {}\n", eta);
+                best_iteration = i;
+                println!("Reduced eta to {}, best error was {}\n", eta, lowest_error);
                 continue;
             }
         }
         errors.push(error);
         paramss.push(new_params);
     }
+    unreachable!()
 }
 
 pub fn calc_slope<B>(positions: &[B], results: &[GameResult], params: &[f32]) -> Vec<f32>
