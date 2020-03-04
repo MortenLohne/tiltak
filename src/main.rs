@@ -102,7 +102,7 @@ fn test_position() {
     let mut board = Board::default();
     let mut moves = vec![];
 
-    for mv_san in ["c3"].iter() {
+    for mv_san in ["a5", "e1"].iter() {
         let mv = board.move_from_san(&mv_san).unwrap();
         board.generate_moves(&mut moves);
         assert!(moves.contains(&mv));
@@ -233,8 +233,9 @@ fn bench() {
 
 fn tune() {
     let outfile = fs::OpenOptions::new()
+        .create(true)
         .append(true)
-        .open("output.ptn")
+        .open("output3.ptn")
         .unwrap();
     let locked_writer = sync::Mutex::new(io::BufWriter::new(outfile));
 
@@ -270,7 +271,7 @@ fn tune() {
 }
 
 fn tune_from_file() -> Result<(), Box<dyn error::Error>> {
-    let mut file = fs::File::open("output.ptn")?;
+    let mut file = fs::File::open("output3.ptn")?;
     let mut input = String::new();
     file.read_to_string(&mut input)?;
     let games: Vec<Game<Board>> = tune::pgn_parse::parse_pgn(&input)?;
