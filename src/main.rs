@@ -28,7 +28,7 @@ use rayon::prelude::*;
 use std::io::{Read, Write};
 
 fn main() {
-    println!("play: Play against the minmax AI");
+    println!("play: Play against the mcts AI");
     println!("aimatch: Watch the minmax and mcts AIs play");
     println!("analyze: Mcts analysis of a hardcoded position");
 
@@ -175,10 +175,10 @@ fn play_human(mut board: Board) {
                 board.do_move(c_move);
                 play_human(board);
             } else {
-                let (best_move, score) = minmax::minmax(&mut board, 3);
+                let (best_move, score) = mcts::mcts(board.clone(), 100_000, 0.1);
 
                 println!("Computer played {:?} with score {}", best_move, score);
-                board.do_move(best_move.unwrap());
+                board.do_move(best_move);
                 play_human(board);
             }
         }
