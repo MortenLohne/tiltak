@@ -1057,15 +1057,14 @@ impl pgn_traits::pgn::PgnBoard for Board {
                 let square = Square::parse_square(input);
                 let side = if self.moves_played < 2 {
                     !self.side_to_move()
-                }
-                else {
+                } else {
                     self.side_to_move()
                 };
                 match side {
                     Color::White => Ok(Move::Place(WhiteFlat, square)),
                     Color::Black => Ok(Move::Place(BlackFlat, square)),
                 }
-            },
+            }
             'a'..='e' if input.len() == 3 => {
                 let square = Square::parse_square(&input[0..2]);
                 let direction = Direction::parse(input.chars().nth(2).unwrap());
