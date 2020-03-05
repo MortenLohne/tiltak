@@ -17,8 +17,9 @@ use smallvec::alloc::fmt::{Error, Formatter};
 use std::cmp::Ordering;
 use std::fmt::Debug;
 use std::fmt::Write;
+use std::iter::FromIterator;
 use std::ops::{Index, IndexMut};
-use std::{fmt, ops};
+use std::{fmt, iter, ops};
 
 pub trait ColorTr {
     fn color() -> Color;
@@ -415,7 +416,11 @@ impl fmt::Display for Move {
             },
             Move::Move(square, direction, stack_movements) => {
                 let mut pieces_held = stack_movements.movements[0].pieces_to_take;
-                write!(f, "{}{}", pieces_held, square).unwrap();
+                if pieces_held == 1 {
+                    write!(f, "{}", square)?;
+                } else {
+                    write!(f, "{}{}", pieces_held, square)?;
+                }
                 match direction {
                     North => f.write_char('+')?,
                     West => f.write_char('<')?,
@@ -426,10 +431,10 @@ impl fmt::Display for Move {
                 if stack_movements.movements.len() > 1 {
                     for movement in stack_movements.movements.iter().skip(1) {
                         let pieces_to_drop = pieces_held - movement.pieces_to_take;
-                        write!(f, "{}", pieces_to_drop).unwrap();
+                        write!(f, "{}", pieces_to_drop)?;
                         pieces_held -= pieces_to_drop;
                     }
-                    write!(f, "{}", pieces_held).unwrap();
+                    write!(f, "{}", pieces_held)?;
                 }
             }
         }
@@ -1032,6 +1037,13 @@ impl pgn_traits::pgn::PgnBoard for Board {
                 Color::White => Ok(Move::Place(WhiteFlat, Square::parse_square(input))),
                 Color::Black => Ok(Move::Place(BlackFlat, Square::parse_square(input))),
             },
+            'a'..='e' if input.len() == 3 => {
+                let square = Square::parse_square(&input[0..2]);
+                let direction = Direction::parse(input.chars().nth(2).unwrap());
+                // Moves in the simplified move notation always move one piece
+                let movements = ArrayVec::from_iter(iter::once(Movement { pieces_to_take: 1 }));
+                Ok(Move::Move(square, direction, StackMovement { movements }))
+            }
             'C' if input.len() == 3 => match self.side_to_move() {
                 Color::White => Ok(Move::Place(WhiteCap, Square::parse_square(&input[1..]))),
                 Color::Black => Ok(Move::Place(BlackCap, Square::parse_square(&input[1..]))),
@@ -1074,7 +1086,12 @@ impl pgn_traits::pgn::PgnBoard for Board {
             }
             _ => Err(pgn::Error::new(
                 pgn::ErrorKind::ParseError,
-                format!("Couldn't parse {}", input),
+                format!(
+                    "Couldn't parse move \"{}\". Moves cannot start with {} and have length {}.",
+                    input,
+                    first_char,
+                    input.len()
+                ),
             )),
         }
     }
