@@ -4,3 +4,5 @@
 .idea
 # Emacs temp files
 *~
+# Tak games
+*.ptn
