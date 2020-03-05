@@ -206,8 +206,8 @@ impl Board {
                         }
                     }
                     match piece.role() {
-                        Cap | Flat => their_points > our_points + 1,
-                        Standing => their_points > our_points,
+                        Flat => their_points > our_points + 1,
+                        Cap | Standing => their_points > our_points,
                     }
                 } else {
                     false

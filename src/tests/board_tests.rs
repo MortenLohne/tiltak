@@ -334,3 +334,15 @@ fn games_ends_when_board_is_full_test() {
         board
     );
 }
+
+#[test]
+fn game_declared_loss_when_every_move_is_suicide() {
+    let mut board = Board::start_board();
+
+    do_moves_and_check_validity(&mut board, &["b3", "c4", "c4-", "b3>"]);
+
+    for _ in 0..20 {
+        do_moves_and_check_validity(&mut board, &["c4", "b3", "c4-", "b3>"]);
+    }
+    assert_eq!(board.game_result(), Some(BlackWin));
+}
