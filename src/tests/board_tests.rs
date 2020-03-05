@@ -1,5 +1,5 @@
 use crate::board::Piece::{BlackCap, BlackFlat, WhiteFlat, WhiteStanding};
-use crate::board::{board_iterator, Board, Direction::*, Move, Piece, Role, Square};
+use crate::board::{board_iterator, Board, Direction::*, Move, Piece, Role, Square, BOARD_SIZE};
 use crate::tests::do_moves_and_check_validity;
 use crate::{board as board_mod, board};
 use board_game_traits::board::Board as BoardTrait;
@@ -345,4 +345,30 @@ fn game_declared_loss_when_every_move_is_suicide() {
         do_moves_and_check_validity(&mut board, &["c4", "b3", "c4-", "b3>"]);
     }
     assert_eq!(board.game_result(), Some(BlackWin));
+}
+
+#[test]
+fn bitboard_full_board_file_rank_test() {
+    let mut board = Board::start_board();
+    let move_strings: Vec<String> = board_iterator().map(|sq| sq.to_string()).collect();
+    do_moves_and_check_validity(
+        &mut board,
+        &(move_strings.iter().map(AsRef::as_ref).collect::<Vec<_>>()),
+    );
+    assert_eq!(board.game_result(), Some(WhiteWin));
+
+    let road_pieces = board.white_road_pieces() | board.black_road_pieces();
+
+    assert_eq!(road_pieces.count(), 25);
+
+    for x in 0..BOARD_SIZE as u8 {
+        assert_eq!(road_pieces.rank(x).count() as usize, BOARD_SIZE);
+        assert_eq!(road_pieces.file(x).count() as usize, BOARD_SIZE);
+        for y in 0..BOARD_SIZE as u8 {
+            if x != y {
+                assert!((road_pieces.rank(x) & road_pieces.rank(y)).is_empty());
+                assert!((road_pieces.file(x) & road_pieces.file(y)).is_empty());
+            }
+        }
+    }
 }

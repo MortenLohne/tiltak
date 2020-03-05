@@ -576,6 +576,14 @@ impl Debug for Board {
 }
 
 impl Board {
+    pub fn white_road_pieces(&self) -> BitBoard {
+        self.white_road_pieces
+    }
+
+    pub fn black_road_pieces(&self) -> BitBoard {
+        self.black_road_pieces
+    }
+
     #[cfg(test)]
     pub fn flip_board_y(&self) -> Board {
         let mut new_board = self.clone();

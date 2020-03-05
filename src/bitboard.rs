@@ -1,4 +1,5 @@
 use std::{fmt, ops};
+use crate::board::BOARD_SIZE;
 
 #[derive(PartialEq, Eq, Clone, Copy, Hash, Default)]
 pub struct BitBoard {
@@ -88,6 +89,30 @@ impl BitBoard {
     pub fn clear(self, i: u8) -> Self {
         debug_assert!(i < 64);
         BitBoard::from_u64(self.board & !(1 << i))
+    }
+
+    #[inline]
+    pub fn rank(self, i: u8) -> Self {
+        debug_assert!(i < BOARD_SIZE as u8);
+        const MASK: u64 = 0b11111;
+        BitBoard::from_u64(self.board & (MASK << i as u64 * BOARD_SIZE as u64))
+    }
+
+    #[inline]
+    pub fn file(self, i: u8) -> Self {
+        debug_assert!(i < BOARD_SIZE as u8);
+        const MASK: u64 = 0b1_00001_00001_00001_00001; // TODO: Change for 6x6
+        BitBoard::from_u64(self.board & (MASK << i as u64))
+    }
+
+    #[inline]
+    pub fn is_empty(self) -> bool {
+        self.board == 0
+    }
+
+    #[inline]
+    pub fn count(self) -> u8 {
+        self.board.count_ones() as u8
     }
 }
 
