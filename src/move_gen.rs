@@ -199,9 +199,9 @@ impl Board {
                     let mut our_points = 0;
                     let mut their_points = 0;
                     for top_stone in board_iterator().filter_map(|sq| self[sq].top_stone()) {
-                        if Us::is_road_stone(top_stone) {
+                        if top_stone == Us::flat_piece() {
                             our_points += 1;
-                        } else if Them::is_road_stone(top_stone) {
+                        } else if top_stone == Them::flat_piece() {
                             their_points += 1;
                         }
                     }

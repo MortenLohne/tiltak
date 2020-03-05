@@ -691,6 +691,15 @@ impl board::Board for Board {
         self.to_move
     }
 
+    /// Adds all legal moves to the provided vector.
+    /// Suicide moves are considered illegal moves and are not generated.
+    /// This includes moves that complete a road for the opponent without creating an own road,
+    /// and moves that place your last piece on the board when that would result in an immediate loss.
+    ///
+    /// All pieces (including capstones) must be placed for the game to end.
+    /// Capstones are not counted towards a flat win, if the game ended due to the board being filled.
+    ///
+    /// TODO: Suicide moves are allowed if it fills the board, both place and move moves
     fn generate_moves(&self, moves: &mut Vec<Self::Move>) {
         debug_assert!(
             self.game_result().is_none(),
@@ -888,8 +897,8 @@ impl board::Board for Board {
             let mut black_points = 0;
             for square in board_iterator() {
                 match self[square].top_stone() {
-                    Some(WhiteFlat) | Some(WhiteCap) => white_points += 1,
-                    Some(BlackFlat) | Some(BlackCap) => black_points += 1,
+                    Some(WhiteFlat) => white_points += 1,
+                    Some(BlackFlat) => black_points += 1,
                     _ => (),
                 }
             }
