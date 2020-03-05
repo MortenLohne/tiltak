@@ -49,6 +49,7 @@ fn main() {
         "bench" => bench(),
         "tune" => tune(),
         "tune_from_file" => tune_from_file().unwrap(),
+        "pgn_to_move_list" => pgn_to_move_list(),
         s => println!("Unknown option \"{}\"", s),
     }
 }
@@ -303,6 +304,19 @@ fn tune_from_file() -> Result<(), Box<dyn error::Error>> {
     );
 
     Ok(())
+}
+
+fn pgn_to_move_list() {
+    let mut file = fs::File::open("game.ptn").unwrap();
+    let mut input = String::new();
+    file.read_to_string(&mut input).unwrap();
+    let games: Vec<Game<Board>> = tune::pgn_parse::parse_pgn(&input).unwrap();
+    println!("Parsed {} games", games.len());
+    print!("[");
+    for (mv, _) in games[0].moves.iter() {
+        print!("\"{}\", ", mv);
+    }
+    println!("]")
 }
 
 /// Print memory usage of various data types in the project, for debugging purposes

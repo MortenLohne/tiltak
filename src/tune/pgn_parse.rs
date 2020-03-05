@@ -113,10 +113,17 @@ pub fn parse_pgn<B: PgnBoard + Debug + Clone>(
                     let mv = board.move_from_san(move_text);
                     match mv {
                         Err(err) => {
-                            println!("{:?}\n{}", board, err);
+                            println!(
+                                "Failed to parse move text \"{}\" on board\n{:?}\n{}",
+                                move_text, board, err
+                            );
                             return Err(err.into());
                         }
                         Ok(mv) => {
+                            // Checking for move legality is too expensive for release builds
+                            let mut legal_moves = vec![];
+                            board.generate_moves(&mut legal_moves);
+                            debug_assert!(legal_moves.contains(&mv));
                             board.do_move(mv.clone());
                             moves.push((mv, comment.unwrap_or("").to_string()));
                         }
