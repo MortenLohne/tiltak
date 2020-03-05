@@ -115,7 +115,7 @@ fn correct_number_of_legal_directions_test() {
 fn stones_left_behind_by_stack_movement_test() {
     let mut board: Board = Board::default();
 
-    do_moves_and_check_validity(&mut board, &["c3", "d3", "c4", "1d3<", "1c4-", "Sc4"]);
+    do_moves_and_check_validity(&mut board, &["d3", "c3", "c4", "1d3<", "1c4-", "Sc4"]);
 
     let mv = board.move_from_san("2c3<11").unwrap();
     if let Move::Move(square, _direction, stack_movement) = mv {
@@ -152,7 +152,7 @@ fn black_can_win_with_road_test() {
     let mut moves = vec![];
 
     for mv_san in [
-        "c3", "e5", "c2", "d5", "c1", "c5", "d3", "a4", "e3", "b5", "b1", "a5",
+        "e5", "c3", "c2", "d5", "c1", "c5", "d3", "a4", "e3", "b5", "b1", "a5",
     ]
     .iter()
     {
@@ -261,7 +261,7 @@ fn double_road_wins_test() {
     let mut moves = vec![];
 
     let move_strings = [
-        "a5", "a4", "b5", "b4", "c5", "c4", "1c5-", "d4", "d5", "e4", "e5", "c3",
+        "a4", "a5", "b5", "b4", "c5", "c4", "1c5-", "d4", "d5", "e4", "e5", "c3",
     ];
     do_moves_and_check_validity(&mut board, &move_strings);
 

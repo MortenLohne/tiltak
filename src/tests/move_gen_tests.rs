@@ -9,12 +9,12 @@ fn start_board_move_gen_test() {
     let mut board = Board::default();
     let mut moves = vec![];
     board.generate_moves(&mut moves);
-    assert_eq!(moves.len(), 75);
+    assert_eq!(moves.len(), 25);
     for mv in moves {
         let reverse_move = board.do_move(mv);
         let mut moves = vec![];
         board.generate_moves(&mut moves);
-        assert_eq!(moves.len(), 72);
+        assert_eq!(moves.len(), 24);
         board.reverse_move(reverse_move);
     }
 }
@@ -24,7 +24,7 @@ fn move_stack_test() {
     let mut board = Board::default();
     let mut moves = vec![];
 
-    do_moves_and_check_validity(&mut board, &["c3", "d3", "c4", "1d3<", "1c4-", "Sc4"]);
+    do_moves_and_check_validity(&mut board, &["d3", "c3", "c4", "1d3<", "1c4-", "Sc4"]);
 
     board.generate_moves(&mut moves);
     assert_eq!(
@@ -51,7 +51,7 @@ fn respect_carry_limit_test() {
     do_moves_and_check_validity(
         &mut board,
         &[
-            "c3", "c2", "d3", "b3", "c4", "1c2+", "1d3<", "1b3>", "1c4+", "Cc2", "a1", "1c2+", "a2",
+            "c2", "c3", "d3", "b3", "c4", "1c2+", "1d3<", "1b3>", "1c4+", "Cc2", "a1", "1c2+", "a2",
         ],
     );
     board.generate_moves(&mut moves);
@@ -73,14 +73,14 @@ fn respect_carry_limit_test() {
 #[test]
 fn start_pos_perf_test() {
     let mut board = Board::default();
-    perft_check_answers(&mut board, &[1, 75, 5400, 348_080, 21_536_636]);
+    perft_check_answers(&mut board, &[1, 25, 600, 43_320, 2_999_784]);
 }
 
 #[test]
 fn perf_test2() {
     let mut board = Board::default();
 
-    do_moves_and_check_validity(&mut board, &["c3", "d3", "c4", "1d3<", "1c4-", "Sc4"]);
+    do_moves_and_check_validity(&mut board, &["d3", "c3", "c4", "1d3<", "1c4-", "Sc4"]);
 
     perft_check_answers(&mut board, &[1, 87, 6155, 461_800]);
 }
@@ -92,7 +92,7 @@ fn perf_test3() {
     do_moves_and_check_validity(
         &mut board,
         &[
-            "c3", "c2", "d3", "b3", "c4", "1c2+", "1d3<", "1b3>", "1c4-", "Cc2", "a1", "1c2+", "a2",
+            "c2", "c3", "d3", "b3", "c4", "1c2+", "1d3<", "1b3>", "1c4-", "Cc2", "a1", "1c2+", "a2",
         ],
     );
 
@@ -102,7 +102,7 @@ fn perf_test3() {
 #[test]
 fn suicide_perf_test() {
     let move_strings = [
-        "c2", "c4", "d2", "c3", "b2", "d3", "1d2+", "b3", "d2", "b4", "1c2+", "1b3>", "2d3<",
+        "c4", "c2", "d2", "c3", "b2", "d3", "1d2+", "b3", "d2", "b4", "1c2+", "1b3>", "2d3<",
         "1c4-", "d4", "5c3<23", "c2", "c4", "1d4<", "d3", "1d2+", "1c3+", "Cc3", "2c4>", "1c3<",
         "d2", "c3", "1d2+", "1c3+", "1b4>", "2b3>11", "3c4-12", "d2", "c4", "b4", "c5", "1b3>",
         "1c4<", "3c3-", "e5", "e2",

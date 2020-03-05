@@ -504,6 +504,7 @@ pub struct Board {
     black_stones_left: u8,
     white_capstones_left: u8,
     black_capstones_left: u8,
+    moves_played: u8,
 }
 
 impl Index<Square> for Board {
@@ -531,6 +532,7 @@ impl Default for Board {
             black_stones_left: 21,
             white_capstones_left: 1,
             black_capstones_left: 1,
+            moves_played: 0,
         }
     }
 }
@@ -566,7 +568,7 @@ impl Debug for Board {
             "Capstones left: {}/{}.",
             self.white_capstones_left, self.black_capstones_left
         )?;
-        writeln!(f, "{} to move.", self.to_move)?;
+        writeln!(f, "{} to move.", self.side_to_move())?;
         writeln!(f, "White road stones: {:b}", self.white_road_pieces.board)?;
         writeln!(f, "Black road stones: {:b}", self.black_road_pieces.board)?;
         Ok(())
@@ -696,9 +698,25 @@ impl board::Board for Board {
             self.game_result(),
             self
         );
-        match self.side_to_move() {
-            Color::White => self.generate_moves_colortr::<WhiteTr, BlackTr>(moves),
-            Color::Black => self.generate_moves_colortr::<BlackTr, WhiteTr>(moves),
+
+        match self.moves_played {
+            0 => {
+                for square in board_iterator() {
+                    moves.push(Move::Place(BlackFlat, square));
+                }
+            }
+
+            1 => {
+                for square in board_iterator() {
+                    if self[square].is_empty() {
+                        moves.push(Move::Place(WhiteFlat, square));
+                    }
+                }
+            }
+            _ => match self.side_to_move() {
+                Color::White => self.generate_moves_colortr::<WhiteTr, BlackTr>(moves),
+                Color::Black => self.generate_moves_colortr::<BlackTr, WhiteTr>(moves),
+            },
         }
     }
 
@@ -708,7 +726,7 @@ impl board::Board for Board {
                 debug_assert!(self[to].is_empty());
                 self[to].push(piece);
                 if piece.role() != Standing {
-                    match self.side_to_move() {
+                    match piece.color() {
                         Color::White => self.white_road_pieces = self.white_road_pieces.set(to.0),
                         Color::Black => self.black_road_pieces = self.black_road_pieces.set(to.0),
                     };
@@ -785,6 +803,7 @@ impl board::Board for Board {
         );
 
         self.to_move = !self.to_move;
+        self.moves_played += 1;
         reverse_move
     }
 
@@ -792,7 +811,7 @@ impl board::Board for Board {
         match reverse_move {
             ReverseMove::Place(square) => {
                 let piece = self[square].pop().unwrap();
-                debug_assert_eq!(piece.color(), !self.side_to_move());
+                debug_assert!(piece.color() != self.side_to_move() || self.moves_played < 3);
 
                 self.white_road_pieces = self.white_road_pieces.clear(square.0);
                 self.black_road_pieces = self.black_road_pieces.clear(square.0);
@@ -838,6 +857,7 @@ impl board::Board for Board {
             self.black_road_pieces,
             self.black_road_pieces_from_scratch()
         );
+        self.moves_played -= 1;
         self.to_move = !self.to_move;
     }
 
@@ -1033,9 +1053,18 @@ impl pgn_traits::pgn::PgnBoard for Board {
         }
         let first_char = input.chars().next().unwrap();
         match first_char {
-            'a'..='e' if input.len() == 2 => match self.side_to_move() {
-                Color::White => Ok(Move::Place(WhiteFlat, Square::parse_square(input))),
-                Color::Black => Ok(Move::Place(BlackFlat, Square::parse_square(input))),
+            'a'..='e' if input.len() == 2 => {
+                let square = Square::parse_square(input);
+                let side = if self.moves_played < 2 {
+                    !self.side_to_move()
+                }
+                else {
+                    self.side_to_move()
+                };
+                match side {
+                    Color::White => Ok(Move::Place(WhiteFlat, square)),
+                    Color::Black => Ok(Move::Place(BlackFlat, square)),
+                }
             },
             'a'..='e' if input.len() == 3 => {
                 let square = Square::parse_square(&input[0..2]);
