@@ -117,7 +117,10 @@ fn test_position() {
     let mut board = Board::default();
     let mut moves = vec![];
 
-    let move_strings: &[&str] = &["e1"];
+    let move_strings: &[&str] = &[
+        "e1", "a1", "Cc3", "e2", "b3", "d4", "d3", "Ce3", "d3+", "e4", "e5", "d5", "2d4+", "d4",
+        "c5", "d4+", "c5>", "Sc5", "5d5-", "e4<"
+    ];
 
     for mv_san in move_strings.iter() {
         let mv = board.move_from_san(&mv_san).unwrap();
@@ -197,7 +200,7 @@ fn play_human(mut board: Board) {
                 board.do_move(c_move);
                 play_human(board);
             } else {
-                let (best_move, score) = mcts::mcts(board.clone(), 500_000, 0.1);
+                let (best_move, score) = mcts::mcts(board.clone(), 1_000_000, 0.1);
 
                 println!("Computer played {:?} with score {}", best_move, score);
                 board.do_move(best_move);
