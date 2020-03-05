@@ -1,4 +1,3 @@
-use crate::board::BOARD_SIZE;
 use std::{fmt, ops};
 
 #[derive(PartialEq, Eq, Clone, Copy, Hash, Default)]
@@ -74,20 +73,20 @@ impl BitBoard {
 
     #[inline]
     pub fn get(self, i: u8) -> bool {
-        debug_assert!(i < BOARD_SIZE as u8 * BOARD_SIZE as u8);
+        debug_assert!(i < 64);
         self.board & (1 << i) != 0
     }
     // Sets the square to true
     #[inline]
     pub fn set(self, i: u8) -> Self {
-        debug_assert!(i < BOARD_SIZE as u8 * BOARD_SIZE as u8);
+        debug_assert!(i < 64);
         BitBoard::from_u64(self.board | 1 << i)
     }
 
     // Sets the square to false
     #[inline]
     pub fn clear(self, i: u8) -> Self {
-        debug_assert!(i < BOARD_SIZE as u8 * BOARD_SIZE as u8);
+        debug_assert!(i < 64);
         BitBoard::from_u64(self.board & !(1 << i))
     }
 }
