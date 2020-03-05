@@ -17,6 +17,38 @@ fn openings() -> impl Iterator<Item = [Move; 2]> {
     })
 }
 
+pub fn play_game(params: &[f32]) -> Game<Board> {
+    const MCTS_NODES: u64 = 10_000;
+    const TEMPERATURE: f64 = 1.0;
+
+    let mut board = Board::start_board();
+    let mut game_moves = vec![];
+
+    while board.game_result().is_none() {
+        let num_plies = game_moves.len();
+        if num_plies > 200 {
+            break;
+        }
+        // Turn off temperature in the middle-game, when all games are expected to be unique
+        let (best_move, _score) = if num_plies < 20 {
+            mcts::mcts_training(board.clone(), MCTS_NODES, params, TEMPERATURE)
+        } else {
+            mcts::mcts_training(board.clone(), MCTS_NODES, params, 0.1)
+        };
+        board.do_move(best_move.clone());
+        game_moves.push(best_move);
+    }
+    Game {
+        start_board: Board::default(),
+        moves: game_moves
+            .into_iter()
+            .map(|mv| (mv, String::new()))
+            .collect::<Vec<_>>(),
+        game_result: board.game_result(),
+        tags: vec![],
+    }
+}
+
 pub fn play_match() -> impl ParallelIterator<Item = Game<Board>> {
     const MCTS_NODES: u64 = 10_000;
     const TEMPERATURE: f64 = 1.0;

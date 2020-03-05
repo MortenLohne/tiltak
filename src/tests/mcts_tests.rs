@@ -1,6 +1,7 @@
 use crate::board::Board;
 use crate::mcts;
 use crate::tests::do_moves_and_check_validity;
+use crate::tune::auto_tune::TunableBoard;
 use board_game_traits::board::Board as BoardTrait;
 use pgn_traits::pgn::PgnBoard;
 
@@ -195,7 +196,12 @@ fn plays_correct_move_property(move_strings: &[&str], correct_moves: TacticAnswe
     let mut simple_moves = vec![];
 
     for i in 1..50000 {
-        mcts.select(&mut board.clone(), &mut simple_moves, &mut moves);
+        mcts.select(
+            &mut board.clone(),
+            Board::PARAMS,
+            &mut simple_moves,
+            &mut moves,
+        );
         if i % 10000 == 0 {
             let (best_move, _score) = mcts.best_move(0.1);
             match correct_moves {

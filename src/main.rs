@@ -6,6 +6,8 @@ extern crate smallvec;
 extern crate arrayvec;
 #[macro_use]
 extern crate nom;
+#[macro_use]
+extern crate log;
 
 mod bitboard;
 mod board;
@@ -15,17 +17,18 @@ mod move_gen;
 mod tests;
 mod tune;
 
-use std::{error, fs, io, sync};
+use std::{fs, io};
 
 use crate::tests::do_moves_and_check_validity;
 use crate::tune::auto_tune::TunableBoard;
 use crate::tune::pgn_parse::Game;
+use crate::tune::training::train_from_scratch;
 use board::Board;
 use board_game_traits::board::Board as BoardTrait;
 use board_game_traits::board::{Color, GameResult};
 use pgn_traits::pgn::PgnBoard;
-use rayon::prelude::*;
 use std::io::{Read, Write};
+use std::path::Path;
 
 fn main() {
     println!("play: Play against the mcts AI");
@@ -47,8 +50,19 @@ fn main() {
         "analyze" => test_position(),
         "mem usage" => mem_usage(),
         "bench" => bench(),
-        "tune" => tune(),
-        "tune_from_file" => tune_from_file().unwrap(),
+        "train_from_scratch" => {
+            for i in 0.. {
+                let file_name = format!("games{}_batch0.ptn", i);
+                if !Path::new(&file_name).exists() {
+                    train_from_scratch(i).unwrap();
+                    break;
+                } else {
+                    println!("File {} already exists, trying next.", file_name);
+                }
+            }
+        }
+        "tune" => tune::training::tune(),
+        "tune_from_file" => tune::training::tune_from_file().unwrap(),
         "pgn_to_move_list" => pgn_to_move_list(),
         s => println!("Unknown option \"{}\"", s),
     }
@@ -103,14 +117,7 @@ fn test_position() {
     let mut board = Board::default();
     let mut moves = vec![];
 
-    let move_strings = [
-        "a1", "e5", "e3", "Cc3", "e4", "e2", "d3", "c3>", "d4", "b2", "c3", "c2", "c4", "d2",
-        "c3-", "a2", "c3", "c1", "2c2<", "c2", "c3-", "b1", "e3-", "e1", "2e2-", "d1", "2c2-",
-        "a2>", "a4", "4b2+112", "a4>", "2b5-", "c4<", "b3+", "e2", "5b4>122", "3e1<", "e1", "e5-",
-        "3d4>", "e2-", "b3", "c3", "c2", "b2", "a3", "c5", "c2+", "c4-", "2d3<", "Cc2", "b3-",
-        "a2", "e2", "a2>", "b1>", "c2-", "e2-", "5c1>32", "Se2", "a2", "a1+", "2b2<", "c2", "c1",
-        "b1", "b2-", "c2-", "4a2+13", "c2", "5e1<23", "e2-",
-    ];
+    let move_strings: &[&str] = &["e1"];
 
     for mv_san in move_strings.iter() {
         let mv = board.move_from_san(&mv_san).unwrap();
@@ -135,7 +142,12 @@ fn test_position() {
     let mut simple_moves = vec![];
     let mut moves = vec![];
     for i in 0.. {
-        tree.select(&mut board.clone(), &mut simple_moves, &mut moves);
+        tree.select(
+            &mut board.clone(),
+            Board::PARAMS,
+            &mut simple_moves,
+            &mut moves,
+        );
         if i % 100_000 == 0 {
             println!("{} visits, val={}", tree.visits, tree.mean_action_value);
             tree.print_info();
@@ -241,80 +253,6 @@ fn bench() {
     );
 }
 
-fn tune() {
-    let outfile = fs::OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open("output3.ptn")
-        .unwrap();
-    let locked_writer = sync::Mutex::new(io::BufWriter::new(outfile));
-
-    use std::sync::atomic::AtomicU64;
-    use std::sync::atomic::Ordering;
-
-    let mut white_wins: AtomicU64 = AtomicU64::new(0);
-    let mut draws = AtomicU64::new(0);
-    let mut black_wins = AtomicU64::new(0);
-    let mut aborted = AtomicU64::new(0);
-    loop {
-        let games = tune::play_match::play_match();
-        games.for_each(|ref game| {
-            {
-                let mut writer = locked_writer.lock().unwrap();
-                tune::play_match::game_to_pgn(game, &mut *writer).unwrap();
-            }
-            match game.game_result {
-                None => aborted.fetch_add(1, Ordering::Relaxed),
-                Some(GameResult::WhiteWin) => white_wins.fetch_add(1, Ordering::Relaxed),
-                Some(GameResult::BlackWin) => black_wins.fetch_add(1, Ordering::Relaxed),
-                Some(GameResult::Draw) => draws.fetch_add(1, Ordering::Relaxed),
-            };
-        });
-        println!(
-            "{} white wins, {} draws, {} black wins, {} aborted.",
-            white_wins.get_mut(),
-            draws.get_mut(),
-            black_wins.get_mut(),
-            aborted.get_mut()
-        );
-    }
-}
-
-fn tune_from_file() -> Result<(), Box<dyn error::Error>> {
-    let mut file = fs::File::open("output3.ptn")?;
-    let mut input = String::new();
-    file.read_to_string(&mut input)?;
-    let games: Vec<Game<Board>> = tune::pgn_parse::parse_pgn(&input)?;
-
-    let mut positions = vec![];
-    let mut results = vec![];
-    for game in games.into_iter().filter(|game| game.game_result.is_some()) {
-        let mut board = game.start_board;
-        for (mv, _) in game.moves {
-            board.do_move(mv);
-            positions.push(board.clone());
-            results.push(game.game_result.unwrap());
-        }
-    }
-
-    let middle_index = positions.len() / 2;
-
-    let params = [0.01; Board::PARAMS.len()];
-
-    println!(
-        "Final parameters: {:?}",
-        tune::auto_tune::gradient_descent(
-            &positions[0..middle_index],
-            &results[0..middle_index],
-            &positions[middle_index..],
-            &results[middle_index..],
-            &params,
-        )
-    );
-
-    Ok(())
-}
-
 fn pgn_to_move_list() {
     let mut file = fs::File::open("game.ptn").unwrap();
     let mut input = String::new();
@@ -338,7 +276,7 @@ fn mem_usage() {
     println!("MCTS node: {} bytes.", mem::size_of::<mcts::Tree>());
     let mut board = board::Board::default();
     let mut tree = mcts::Tree::new_root();
-    tree.select(&mut board, &mut vec![], &mut vec![]);
+    tree.select(&mut board, Board::PARAMS, &mut vec![], &mut vec![]);
     println!(
         "MCTS node's children: {} bytes.",
         tree.children.len() * mem::size_of::<(mcts::Tree, board::Move)>()

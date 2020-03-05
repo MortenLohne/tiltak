@@ -1,5 +1,6 @@
 use crate::board::{Board, Move};
-use board_game_traits::board::{Board as BoardTrait, Color, EvalBoard, GameResult};
+use crate::tune::auto_tune::TunableBoard;
+use board_game_traits::board::{Board as BoardTrait, Color, GameResult};
 use rand::Rng;
 
 const C_PUCT: Score = 3.0;
@@ -23,7 +24,27 @@ pub(crate) fn mcts(board: Board, nodes: u64, temperature: f64) -> (Move, Score) 
     let mut moves = vec![];
     let mut simple_moves = vec![];
     for _ in 0..nodes {
-        tree.select(&mut board.clone(), &mut simple_moves, &mut moves);
+        tree.select(
+            &mut board.clone(),
+            Board::PARAMS,
+            &mut simple_moves,
+            &mut moves,
+        );
+    }
+    tree.best_move(temperature)
+}
+
+pub(crate) fn mcts_training(
+    board: Board,
+    nodes: u64,
+    params: &[f32],
+    temperature: f64,
+) -> (Move, Score) {
+    let mut tree = Tree::new_root();
+    let mut moves = vec![];
+    let mut simple_moves = vec![];
+    for _ in 0..nodes {
+        tree.select(&mut board.clone(), params, &mut simple_moves, &mut moves);
     }
     tree.best_move(temperature)
 }
@@ -105,6 +126,7 @@ impl Tree {
     pub fn select(
         &mut self,
         board: &mut Board,
+        params: &[f32],
         simple_moves: &mut Vec<Move>,
         moves: &mut Vec<(Move, Score)>,
     ) -> Score {
@@ -113,7 +135,7 @@ impl Tree {
             self.total_action_value += self.mean_action_value;
             self.mean_action_value
         } else if self.visits == 0 {
-            self.expand(board)
+            self.expand(board, params)
         } else {
             // Only generate child moves on the 2nd visit
             if self.visits == 1 {
@@ -121,6 +143,13 @@ impl Tree {
             }
 
             let visits_sqrt = (self.visits as Score).sqrt();
+
+            assert_ne!(
+                self.children.len(),
+                0,
+                "No legal moves on board\n{:?}",
+                board
+            );
 
             let mut best_exploration_value = self.children[0].0.exploration_value(visits_sqrt);
             let mut best_child_node_index = 0;
@@ -136,7 +165,7 @@ impl Tree {
             let (child, mv) = self.children.get_mut(best_child_node_index).unwrap();
 
             board.do_move(mv.clone());
-            let result = 1.0 - child.select(board, simple_moves, moves);
+            let result = 1.0 - child.select(board, params, simple_moves, moves);
             self.visits += 1;
             self.total_action_value += result;
             self.mean_action_value = self.total_action_value / self.visits as Score;
@@ -146,7 +175,7 @@ impl Tree {
 
     // Never inline, for profiling purposes
     #[inline(never)]
-    fn expand(&mut self, board: &mut Board) -> Score {
+    fn expand(&mut self, board: &mut Board, params: &[f32]) -> Score {
         debug_assert!(self.children.is_empty());
 
         if let Some(game_result) = board.game_result() {
@@ -162,7 +191,7 @@ impl Tree {
             return result;
         }
 
-        let mut static_eval = cp_to_win_percentage(board.static_eval());
+        let mut static_eval = cp_to_win_percentage(board.static_eval_with_params(params));
         if board.side_to_move() == Color::Black {
             static_eval = 1.0 - static_eval;
         }
