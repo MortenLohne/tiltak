@@ -881,6 +881,7 @@ impl board::Board for Board {
 
         if (self.white_stones_left == 0 && self.white_capstones_left == 0)
             || (self.black_stones_left == 0 && self.black_capstones_left == 0)
+            || board_iterator().all(|square| !self[square].is_empty())
         {
             // Count points
             let mut white_points = 0;

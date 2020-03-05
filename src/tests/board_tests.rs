@@ -316,3 +316,21 @@ fn cannot_suicide_into_points_loss_test() {
         false
     }));
 }
+
+#[test]
+fn games_ends_when_board_is_full_test() {
+    let mut board = Board::start_board();
+    let move_strings: Vec<String> = board_iterator().skip(1).map(|sq| sq.to_string()).collect();
+    do_moves_and_check_validity(
+        &mut board,
+        &(move_strings.iter().map(AsRef::as_ref).collect::<Vec<_>>()),
+    );
+    assert!(board.game_result().is_none());
+    board.do_move(board.move_from_san("a5").unwrap());
+    assert_eq!(
+        board.game_result(),
+        Some(WhiteWin),
+        "Board is full, game should have ended:\n{:?}",
+        board
+    );
+}
