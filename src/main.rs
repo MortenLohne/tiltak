@@ -103,7 +103,16 @@ fn test_position() {
     let mut board = Board::default();
     let mut moves = vec![];
 
-    for mv_san in ["a5", "e1"].iter() {
+    let move_strings = [
+        "a1", "e5", "e3", "Cc3", "e4", "e2", "d3", "c3>", "d4", "b2", "c3", "c2", "c4", "d2",
+        "c3-", "a2", "c3", "c1", "2c2<", "c2", "c3-", "b1", "e3-", "e1", "2e2-", "d1", "2c2-",
+        "a2>", "a4", "4b2+112", "a4>", "2b5-", "c4<", "b3+", "e2", "5b4>122", "3e1<", "e1", "e5-",
+        "3d4>", "e2-", "b3", "c3", "c2", "b2", "a3", "c5", "c2+", "c4-", "2d3<", "Cc2", "b3-",
+        "a2", "e2", "a2>", "b1>", "c2-", "e2-", "5c1>32", "Se2", "a2", "a1+", "2b2<", "c2", "c1",
+        "b1", "b2-", "c2-", "4a2+13", "c2", "5e1<23", "e2-",
+    ];
+
+    for mv_san in move_strings.iter() {
         let mv = board.move_from_san(&mv_san).unwrap();
         board.generate_moves(&mut moves);
         assert!(moves.contains(&mv));
@@ -144,7 +153,7 @@ fn play_human(mut board: Board) {
             use board_game_traits::board::Color::*;
             println!("Board:\n{:?}", board);
             // If black, play as human
-            if board.side_to_move() == White {
+            if board.side_to_move() == Black {
                 println!("Type your move in algebraic notation (c3):");
 
                 let reader = io::stdin();
@@ -176,7 +185,7 @@ fn play_human(mut board: Board) {
                 board.do_move(c_move);
                 play_human(board);
             } else {
-                let (best_move, score) = mcts::mcts(board.clone(), 100_000, 0.1);
+                let (best_move, score) = mcts::mcts(board.clone(), 500_000, 0.1);
 
                 println!("Computer played {:?} with score {}", best_move, score);
                 board.do_move(best_move);
@@ -204,7 +213,7 @@ fn bench() {
     {
         let mut board = Board::default();
 
-        do_moves_and_check_validity(&mut board, &["c3", "d3", "c4", "1d3<", "1c4+", "Sc4"]);
+        do_moves_and_check_validity(&mut board, &["d3", "c3", "c4", "1d3<", "1c4+", "Sc4"]);
 
         let (_move, score) = mcts::mcts(board, NODES, 0.1);
         print!("{:.3}, ", score);
@@ -215,7 +224,7 @@ fn bench() {
         do_moves_and_check_validity(
             &mut board,
             &[
-                "c3", "c2", "d3", "b3", "c4", "1c2-", "1d3<", "1b3>", "1c4+", "Cc2", "a1", "1c2-",
+                "c2", "c3", "d3", "b3", "c4", "1c2-", "1d3<", "1b3>", "1c4+", "Cc2", "a1", "1c2-",
                 "a2",
             ],
         );
