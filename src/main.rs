@@ -61,7 +61,6 @@ fn main() {
                 }
             }
         }
-        "tune" => tune::training::tune(),
         "tune_from_file" => tune::training::tune_from_file().unwrap(),
         "pgn_to_move_list" => pgn_to_move_list(),
         s => println!("Unknown option \"{}\"", s),
@@ -119,7 +118,7 @@ fn test_position() {
 
     let move_strings: &[&str] = &[
         "e1", "a1", "Cc3", "e2", "b3", "d4", "d3", "Ce3", "d3+", "e4", "e5", "d5", "2d4+", "d4",
-        "c5", "d4+", "c5>", "Sc5", "5d5-", "e4<"
+        "c5", "d4+", "c5>", "Sc5", "5d5-", "e4<",
     ];
 
     for mv_san in move_strings.iter() {

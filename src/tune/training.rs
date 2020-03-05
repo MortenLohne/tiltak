@@ -10,7 +10,7 @@ use rand::prelude::*;
 use rayon::prelude::*;
 use std::io::Read;
 use std::iter::FromIterator;
-use std::{error, fs, io, iter, sync};
+use std::{error, fs, io, iter};
 
 pub fn train_from_scratch(training_id: usize) -> Result<(), Box<dyn error::Error>> {
     const BATCH_SIZE: usize = 200;
@@ -100,45 +100,6 @@ impl GameStats {
             }
         }
         stats
-    }
-}
-
-pub fn tune() {
-    let outfile = fs::OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open("output4.ptn")
-        .unwrap();
-    let locked_writer = sync::Mutex::new(io::BufWriter::new(outfile));
-
-    use std::sync::atomic::AtomicU64;
-    use std::sync::atomic::Ordering;
-
-    let mut white_wins: AtomicU64 = AtomicU64::new(0);
-    let mut draws = AtomicU64::new(0);
-    let mut black_wins = AtomicU64::new(0);
-    let mut aborted = AtomicU64::new(0);
-    loop {
-        let games = play_match::play_match();
-        games.for_each(|ref game| {
-            {
-                let mut writer = locked_writer.lock().unwrap();
-                play_match::game_to_pgn(game, &mut *writer).unwrap();
-            }
-            match game.game_result {
-                None => aborted.fetch_add(1, Ordering::Relaxed),
-                Some(GameResult::WhiteWin) => white_wins.fetch_add(1, Ordering::Relaxed),
-                Some(GameResult::BlackWin) => black_wins.fetch_add(1, Ordering::Relaxed),
-                Some(GameResult::Draw) => draws.fetch_add(1, Ordering::Relaxed),
-            };
-        });
-        println!(
-            "{} white wins, {} draws, {} black wins, {} aborted.",
-            white_wins.get_mut(),
-            draws.get_mut(),
-            black_wins.get_mut(),
-            aborted.get_mut()
-        );
     }
 }
 
