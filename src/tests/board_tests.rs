@@ -1,5 +1,5 @@
 use crate::board::Piece::{BlackCap, BlackFlat, WhiteFlat, WhiteStanding};
-use crate::board::{board_iterator, Board, Direction::*, Move, Piece, Square};
+use crate::board::{board_iterator, Board, Direction::*, Move, Piece, Role, Square};
 use crate::tests::do_moves_and_check_validity;
 use crate::{board as board_mod, board};
 use board_game_traits::board::Board as BoardTrait;
@@ -280,4 +280,39 @@ fn double_road_wins_test() {
 
     board.do_move(board.move_from_san(&"1c2-").unwrap());
     assert_eq!(board.game_result(), Some(WhiteWin));
+}
+
+// Black is behind by one point, with one stone left to place
+// Check that placing it standing is suicide, but placing it flat is not
+#[test]
+fn cannot_suicide_into_points_loss_test() {
+    let mut board = Board::start_board();
+    let move_strings = [
+        "a1", "e5", "e3", "Cc3", "e4", "e2", "d3", "c3>", "d4", "b2", "c3", "c2", "c4", "d2",
+        "c3-", "a2", "c3", "c1", "2c2<", "c2", "c3-", "b1", "e3-", "e1", "2e2-", "d1", "2c2-",
+        "a2>", "a4", "4b2+112", "a4>", "2b5-", "c4<", "b3+", "e2", "5b4>122", "3e1<", "e1", "e5-",
+        "3d4>", "e2-", "b3", "c3", "c2", "b2", "a3", "c5", "c2+", "c4-", "2d3<", "Cc2", "b3-",
+        "a2", "e2", "a2>", "b1>", "c2-", "e2-", "5c1>32", "Se2", "a2", "a1+", "2b2<", "c2", "c1",
+        "b1", "b2-", "c2-", "4a2+13", "c2", "5e1<23",
+    ];
+    do_moves_and_check_validity(&mut board, &move_strings);
+
+    let mut moves = vec![];
+    board.generate_moves(&mut moves);
+    for mv in moves.iter() {
+        match mv {
+            Move::Place(piece, _) => assert_ne!(
+                piece.role(),
+                Role::Standing,
+                "Placing a standing stone is suicide"
+            ),
+            _ => (),
+        }
+    }
+
+    assert!(moves.iter().any(|mv| if let Move::Place(_, _) = mv {
+        true
+    } else {
+        false
+    }));
 }

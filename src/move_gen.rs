@@ -1,7 +1,8 @@
 use crate::board;
 use crate::board::Role::*;
 use crate::board::{
-    Board, ColorTr, Direction, Move, Movement, Piece, Square, StackMovement, BOARD_SIZE,
+    board_iterator, Board, ColorTr, Direction, Move, Movement, Piece, Square, StackMovement,
+    BOARD_SIZE,
 };
 use arrayvec::ArrayVec;
 
@@ -13,13 +14,21 @@ impl Board {
         for square in board::board_iterator() {
             match self[square].top_stone() {
                 None => {
+                    // TODO: Suicide move check could be placed outside the loop,
+                    // since it is the same for every square
+                    let mut pesudolegal_moves: ArrayVec<[Move; 3]> = ArrayVec::new();
                     if Us::stones_left(&self) > 0 {
-                        moves.push(Move::Place(Us::flat_piece(), square));
-                        moves.push(Move::Place(Us::standing_piece(), square));
+                        pesudolegal_moves.push(Move::Place(Us::flat_piece(), square));
+                        pesudolegal_moves.push(Move::Place(Us::standing_piece(), square));
                     }
                     if Us::capstones_left(&self) > 0 {
-                        moves.push(Move::Place(Us::cap_piece(), square));
+                        pesudolegal_moves.push(Move::Place(Us::cap_piece(), square));
                     }
+                    moves.extend(
+                        pesudolegal_moves
+                            .drain(..)
+                            .filter(|mv| !self.move_is_suicide::<Us, Them>(mv)),
+                    );
                 }
                 Some(piece) if Us::piece_is_ours(piece) => {
                     for direction in square.directions() {
@@ -140,47 +149,70 @@ impl Board {
     // Never inline, for profiling purposes
     #[inline(never)]
     pub fn move_is_suicide<Us: ColorTr, Them: ColorTr>(&self, mv: &Move) -> bool {
-        if let Move::Move(square, direction, stack_movement) = mv {
-            // Stack moves that don't give the opponent a new road stone,
-            // can trivially be ruled out
-            if self
-                .top_stones_left_behind_by_move(*square, &stack_movement)
-                .any(|piece| piece.is_some() && !Us::piece_is_ours(piece.unwrap()))
-            {
-                let mut our_road_pieces = Us::road_stones(self);
-                let mut their_road_pieces = Them::road_stones(self);
-                let mut sq = *square;
+        match mv {
+            Move::Move(square, direction, stack_movement) => {
+                // Stack moves that don't give the opponent a new road stone,
+                // can trivially be ruled out
+                if self
+                    .top_stones_left_behind_by_move(*square, &stack_movement)
+                    .any(|piece| piece.is_some() && !Us::piece_is_ours(piece.unwrap()))
+                {
+                    let mut our_road_pieces = Us::road_stones(self);
+                    let mut their_road_pieces = Them::road_stones(self);
+                    let mut sq = *square;
 
-                for new_top_piece in self.top_stones_left_behind_by_move(*square, &stack_movement) {
-                    our_road_pieces = our_road_pieces.clear(sq.0);
-                    their_road_pieces = their_road_pieces.clear(sq.0);
-                    if let Some(piece) = new_top_piece {
-                        if Us::is_road_stone(piece) {
-                            our_road_pieces = our_road_pieces.set(sq.0);
+                    for new_top_piece in
+                        self.top_stones_left_behind_by_move(*square, &stack_movement)
+                    {
+                        our_road_pieces = our_road_pieces.clear(sq.0);
+                        their_road_pieces = their_road_pieces.clear(sq.0);
+                        if let Some(piece) = new_top_piece {
+                            if Us::is_road_stone(piece) {
+                                our_road_pieces = our_road_pieces.set(sq.0);
+                            }
+                            if Them::is_road_stone(piece) {
+                                their_road_pieces = their_road_pieces.set(sq.0);
+                            }
                         }
-                        if Them::is_road_stone(piece) {
-                            their_road_pieces = their_road_pieces.set(sq.0);
+                        sq = sq.go_direction(*direction).unwrap_or(sq);
+                    }
+
+                    let (our_components, our_highest_component_id) =
+                        board::connected_components_graph(our_road_pieces);
+
+                    if board::is_win_by_road(&our_components, our_highest_component_id).is_some() {
+                        return false;
+                    }
+
+                    let (their_components, their_highest_component_id) =
+                        board::connected_components_graph(their_road_pieces);
+
+                    board::is_win_by_road(&their_components, their_highest_component_id).is_some()
+                } else {
+                    false
+                }
+            }
+            Move::Place(piece, _) => {
+                // Placing a piece can only be suicide if this is our last piece
+                if Us::capstones_left(self) + Us::stones_left(self) == 1 {
+                    // Count points
+                    let mut our_points = 0;
+                    let mut their_points = 0;
+                    for top_stone in board_iterator().filter_map(|sq| self[sq].top_stone()) {
+                        if Us::is_road_stone(top_stone) {
+                            our_points += 1;
+                        } else if Them::is_road_stone(top_stone) {
+                            their_points += 1;
                         }
                     }
-                    sq = sq.go_direction(*direction).unwrap_or(sq);
+                    match piece.role() {
+                        Cap | Flat => their_points > our_points + 1,
+                        Standing => their_points > our_points,
+                    }
+                } else {
+                    false
                 }
-
-                let (our_components, our_highest_component_id) =
-                    board::connected_components_graph(our_road_pieces);
-
-                if board::is_win_by_road(&our_components, our_highest_component_id).is_some() {
-                    return false;
-                }
-
-                let (their_components, their_highest_component_id) =
-                    board::connected_components_graph(their_road_pieces);
-
-                board::is_win_by_road(&their_components, their_highest_component_id).is_some()
-            } else {
-                false
             }
-        } else {
-            false
         }
     }
 }
