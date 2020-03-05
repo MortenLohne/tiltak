@@ -13,13 +13,13 @@ use std::iter::FromIterator;
 use std::{error, fs, io, iter, sync};
 
 pub fn train_from_scratch(training_id: usize) -> Result<(), Box<dyn error::Error>> {
-    const BATCH_SIZE: usize = 400;
+    const BATCH_SIZE: usize = 200;
     // Only train from the last n batches
     const BATCHES_FOR_TRAINING: usize = 25;
 
     let mut rng = rand::thread_rng();
     let initial_params: ArrayVec<[f32; Board::PARAMS.len()]> =
-        ArrayVec::from_iter(iter::from_fn(|| Some(rng.gen())));
+        ArrayVec::from_iter(iter::from_fn(|| Some(rng.gen_range(-0.1, 0.1))));
 
     let mut all_games = vec![];
     let mut params = initial_params;
