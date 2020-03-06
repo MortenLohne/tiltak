@@ -13,9 +13,9 @@ use std::iter::FromIterator;
 use std::{error, fs, io, iter};
 
 pub fn train_from_scratch(training_id: usize) -> Result<(), Box<dyn error::Error>> {
-    const BATCH_SIZE: usize = 200;
+    const BATCH_SIZE: usize = 500;
     // Only train from the last n batches
-    const BATCHES_FOR_TRAINING: usize = 25;
+    const BATCHES_FOR_TRAINING: usize = 20;
 
     let mut rng = rand::thread_rng();
     let initial_params: ArrayVec<[f32; Board::PARAMS.len()]> =

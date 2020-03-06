@@ -2,11 +2,11 @@ use crate::board::Board;
 use crate::mcts;
 use crate::tune::pgn_parse;
 use crate::tune::pgn_parse::Game;
-use board_game_traits::board::Board as BoardTrait;
+use board_game_traits::board::{Board as BoardTrait, Color, GameResult};
 use std::io;
 
 pub fn play_game(params: &[f32]) -> Game<Board> {
-    const MCTS_NODES: u64 = 10_000;
+    const MCTS_NODES: u64 = 20_000;
     const TEMPERATURE: f64 = 1.0;
 
     let mut board = Board::start_board();
@@ -34,6 +34,66 @@ pub fn play_game(params: &[f32]) -> Game<Board> {
             .collect::<Vec<_>>(),
         game_result: board.game_result(),
         tags: vec![],
+    }
+}
+
+pub fn play_match_between_params(params1: &[f32], params2: &[f32]) -> ! {
+    const NODES: u64 = 50_000;
+    const TEMPERATURE: f64 = 0.5;
+
+    let mut player1_wins = 0;
+    let mut player2_wins = 0;
+    let mut draws = 0;
+    let mut aborted = 0;
+    loop {
+        let mut board = Board::start_board();
+
+        while board.game_result().is_none() {
+            if board.moves_played() > 200 {
+                break;
+            }
+            let (best_move, _) = match board.side_to_move() {
+                Color::White => mcts::mcts_training(board.clone(), NODES, params1, TEMPERATURE),
+                Color::Black => mcts::mcts_training(board.clone(), NODES, params2, TEMPERATURE),
+            };
+            board.do_move(best_move.clone());
+        }
+
+        match board.game_result() {
+            None => aborted += 1,
+            Some(GameResult::WhiteWin) => player1_wins += 1,
+            Some(GameResult::BlackWin) => player2_wins += 1,
+            Some(GameResult::Draw) => draws += 1,
+        }
+
+        board = Board::start_board();
+
+        while board.game_result().is_none() {
+            if board.moves_played() > 200 {
+                break;
+            }
+            let (best_move, _) = match board.side_to_move() {
+                Color::White => mcts::mcts_training(board.clone(), NODES, params2, TEMPERATURE),
+                Color::Black => mcts::mcts_training(board.clone(), NODES, params1, TEMPERATURE),
+            };
+            board.do_move(best_move.clone());
+        }
+
+        match board.game_result() {
+            None => aborted += 1,
+            Some(GameResult::WhiteWin) => player2_wins += 1,
+            Some(GameResult::BlackWin) => player1_wins += 1,
+            Some(GameResult::Draw) => draws += 1,
+        }
+        let decided_games = player1_wins + player2_wins + draws;
+        println!(
+            "+{}-{}={}, {:.1}% score. {} games aborted.",
+            player1_wins,
+            player2_wins,
+            draws,
+            100.0 * (player1_wins as f64 + draws as f64 / 2.0) / decided_games as f64,
+            aborted
+        );
     }
 }
 

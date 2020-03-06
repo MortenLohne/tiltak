@@ -584,6 +584,10 @@ impl Board {
         self.black_road_pieces
     }
 
+    pub fn moves_played(&self) -> u8 {
+        self.moves_played
+    }
+
     #[cfg(test)]
     pub fn flip_board_y(&self) -> Board {
         let mut new_board = self.clone();

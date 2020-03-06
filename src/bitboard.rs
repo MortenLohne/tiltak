@@ -1,5 +1,5 @@
-use std::{fmt, ops};
 use crate::board::BOARD_SIZE;
+use std::{fmt, ops};
 
 #[derive(PartialEq, Eq, Clone, Copy, Hash, Default)]
 pub struct BitBoard {

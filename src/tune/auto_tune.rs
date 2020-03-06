@@ -28,7 +28,7 @@ where
     let beta = 0.8;
 
     // If error is not reduced this number of times, reduce eta, or abort if eta is already low
-    const MAX_TRIES: usize = 5;
+    const MAX_TRIES: usize = 8;
 
     let initial_error = average_error(test_positions, test_results, params);
     println!(
