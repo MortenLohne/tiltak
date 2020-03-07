@@ -3,23 +3,20 @@ use crate::tune::auto_tune::TunableBoard;
 use crate::tune::pgn_parse::Game;
 use crate::tune::play_match::play_game;
 use crate::tune::{auto_tune, pgn_parse, play_match};
-use arrayvec::ArrayVec;
 use board_game_traits::board::Board as BoardTrait;
 use board_game_traits::board::GameResult;
 use rand::prelude::*;
 use rayon::prelude::*;
 use std::io::Read;
-use std::iter::FromIterator;
-use std::{error, fs, io, iter};
+use std::{error, fs, io};
 
 pub fn train_from_scratch(training_id: usize) -> Result<(), Box<dyn error::Error>> {
-    const BATCH_SIZE: usize = 500;
+    const BATCH_SIZE: usize = 1000;
     // Only train from the last n batches
-    const BATCHES_FOR_TRAINING: usize = 20;
+    const BATCHES_FOR_TRAINING: usize = 10;
 
     let mut rng = rand::thread_rng();
-    let initial_params: ArrayVec<[f32; Board::PARAMS.len()]> =
-        ArrayVec::from_iter(iter::from_fn(|| Some(rng.gen_range(-0.1, 0.1))));
+    let initial_params: Vec<f32> = vec![rng.gen_range(-0.1, 0.1); Board::PARAMS.len()];
 
     let mut all_games = vec![];
     let mut params = initial_params;
@@ -65,15 +62,12 @@ pub fn train_from_scratch(training_id: usize) -> Result<(), Box<dyn error::Error
         let (positions, results) = positions_and_results_from_games(training_games);
         let middle_index = positions.len() / 2;
 
-        params = ArrayVec::from_iter(
-            auto_tune::gradient_descent(
-                &positions[0..middle_index],
-                &results[0..middle_index],
-                &positions[middle_index..],
-                &results[middle_index..],
-                &params,
-            )
-            .into_iter(),
+        params = auto_tune::gradient_descent(
+            &positions[0..middle_index],
+            &results[0..middle_index],
+            &positions[middle_index..],
+            &results[middle_index..],
+            &params,
         );
 
         batch_id += 1;
@@ -104,7 +98,7 @@ impl GameStats {
 }
 
 pub fn tune_from_file() -> Result<(), Box<dyn error::Error>> {
-    let mut file = fs::File::open("output4.ptn")?;
+    let mut file = fs::File::open("output3.ptn")?;
     let mut input = String::new();
     file.read_to_string(&mut input)?;
     let games: Vec<Game<Board>> = pgn_parse::parse_pgn(&input)?;
@@ -113,7 +107,8 @@ pub fn tune_from_file() -> Result<(), Box<dyn error::Error>> {
 
     let middle_index = positions.len() / 2;
 
-    let params = [0.01; Board::PARAMS.len()];
+    let mut rng = rand::thread_rng();
+    let params: Vec<f32> = vec![rng.gen_range(-0.1, 0.1); Board::PARAMS.len()];
 
     println!(
         "Final parameters: {:?}",
@@ -135,9 +130,10 @@ pub fn positions_and_results_from_games(games: Vec<Game<Board>>) -> (Vec<Board>,
     for game in games.into_iter().filter(|game| game.game_result.is_some()) {
         let mut board = game.start_board;
         for (mv, _) in game.moves {
-            board.do_move(mv);
             positions.push(board.clone());
             results.push(game.game_result.unwrap());
+            board.do_move(mv);
+            // Deliberately skip the final position
         }
     }
     (positions, results)

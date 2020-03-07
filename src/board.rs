@@ -996,33 +996,46 @@ const SQUARE_SYMMETRIES: [usize; 25] = [
 impl TunableBoard for Board {
     #[allow(clippy::unreadable_literal)]
     const PARAMS: &'static [f32] = &[
-        1.0883423,
-        1.1453367,
-        1.1889126,
-        1.3138986,
-        1.3468088,
-        1.2857507,
-        0.24931683,
-        0.036311746,
-        0.075409554,
-        0.28972352,
-        0.23349784,
-        0.049525037,
-        -0.2754975,
-        0.72188,
-        0.6374655,
-        1.3355252,
-        1.6382277,
-        1.6416214,
-        0.58266574,
-        0.9282423,
-        0.4581855,
-        0.39501676,
-        0.8140925,
-        0.6040379,
+        0.11546037,
+        0.38993832,
+        0.3594647,
+        0.55473673,
+        0.574743,
+        0.54728144,
+        0.8826678,
+        1.2646897,
+        1.1345893,
+        1.4539466,
+        1.5107378,
+        0.7540873,
+        -0.9577312,
+        -0.41307563,
+        -0.44581693,
+        0.29796726,
+        0.7496709,
+        1.0882877,
+        1.2875234,
+        1.8512405,
+        1.1104535,
+        0.23242366,
+        1.4878128,
+        0.8031703,
+        -2.1186066,
+        -1.6040361,
+        -0.6668861,
+        0.58022684,
+        2.0720365,
+        -0.047600698,
+        0.7756413,
+        -1.160208,
+        -0.7191107,
+        -0.36372992,
+        0.092443414,
+        0.6003906,
     ];
-
     fn static_eval_with_params(&self, params: &[f32]) -> f32 {
+        debug_assert!(self.game_result().is_none());
+
         const FLAT_PSQT: usize = 0;
         const STAND_PSQT: usize = FLAT_PSQT + 6;
         const CAP_PSQT: usize = STAND_PSQT + 6;
@@ -1090,7 +1103,45 @@ impl TunableBoard for Board {
             })
             .sum();
 
-        material_psqt + to_move + stacks
+        // Number of pieces in each rank/file
+        const RANK_FILE_CONTROL: usize = STACK + 5;
+        // Number of ranks/files with at least one road stone
+        const NUM_RANKS_FILES_OCCUPIED: usize = RANK_FILE_CONTROL + 6;
+
+        let mut num_ranks_occupied_white = 0;
+        let mut num_files_occupied_white = 0;
+        let mut num_ranks_occupied_black = 0;
+        let mut num_files_occupied_black = 0;
+        let mut pieces_in_rank_file_score = 0.0;
+
+        for rank in (0..BOARD_SIZE as u8).map(|i| self.white_road_pieces().rank(i)) {
+            num_ranks_occupied_white += if rank.is_empty() { 0 } else { 1 };
+            pieces_in_rank_file_score += params[RANK_FILE_CONTROL + rank.count() as usize] as f32;
+        }
+
+        for file in (0..BOARD_SIZE as u8).map(|i| self.white_road_pieces().file(i)) {
+            num_files_occupied_white += if file.is_empty() { 0 } else { 1 };
+            pieces_in_rank_file_score += params[RANK_FILE_CONTROL + file.count() as usize] as f32;
+        }
+
+        for rank in (0..BOARD_SIZE as u8).map(|i| self.black_road_pieces().rank(i)) {
+            num_ranks_occupied_black += if rank.is_empty() { 0 } else { 1 };
+            pieces_in_rank_file_score -= params[RANK_FILE_CONTROL + rank.count() as usize] as f32;
+        }
+
+        for file in (0..BOARD_SIZE as u8).map(|i| self.black_road_pieces().file(i)) {
+            num_files_occupied_black += if file.is_empty() { 0 } else { 1 };
+            pieces_in_rank_file_score -= params[RANK_FILE_CONTROL + file.count() as usize] as f32;
+        }
+
+        let num_ranks_occupied_score = params[NUM_RANKS_FILES_OCCUPIED + num_ranks_occupied_white]
+            + params[NUM_RANKS_FILES_OCCUPIED + num_files_occupied_white]
+            - params[NUM_RANKS_FILES_OCCUPIED + num_ranks_occupied_black]
+            - params[NUM_RANKS_FILES_OCCUPIED + num_files_occupied_black];
+
+        const _NEXT_CONST: usize = NUM_RANKS_FILES_OCCUPIED + 6;
+
+        material_psqt + to_move + stacks + pieces_in_rank_file_score + num_ranks_occupied_score
     }
 }
 

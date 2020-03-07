@@ -22,6 +22,7 @@ use std::{fs, io};
 use crate::tests::do_moves_and_check_validity;
 use crate::tune::auto_tune::TunableBoard;
 use crate::tune::pgn_parse::Game;
+use crate::tune::play_match::play_match_between_params;
 use crate::tune::training::train_from_scratch;
 use board::Board;
 use board_game_traits::board::Board as BoardTrait;
@@ -63,6 +64,48 @@ fn main() {
         }
         "tune_from_file" => tune::training::tune_from_file().unwrap(),
         "pgn_to_move_list" => pgn_to_move_list(),
+        "play_params" => {
+            let params1 = &[
+                0.11546037,
+                0.38993832,
+                0.3594647,
+                0.55473673,
+                0.574743,
+                0.54728144,
+                0.8826678,
+                1.2646897,
+                1.1345893,
+                1.4539466,
+                1.5107378,
+                0.7540873,
+                -0.9577312,
+                -0.41307563,
+                -0.44581693,
+                0.29796726,
+                0.7496709,
+                1.0882877,
+                1.2875234,
+                1.8512405,
+                1.1104535,
+                0.23242366,
+                1.4878128,
+                0.8031703,
+                -2.1186066,
+                -1.6040361,
+                -0.6668861,
+                0.58022684,
+                2.0720365,
+                -0.047600698,
+                0.7756413,
+                -1.160208,
+                -0.7191107,
+                -0.36372992,
+                0.092443414,
+                0.6003906,
+            ];
+            let params2 = Board::PARAMS;
+            play_match_between_params(params1, params2);
+        }
         s => println!("Unknown option \"{}\"", s),
     }
 }
@@ -116,10 +159,7 @@ fn test_position() {
     let mut board = Board::default();
     let mut moves = vec![];
 
-    let move_strings: &[&str] = &[
-        "e1", "a1", "Cc3", "e2", "b3", "d4", "d3", "Ce3", "d3+", "e4", "e5", "d5", "2d4+", "d4",
-        "c5", "d4+", "c5>", "Sc5", "5d5-", "e4<",
-    ];
+    let move_strings: &[&str] = &[];
 
     for mv_san in move_strings.iter() {
         let mv = board.move_from_san(&mv_san).unwrap();

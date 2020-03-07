@@ -3,7 +3,9 @@ use crate::mcts;
 use crate::tune::pgn_parse;
 use crate::tune::pgn_parse::Game;
 use board_game_traits::board::{Board as BoardTrait, Color, GameResult};
+use rayon::prelude::*;
 use std::io;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 pub fn play_game(params: &[f32]) -> Game<Board> {
     const MCTS_NODES: u64 = 20_000;
@@ -38,14 +40,14 @@ pub fn play_game(params: &[f32]) -> Game<Board> {
 }
 
 pub fn play_match_between_params(params1: &[f32], params2: &[f32]) -> ! {
-    const NODES: u64 = 50_000;
+    const NODES: u64 = 100_000;
     const TEMPERATURE: f64 = 0.5;
 
-    let mut player1_wins = 0;
-    let mut player2_wins = 0;
-    let mut draws = 0;
-    let mut aborted = 0;
-    loop {
+    let player1_wins = AtomicU64::new(0);
+    let player2_wins = AtomicU64::new(0);
+    let draws = AtomicU64::new(0);
+    let aborted = AtomicU64::new(0);
+    rayon::iter::repeat(()).for_each(|_| {
         let mut board = Board::start_board();
 
         while board.game_result().is_none() {
@@ -60,11 +62,11 @@ pub fn play_match_between_params(params1: &[f32], params2: &[f32]) -> ! {
         }
 
         match board.game_result() {
-            None => aborted += 1,
-            Some(GameResult::WhiteWin) => player1_wins += 1,
-            Some(GameResult::BlackWin) => player2_wins += 1,
-            Some(GameResult::Draw) => draws += 1,
-        }
+            None => aborted.fetch_add(1, Ordering::Relaxed),
+            Some(GameResult::WhiteWin) => player1_wins.fetch_add(1, Ordering::Relaxed),
+            Some(GameResult::BlackWin) => player2_wins.fetch_add(1, Ordering::Relaxed),
+            Some(GameResult::Draw) => draws.fetch_add(1, Ordering::Relaxed),
+        };
 
         board = Board::start_board();
 
@@ -80,21 +82,27 @@ pub fn play_match_between_params(params1: &[f32], params2: &[f32]) -> ! {
         }
 
         match board.game_result() {
-            None => aborted += 1,
-            Some(GameResult::WhiteWin) => player2_wins += 1,
-            Some(GameResult::BlackWin) => player1_wins += 1,
-            Some(GameResult::Draw) => draws += 1,
-        }
-        let decided_games = player1_wins + player2_wins + draws;
+            None => aborted.fetch_add(1, Ordering::Relaxed),
+            Some(GameResult::WhiteWin) => player2_wins.fetch_add(1, Ordering::Relaxed),
+            Some(GameResult::BlackWin) => player1_wins.fetch_add(1, Ordering::Relaxed),
+            Some(GameResult::Draw) => draws.fetch_add(1, Ordering::Relaxed),
+        };
+        let decided_games = player1_wins.load(Ordering::SeqCst)
+            + player2_wins.load(Ordering::SeqCst)
+            + draws.load(Ordering::SeqCst);
         println!(
             "+{}-{}={}, {:.1}% score. {} games aborted.",
-            player1_wins,
-            player2_wins,
-            draws,
-            100.0 * (player1_wins as f64 + draws as f64 / 2.0) / decided_games as f64,
-            aborted
+            player1_wins.load(Ordering::SeqCst),
+            player2_wins.load(Ordering::SeqCst),
+            draws.load(Ordering::SeqCst),
+            100.0
+                * (player1_wins.load(Ordering::SeqCst) as f64
+                    + draws.load(Ordering::SeqCst) as f64 / 2.0)
+                / decided_games as f64,
+            aborted.load(Ordering::SeqCst)
         );
-    }
+    });
+    unreachable!()
 }
 
 pub fn game_to_pgn<W: io::Write>(game: &Game<Board>, writer: &mut W) -> Result<(), io::Error> {
