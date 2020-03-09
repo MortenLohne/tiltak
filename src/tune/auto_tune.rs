@@ -54,17 +54,17 @@ where
             .zip(slopes)
             .map(|(gradient, slope)| beta * gradient + (1.0 - beta) * slope)
             .collect();
-        println!("Gradients: {:?}", gradients);
+        trace!("Gradients: {:?}", gradients);
 
         let new_params: Vec<f32> = last_params
             .iter()
             .zip(gradients.iter())
             .map(|(param, gradient)| param + gradient * eta)
             .collect();
-        println!("New parameters: {:?}", new_params);
+        trace!("New parameters: {:?}", new_params);
 
         let error = average_error(test_positions, test_results, &new_params);
-        println!("Error now {}\n", error);
+        trace!("Error now {}\n", error);
 
         if error < lowest_error {
             lowest_error = error;
@@ -72,7 +72,7 @@ where
             best_iteration = i;
         } else if i - best_iteration > MAX_TRIES {
             if eta < 0.005 {
-                println!(
+                trace!(
                     "Finished gradient descent, error is {}. Parameters:\n{:?}",
                     lowest_error, best_params
                 );
@@ -82,7 +82,7 @@ where
                 paramss = vec![best_params.clone()];
                 errors = vec![lowest_error];
                 best_iteration = i;
-                println!("Reduced eta to {}, best error was {}\n", eta, lowest_error);
+                trace!("Reduced eta to {}, best error was {}\n", eta, lowest_error);
                 continue;
             }
         }
