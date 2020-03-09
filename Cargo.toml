@@ -1,6 +1,6 @@
 [package]
 name = "taik"
-version = "0.0.1"
+version = "0.1.0"
 authors = ["Morten Lohne <lohnemorten@gmail.com>"]
 edition = "2018"
 repository = "https://github.com/MortenLohne/taik/"
