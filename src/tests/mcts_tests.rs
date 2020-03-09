@@ -1,7 +1,7 @@
 use crate::board::Board;
 use crate::mcts;
 use crate::tests::do_moves_and_check_validity;
-use crate::tune::auto_tune::TunableBoard;
+use crate::tune::gradient_descent::TunableBoard;
 use board_game_traits::board::Board as BoardTrait;
 use pgn_traits::pgn::PgnBoard;
 

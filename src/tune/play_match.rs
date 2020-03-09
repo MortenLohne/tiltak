@@ -7,6 +7,7 @@ use rayon::prelude::*;
 use std::io;
 use std::sync::atomic::{AtomicU64, Ordering};
 
+/// Play a single training game between the same parameter set
 pub fn play_game(params: &[f32]) -> Game<Board> {
     const MCTS_NODES: u64 = 20_000;
     const TEMPERATURE: f64 = 1.0;
@@ -39,6 +40,9 @@ pub fn play_game(params: &[f32]) -> Game<Board> {
     }
 }
 
+/// Play an infinite match between two parameter sets
+/// Prints the match score continuously
+/// In each iteration, each side plays one white and one black game
 pub fn play_match_between_params(params1: &[f32], params2: &[f32]) -> ! {
     const NODES: u64 = 100_000;
     const TEMPERATURE: f64 = 0.5;
@@ -105,7 +109,8 @@ pub fn play_match_between_params(params1: &[f32], params2: &[f32]) -> ! {
     unreachable!()
 }
 
-pub fn game_to_pgn<W: io::Write>(game: &Game<Board>, writer: &mut W) -> Result<(), io::Error> {
+/// Write a single game in ptn format with the given writer
+pub fn game_to_ptn<W: io::Write>(game: &Game<Board>, writer: &mut W) -> Result<(), io::Error> {
     let Game {
         start_board,
         moves,

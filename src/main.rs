@@ -20,7 +20,7 @@ mod tune;
 use std::{fs, io};
 
 use crate::tests::do_moves_and_check_validity;
-use crate::tune::auto_tune::TunableBoard;
+use crate::tune::gradient_descent::TunableBoard;
 use crate::tune::pgn_parse::Game;
 use crate::tune::play_match::play_match_between_params;
 use crate::tune::training::train_from_scratch;

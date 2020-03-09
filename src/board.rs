@@ -6,7 +6,7 @@ use crate::board::Piece::*;
 use crate::board::Role::Flat;
 use crate::board::Role::*;
 use crate::mcts;
-use crate::tune::auto_tune::TunableBoard;
+use crate::tune::gradient_descent::TunableBoard;
 use arrayvec::ArrayVec;
 use board_game_traits::board;
 use board_game_traits::board::GameResult::{BlackWin, Draw, WhiteWin};

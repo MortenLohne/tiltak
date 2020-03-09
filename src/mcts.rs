@@ -1,5 +1,5 @@
 use crate::board::{Board, Move};
-use crate::tune::auto_tune::TunableBoard;
+use crate::tune::gradient_descent::TunableBoard;
 use board_game_traits::board::{Board as BoardTrait, Color, GameResult};
 use rand::Rng;
 

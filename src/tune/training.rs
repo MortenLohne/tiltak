@@ -1,8 +1,8 @@
 use crate::board::Board;
-use crate::tune::auto_tune::TunableBoard;
+use crate::tune::gradient_descent::TunableBoard;
 use crate::tune::pgn_parse::Game;
 use crate::tune::play_match::play_game;
-use crate::tune::{auto_tune, pgn_parse, play_match};
+use crate::tune::{gradient_descent, pgn_parse, play_match};
 use board_game_traits::board::Board as BoardTrait;
 use board_game_traits::board::GameResult;
 use rand::prelude::*;
@@ -41,7 +41,7 @@ pub fn train_from_scratch(training_id: usize) -> Result<(), Box<dyn error::Error
         let mut writer = io::BufWriter::new(outfile);
 
         for game in games.iter() {
-            play_match::game_to_pgn(game, &mut writer)?;
+            play_match::game_to_ptn(game, &mut writer)?;
         }
 
         let game_stats = GameStats::from_games(&games);
@@ -62,7 +62,7 @@ pub fn train_from_scratch(training_id: usize) -> Result<(), Box<dyn error::Error
         let (positions, results) = positions_and_results_from_games(training_games);
         let middle_index = positions.len() / 2;
 
-        params = auto_tune::gradient_descent(
+        params = gradient_descent::gradient_descent(
             &positions[0..middle_index],
             &results[0..middle_index],
             &positions[middle_index..],
@@ -112,7 +112,7 @@ pub fn tune_from_file() -> Result<(), Box<dyn error::Error>> {
 
     println!(
         "Final parameters: {:?}",
-        auto_tune::gradient_descent(
+        gradient_descent::gradient_descent(
             &positions[0..middle_index],
             &results[0..middle_index],
             &positions[middle_index..],
