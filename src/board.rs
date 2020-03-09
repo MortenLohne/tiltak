@@ -1,3 +1,5 @@
+//! Tak move generation, along with all required data types.
+
 /// The size of the board. Only 5 works correctly for now.
 pub const BOARD_SIZE: usize = 5;
 

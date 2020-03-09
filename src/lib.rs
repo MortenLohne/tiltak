@@ -9,3 +9,5 @@ pub mod mcts;
 pub mod minmax;
 mod move_gen;
 mod tests;
+
+pub use mcts::mcts;

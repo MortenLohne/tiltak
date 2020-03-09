@@ -1,11 +1,17 @@
+//! A strong Tak AI, based on Monte Carlo Tree Search.
+//!
+//! This implementation does not use full Monte Carlo rollouts, relying on a heuristic evaluation when expanding new nodes instead.
+
 use crate::board::{Board, Move, TunableBoard};
 use board_game_traits::board::{Board as BoardTrait, Color, GameResult};
 use rand::Rng;
 
 const C_PUCT: Score = 3.0;
 
+/// Type alias for winning probability, used for scoring positions.
 pub type Score = f32;
 
+/// A Monte Carlo Search Tree, containing every node that has been seen in search.
 #[derive(Clone, PartialEq, Debug)]
 pub struct Tree {
     pub children: Vec<(Tree, Move)>,
@@ -18,8 +24,7 @@ pub struct Tree {
 
 // TODO: Winning percentage should be always be interpreted from the side to move's perspective
 
-/// The module's main function. Run Monte Carlo Tree Search for `nodes` nodes.
-/// Returns the best move, and its estimated winning probability for the side to move.
+/// The simplest way to use the mcts module. Run Monte Carlo Tree Search for `nodes` nodes, returning the best move, and its estimated winning probability for the side to move.
 pub fn mcts(board: Board, nodes: u64) -> (Move, Score) {
     let mut tree = Tree::new_root();
     let mut moves = vec![];
@@ -78,6 +83,7 @@ impl Tree {
         }
     }
 
+    /// Print human-readable information of the search's progress.
     pub fn print_info(&self) {
         let mut best_children: Vec<(Tree, Move)> = self.shallow_clone(3).children;
         best_children.sort_by_key(|(child, _)| child.visits);
@@ -124,6 +130,9 @@ impl Tree {
         }
     }
 
+    /// Perform one iteration of monte carlo tree search.
+    ///
+    /// Moves done on the board are not reversed.
     pub fn select(
         &mut self,
         board: &mut Board,
@@ -226,6 +235,7 @@ impl Tree {
     }
 }
 
+/// Convert a static evaluation in centipawns to a winning probability between 0.0 and 1.0.
 pub fn cp_to_win_percentage(cp: f32) -> Score {
     1.0 / (1.0 + Score::powf(10.0, -cp as Score / 3.0))
 }
