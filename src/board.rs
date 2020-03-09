@@ -12,9 +12,7 @@ use board_game_traits::board::GameResult::{BlackWin, Draw, WhiteWin};
 use board_game_traits::board::{Board as BoardTrait, EvalBoard as EvalBoardTrait};
 use board_game_traits::board::{Color, GameResult};
 use pgn_traits::pgn;
-use smallvec::alloc::fmt::{Error, Formatter};
 use std::cmp::Ordering;
-use std::fmt::Debug;
 use std::fmt::Write;
 use std::iter::FromIterator;
 use std::ops::{Index, IndexMut};
@@ -224,7 +222,7 @@ impl Square {
 }
 
 impl fmt::Display for Square {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
         write!(f, "{}", (self.file() + b'a') as char)?;
         write!(f, "{}", BOARD_SIZE as u8 - self.rank())?;
         Ok(())
@@ -232,7 +230,7 @@ impl fmt::Display for Square {
 }
 
 impl fmt::Debug for Square {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
         write!(f, "{}", self)
     }
 }
@@ -412,7 +410,7 @@ pub enum Move {
 }
 
 impl fmt::Display for Move {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
         match self {
             Move::Place(piece, square) => match piece {
                 WhiteCap | BlackCap => write!(f, "C{}", square)?,
@@ -448,7 +446,7 @@ impl fmt::Display for Move {
 }
 
 impl fmt::Debug for Move {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
         write!(f, "{}", self)
     }
 }
@@ -544,8 +542,8 @@ impl Default for Board {
     }
 }
 
-impl Debug for Board {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
+impl fmt::Debug for Board {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
         for y in 0..BOARD_SIZE {
             for print_row in 0..3 {
                 for x in 0..BOARD_SIZE {

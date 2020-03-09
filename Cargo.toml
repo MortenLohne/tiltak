@@ -16,7 +16,6 @@ constant-tuning = ["rayon", "log", "nom"]
 [dependencies]
 board-game-traits = "0.1"
 pgn-traits = "0.1"
-smallvec = "1.2"
 rand = "0.7"
 arrayvec = "0.5.1"
 rayon = { version = "1.3.*", optional = true }

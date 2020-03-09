@@ -1,9 +1,7 @@
+extern crate arrayvec;
 extern crate board_game_traits;
 extern crate pgn_traits;
 extern crate rand;
-#[macro_use]
-extern crate smallvec;
-extern crate arrayvec;
 
 mod bitboard;
 pub mod board;
