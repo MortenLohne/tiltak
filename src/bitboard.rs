@@ -74,26 +74,45 @@ impl BitBoard {
 
     #[inline]
     pub fn get(self, i: u8) -> bool {
-        debug_assert!(i < BOARD_SIZE as u8 * BOARD_SIZE as u8);
+        debug_assert!(i < 64);
         self.board & (1 << i) != 0
     }
     // Sets the square to true
     #[inline]
     pub fn set(self, i: u8) -> Self {
-        debug_assert!(i < BOARD_SIZE as u8 * BOARD_SIZE as u8);
+        debug_assert!(i < 64);
         BitBoard::from_u64(self.board | 1 << i)
     }
 
     // Sets the square to false
     #[inline]
     pub fn clear(self, i: u8) -> Self {
-        debug_assert!(i < BOARD_SIZE as u8 * BOARD_SIZE as u8);
+        debug_assert!(i < 64);
         BitBoard::from_u64(self.board & !(1 << i))
     }
 
     #[inline]
-    pub const fn popcount(self) -> u32 {
-        self.board.count_ones()
+    pub fn rank(self, i: u8) -> Self {
+        debug_assert!(i < BOARD_SIZE as u8);
+        const MASK: u64 = 0b11111;
+        BitBoard::from_u64(self.board & (MASK << (i as u64 * BOARD_SIZE as u64)))
+    }
+
+    #[inline]
+    pub fn file(self, i: u8) -> Self {
+        debug_assert!(i < BOARD_SIZE as u8);
+        const MASK: u64 = 0b1_00001_00001_00001_00001; // TODO: Change for 6x6
+        BitBoard::from_u64(self.board & (MASK << i as u64))
+    }
+
+    #[inline]
+    pub fn is_empty(self) -> bool {
+        self.board == 0
+    }
+
+    #[inline]
+    pub fn count(self) -> u8 {
+        self.board.count_ones() as u8
     }
 }
 

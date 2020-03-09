@@ -6,6 +6,7 @@ use crate::board::Piece::*;
 use crate::board::Role::Flat;
 use crate::board::Role::*;
 use crate::mcts;
+use crate::tune::gradient_descent::TunableBoard;
 use arrayvec::ArrayVec;
 use board_game_traits::board;
 use board_game_traits::board::GameResult::{BlackWin, Draw, WhiteWin};
@@ -16,8 +17,9 @@ use smallvec::alloc::fmt::{Error, Formatter};
 use std::cmp::Ordering;
 use std::fmt::Debug;
 use std::fmt::Write;
+use std::iter::FromIterator;
 use std::ops::{Index, IndexMut};
-use std::{fmt, ops};
+use std::{fmt, iter, ops};
 
 pub trait ColorTr {
     fn color() -> Color;
@@ -414,7 +416,11 @@ impl fmt::Display for Move {
             },
             Move::Move(square, direction, stack_movements) => {
                 let mut pieces_held = stack_movements.movements[0].pieces_to_take;
-                write!(f, "{}{}", pieces_held, square).unwrap();
+                if pieces_held == 1 {
+                    write!(f, "{}", square)?;
+                } else {
+                    write!(f, "{}{}", pieces_held, square)?;
+                }
                 match direction {
                     North => f.write_char('+')?,
                     West => f.write_char('<')?,
@@ -425,10 +431,10 @@ impl fmt::Display for Move {
                 if stack_movements.movements.len() > 1 {
                     for movement in stack_movements.movements.iter().skip(1) {
                         let pieces_to_drop = pieces_held - movement.pieces_to_take;
-                        write!(f, "{}", pieces_to_drop).unwrap();
+                        write!(f, "{}", pieces_to_drop)?;
                         pieces_held -= pieces_to_drop;
                     }
-                    write!(f, "{}", pieces_held).unwrap();
+                    write!(f, "{}", pieces_held)?;
                 }
             }
         }
@@ -498,6 +504,8 @@ pub struct Board {
     black_stones_left: u8,
     white_capstones_left: u8,
     black_capstones_left: u8,
+    moves_played: u8,
+    moves: Vec<Move>,
 }
 
 impl Index<Square> for Board {
@@ -525,6 +533,8 @@ impl Default for Board {
             black_stones_left: 21,
             white_capstones_left: 1,
             black_capstones_left: 1,
+            moves_played: 0,
+            moves: vec![],
         }
     }
 }
@@ -560,7 +570,7 @@ impl Debug for Board {
             "Capstones left: {}/{}.",
             self.white_capstones_left, self.black_capstones_left
         )?;
-        writeln!(f, "{} to move.", self.to_move)?;
+        writeln!(f, "{} to move.", self.side_to_move())?;
         writeln!(f, "White road stones: {:b}", self.white_road_pieces.board)?;
         writeln!(f, "Black road stones: {:b}", self.black_road_pieces.board)?;
         Ok(())
@@ -568,6 +578,22 @@ impl Debug for Board {
 }
 
 impl Board {
+    pub fn white_road_pieces(&self) -> BitBoard {
+        self.white_road_pieces
+    }
+
+    pub fn black_road_pieces(&self) -> BitBoard {
+        self.black_road_pieces
+    }
+
+    pub fn moves_played(&self) -> u8 {
+        self.moves_played
+    }
+
+    pub fn moves(&self) -> &Vec<Move> {
+        &self.moves
+    }
+
     #[cfg(test)]
     pub fn flip_board_y(&self) -> Board {
         let mut new_board = self.clone();
@@ -617,8 +643,12 @@ impl Board {
     ) {
         debug_assert!(simple_moves.is_empty());
         self.generate_moves(simple_moves);
-        let average = 1.0 / simple_moves.len() as mcts::Score;
-        moves.extend(simple_moves.drain(..).map(|mv| (mv, average)));
+        match self.side_to_move() {
+            Color::White => self
+                .generate_moves_with_probabilities_colortr::<WhiteTr, BlackTr>(simple_moves, moves),
+            Color::Black => self
+                .generate_moves_with_probabilities_colortr::<BlackTr, WhiteTr>(simple_moves, moves),
+        }
     }
 
     pub fn count_all_stones(&self) -> u8 {
@@ -683,6 +713,15 @@ impl board::Board for Board {
         self.to_move
     }
 
+    /// Adds all legal moves to the provided vector.
+    /// Suicide moves are considered illegal moves and are not generated.
+    /// This includes moves that complete a road for the opponent without creating an own road,
+    /// and moves that place your last piece on the board when that would result in an immediate loss.
+    ///
+    /// All pieces (including capstones) must be placed for the game to end.
+    /// Capstones are not counted towards a flat win, if the game ended due to the board being filled.
+    ///
+    /// TODO: Suicide moves are allowed if it fills the board, both place and move moves
     fn generate_moves(&self, moves: &mut Vec<Self::Move>) {
         debug_assert!(
             self.game_result().is_none(),
@@ -690,37 +729,47 @@ impl board::Board for Board {
             self.game_result(),
             self
         );
-        match self.side_to_move() {
-            Color::White => self.generate_moves_colortr::<WhiteTr, BlackTr>(moves),
-            Color::Black => self.generate_moves_colortr::<BlackTr, WhiteTr>(moves),
+
+        match self.moves_played {
+            0 => {
+                for square in board_iterator() {
+                    moves.push(Move::Place(BlackFlat, square));
+                }
+            }
+
+            1 => {
+                for square in board_iterator() {
+                    if self[square].is_empty() {
+                        moves.push(Move::Place(WhiteFlat, square));
+                    }
+                }
+            }
+            _ => match self.side_to_move() {
+                Color::White => self.generate_moves_colortr::<WhiteTr, BlackTr>(moves),
+                Color::Black => self.generate_moves_colortr::<BlackTr, WhiteTr>(moves),
+            },
         }
     }
 
     fn do_move(&mut self, mv: Self::Move) -> Self::ReverseMove {
-        let reverse_move = match mv {
+        let reverse_move = match mv.clone() {
             Move::Place(piece, to) => {
                 debug_assert!(self[to].is_empty());
                 self[to].push(piece);
                 if piece.role() != Standing {
-                    match self.side_to_move() {
+                    match piece.color() {
                         Color::White => self.white_road_pieces = self.white_road_pieces.set(to.0),
                         Color::Black => self.black_road_pieces = self.black_road_pieces.set(to.0),
                     };
                 }
 
-                match (self.side_to_move(), piece) {
-                    (Color::White, WhiteFlat) => self.white_stones_left -= 1,
-                    (Color::White, WhiteStanding) => self.white_stones_left -= 1,
-                    (Color::White, WhiteCap) => self.white_capstones_left -= 1,
-                    (Color::Black, BlackFlat) => self.black_stones_left -= 1,
-                    (Color::Black, BlackStanding) => self.black_stones_left -= 1,
-                    (Color::Black, BlackCap) => self.black_capstones_left -= 1,
-                    _ => unreachable!(
-                        "Tried to place {} stone on {}'s move\n{:?}",
-                        piece.color(),
-                        self.side_to_move(),
-                        self
-                    ),
+                match piece {
+                    WhiteFlat => self.white_stones_left -= 1,
+                    WhiteStanding => self.white_stones_left -= 1,
+                    WhiteCap => self.white_capstones_left -= 1,
+                    BlackFlat => self.black_stones_left -= 1,
+                    BlackStanding => self.black_stones_left -= 1,
+                    BlackCap => self.black_capstones_left -= 1,
                 }
                 ReverseMove::Place(to)
             }
@@ -784,7 +833,9 @@ impl board::Board for Board {
             self.black_road_pieces_from_scratch()
         );
 
+        self.moves.push(mv);
         self.to_move = !self.to_move;
+        self.moves_played += 1;
         reverse_move
     }
 
@@ -792,7 +843,7 @@ impl board::Board for Board {
         match reverse_move {
             ReverseMove::Place(square) => {
                 let piece = self[square].pop().unwrap();
-                debug_assert_eq!(piece.color(), !self.side_to_move());
+                debug_assert!(piece.color() != self.side_to_move() || self.moves_played < 3);
 
                 self.white_road_pieces = self.white_road_pieces.clear(square.0);
                 self.black_road_pieces = self.black_road_pieces.clear(square.0);
@@ -838,6 +889,8 @@ impl board::Board for Board {
             self.black_road_pieces,
             self.black_road_pieces_from_scratch()
         );
+        self.moves.pop();
+        self.moves_played -= 1;
         self.to_move = !self.to_move;
     }
 
@@ -861,14 +914,15 @@ impl board::Board for Board {
 
         if (self.white_stones_left == 0 && self.white_capstones_left == 0)
             || (self.black_stones_left == 0 && self.black_capstones_left == 0)
+            || board_iterator().all(|square| !self[square].is_empty())
         {
             // Count points
             let mut white_points = 0;
             let mut black_points = 0;
             for square in board_iterator() {
                 match self[square].top_stone() {
-                    Some(WhiteFlat) | Some(WhiteCap) => white_points += 1,
-                    Some(BlackFlat) | Some(BlackCap) => black_points += 1,
+                    Some(WhiteFlat) => white_points += 1,
+                    Some(BlackFlat) => black_points += 1,
                     _ => (),
                 }
             }
@@ -876,6 +930,64 @@ impl board::Board for Board {
                 Ordering::Greater => Some(WhiteWin),
                 Ordering::Less => Some(BlackWin),
                 Ordering::Equal => Some(Draw),
+            }
+        // If the only legal move is to suicidally place our capstone, we lose
+        } else if (self.side_to_move() == Color::White
+            && self.white_stones_left == 0
+            && self.white_capstones_left == 1)
+            || (self.side_to_move() == Color::Black
+                && self.black_stones_left == 0
+                && self.black_capstones_left == 1)
+        {
+            // Count points
+            let mut white_points = 0;
+            let mut black_points = 0;
+            for square in board_iterator() {
+                match self[square].top_stone() {
+                    Some(WhiteFlat) => white_points += 1,
+                    Some(BlackFlat) => black_points += 1,
+                    _ => (),
+                }
+            }
+            match self.side_to_move() {
+                Color::White => {
+                    if black_points > white_points {
+                        for square in board_iterator() {
+                            if let Some(piece) = self[square].top_stone() {
+                                if piece.color() == Color::White
+                                    && square
+                                        .neighbours()
+                                        .filter_map(|sq| self[sq].top_stone())
+                                        .any(|piece| piece.role() == Flat)
+                                {
+                                    return None;
+                                }
+                            }
+                        }
+                        Some(BlackWin)
+                    } else {
+                        None
+                    }
+                }
+                Color::Black => {
+                    if white_points > black_points {
+                        for square in board_iterator() {
+                            if let Some(piece) = self[square].top_stone() {
+                                if piece.color() == Color::Black
+                                    && square
+                                        .neighbours()
+                                        .filter_map(|sq| self[sq].top_stone())
+                                        .any(|piece| piece.role() == Flat)
+                                {
+                                    return None;
+                                }
+                            }
+                        }
+                        Some(WhiteWin)
+                    } else {
+                        None
+                    }
+                }
             }
         } else {
             None
@@ -885,31 +997,84 @@ impl board::Board for Board {
 
 impl EvalBoardTrait for Board {
     fn static_eval(&self) -> f32 {
-        let material = (self.white_road_pieces.popcount() as i64
-            - self.black_road_pieces.popcount() as i64
-            + self.white_capstones_left as i64
-            - self.black_capstones_left as i64) as f32;
+        self.static_eval_with_params(Self::PARAMS)
+    }
+}
 
-        let to_move = match self.side_to_move() {
-            Color::White => 0.5,
-            Color::Black => -0.5,
-        };
+const SQUARE_SYMMETRIES: [usize; 25] = [
+    0, 1, 2, 1, 0, 1, 3, 4, 3, 1, 2, 4, 5, 4, 2, 1, 3, 4, 3, 1, 0, 1, 2, 1, 0,
+];
 
-        let mut centre = 0.0;
-        for x in 1..4 {
-            for y in 1..4 {
-                match self.cells.raw[y][x].top_stone().map(Piece::color) {
-                    Some(Color::White) => centre += 0.2,
-                    Some(Color::Black) => centre -= 0.2,
-                    None => (),
+impl TunableBoard for Board {
+    #[allow(clippy::unreadable_literal)]
+    const PARAMS: &'static [f32] = &[
+        0.11546037,
+        0.38993832,
+        0.3594647,
+        0.55473673,
+        0.574743,
+        0.54728144,
+        0.8826678,
+        1.2646897,
+        1.1345893,
+        1.4539466,
+        1.5107378,
+        0.7540873,
+        -0.9577312,
+        -0.41307563,
+        -0.44581693,
+        0.29796726,
+        0.7496709,
+        1.0882877,
+        1.2875234,
+        1.8512405,
+        1.1104535,
+        0.23242366,
+        1.4878128,
+        0.8031703,
+        -2.1186066,
+        -1.6040361,
+        -0.6668861,
+        0.58022684,
+        2.0720365,
+        -0.047600698,
+        0.7756413,
+        -1.160208,
+        -0.7191107,
+        -0.36372992,
+        0.092443414,
+        0.6003906,
+    ];
+    fn static_eval_with_params(&self, params: &[f32]) -> f32 {
+        debug_assert!(self.game_result().is_none());
+
+        const FLAT_PSQT: usize = 0;
+        const STAND_PSQT: usize = FLAT_PSQT + 6;
+        const CAP_PSQT: usize = STAND_PSQT + 6;
+
+        let mut material_psqt = 0.0;
+        for square in board_iterator() {
+            if let Some(piece) = self[square].top_stone() {
+                let i = square.0 as usize;
+                material_psqt += match piece {
+                    WhiteFlat => params[FLAT_PSQT + SQUARE_SYMMETRIES[i]],
+                    BlackFlat => params[FLAT_PSQT + SQUARE_SYMMETRIES[i]] * -1.0,
+                    WhiteStanding => params[STAND_PSQT + SQUARE_SYMMETRIES[i]],
+                    BlackStanding => params[STAND_PSQT + SQUARE_SYMMETRIES[i]] * -1.0,
+                    WhiteCap => params[CAP_PSQT + SQUARE_SYMMETRIES[i]],
+                    BlackCap => params[CAP_PSQT + SQUARE_SYMMETRIES[i]] * -1.0,
                 }
             }
         }
-        match self.cells.raw[2][2].top_stone().map(Piece::color) {
-            Some(Color::White) => centre += 0.1,
-            Some(Color::Black) => centre -= 0.1,
-            None => (),
-        }
+
+        const TO_MOVE: usize = CAP_PSQT + 6;
+
+        let to_move = match self.side_to_move() {
+            Color::White => params[TO_MOVE],
+            Color::Black => -params[TO_MOVE],
+        };
+
+        const STACK: usize = TO_MOVE + 1;
 
         let stacks: f32 = board_iterator()
             .map(|sq| &self[sq])
@@ -923,9 +1088,9 @@ impl EvalBoardTrait for Board {
                     .take(stack.len() as usize - 1)
                     .map(|piece| {
                         if piece.color() == controlling_player {
-                            0.8
+                            params[STACK]
                         } else {
-                            -0.4
+                            -params[STACK + 1]
                         }
                     })
                     .sum::<f32>();
@@ -934,21 +1099,61 @@ impl EvalBoardTrait for Board {
                 if top_stone.role() == Cap
                     && stack.get(stack.len() - 2).unwrap().color() == controlling_player
                 {
-                    val += 0.5;
+                    val += params[STACK + 2];
                 }
 
-                match top_stone {
-                    WhiteCap => val * 2.0,
-                    BlackCap => val * -2.0,
-                    WhiteFlat => val,
-                    BlackFlat => val * -1.0,
-                    WhiteStanding => val * 1.5,
-                    BlackStanding => val * -1.5,
+                match top_stone.role() {
+                    Cap => val += params[STACK + 3],
+                    Flat => (),
+                    Standing => val += params[STACK + 4],
+                }
+
+                match top_stone.color() {
+                    Color::White => val,
+                    Color::Black => val * -1.0,
                 }
             })
             .sum();
 
-        material + to_move + centre + stacks
+        // Number of pieces in each rank/file
+        const RANK_FILE_CONTROL: usize = STACK + 5;
+        // Number of ranks/files with at least one road stone
+        const NUM_RANKS_FILES_OCCUPIED: usize = RANK_FILE_CONTROL + 6;
+
+        let mut num_ranks_occupied_white = 0;
+        let mut num_files_occupied_white = 0;
+        let mut num_ranks_occupied_black = 0;
+        let mut num_files_occupied_black = 0;
+        let mut pieces_in_rank_file_score = 0.0;
+
+        for rank in (0..BOARD_SIZE as u8).map(|i| self.white_road_pieces().rank(i)) {
+            num_ranks_occupied_white += if rank.is_empty() { 0 } else { 1 };
+            pieces_in_rank_file_score += params[RANK_FILE_CONTROL + rank.count() as usize] as f32;
+        }
+
+        for file in (0..BOARD_SIZE as u8).map(|i| self.white_road_pieces().file(i)) {
+            num_files_occupied_white += if file.is_empty() { 0 } else { 1 };
+            pieces_in_rank_file_score += params[RANK_FILE_CONTROL + file.count() as usize] as f32;
+        }
+
+        for rank in (0..BOARD_SIZE as u8).map(|i| self.black_road_pieces().rank(i)) {
+            num_ranks_occupied_black += if rank.is_empty() { 0 } else { 1 };
+            pieces_in_rank_file_score -= params[RANK_FILE_CONTROL + rank.count() as usize] as f32;
+        }
+
+        for file in (0..BOARD_SIZE as u8).map(|i| self.black_road_pieces().file(i)) {
+            num_files_occupied_black += if file.is_empty() { 0 } else { 1 };
+            pieces_in_rank_file_score -= params[RANK_FILE_CONTROL + file.count() as usize] as f32;
+        }
+
+        let num_ranks_occupied_score = params[NUM_RANKS_FILES_OCCUPIED + num_ranks_occupied_white]
+            + params[NUM_RANKS_FILES_OCCUPIED + num_files_occupied_white]
+            - params[NUM_RANKS_FILES_OCCUPIED + num_ranks_occupied_black]
+            - params[NUM_RANKS_FILES_OCCUPIED + num_files_occupied_black];
+
+        const _NEXT_CONST: usize = NUM_RANKS_FILES_OCCUPIED + 6;
+
+        material_psqt + to_move + stacks + pieces_in_rank_file_score + num_ranks_occupied_score
     }
 }
 
@@ -958,7 +1163,22 @@ impl pgn_traits::pgn::PgnBoard for Board {
     }
 
     fn to_fen(&self) -> String {
-        unimplemented!()
+        let mut f = String::new();
+        board_iterator()
+            .map(|square| self[square].clone())
+            .for_each(|stack: Stack| {
+                (match stack.top_stone() {
+                    None => write!(f, "-"),
+                    Some(WhiteFlat) => write!(f, "w"),
+                    Some(WhiteStanding) => write!(f, "W"),
+                    Some(WhiteCap) => write!(f, "C"),
+                    Some(BlackFlat) => write!(f, "b"),
+                    Some(BlackStanding) => write!(f, "B"),
+                    Some(BlackCap) => write!(f, "c"),
+                })
+                .unwrap()
+            });
+        f
     }
 
     fn move_from_san(&self, input: &str) -> Result<Self::Move, pgn::Error> {
@@ -976,10 +1196,25 @@ impl pgn_traits::pgn::PgnBoard for Board {
         }
         let first_char = input.chars().next().unwrap();
         match first_char {
-            'a'..='e' if input.len() == 2 => match self.side_to_move() {
-                Color::White => Ok(Move::Place(WhiteFlat, Square::parse_square(input))),
-                Color::Black => Ok(Move::Place(BlackFlat, Square::parse_square(input))),
-            },
+            'a'..='e' if input.len() == 2 => {
+                let square = Square::parse_square(input);
+                let side = if self.moves_played < 2 {
+                    !self.side_to_move()
+                } else {
+                    self.side_to_move()
+                };
+                match side {
+                    Color::White => Ok(Move::Place(WhiteFlat, square)),
+                    Color::Black => Ok(Move::Place(BlackFlat, square)),
+                }
+            }
+            'a'..='e' if input.len() == 3 => {
+                let square = Square::parse_square(&input[0..2]);
+                let direction = Direction::parse(input.chars().nth(2).unwrap());
+                // Moves in the simplified move notation always move one piece
+                let movements = ArrayVec::from_iter(iter::once(Movement { pieces_to_take: 1 }));
+                Ok(Move::Move(square, direction, StackMovement { movements }))
+            }
             'C' if input.len() == 3 => match self.side_to_move() {
                 Color::White => Ok(Move::Place(WhiteCap, Square::parse_square(&input[1..]))),
                 Color::Black => Ok(Move::Place(BlackCap, Square::parse_square(&input[1..]))),
@@ -1022,7 +1257,12 @@ impl pgn_traits::pgn::PgnBoard for Board {
             }
             _ => Err(pgn::Error::new(
                 pgn::ErrorKind::ParseError,
-                format!("Couldn't parse {}", input),
+                format!(
+                    "Couldn't parse move \"{}\". Moves cannot start with {} and have length {}.",
+                    input,
+                    first_char,
+                    input.len()
+                ),
             )),
         }
     }

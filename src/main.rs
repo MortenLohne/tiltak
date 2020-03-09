@@ -4,6 +4,10 @@ extern crate rand;
 #[macro_use]
 extern crate smallvec;
 extern crate arrayvec;
+#[macro_use]
+extern crate nom;
+#[macro_use]
+extern crate log;
 
 mod bitboard;
 mod board;
@@ -11,18 +15,24 @@ mod mcts;
 mod minmax;
 mod move_gen;
 mod tests;
+mod tune;
 
-use std::io;
+use std::{fs, io};
 
 use crate::tests::do_moves_and_check_validity;
+use crate::tune::gradient_descent::TunableBoard;
+use crate::tune::pgn_parse::Game;
+use crate::tune::play_match::play_match_between_params;
+use crate::tune::training::train_from_scratch;
 use board::Board;
 use board_game_traits::board::Board as BoardTrait;
 use board_game_traits::board::{Color, GameResult};
 use pgn_traits::pgn::PgnBoard;
-use std::io::Write;
+use std::io::{Read, Write};
+use std::path::Path;
 
 fn main() {
-    println!("play: Play against the minmax AI");
+    println!("play: Play against the mcts AI");
     println!("aimatch: Watch the minmax and mcts AIs play");
     println!("analyze: Mcts analysis of a hardcoded position");
 
@@ -41,6 +51,62 @@ fn main() {
         "analyze" => test_position(),
         "mem usage" => mem_usage(),
         "bench" => bench(),
+        "train_from_scratch" => {
+            for i in 0.. {
+                let file_name = format!("games{}_batch0.ptn", i);
+                if !Path::new(&file_name).exists() {
+                    train_from_scratch(i).unwrap();
+                    break;
+                } else {
+                    println!("File {} already exists, trying next.", file_name);
+                }
+            }
+        }
+        "tune_from_file" => tune::training::tune_from_file().unwrap(),
+        "pgn_to_move_list" => pgn_to_move_list(),
+        "play_params" => {
+            #[allow(clippy::unreadable_literal)]
+            let params1 = &[
+                0.11546037,
+                0.38993832,
+                0.3594647,
+                0.55473673,
+                0.574743,
+                0.54728144,
+                0.8826678,
+                1.2646897,
+                1.1345893,
+                1.4539466,
+                1.5107378,
+                0.7540873,
+                -0.9577312,
+                -0.41307563,
+                -0.44581693,
+                0.29796726,
+                0.7496709,
+                1.0882877,
+                1.2875234,
+                1.8512405,
+                1.1104535,
+                0.23242366,
+                1.4878128,
+                0.8031703,
+                -2.1186066,
+                -1.6040361,
+                -0.6668861,
+                0.58022684,
+                2.0720365,
+                -0.047600698,
+                0.7756413,
+                -1.160208,
+                -0.7191107,
+                -0.36372992,
+                0.092443414,
+                0.6003906,
+            ];
+            let params2 = Board::PARAMS;
+            play_match_between_params(params1, params2);
+        }
         s => println!("Unknown option \"{}\"", s),
     }
 }
@@ -94,14 +160,12 @@ fn test_position() {
     let mut board = Board::default();
     let mut moves = vec![];
 
-    for mv_san in [
-        "c3", "c4", "b4", "1c4+", "d2", "b5", "b3", "1b5+", "1b3>", "d4", "2c3+", "c4", "d3",
-        "1d4+", "d4", "1c4+", "b2", "c4", "1d4+", "2c3>", "1d2-", "Sb3", "5d3+3", "1b3+", "d4",
-        "2b2>1", "3c2-1", "b3", "b2", "1b3+", "c2", "b3", "c5", "2b2>", "b2", "1b3+", "b3", "2b4+",
-        "d5", "b4", "2c4<", "3b3-", "2c3+", "2b2>", "3d1<", "3c2+", "d1", "5b4+4",
-    ]
-    .iter()
-    {
+    let move_strings: &[&str] = &[
+        "c3", "c2", "d2", "d3", "d2+", "c4", "d2", "b4", "c2+", "c4-", "2d3<", "d4", "b2", "a5",
+        "c2", "a2", "b1", "a2>", "b1+", "d4-", "5c3>23",
+    ];
+
+    for mv_san in move_strings.iter() {
         let mv = board.move_from_san(&mv_san).unwrap();
         board.generate_moves(&mut moves);
         assert!(moves.contains(&mv));
@@ -124,10 +188,18 @@ fn test_position() {
     let mut simple_moves = vec![];
     let mut moves = vec![];
     for i in 0.. {
-        tree.select(&mut board.clone(), &mut simple_moves, &mut moves);
+        tree.select(
+            &mut board.clone(),
+            Board::PARAMS,
+            &mut simple_moves,
+            &mut moves,
+        );
         if i % 100_000 == 0 {
             println!("{} visits, val={}", tree.visits, tree.mean_action_value);
             tree.print_info();
+            if i > 0 {
+                println!("A good move: {}", tree.best_move(1.0).0);
+            }
         }
     }
 }
@@ -139,7 +211,7 @@ fn play_human(mut board: Board) {
             use board_game_traits::board::Color::*;
             println!("Board:\n{:?}", board);
             // If black, play as human
-            if board.side_to_move() == White {
+            if board.side_to_move() == Black {
                 println!("Type your move in algebraic notation (c3):");
 
                 let reader = io::stdin();
@@ -171,10 +243,10 @@ fn play_human(mut board: Board) {
                 board.do_move(c_move);
                 play_human(board);
             } else {
-                let (best_move, score) = minmax::minmax(&mut board, 3);
+                let (best_move, score) = mcts::mcts(board.clone(), 1_000_000);
 
                 println!("Computer played {:?} with score {}", best_move, score);
-                board.do_move(best_move.unwrap());
+                board.do_move(best_move);
                 play_human(board);
             }
         }
@@ -199,7 +271,7 @@ fn bench() {
     {
         let mut board = Board::default();
 
-        do_moves_and_check_validity(&mut board, &["c3", "d3", "c4", "1d3<", "1c4+", "Sc4"]);
+        do_moves_and_check_validity(&mut board, &["d3", "c3", "c4", "1d3<", "1c4+", "Sc4"]);
 
         let (_move, score) = mcts::mcts(board, NODES);
         print!("{:.3}, ", score);
@@ -210,7 +282,7 @@ fn bench() {
         do_moves_and_check_validity(
             &mut board,
             &[
-                "c3", "c2", "d3", "b3", "c4", "1c2-", "1d3<", "1b3>", "1c4+", "Cc2", "a1", "1c2-",
+                "c2", "c3", "d3", "b3", "c4", "1c2-", "1d3<", "1b3>", "1c4+", "Cc2", "a1", "1c2-",
                 "a2",
             ],
         );
@@ -226,6 +298,20 @@ fn bench() {
         NODES as f64 * 3.0 / (1000.0 * time_taken.as_secs_f64())
     );
 }
+
+fn pgn_to_move_list() {
+    let mut file = fs::File::open("game.ptn").unwrap();
+    let mut input = String::new();
+    file.read_to_string(&mut input).unwrap();
+    let games: Vec<Game<Board>> = tune::pgn_parse::parse_pgn(&input).unwrap();
+    println!("Parsed {} games", games.len());
+    print!("[");
+    for (mv, _) in games[0].moves.iter() {
+        print!("\"{}\", ", mv);
+    }
+    println!("]")
+}
+
 /// Print memory usage of various data types in the project, for debugging purposes
 fn mem_usage() {
     use std::mem;
@@ -236,7 +322,7 @@ fn mem_usage() {
     println!("MCTS node: {} bytes.", mem::size_of::<mcts::Tree>());
     let mut board = board::Board::default();
     let mut tree = mcts::Tree::new_root();
-    tree.select(&mut board, &mut vec![], &mut vec![]);
+    tree.select(&mut board, Board::PARAMS, &mut vec![], &mut vec![]);
     println!(
         "MCTS node's children: {} bytes.",
         tree.children.len() * mem::size_of::<(mcts::Tree, board::Move)>()

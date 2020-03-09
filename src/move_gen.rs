@@ -1,11 +1,109 @@
-use crate::board;
 use crate::board::Role::*;
 use crate::board::{
-    Board, ColorTr, Direction, Move, Movement, Piece, Square, StackMovement, BOARD_SIZE,
+    board_iterator, Board, ColorTr, Direction, Move, Movement, Piece, Square, StackMovement,
+    BOARD_SIZE,
 };
+use crate::{board, mcts};
 use arrayvec::ArrayVec;
 
 impl Board {
+    pub fn generate_moves_with_probabilities_colortr<Us: ColorTr, Them: ColorTr>(
+        &self,
+        simple_moves: &mut Vec<Move>,
+        moves: &mut Vec<(Move, mcts::Score)>,
+    ) {
+        moves.extend(simple_moves.drain(..).map(|mv| (mv, 1.0)));
+        for (mv, prob) in moves.iter_mut() {
+            match mv {
+                Move::Place(piece, square) if *piece == Us::flat_piece() => {
+                    // If square is next to a road stone laid on our last turn
+                    if let Some(Move::Place(last_piece, last_square)) =
+                        self.moves().get(self.moves().len() - 2)
+                    {
+                        if Us::is_road_stone(*last_piece)
+                            && square.neighbours().any(|neigh| neigh == *last_square)
+                        {
+                            *prob += 3.0;
+                        }
+                    }
+                    // If square has two or more of your own pieces around it
+                    if square
+                        .neighbours()
+                        .filter_map(|neighbour| self[neighbour].top_stone())
+                        .filter(|neighbour_piece| Us::is_road_stone(*neighbour_piece))
+                        .count()
+                        >= 2
+                    {
+                        *prob += 4.0;
+                    }
+                    for direction in square.directions() {
+                        let neighbour = square.go_direction(direction).unwrap();
+                        if self[neighbour]
+                            .top_stone()
+                            .map(Us::is_road_stone)
+                            .unwrap_or_default()
+                            && neighbour
+                                .go_direction(direction)
+                                .and_then(|sq| self[sq].top_stone())
+                                .map(Us::is_road_stone)
+                                .unwrap_or_default()
+                        {
+                            *prob += 2.0;
+                        }
+                    }
+                }
+                Move::Place(_piece, square) => {
+                    // If square has two or more opponent flatstones around it
+                    if square
+                        .neighbours()
+                        .filter_map(|neighbour| self[neighbour].top_stone())
+                        .filter(|neighbour_piece| *neighbour_piece == Them::flat_piece())
+                        .count()
+                        >= 2
+                    {
+                        *prob += 2.0;
+                    }
+                    for direction in square.directions() {
+                        let neighbour = square.go_direction(direction).unwrap();
+                        if self[neighbour]
+                            .top_stone()
+                            .map(Them::is_road_stone)
+                            .unwrap_or_default()
+                            && neighbour
+                                .go_direction(direction)
+                                .and_then(|sq| self[sq].top_stone())
+                                .map(Them::is_road_stone)
+                                .unwrap_or_default()
+                        {
+                            *prob += 1.0;
+                        }
+                    }
+                }
+                Move::Move(square, _direction, stack_movement) => {
+                    let mut our_pieces = 0;
+                    let mut their_pieces = 0;
+                    for piece in self
+                        .top_stones_left_behind_by_move(*square, stack_movement)
+                        .flatten()
+                    {
+                        if Us::piece_is_ours(piece) {
+                            our_pieces += 1;
+                        } else {
+                            their_pieces += 1;
+                        }
+                    }
+                    if their_pieces == 0 && our_pieces > 1 {
+                        *prob += f32::powi(2.0, our_pieces - 1);
+                    }
+                }
+            }
+        }
+        let p_sum: f32 = moves.iter().map(|(_mv, p)| p).sum();
+        for (_mv, p) in moves.iter_mut() {
+            *p /= p_sum;
+        }
+    }
+
     pub fn generate_moves_colortr<Us: ColorTr, Them: ColorTr>(
         &self,
         moves: &mut Vec<<Board as board_game_traits::board::Board>::Move>,
@@ -13,13 +111,21 @@ impl Board {
         for square in board::board_iterator() {
             match self[square].top_stone() {
                 None => {
+                    // TODO: Suicide move check could be placed outside the loop,
+                    // since it is the same for every square
+                    let mut pesudolegal_moves: ArrayVec<[Move; 3]> = ArrayVec::new();
                     if Us::stones_left(&self) > 0 {
-                        moves.push(Move::Place(Us::flat_piece(), square));
-                        moves.push(Move::Place(Us::standing_piece(), square));
+                        pesudolegal_moves.push(Move::Place(Us::flat_piece(), square));
+                        pesudolegal_moves.push(Move::Place(Us::standing_piece(), square));
                     }
                     if Us::capstones_left(&self) > 0 {
-                        moves.push(Move::Place(Us::cap_piece(), square));
+                        pesudolegal_moves.push(Move::Place(Us::cap_piece(), square));
                     }
+                    moves.extend(
+                        pesudolegal_moves
+                            .drain(..)
+                            .filter(|mv| !self.move_is_suicide::<Us, Them>(mv)),
+                    );
                 }
                 Some(piece) if Us::piece_is_ours(piece) => {
                     for direction in square.directions() {
@@ -140,47 +246,70 @@ impl Board {
     // Never inline, for profiling purposes
     #[inline(never)]
     pub fn move_is_suicide<Us: ColorTr, Them: ColorTr>(&self, mv: &Move) -> bool {
-        if let Move::Move(square, direction, stack_movement) = mv {
-            // Stack moves that don't give the opponent a new road stone,
-            // can trivially be ruled out
-            if self
-                .top_stones_left_behind_by_move(*square, &stack_movement)
-                .any(|piece| piece.is_some() && !Us::piece_is_ours(piece.unwrap()))
-            {
-                let mut our_road_pieces = Us::road_stones(self);
-                let mut their_road_pieces = Them::road_stones(self);
-                let mut sq = *square;
+        match mv {
+            Move::Move(square, direction, stack_movement) => {
+                // Stack moves that don't give the opponent a new road stone,
+                // can trivially be ruled out
+                if self
+                    .top_stones_left_behind_by_move(*square, &stack_movement)
+                    .any(|piece| piece.is_some() && !Us::piece_is_ours(piece.unwrap()))
+                {
+                    let mut our_road_pieces = Us::road_stones(self);
+                    let mut their_road_pieces = Them::road_stones(self);
+                    let mut sq = *square;
 
-                for new_top_piece in self.top_stones_left_behind_by_move(*square, &stack_movement) {
-                    our_road_pieces = our_road_pieces.clear(sq.0);
-                    their_road_pieces = their_road_pieces.clear(sq.0);
-                    if let Some(piece) = new_top_piece {
-                        if Us::is_road_stone(piece) {
-                            our_road_pieces = our_road_pieces.set(sq.0);
+                    for new_top_piece in
+                        self.top_stones_left_behind_by_move(*square, &stack_movement)
+                    {
+                        our_road_pieces = our_road_pieces.clear(sq.0);
+                        their_road_pieces = their_road_pieces.clear(sq.0);
+                        if let Some(piece) = new_top_piece {
+                            if Us::is_road_stone(piece) {
+                                our_road_pieces = our_road_pieces.set(sq.0);
+                            }
+                            if Them::is_road_stone(piece) {
+                                their_road_pieces = their_road_pieces.set(sq.0);
+                            }
                         }
-                        if Them::is_road_stone(piece) {
-                            their_road_pieces = their_road_pieces.set(sq.0);
+                        sq = sq.go_direction(*direction).unwrap_or(sq);
+                    }
+
+                    let (our_components, our_highest_component_id) =
+                        board::connected_components_graph(our_road_pieces);
+
+                    if board::is_win_by_road(&our_components, our_highest_component_id).is_some() {
+                        return false;
+                    }
+
+                    let (their_components, their_highest_component_id) =
+                        board::connected_components_graph(their_road_pieces);
+
+                    board::is_win_by_road(&their_components, their_highest_component_id).is_some()
+                } else {
+                    false
+                }
+            }
+            Move::Place(piece, _) => {
+                // Placing a piece can only be suicide if this is our last piece
+                if Us::capstones_left(self) + Us::stones_left(self) == 1 {
+                    // Count points
+                    let mut our_points = 0;
+                    let mut their_points = 0;
+                    for top_stone in board_iterator().filter_map(|sq| self[sq].top_stone()) {
+                        if top_stone == Us::flat_piece() {
+                            our_points += 1;
+                        } else if top_stone == Them::flat_piece() {
+                            their_points += 1;
                         }
                     }
-                    sq = sq.go_direction(*direction).unwrap_or(sq);
+                    match piece.role() {
+                        Flat => their_points > our_points + 1,
+                        Cap | Standing => their_points > our_points,
+                    }
+                } else {
+                    false
                 }
-
-                let (our_components, our_highest_component_id) =
-                    board::connected_components_graph(our_road_pieces);
-
-                if board::is_win_by_road(&our_components, our_highest_component_id).is_some() {
-                    return false;
-                }
-
-                let (their_components, their_highest_component_id) =
-                    board::connected_components_graph(their_road_pieces);
-
-                board::is_win_by_road(&their_components, their_highest_component_id).is_some()
-            } else {
-                false
             }
-        } else {
-            false
         }
     }
 }

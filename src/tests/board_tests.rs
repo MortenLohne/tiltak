@@ -1,5 +1,5 @@
 use crate::board::Piece::{BlackCap, BlackFlat, WhiteFlat, WhiteStanding};
-use crate::board::{board_iterator, Board, Direction::*, Move, Piece, Square};
+use crate::board::{board_iterator, Board, Direction::*, Move, Piece, Role, Square, BOARD_SIZE};
 use crate::tests::do_moves_and_check_validity;
 use crate::{board as board_mod, board};
 use board_game_traits::board::Board as BoardTrait;
@@ -115,7 +115,7 @@ fn correct_number_of_legal_directions_test() {
 fn stones_left_behind_by_stack_movement_test() {
     let mut board: Board = Board::default();
 
-    do_moves_and_check_validity(&mut board, &["c3", "d3", "c4", "1d3<", "1c4-", "Sc4"]);
+    do_moves_and_check_validity(&mut board, &["d3", "c3", "c4", "1d3<", "1c4-", "Sc4"]);
 
     let mv = board.move_from_san("2c3<11").unwrap();
     if let Move::Move(square, _direction, stack_movement) = mv {
@@ -152,7 +152,7 @@ fn black_can_win_with_road_test() {
     let mut moves = vec![];
 
     for mv_san in [
-        "c3", "e5", "c2", "d5", "c1", "c5", "d3", "a4", "e3", "b5", "b1", "a5",
+        "e5", "c3", "c2", "d5", "c1", "c5", "d3", "a4", "e3", "b5", "b1", "a5",
     ]
     .iter()
     {
@@ -261,7 +261,7 @@ fn double_road_wins_test() {
     let mut moves = vec![];
 
     let move_strings = [
-        "a5", "a4", "b5", "b4", "c5", "c4", "1c5-", "d4", "d5", "e4", "e5", "c3",
+        "a4", "a5", "b5", "b4", "c5", "c4", "1c5-", "d4", "d5", "e4", "e5", "c3",
     ];
     do_moves_and_check_validity(&mut board, &move_strings);
 
@@ -280,4 +280,95 @@ fn double_road_wins_test() {
 
     board.do_move(board.move_from_san(&"1c2-").unwrap());
     assert_eq!(board.game_result(), Some(WhiteWin));
+}
+
+// Black is behind by one point, with one stone left to place
+// Check that placing it standing is suicide, but placing it flat is not
+#[test]
+fn cannot_suicide_into_points_loss_test() {
+    let mut board = Board::start_board();
+    let move_strings = [
+        "a1", "e5", "e3", "Cc3", "e4", "e2", "d3", "c3>", "d4", "b2", "c3", "c2", "c4", "d2",
+        "c3-", "a2", "c3", "c1", "2c2<", "c2", "c3-", "b1", "e3-", "e1", "2e2-", "d1", "2c2-",
+        "a2>", "a4", "4b2+112", "a4>", "2b5-", "c4<", "b3+", "e2", "5b4>122", "3e1<", "e1", "e5-",
+        "3d4>", "e2-", "b3", "c3", "c2", "b2", "a3", "c5", "c2+", "c4-", "2d3<", "Cc2", "b3-",
+        "a2", "e2", "a2>", "b1>", "c2-", "e2-", "5c1>32", "Se2", "a2", "a1+", "2b2<", "c2", "c1",
+        "b1", "b2-", "c2-", "4a2+13", "c2", "5e1<23",
+    ];
+    do_moves_and_check_validity(&mut board, &move_strings);
+
+    let mut moves = vec![];
+    board.generate_moves(&mut moves);
+    for mv in moves.iter() {
+        match mv {
+            Move::Place(piece, _) => assert_ne!(
+                piece.role(),
+                Role::Standing,
+                "Placing a standing stone is suicide"
+            ),
+            _ => (),
+        }
+    }
+
+    assert!(moves.iter().any(|mv| if let Move::Place(_, _) = mv {
+        true
+    } else {
+        false
+    }));
+}
+
+#[test]
+fn games_ends_when_board_is_full_test() {
+    let mut board = Board::start_board();
+    let move_strings: Vec<String> = board_iterator().skip(1).map(|sq| sq.to_string()).collect();
+    do_moves_and_check_validity(
+        &mut board,
+        &(move_strings.iter().map(AsRef::as_ref).collect::<Vec<_>>()),
+    );
+    assert!(board.game_result().is_none());
+    board.do_move(board.move_from_san("a5").unwrap());
+    assert_eq!(
+        board.game_result(),
+        Some(WhiteWin),
+        "Board is full, game should have ended:\n{:?}",
+        board
+    );
+}
+
+#[test]
+fn game_declared_loss_when_every_move_is_suicide() {
+    let mut board = Board::start_board();
+
+    do_moves_and_check_validity(&mut board, &["b3", "c4", "c4-", "b3>"]);
+
+    for _ in 0..20 {
+        do_moves_and_check_validity(&mut board, &["c4", "b3", "c4-", "b3>"]);
+    }
+    assert_eq!(board.game_result(), Some(BlackWin));
+}
+
+#[test]
+fn bitboard_full_board_file_rank_test() {
+    let mut board = Board::start_board();
+    let move_strings: Vec<String> = board_iterator().map(|sq| sq.to_string()).collect();
+    do_moves_and_check_validity(
+        &mut board,
+        &(move_strings.iter().map(AsRef::as_ref).collect::<Vec<_>>()),
+    );
+    assert_eq!(board.game_result(), Some(WhiteWin));
+
+    let road_pieces = board.white_road_pieces() | board.black_road_pieces();
+
+    assert_eq!(road_pieces.count(), 25);
+
+    for x in 0..BOARD_SIZE as u8 {
+        assert_eq!(road_pieces.rank(x).count() as usize, BOARD_SIZE);
+        assert_eq!(road_pieces.file(x).count() as usize, BOARD_SIZE);
+        for y in 0..BOARD_SIZE as u8 {
+            if x != y {
+                assert!((road_pieces.rank(x) & road_pieces.rank(y)).is_empty());
+                assert!((road_pieces.file(x) & road_pieces.file(y)).is_empty());
+            }
+        }
+    }
 }
