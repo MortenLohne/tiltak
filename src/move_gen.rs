@@ -1,12 +1,109 @@
-use crate::board;
 use crate::board::Role::*;
 use crate::board::{
     board_iterator, Board, ColorTr, Direction, Move, Movement, Piece, Square, StackMovement,
     BOARD_SIZE,
 };
+use crate::{board, mcts};
 use arrayvec::ArrayVec;
 
 impl Board {
+    pub fn generate_moves_with_probabilities_colortr<Us: ColorTr, Them: ColorTr>(
+        &self,
+        simple_moves: &mut Vec<Move>,
+        moves: &mut Vec<(Move, mcts::Score)>,
+    ) {
+        moves.extend(simple_moves.drain(..).map(|mv| (mv, 1.0)));
+        for (mv, prob) in moves.iter_mut() {
+            match mv {
+                Move::Place(piece, square) if *piece == Us::flat_piece() => {
+                    // If square is next to a road stone laid on our last turn
+                    if let Some(Move::Place(last_piece, last_square)) =
+                        self.moves().get(self.moves().len() - 2)
+                    {
+                        if Us::is_road_stone(*last_piece)
+                            && square.neighbours().any(|neigh| neigh == *last_square)
+                        {
+                            *prob += 3.0;
+                        }
+                    }
+                    // If square has two or more of your own pieces around it
+                    if square
+                        .neighbours()
+                        .filter_map(|neighbour| self[neighbour].top_stone())
+                        .filter(|neighbour_piece| Us::is_road_stone(*neighbour_piece))
+                        .count()
+                        >= 2
+                    {
+                        *prob += 4.0;
+                    }
+                    for direction in square.directions() {
+                        let neighbour = square.go_direction(direction).unwrap();
+                        if self[neighbour]
+                            .top_stone()
+                            .map(Us::is_road_stone)
+                            .unwrap_or_default()
+                            && neighbour
+                                .go_direction(direction)
+                                .and_then(|sq| self[sq].top_stone())
+                                .map(Us::is_road_stone)
+                                .unwrap_or_default()
+                        {
+                            *prob += 2.0;
+                        }
+                    }
+                }
+                Move::Place(_piece, square) => {
+                    // If square has two or more opponent flatstones around it
+                    if square
+                        .neighbours()
+                        .filter_map(|neighbour| self[neighbour].top_stone())
+                        .filter(|neighbour_piece| *neighbour_piece == Them::flat_piece())
+                        .count()
+                        >= 2
+                    {
+                        *prob += 2.0;
+                    }
+                    for direction in square.directions() {
+                        let neighbour = square.go_direction(direction).unwrap();
+                        if self[neighbour]
+                            .top_stone()
+                            .map(Them::is_road_stone)
+                            .unwrap_or_default()
+                            && neighbour
+                                .go_direction(direction)
+                                .and_then(|sq| self[sq].top_stone())
+                                .map(Them::is_road_stone)
+                                .unwrap_or_default()
+                        {
+                            *prob += 1.0;
+                        }
+                    }
+                }
+                Move::Move(square, _direction, stack_movement) => {
+                    let mut our_pieces = 0;
+                    let mut their_pieces = 0;
+                    for piece in self
+                        .top_stones_left_behind_by_move(*square, stack_movement)
+                        .flatten()
+                    {
+                        if Us::piece_is_ours(piece) {
+                            our_pieces += 1;
+                        } else {
+                            their_pieces += 1;
+                        }
+                    }
+                    if their_pieces == 0 && our_pieces > 1 {
+                        *prob += f32::powi(2.0, our_pieces - 1);
+                    }
+                }
+            }
+        }
+        let p_sum: f32 = moves.iter().map(|(_mv, p)| p).sum();
+        for (_mv, p) in moves.iter_mut() {
+            *p /= p_sum;
+        }
+    }
+
     pub fn generate_moves_colortr<Us: ColorTr, Them: ColorTr>(
         &self,
         moves: &mut Vec<<Board as board_game_traits::board::Board>::Move>,

@@ -505,6 +505,7 @@ pub struct Board {
     white_capstones_left: u8,
     black_capstones_left: u8,
     moves_played: u8,
+    moves: Vec<Move>,
 }
 
 impl Index<Square> for Board {
@@ -533,6 +534,7 @@ impl Default for Board {
             white_capstones_left: 1,
             black_capstones_left: 1,
             moves_played: 0,
+            moves: vec![],
         }
     }
 }
@@ -588,6 +590,10 @@ impl Board {
         self.moves_played
     }
 
+    pub fn moves(&self) -> &Vec<Move> {
+        &self.moves
+    }
+
     #[cfg(test)]
     pub fn flip_board_y(&self) -> Board {
         let mut new_board = self.clone();
@@ -637,8 +643,12 @@ impl Board {
     ) {
         debug_assert!(simple_moves.is_empty());
         self.generate_moves(simple_moves);
-        let average = 1.0 / simple_moves.len() as mcts::Score;
-        moves.extend(simple_moves.drain(..).map(|mv| (mv, average)));
+        match self.side_to_move() {
+            Color::White => self
+                .generate_moves_with_probabilities_colortr::<WhiteTr, BlackTr>(simple_moves, moves),
+            Color::Black => self
+                .generate_moves_with_probabilities_colortr::<BlackTr, WhiteTr>(simple_moves, moves),
+        }
     }
 
     pub fn count_all_stones(&self) -> u8 {
@@ -742,7 +752,7 @@ impl board::Board for Board {
     }
 
     fn do_move(&mut self, mv: Self::Move) -> Self::ReverseMove {
-        let reverse_move = match mv {
+        let reverse_move = match mv.clone() {
             Move::Place(piece, to) => {
                 debug_assert!(self[to].is_empty());
                 self[to].push(piece);
@@ -823,6 +833,7 @@ impl board::Board for Board {
             self.black_road_pieces_from_scratch()
         );
 
+        self.moves.push(mv);
         self.to_move = !self.to_move;
         self.moves_played += 1;
         reverse_move
@@ -878,6 +889,7 @@ impl board::Board for Board {
             self.black_road_pieces,
             self.black_road_pieces_from_scratch()
         );
+        self.moves.pop();
         self.moves_played -= 1;
         self.to_move = !self.to_move;
     }
