@@ -1,6 +1,6 @@
 use crate::board::Piece::{BlackCap, BlackFlat, WhiteFlat, WhiteStanding};
 use crate::board::{board_iterator, Board, Direction::*, Move, Piece, Role, Square, BOARD_SIZE};
-use crate::do_moves_and_check_validity;
+use crate::tests::do_moves_and_check_validity;
 use crate::{board as board_mod, board};
 use board_game_traits::board::Board as BoardTrait;
 use board_game_traits::board::{GameResult, GameResult::*};

@@ -1,6 +1,6 @@
 use crate::board::Board;
 use crate::board::TunableBoard;
-use crate::do_moves_and_check_validity;
+use crate::tests::do_moves_and_check_validity;
 use crate::mcts;
 use board_game_traits::board::Board as BoardTrait;
 use pgn_traits::pgn::PgnBoard;

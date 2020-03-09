@@ -27,7 +27,7 @@ use taik::board;
 use taik::board::Board;
 use taik::board::TunableBoard;
 use taik::minmax;
-use taik::{do_moves_and_check_validity, mcts};
+use taik::mcts;
 
 fn main() {
     println!("play: Play against the mcts AI");
@@ -333,4 +333,21 @@ fn mem_usage() {
         "MCTS node's children: {} bytes.",
         tree.children.len() * mem::size_of::<(mcts::Tree, board::Move)>()
     );
+}
+
+fn do_moves_and_check_validity(board: &mut Board, move_strings: &[&str]) {
+    let mut moves = vec![];
+    for mv_san in move_strings.iter() {
+        let mv = board.move_from_san(&mv_san).unwrap();
+        board.generate_moves(&mut moves);
+        assert!(
+            moves.contains(&mv),
+            "Move {} was not among legal moves: {:?}\n{:?}",
+            board.move_to_san(&mv),
+            moves,
+            board
+        );
+        board.do_move(mv);
+        moves.clear();
+    }
 }
