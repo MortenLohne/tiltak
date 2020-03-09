@@ -1,20 +1,28 @@
+#[cfg(feature = "constant-tuning")]
 #[macro_use]
 extern crate nom;
+#[cfg(feature = "constant-tuning")]
 #[macro_use]
 extern crate log;
 
+#[cfg(feature = "constant-tuning")]
 mod tune;
 
-use std::{fs, io};
+use std::io;
+use std::io::Write;
+#[cfg(feature = "constant-tuning")]
+use std::path::Path;
 
+#[cfg(feature = "constant-tuning")]
 use crate::tune::pgn_parse::Game;
+#[cfg(feature = "constant-tuning")]
 use crate::tune::play_match::play_match_between_params;
+#[cfg(feature = "constant-tuning")]
 use crate::tune::training::train_from_scratch;
 use board_game_traits::board::Board as BoardTrait;
 use board_game_traits::board::{Color, GameResult};
 use pgn_traits::pgn::PgnBoard;
-use std::io::{Read, Write};
-use std::path::Path;
+
 use taik::board;
 use taik::board::Board;
 use taik::board::TunableBoard;
@@ -41,6 +49,7 @@ fn main() {
         "analyze" => test_position(),
         "mem usage" => mem_usage(),
         "bench" => bench(),
+        #[cfg(feature = "constant-tuning")]
         "train_from_scratch" => {
             for i in 0.. {
                 let file_name = format!("games{}_batch0.ptn", i);
@@ -52,8 +61,11 @@ fn main() {
                 }
             }
         }
+        #[cfg(feature = "constant-tuning")]
         "tune_from_file" => tune::training::tune_from_file().unwrap(),
+        #[cfg(feature = "constant-tuning")]
         "pgn_to_move_list" => pgn_to_move_list(),
+        #[cfg(feature = "constant-tuning")]
         "play_params" => {
             #[allow(clippy::unreadable_literal)]
             let params1 = &[
@@ -289,7 +301,11 @@ fn bench() {
     );
 }
 
+#[cfg(feature = "constant-tuning")]
 fn pgn_to_move_list() {
+    use std::fs;
+    use std::io::Read;
+
     let mut file = fs::File::open("game.ptn").unwrap();
     let mut input = String::new();
     file.read_to_string(&mut input).unwrap();
