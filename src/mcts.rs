@@ -8,7 +8,7 @@ const C_PUCT: Score = 3.0;
 pub type Score = f32;
 
 #[derive(Clone, PartialEq, Debug)]
-pub struct Tree {
+pub(crate) struct Tree {
     pub children: Vec<(Tree, Move)>,
     pub visits: u64,
     pub total_action_value: Score,
@@ -19,11 +19,13 @@ pub struct Tree {
 
 // TODO: Winning percentage should be always be interpreted from the side to move's perspective
 
-pub(crate) fn mcts(board: Board, nodes: u64, temperature: f64) -> (Move, Score) {
+/// The module's main function. Run Monte Carlo Tree Search for `nodes` nodes.
+/// Returns the best move, and its estimated winning probability for the side to move.
+pub fn mcts(board: Board, nodes: u64) -> (Move, Score) {
     let mut tree = Tree::new_root();
     let mut moves = vec![];
     let mut simple_moves = vec![];
-    for _ in 0..nodes {
+    for _ in 0..nodes.max(2) {
         tree.select(
             &mut board.clone(),
             Board::PARAMS,
@@ -31,7 +33,8 @@ pub(crate) fn mcts(board: Board, nodes: u64, temperature: f64) -> (Move, Score) 
             &mut moves,
         );
     }
-    tree.best_move(temperature)
+    let (mv, score) = tree.best_move(0.1);
+    (mv, 1.0 - score)
 }
 
 pub(crate) fn mcts_training(
@@ -61,7 +64,7 @@ impl Tree {
         }
     }
 
-    /// Clones this node, but does not clone its children
+    /// Clones this node, and all children down to a maximum depth
     pub fn shallow_clone(&self, depth: u8) -> Self {
         Tree {
             children: if depth <= 1 {

@@ -122,7 +122,7 @@ fn mcts_vs_minmax(minmax_depth: u16, mcts_nodes: u64) {
         }
         match board.side_to_move() {
             Color::Black => {
-                let (best_move, score) = mcts::mcts(board.clone(), mcts_nodes, 0.1);
+                let (best_move, score) = mcts::mcts(board.clone(), mcts_nodes);
                 board.do_move(best_move.clone());
                 moves.push(best_move.clone());
                 println!("{:6}: {:.3}", best_move, score);
@@ -243,7 +243,7 @@ fn play_human(mut board: Board) {
                 board.do_move(c_move);
                 play_human(board);
             } else {
-                let (best_move, score) = mcts::mcts(board.clone(), 1_000_000, 0.1);
+                let (best_move, score) = mcts::mcts(board.clone(), 1_000_000);
 
                 println!("Computer played {:?} with score {}", best_move, score);
                 board.do_move(best_move);
@@ -264,7 +264,7 @@ fn bench() {
     {
         let board = Board::default();
 
-        let (_move, score) = mcts::mcts(board, NODES, 0.1);
+        let (_move, score) = mcts::mcts(board, NODES);
         print!("{:.3}, ", score);
     }
 
@@ -273,7 +273,7 @@ fn bench() {
 
         do_moves_and_check_validity(&mut board, &["d3", "c3", "c4", "1d3<", "1c4+", "Sc4"]);
 
-        let (_move, score) = mcts::mcts(board, NODES, 0.1);
+        let (_move, score) = mcts::mcts(board, NODES);
         print!("{:.3}, ", score);
     }
     {
@@ -287,7 +287,7 @@ fn bench() {
             ],
         );
 
-        let (_move, score) = mcts::mcts(board, NODES, 0.1);
+        let (_move, score) = mcts::mcts(board, NODES);
         println!("{:.3}", score);
     }
     let time_taken = start_time.elapsed();
