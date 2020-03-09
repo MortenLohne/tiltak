@@ -56,16 +56,6 @@ fn black_avoid_loss_in_one_test2() {
 }
 
 #[test]
-fn black_avoid_loss_in_one_test3() {
-    let move_strings = [
-        "c3", "c2", "d2", "d3", "d2+", "c4", "d2", "b4", "c2+", "c4-", "2d3<", "d4", "b2", "a5",
-        "c2", "a2", "b1", "a2>", "b1+", "d4-", "5c3>23",
-    ];
-
-    plays_correct_move_property(&move_strings, TacticAnswer::PlayMoves(&["Ca2", "Sa2"]));
-}
-
-#[test]
 fn black_avoid_less_in_one_test5() {
     let move_strings = [
         "b3", "c2", "d2", "c3", "b2", "d4", "b2+", "d3", "d2+", "c3>", "Cc3", "b4", "c3>", "d2",
