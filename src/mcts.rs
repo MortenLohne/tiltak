@@ -1,5 +1,4 @@
-use crate::board::{Board, Move};
-use crate::tune::gradient_descent::TunableBoard;
+use crate::board::{Board, Move, TunableBoard};
 use board_game_traits::board::{Board as BoardTrait, Color, GameResult};
 use rand::Rng;
 
@@ -8,7 +7,7 @@ const C_PUCT: Score = 3.0;
 pub type Score = f32;
 
 #[derive(Clone, PartialEq, Debug)]
-pub(crate) struct Tree {
+pub struct Tree {
     pub children: Vec<(Tree, Move)>,
     pub visits: u64,
     pub total_action_value: Score,
@@ -37,12 +36,8 @@ pub fn mcts(board: Board, nodes: u64) -> (Move, Score) {
     (mv, 1.0 - score)
 }
 
-pub(crate) fn mcts_training(
-    board: Board,
-    nodes: u64,
-    params: &[f32],
-    temperature: f64,
-) -> (Move, Score) {
+/// Run mcts with specific static evaluation parameters, for optimization the parameter set.
+pub fn mcts_training(board: Board, nodes: u64, params: &[f32], temperature: f64) -> (Move, Score) {
     let mut tree = Tree::new_root();
     let mut moves = vec![];
     let mut simple_moves = vec![];
@@ -53,7 +48,7 @@ pub(crate) fn mcts_training(
 }
 
 impl Tree {
-    pub(crate) fn new_root() -> Self {
+    pub fn new_root() -> Self {
         Tree {
             children: vec![],
             visits: 0,

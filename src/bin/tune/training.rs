@@ -1,5 +1,3 @@
-use crate::board::Board;
-use crate::tune::gradient_descent::TunableBoard;
 use crate::tune::pgn_parse::Game;
 use crate::tune::play_match::play_game;
 use crate::tune::{gradient_descent, pgn_parse, play_match};
@@ -9,6 +7,8 @@ use rand::prelude::*;
 use rayon::prelude::*;
 use std::io::Read;
 use std::{error, fs, io};
+use taik::board::Board;
+use taik::board::TunableBoard;
 
 pub fn train_from_scratch(training_id: usize) -> Result<(), Box<dyn error::Error>> {
     const BATCH_SIZE: usize = 1000;

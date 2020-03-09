@@ -1,11 +1,11 @@
-use crate::board::Board;
-use crate::mcts;
 use crate::tune::pgn_parse;
 use crate::tune::pgn_parse::Game;
 use board_game_traits::board::{Board as BoardTrait, Color, GameResult};
 use rayon::prelude::*;
 use std::io;
 use std::sync::atomic::{AtomicU64, Ordering};
+use taik::board::Board;
+use taik::mcts;
 
 /// Play a single training game between the same parameter set
 pub fn play_game(params: &[f32]) -> Game<Board> {

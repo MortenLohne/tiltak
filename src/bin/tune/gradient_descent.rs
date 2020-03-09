@@ -1,15 +1,10 @@
-use crate::mcts;
 use board_game_traits::board::Board as BoardTrait;
 use board_game_traits::board::GameResult;
 use pgn_traits::pgn::PgnBoard;
 use rayon::prelude::*;
 use std::fmt::Debug;
-
-pub trait TunableBoard {
-    const PARAMS: &'static [f32];
-
-    fn static_eval_with_params(&self, params: &[f32]) -> f32;
-}
+use taik::board::TunableBoard;
+use taik::mcts;
 
 pub fn gradient_descent<B>(
     positions: &[B],

@@ -1,35 +1,25 @@
-extern crate board_game_traits;
-extern crate pgn_traits;
-extern crate rand;
-#[macro_use]
-extern crate smallvec;
-extern crate arrayvec;
 #[macro_use]
 extern crate nom;
 #[macro_use]
 extern crate log;
 
-mod bitboard;
-mod board;
-mod mcts;
-mod minmax;
-mod move_gen;
-mod tests;
 mod tune;
 
 use std::{fs, io};
 
-use crate::tests::do_moves_and_check_validity;
-use crate::tune::gradient_descent::TunableBoard;
 use crate::tune::pgn_parse::Game;
 use crate::tune::play_match::play_match_between_params;
 use crate::tune::training::train_from_scratch;
-use board::Board;
 use board_game_traits::board::Board as BoardTrait;
 use board_game_traits::board::{Color, GameResult};
 use pgn_traits::pgn::PgnBoard;
 use std::io::{Read, Write};
 use std::path::Path;
+use taik::board;
+use taik::board::Board;
+use taik::board::TunableBoard;
+use taik::minmax;
+use taik::{do_moves_and_check_validity, mcts};
 
 fn main() {
     println!("play: Play against the mcts AI");

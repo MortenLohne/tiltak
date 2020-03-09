@@ -6,7 +6,6 @@ use crate::board::Piece::*;
 use crate::board::Role::Flat;
 use crate::board::Role::*;
 use crate::mcts;
-use crate::tune::gradient_descent::TunableBoard;
 use arrayvec::ArrayVec;
 use board_game_traits::board;
 use board_game_traits::board::GameResult::{BlackWin, Draw, WhiteWin};
@@ -20,6 +19,12 @@ use std::fmt::Write;
 use std::iter::FromIterator;
 use std::ops::{Index, IndexMut};
 use std::{fmt, iter, ops};
+
+pub trait TunableBoard {
+    const PARAMS: &'static [f32];
+
+    fn static_eval_with_params(&self, params: &[f32]) -> f32;
+}
 
 pub trait ColorTr {
     fn color() -> Color;
