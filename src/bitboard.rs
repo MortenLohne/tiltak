@@ -95,7 +95,7 @@ impl BitBoard {
     pub fn rank(self, i: u8) -> Self {
         debug_assert!(i < BOARD_SIZE as u8);
         const MASK: u64 = 0b11111;
-        BitBoard::from_u64(self.board & (MASK << i as u64 * BOARD_SIZE as u64))
+        BitBoard::from_u64(self.board & (MASK << (i as u64 * BOARD_SIZE as u64)))
     }
 
     #[inline]
