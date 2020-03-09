@@ -1,3 +1,4 @@
+/// The size of the board. Only 5 works correctly for now.
 pub const BOARD_SIZE: usize = 5;
 
 use crate::bitboard::BitBoard;
@@ -18,13 +19,14 @@ use std::iter::FromIterator;
 use std::ops::{Index, IndexMut};
 use std::{fmt, iter, ops};
 
+/// Extra items for tuning evaluation constants.
 pub trait TunableBoard {
     const PARAMS: &'static [f32];
 
     fn static_eval_with_params(&self, params: &[f32]) -> f32;
 }
 
-pub trait ColorTr {
+pub(crate) trait ColorTr {
     fn color() -> Color;
 
     fn stones_left(board: &Board) -> u8;
@@ -124,6 +126,7 @@ impl ColorTr for BlackTr {
     }
 }
 
+/// A location on the board. Can be used to index a `Board`.
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct Square(pub u8);
 
@@ -235,10 +238,12 @@ impl fmt::Debug for Square {
     }
 }
 
-pub fn board_iterator() -> impl Iterator<Item = Square> {
+/// Iterates over all board squares.
+pub fn squares_iterator() -> impl Iterator<Item = Square> {
     (0..(BOARD_SIZE * BOARD_SIZE)).map(|i| Square(i as u8))
 }
 
+/// One of the 3 piece roles in Tak. The same as piece, but without different variants for each color.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Role {
     Flat,
@@ -246,6 +251,7 @@ pub enum Role {
     Cap,
 }
 
+/// One of the 6 game pieces in Tak. Each piece has one variant for each color.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Piece {
     WhiteFlat,
@@ -292,6 +298,7 @@ impl ops::Not for Piece {
     }
 }
 
+/// The contents of a square on the board, consisting of zero or more pieces
 #[derive(Clone, PartialEq, Eq, Debug, Default)]
 pub struct Stack {
     top_stone: Option<Piece>,
@@ -318,6 +325,7 @@ impl Stack {
     }
 
     /// Push a new piece to the top of the stack
+    ///
     /// Any piece already on the stack will be flattened, including capstones
     pub fn push(&mut self, piece: Piece) {
         if self.height > 0 && self.top_stone.unwrap().color() == Color::White {
@@ -327,6 +335,9 @@ impl Stack {
         self.height += 1;
     }
 
+    /// Remove the top piece from the stack, a
+    ///
+    /// Will not un-flatten a previously flattened stone
     pub fn pop(&mut self) -> Option<Piece> {
         debug_assert_ne!(self.height, 0);
         let old_piece = self.top_stone;
@@ -378,6 +389,7 @@ impl Stack {
     }
 }
 
+/// An iterator over the pieces in a stack.
 pub struct StackIterator {
     stack: Stack,
 }
@@ -403,6 +415,7 @@ impl IntoIterator for Stack {
     }
 }
 
+/// A legal move for a position.
 #[derive(Clone, PartialEq, Eq)]
 pub enum Move {
     Place(Piece, Square),
@@ -450,13 +463,14 @@ impl fmt::Debug for Move {
         write!(f, "{}", self)
     }
 }
-
+/// The counterpart of `Move`. When applied to a `Board`, it fully reverses the accompanying `Move`.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub enum ReverseMove {
     Place(Square),
     Move(Square, Direction, StackMovement, bool),
 }
 
+/// One of the four cardinal directions on the board
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Direction {
     North,
@@ -486,6 +500,7 @@ impl Direction {
     }
 }
 
+/// One or more `Movement`s, storing how many pieces are dropped off at each step
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct StackMovement {
     pub movements: ArrayVec<[Movement; BOARD_SIZE - 1]>,
@@ -497,6 +512,7 @@ pub struct Movement {
     pub pieces_to_take: u8,
 }
 
+/// Complete representation of a Tak position
 #[derive(Clone, PartialEq, Eq)]
 pub struct Board {
     cells: AbstractBoard<Stack>,
@@ -581,18 +597,20 @@ impl fmt::Debug for Board {
 }
 
 impl Board {
-    pub fn white_road_pieces(&self) -> BitBoard {
+    pub(crate) fn white_road_pieces(&self) -> BitBoard {
         self.white_road_pieces
     }
 
-    pub fn black_road_pieces(&self) -> BitBoard {
+    pub(crate) fn black_road_pieces(&self) -> BitBoard {
         self.black_road_pieces
     }
 
+    /// Number of moves/plies played in the game
     pub fn moves_played(&self) -> u8 {
         self.moves_played
     }
 
+    /// All the moves played in the game
     pub fn moves(&self) -> &Vec<Move> {
         &self.moves
     }
@@ -639,6 +657,12 @@ impl Board {
         new_board
     }
 
+    /// Move generation that includes a heuristic probability of each move being played.
+    ///
+    /// # Arguments
+    ///
+    /// * `simple_moves` - An empty vector to temporarily store moves without probabilities. The vector will be emptied before the function returns, and only serves to re-use allocated memory.
+    /// * `moves` A vector to place the moves and associated probabilities.
     pub fn generate_moves_with_probabilities(
         &self,
         simple_moves: &mut Vec<Move>,
@@ -654,7 +678,7 @@ impl Board {
         }
     }
 
-    pub fn count_all_stones(&self) -> u8 {
+    fn count_all_pieces(&self) -> u8 {
         self.cells
             .raw
             .iter()
@@ -665,7 +689,7 @@ impl Board {
 
     fn white_road_pieces_from_scratch(&self) -> BitBoard {
         let mut bitboard = BitBoard::empty();
-        for square in board_iterator() {
+        for square in squares_iterator() {
             if self[square].top_stone.map(WhiteTr::is_road_stone) == Some(true) {
                 bitboard = bitboard.set(square.0);
             }
@@ -675,7 +699,7 @@ impl Board {
 
     fn black_road_pieces_from_scratch(&self) -> BitBoard {
         let mut bitboard = BitBoard::empty();
-        for square in board_iterator() {
+        for square in squares_iterator() {
             if self[square].top_stone.map(BlackTr::is_road_stone) == Some(true) {
                 bitboard = bitboard.set(square.0);
             }
@@ -735,13 +759,13 @@ impl board::Board for Board {
 
         match self.moves_played {
             0 => {
-                for square in board_iterator() {
+                for square in squares_iterator() {
                     moves.push(Move::Place(BlackFlat, square));
                 }
             }
 
             1 => {
-                for square in board_iterator() {
+                for square in squares_iterator() {
                     if self[square].is_empty() {
                         moves.push(Move::Place(WhiteFlat, square));
                     }
@@ -822,7 +846,7 @@ impl board::Board for Board {
                 - self.black_stones_left
                 - self.white_capstones_left
                 - self.black_capstones_left,
-            self.count_all_stones(),
+            self.count_all_pieces(),
             "Wrong number of stones on board:\n{:?}",
             self
         );
@@ -917,12 +941,12 @@ impl board::Board for Board {
 
         if (self.white_stones_left == 0 && self.white_capstones_left == 0)
             || (self.black_stones_left == 0 && self.black_capstones_left == 0)
-            || board_iterator().all(|square| !self[square].is_empty())
+            || squares_iterator().all(|square| !self[square].is_empty())
         {
             // Count points
             let mut white_points = 0;
             let mut black_points = 0;
-            for square in board_iterator() {
+            for square in squares_iterator() {
                 match self[square].top_stone() {
                     Some(WhiteFlat) => white_points += 1,
                     Some(BlackFlat) => black_points += 1,
@@ -945,7 +969,7 @@ impl board::Board for Board {
             // Count points
             let mut white_points = 0;
             let mut black_points = 0;
-            for square in board_iterator() {
+            for square in squares_iterator() {
                 match self[square].top_stone() {
                     Some(WhiteFlat) => white_points += 1,
                     Some(BlackFlat) => black_points += 1,
@@ -955,7 +979,7 @@ impl board::Board for Board {
             match self.side_to_move() {
                 Color::White => {
                     if black_points > white_points {
-                        for square in board_iterator() {
+                        for square in squares_iterator() {
                             if let Some(piece) = self[square].top_stone() {
                                 if piece.color() == Color::White
                                     && square
@@ -974,7 +998,7 @@ impl board::Board for Board {
                 }
                 Color::Black => {
                     if white_points > black_points {
-                        for square in board_iterator() {
+                        for square in squares_iterator() {
                             if let Some(piece) = self[square].top_stone() {
                                 if piece.color() == Color::Black
                                     && square
@@ -1056,7 +1080,7 @@ impl TunableBoard for Board {
         const CAP_PSQT: usize = STAND_PSQT + 6;
 
         let mut material_psqt = 0.0;
-        for square in board_iterator() {
+        for square in squares_iterator() {
             if let Some(piece) = self[square].top_stone() {
                 let i = square.0 as usize;
                 material_psqt += match piece {
@@ -1079,7 +1103,7 @@ impl TunableBoard for Board {
 
         const STACK: usize = TO_MOVE + 1;
 
-        let stacks: f32 = board_iterator()
+        let stacks: f32 = squares_iterator()
             .map(|sq| &self[sq])
             .filter(|stack| stack.len() > 1)
             .map(|stack| {
@@ -1167,7 +1191,7 @@ impl pgn_traits::pgn::PgnBoard for Board {
 
     fn to_fen(&self) -> String {
         let mut f = String::new();
-        board_iterator()
+        squares_iterator()
             .map(|square| self[square].clone())
             .for_each(|stack: Stack| {
                 (match stack.top_stone() {
@@ -1286,7 +1310,7 @@ impl pgn_traits::pgn::PgnBoard for Board {
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct AbstractBoard<T> {
+pub(crate) struct AbstractBoard<T> {
     raw: [[T; BOARD_SIZE]; BOARD_SIZE],
 }
 
@@ -1304,11 +1328,11 @@ impl<T> IndexMut<Square> for AbstractBoard<T> {
     }
 }
 
-pub fn connected_components_graph(road_pieces: BitBoard) -> (AbstractBoard<u8>, u8) {
+pub(crate) fn connected_components_graph(road_pieces: BitBoard) -> (AbstractBoard<u8>, u8) {
     let mut components: AbstractBoard<u8> = Default::default();
     let mut id = 1;
 
-    for square in board_iterator() {
+    for square in squares_iterator() {
         if components[square] == 0 && road_pieces.get(square.0) {
             connect_component(road_pieces, &mut components, square, id);
             id += 1;
@@ -1333,7 +1357,10 @@ fn connect_component(
 
 /// Check if either side has completed a road
 /// Returns one of the winning squares in the road
-pub fn is_win_by_road(components: &AbstractBoard<u8>, highest_component_id: u8) -> Option<Square> {
+pub(crate) fn is_win_by_road(
+    components: &AbstractBoard<u8>,
+    highest_component_id: u8,
+) -> Option<Square> {
     for id in 1..highest_component_id {
         if (components.raw[0].iter().any(|&cell| cell == id)
             && components.raw[BOARD_SIZE - 1]
@@ -1342,7 +1369,7 @@ pub fn is_win_by_road(components: &AbstractBoard<u8>, highest_component_id: u8) 
             || ((0..BOARD_SIZE).any(|y| components.raw[y][0] == id)
                 && (0..BOARD_SIZE).any(|y| components.raw[y][BOARD_SIZE - 1] == id))
         {
-            let square = board_iterator().find(|&sq| components[sq] == id).unwrap();
+            let square = squares_iterator().find(|&sq| components[sq] == id).unwrap();
             return Some(square);
         }
     }

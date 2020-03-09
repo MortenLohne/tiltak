@@ -26,8 +26,8 @@ use pgn_traits::pgn::PgnBoard;
 use taik::board;
 use taik::board::Board;
 use taik::board::TunableBoard;
-use taik::minmax;
 use taik::mcts;
+use taik::minmax;
 
 fn main() {
     println!("play: Play against the mcts AI");

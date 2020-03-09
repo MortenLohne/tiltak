@@ -2,7 +2,7 @@ use crate::board::BOARD_SIZE;
 use std::{fmt, ops};
 
 #[derive(PartialEq, Eq, Clone, Copy, Hash, Default)]
-pub struct BitBoard {
+pub(crate) struct BitBoard {
     pub board: u64,
 }
 

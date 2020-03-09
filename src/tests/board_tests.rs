@@ -1,5 +1,5 @@
 use crate::board::Piece::{BlackCap, BlackFlat, WhiteFlat, WhiteStanding};
-use crate::board::{board_iterator, Board, Direction::*, Move, Piece, Role, Square, BOARD_SIZE};
+use crate::board::{squares_iterator, Board, Direction::*, Move, Piece, Role, Square, BOARD_SIZE};
 use crate::tests::do_moves_and_check_validity;
 use crate::{board as board_mod, board};
 use board_game_traits::board::Board as BoardTrait;
@@ -10,14 +10,14 @@ use rand::seq::SliceRandom;
 #[test]
 fn default_board_test() {
     let board = board_mod::Board::default();
-    for square in board_iterator() {
+    for square in squares_iterator() {
         assert!(board[square].is_empty());
     }
 }
 
 #[test]
 fn go_in_directions_test() {
-    for square in board_iterator() {
+    for square in squares_iterator() {
         assert_eq!(square.directions().count(), square.neighbours().count());
         for direction in square.directions() {
             assert!(
@@ -82,7 +82,7 @@ fn flatten_stack_test() {
 #[test]
 fn correct_number_of_direction_test() {
     assert_eq!(
-        board_iterator()
+        squares_iterator()
             .flat_map(|square| square.directions())
             .count(),
         4 * 2 + 12 * 3 + 9 * 4
@@ -92,7 +92,7 @@ fn correct_number_of_direction_test() {
 #[test]
 fn correct_number_of_neighbours_test() {
     assert_eq!(
-        board_iterator()
+        squares_iterator()
             .flat_map(|square| square.neighbours())
             .count(),
         4 * 2 + 12 * 3 + 9 * 4
@@ -102,7 +102,7 @@ fn correct_number_of_neighbours_test() {
 #[test]
 fn correct_number_of_legal_directions_test() {
     assert_eq!(
-        board_iterator()
+        squares_iterator()
             .flat_map(|square| [North, South, East, West]
                 .iter()
                 .filter_map(move |&direction| square.go_direction(direction)))
@@ -320,7 +320,10 @@ fn cannot_suicide_into_points_loss_test() {
 #[test]
 fn games_ends_when_board_is_full_test() {
     let mut board = Board::start_board();
-    let move_strings: Vec<String> = board_iterator().skip(1).map(|sq| sq.to_string()).collect();
+    let move_strings: Vec<String> = squares_iterator()
+        .skip(1)
+        .map(|sq| sq.to_string())
+        .collect();
     do_moves_and_check_validity(
         &mut board,
         &(move_strings.iter().map(AsRef::as_ref).collect::<Vec<_>>()),
@@ -350,7 +353,7 @@ fn game_declared_loss_when_every_move_is_suicide() {
 #[test]
 fn bitboard_full_board_file_rank_test() {
     let mut board = Board::start_board();
-    let move_strings: Vec<String> = board_iterator().map(|sq| sq.to_string()).collect();
+    let move_strings: Vec<String> = squares_iterator().map(|sq| sq.to_string()).collect();
     do_moves_and_check_validity(
         &mut board,
         &(move_strings.iter().map(AsRef::as_ref).collect::<Vec<_>>()),

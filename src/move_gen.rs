@@ -1,13 +1,13 @@
 use crate::board::Role::*;
 use crate::board::{
-    board_iterator, Board, ColorTr, Direction, Move, Movement, Piece, Square, StackMovement,
+    squares_iterator, Board, ColorTr, Direction, Move, Movement, Piece, Square, StackMovement,
     BOARD_SIZE,
 };
 use crate::{board, mcts};
 use arrayvec::ArrayVec;
 
 impl Board {
-    pub fn generate_moves_with_probabilities_colortr<Us: ColorTr, Them: ColorTr>(
+    pub(crate) fn generate_moves_with_probabilities_colortr<Us: ColorTr, Them: ColorTr>(
         &self,
         simple_moves: &mut Vec<Move>,
         moves: &mut Vec<(Move, mcts::Score)>,
@@ -104,11 +104,11 @@ impl Board {
         }
     }
 
-    pub fn generate_moves_colortr<Us: ColorTr, Them: ColorTr>(
+    pub(crate) fn generate_moves_colortr<Us: ColorTr, Them: ColorTr>(
         &self,
         moves: &mut Vec<<Board as board_game_traits::board::Board>::Move>,
     ) {
-        for square in board::board_iterator() {
+        for square in board::squares_iterator() {
             match self[square].top_stone() {
                 None => {
                     // TODO: Suicide move check could be placed outside the loop,
@@ -163,7 +163,7 @@ impl Board {
         }
     }
 
-    pub fn generate_moving_moves_cap<Colorr: ColorTr>(
+    fn generate_moving_moves_cap<Colorr: ColorTr>(
         &self,
         direction: Direction,
         origin_square: Square,
@@ -205,7 +205,7 @@ impl Board {
         }
     }
 
-    pub fn generate_moving_moves_non_cap<Colorr: ColorTr>(
+    fn generate_moving_moves_non_cap<Colorr: ColorTr>(
         &self,
         direction: Direction,
         origin_square: Square,
@@ -245,7 +245,7 @@ impl Board {
 
     // Never inline, for profiling purposes
     #[inline(never)]
-    pub fn move_is_suicide<Us: ColorTr, Them: ColorTr>(&self, mv: &Move) -> bool {
+    fn move_is_suicide<Us: ColorTr, Them: ColorTr>(&self, mv: &Move) -> bool {
         match mv {
             Move::Move(square, direction, stack_movement) => {
                 // Stack moves that don't give the opponent a new road stone,
@@ -295,7 +295,7 @@ impl Board {
                     // Count points
                     let mut our_points = 0;
                     let mut their_points = 0;
-                    for top_stone in board_iterator().filter_map(|sq| self[sq].top_stone()) {
+                    for top_stone in squares_iterator().filter_map(|sq| self[sq].top_stone()) {
                         if top_stone == Us::flat_piece() {
                             our_points += 1;
                         } else if top_stone == Them::flat_piece() {
