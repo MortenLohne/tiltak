@@ -1,11 +1,13 @@
 use crate::tune::pgn_parse;
 use crate::tune::pgn_parse::Game;
 use board_game_traits::board::{Board as BoardTrait, Color, GameResult};
+use rand::Rng;
 use rayon::prelude::*;
 use std::io;
 use std::sync::atomic::{AtomicU64, Ordering};
-use taik::board::Board;
+use taik::board::{Board, Move};
 use taik::mcts;
+use taik::mcts::Score;
 
 /// Play a single training game between the same parameter set
 pub fn play_game(value_params: &[f32], policy_params: &[f32]) -> Game<Board> {
@@ -20,17 +22,14 @@ pub fn play_game(value_params: &[f32], policy_params: &[f32]) -> Game<Board> {
         if num_plies > 200 {
             break;
         }
+
+        let moves_scores =
+            mcts::mcts_training(board.clone(), MCTS_NODES, value_params, policy_params);
         // Turn off temperature in the middle-game, when all games are expected to be unique
-        let (best_move, _score) = if num_plies < 20 {
-            mcts::mcts_training(
-                board.clone(),
-                MCTS_NODES,
-                value_params,
-                policy_params,
-                TEMPERATURE,
-            )
+        let best_move = if board.moves_played() < 20 {
+            best_move(TEMPERATURE, &moves_scores[..])
         } else {
-            mcts::mcts_training(board.clone(), MCTS_NODES, value_params, policy_params, 0.1)
+            best_move(0.1, &moves_scores[..])
         };
         board.do_move(best_move.clone());
         game_moves.push(best_move);
@@ -44,6 +43,25 @@ pub fn play_game(value_params: &[f32], policy_params: &[f32]) -> Game<Board> {
         game_result: board.game_result(),
         tags: vec![],
     }
+}
+
+pub fn best_move(temperature: f64, move_scores: &[(Move, Score)]) -> Move {
+    let mut rng = rand::thread_rng();
+    let mut move_probabilities = vec![];
+    let mut cumulative_prob = 0.0;
+
+    for (mv, individual_prob) in move_scores.iter() {
+        cumulative_prob += (*individual_prob as f64).powf(1.0 / temperature);
+        move_probabilities.push((mv, cumulative_prob));
+    }
+
+    let p = rng.gen_range(0.0, cumulative_prob);
+    for (mv, cumulative_prob) in move_probabilities {
+        if cumulative_prob > p {
+            return mv.clone();
+        }
+    }
+    unreachable!()
 }
 
 /// Play an infinite match between two parameter sets
@@ -69,23 +87,16 @@ pub fn play_match_between_params(
             if board.moves_played() > 200 {
                 break;
             }
-            let (best_move, _) = match board.side_to_move() {
-                Color::White => mcts::mcts_training(
-                    board.clone(),
-                    NODES,
-                    value_params1,
-                    policy_params1,
-                    TEMPERATURE,
-                ),
-                Color::Black => mcts::mcts_training(
-                    board.clone(),
-                    NODES,
-                    value_params2,
-                    policy_params2,
-                    TEMPERATURE,
-                ),
+            let moves_scores = match board.side_to_move() {
+                Color::White => {
+                    mcts::mcts_training(board.clone(), NODES, value_params1, policy_params1)
+                }
+                Color::Black => {
+                    mcts::mcts_training(board.clone(), NODES, value_params2, policy_params2)
+                }
             };
-            board.do_move(best_move.clone());
+            let best_move = best_move(TEMPERATURE, &moves_scores[..]);
+            board.do_move(best_move);
         }
 
         match board.game_result() {
@@ -101,22 +112,15 @@ pub fn play_match_between_params(
             if board.moves_played() > 200 {
                 break;
             }
-            let (best_move, _) = match board.side_to_move() {
-                Color::White => mcts::mcts_training(
-                    board.clone(),
-                    NODES,
-                    value_params2,
-                    policy_params2,
-                    TEMPERATURE,
-                ),
-                Color::Black => mcts::mcts_training(
-                    board.clone(),
-                    NODES,
-                    value_params1,
-                    policy_params1,
-                    TEMPERATURE,
-                ),
+            let moves_scores = match board.side_to_move() {
+                Color::White => {
+                    mcts::mcts_training(board.clone(), NODES, value_params2, policy_params2)
+                }
+                Color::Black => {
+                    mcts::mcts_training(board.clone(), NODES, value_params1, policy_params1)
+                }
             };
+            let best_move = best_move(TEMPERATURE, &moves_scores[..]);
             board.do_move(best_move.clone());
         }
 

@@ -48,8 +48,7 @@ pub fn mcts_training(
     nodes: u64,
     value_params: &[f32],
     policy_params: &[f32],
-    temperature: f64,
-) -> (Move, Score) {
+) -> Vec<(Move, Score)> {
     let mut tree = Tree::new_root();
     let mut moves = vec![];
     let mut simple_moves = vec![];
@@ -62,7 +61,11 @@ pub fn mcts_training(
             &mut moves,
         );
     }
-    tree.best_move(temperature)
+    let child_visits: u64 = tree.children.iter().map(|(child, _)| child.visits).sum();
+    tree.children
+        .iter()
+        .map(|(child, mv)| (mv.clone(), child.visits as f32 / child_visits as f32))
+        .collect()
 }
 
 impl Tree {
