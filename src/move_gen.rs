@@ -9,9 +9,22 @@ use arrayvec::ArrayVec;
 impl Board {
     pub(crate) fn generate_moves_with_probabilities_colortr<Us: ColorTr, Them: ColorTr>(
         &self,
+        params: &[f32],
         simple_moves: &mut Vec<Move>,
         moves: &mut Vec<(Move, mcts::Score)>,
     ) {
+        const NEXT_TO_LAST_TURNS_STONE: usize = 0;
+        const FLAT_PIECE_NEXT_TO_TWO_FLAT_PIECES: usize = NEXT_TO_LAST_TURNS_STONE + 1;
+        const EXTEND_ROW_OF_TWO_FLATS: usize = FLAT_PIECE_NEXT_TO_TWO_FLAT_PIECES + 1;
+
+        const BLOCKING_STONE_NEXT_TO_TWO_OF_THEIR_FLATS: usize = EXTEND_ROW_OF_TWO_FLATS + 1;
+        const BLOCKING_STONE_BLOCKS_EXTENSIONS_OF_TWO_FLATS: usize =
+            BLOCKING_STONE_NEXT_TO_TWO_OF_THEIR_FLATS + 1;
+
+        const STACK_MOVEMENT_THAT_GIVES_US_TOP_PIECES: usize =
+            BLOCKING_STONE_BLOCKS_EXTENSIONS_OF_TWO_FLATS + 1;
+        const _NEXT_CONST: usize = STACK_MOVEMENT_THAT_GIVES_US_TOP_PIECES + 4;
+
         moves.extend(simple_moves.drain(..).map(|mv| (mv, 1.0)));
         for (mv, prob) in moves.iter_mut() {
             match mv {
@@ -23,7 +36,7 @@ impl Board {
                         if Us::is_road_stone(*last_piece)
                             && square.neighbours().any(|neigh| neigh == *last_square)
                         {
-                            *prob += 3.0;
+                            *prob += params[NEXT_TO_LAST_TURNS_STONE];
                         }
                     }
                     // If square has two or more of your own pieces around it
@@ -34,7 +47,7 @@ impl Board {
                         .count()
                         >= 2
                     {
-                        *prob += 4.0;
+                        *prob += params[FLAT_PIECE_NEXT_TO_TWO_FLAT_PIECES];
                     }
                     for direction in square.directions() {
                         let neighbour = square.go_direction(direction).unwrap();
@@ -48,7 +61,7 @@ impl Board {
                                 .map(Us::is_road_stone)
                                 .unwrap_or_default()
                         {
-                            *prob += 2.0;
+                            *prob += params[EXTEND_ROW_OF_TWO_FLATS];
                         }
                     }
                 }
@@ -61,7 +74,7 @@ impl Board {
                         .count()
                         >= 2
                     {
-                        *prob += 2.0;
+                        *prob += params[BLOCKING_STONE_NEXT_TO_TWO_OF_THEIR_FLATS];
                     }
                     for direction in square.directions() {
                         let neighbour = square.go_direction(direction).unwrap();
@@ -75,7 +88,7 @@ impl Board {
                                 .map(Them::is_road_stone)
                                 .unwrap_or_default()
                         {
-                            *prob += 1.0;
+                            *prob += params[BLOCKING_STONE_BLOCKS_EXTENSIONS_OF_TWO_FLATS];
                         }
                     }
                 }
@@ -93,7 +106,7 @@ impl Board {
                         }
                     }
                     if their_pieces == 0 && our_pieces > 1 {
-                        *prob += f32::powi(2.0, our_pieces - 1);
+                        *prob += params[STACK_MOVEMENT_THAT_GIVES_US_TOP_PIECES + our_pieces - 2];
                     }
                 }
             }

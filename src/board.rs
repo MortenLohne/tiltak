@@ -23,9 +23,17 @@ use std::{fmt, iter, ops};
 
 /// Extra items for tuning evaluation constants.
 pub trait TunableBoard {
-    const PARAMS: &'static [f32];
+    const VALUE_PARAMS: &'static [f32];
+    const POLICY_PARAMS: &'static [f32];
 
     fn static_eval_with_params(&self, params: &[f32]) -> f32;
+
+    fn generate_moves_with_params(
+        &self,
+        params: &[f32],
+        simple_moves: &mut Vec<Move>,
+        moves: &mut Vec<(Move, mcts::Score)>,
+    );
 }
 
 pub(crate) trait ColorTr {
@@ -670,14 +678,7 @@ impl Board {
         simple_moves: &mut Vec<Move>,
         moves: &mut Vec<(Move, mcts::Score)>,
     ) {
-        debug_assert!(simple_moves.is_empty());
-        self.generate_moves(simple_moves);
-        match self.side_to_move() {
-            Color::White => self
-                .generate_moves_with_probabilities_colortr::<WhiteTr, BlackTr>(simple_moves, moves),
-            Color::Black => self
-                .generate_moves_with_probabilities_colortr::<BlackTr, WhiteTr>(simple_moves, moves),
-        }
+        self.generate_moves_with_params(Board::POLICY_PARAMS, simple_moves, moves)
     }
 
     fn count_all_pieces(&self) -> u8 {
@@ -1026,7 +1027,7 @@ impl board::Board for Board {
 
 impl EvalBoardTrait for Board {
     fn static_eval(&self) -> f32 {
-        self.static_eval_with_params(Self::PARAMS)
+        self.static_eval_with_params(Self::VALUE_PARAMS)
     }
 }
 
@@ -1036,7 +1037,7 @@ const SQUARE_SYMMETRIES: [usize; 25] = [
 
 impl TunableBoard for Board {
     #[allow(clippy::unreadable_literal)]
-    const PARAMS: &'static [f32] = &[
+    const VALUE_PARAMS: &'static [f32] = &[
         0.11546037,
         0.38993832,
         0.3594647,
@@ -1074,6 +1075,8 @@ impl TunableBoard for Board {
         0.092443414,
         0.6003906,
     ];
+    const POLICY_PARAMS: &'static [f32] = &[3.0, 4.0, 2.0, 2.0, 1.0, 2.0, 4.0, 8.0, 16.0];
+
     fn static_eval_with_params(&self, params: &[f32]) -> f32 {
         debug_assert!(self.game_result().is_none());
 
@@ -1183,6 +1186,28 @@ impl TunableBoard for Board {
         const _NEXT_CONST: usize = NUM_RANKS_FILES_OCCUPIED + 6;
 
         material_psqt + to_move + stacks + pieces_in_rank_file_score + num_ranks_occupied_score
+    }
+
+    fn generate_moves_with_params(
+        &self,
+        params: &[f32],
+        simple_moves: &mut Vec<Move>,
+        moves: &mut Vec<(Move, f32)>,
+    ) {
+        debug_assert!(simple_moves.is_empty());
+        self.generate_moves(simple_moves);
+        match self.side_to_move() {
+            Color::White => self.generate_moves_with_probabilities_colortr::<WhiteTr, BlackTr>(
+                params,
+                simple_moves,
+                moves,
+            ),
+            Color::Black => self.generate_moves_with_probabilities_colortr::<BlackTr, WhiteTr>(
+                params,
+                simple_moves,
+                moves,
+            ),
+        }
     }
 }
 

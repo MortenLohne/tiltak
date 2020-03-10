@@ -16,17 +16,20 @@ pub fn train_from_scratch(training_id: usize) -> Result<(), Box<dyn error::Error
     const BATCHES_FOR_TRAINING: usize = 10;
 
     let mut rng = rand::thread_rng();
-    let initial_params: Vec<f32> = vec![rng.gen_range(-0.1, 0.1); Board::PARAMS.len()];
+    let initial_value_params: Vec<f32> = vec![rng.gen_range(-0.1, 0.1); Board::VALUE_PARAMS.len()];
+    let initial_policy_params: Vec<f32> =
+        vec![rng.gen_range(-0.1, 0.1); Board::POLICY_PARAMS.len()];
 
     let mut all_games = vec![];
-    let mut params = initial_params;
+    let mut value_params = initial_value_params;
+    let mut policy_params = initial_policy_params;
 
     let mut batch_id = 0;
 
     loop {
         let games: Vec<Game<Board>> = (0..BATCH_SIZE)
             .into_par_iter()
-            .map(|_| play_game(&params))
+            .map(|_| play_game(&value_params, &policy_params))
             .collect();
         all_games.extend_from_slice(&games[..]);
 
@@ -62,12 +65,12 @@ pub fn train_from_scratch(training_id: usize) -> Result<(), Box<dyn error::Error
         let (positions, results) = positions_and_results_from_games(training_games);
         let middle_index = positions.len() / 2;
 
-        params = gradient_descent::gradient_descent(
+        value_params = gradient_descent::gradient_descent(
             &positions[0..middle_index],
             &results[0..middle_index],
             &positions[middle_index..],
             &results[middle_index..],
-            &params,
+            &value_params,
         );
 
         batch_id += 1;
@@ -108,7 +111,7 @@ pub fn tune_from_file() -> Result<(), Box<dyn error::Error>> {
     let middle_index = positions.len() / 2;
 
     let mut rng = rand::thread_rng();
-    let params: Vec<f32> = vec![rng.gen_range(-0.1, 0.1); Board::PARAMS.len()];
+    let params: Vec<f32> = vec![rng.gen_range(-0.1, 0.1); Board::VALUE_PARAMS.len()];
 
     println!(
         "Final parameters: {:?}",

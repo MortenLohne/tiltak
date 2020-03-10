@@ -32,7 +32,8 @@ pub fn mcts(board: Board, nodes: u64) -> (Move, Score) {
     for _ in 0..nodes.max(2) {
         tree.select(
             &mut board.clone(),
-            Board::PARAMS,
+            Board::VALUE_PARAMS,
+            Board::POLICY_PARAMS,
             &mut simple_moves,
             &mut moves,
         );
@@ -42,12 +43,24 @@ pub fn mcts(board: Board, nodes: u64) -> (Move, Score) {
 }
 
 /// Run mcts with specific static evaluation parameters, for optimization the parameter set.
-pub fn mcts_training(board: Board, nodes: u64, params: &[f32], temperature: f64) -> (Move, Score) {
+pub fn mcts_training(
+    board: Board,
+    nodes: u64,
+    value_params: &[f32],
+    policy_params: &[f32],
+    temperature: f64,
+) -> (Move, Score) {
     let mut tree = Tree::new_root();
     let mut moves = vec![];
     let mut simple_moves = vec![];
     for _ in 0..nodes {
-        tree.select(&mut board.clone(), params, &mut simple_moves, &mut moves);
+        tree.select(
+            &mut board.clone(),
+            value_params,
+            policy_params,
+            &mut simple_moves,
+            &mut moves,
+        );
     }
     tree.best_move(temperature)
 }
@@ -136,7 +149,8 @@ impl Tree {
     pub fn select(
         &mut self,
         board: &mut Board,
-        params: &[f32],
+        value_params: &[f32],
+        policy_params: &[f32],
         simple_moves: &mut Vec<Move>,
         moves: &mut Vec<(Move, Score)>,
     ) -> Score {
@@ -145,11 +159,11 @@ impl Tree {
             self.total_action_value += self.mean_action_value;
             self.mean_action_value
         } else if self.visits == 0 {
-            self.expand(board, params)
+            self.expand(board, value_params)
         } else {
             // Only generate child moves on the 2nd visit
             if self.visits == 1 {
-                self.init_children(&board, simple_moves, moves);
+                self.init_children(&board, simple_moves, policy_params, moves);
             }
 
             let visits_sqrt = (self.visits as Score).sqrt();
@@ -175,7 +189,8 @@ impl Tree {
             let (child, mv) = self.children.get_mut(best_child_node_index).unwrap();
 
             board.do_move(mv.clone());
-            let result = 1.0 - child.select(board, params, simple_moves, moves);
+            let result =
+                1.0 - child.select(board, value_params, policy_params, simple_moves, moves);
             self.visits += 1;
             self.total_action_value += result;
             self.mean_action_value = self.total_action_value / self.visits as Score;
@@ -218,9 +233,10 @@ impl Tree {
         &mut self,
         board: &Board,
         simple_moves: &mut Vec<Move>,
+        policy_params: &[f32],
         moves: &mut Vec<(Move, Score)>,
     ) {
-        board.generate_moves_with_probabilities(simple_moves, moves);
+        board.generate_moves_with_params(policy_params, simple_moves, moves);
         self.children.reserve_exact(moves.len());
         for (mv, heuristic_score) in moves.drain(..) {
             self.children

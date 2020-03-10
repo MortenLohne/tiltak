@@ -188,7 +188,8 @@ fn plays_correct_move_property(move_strings: &[&str], correct_moves: TacticAnswe
     for i in 1..50000 {
         mcts.select(
             &mut board.clone(),
-            Board::PARAMS,
+            Board::VALUE_PARAMS,
+            Board::POLICY_PARAMS,
             &mut simple_moves,
             &mut moves,
         );

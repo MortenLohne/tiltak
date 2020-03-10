@@ -8,7 +8,7 @@ use taik::board::Board;
 use taik::mcts;
 
 /// Play a single training game between the same parameter set
-pub fn play_game(params: &[f32]) -> Game<Board> {
+pub fn play_game(value_params: &[f32], policy_params: &[f32]) -> Game<Board> {
     const MCTS_NODES: u64 = 20_000;
     const TEMPERATURE: f64 = 1.0;
 
@@ -22,9 +22,15 @@ pub fn play_game(params: &[f32]) -> Game<Board> {
         }
         // Turn off temperature in the middle-game, when all games are expected to be unique
         let (best_move, _score) = if num_plies < 20 {
-            mcts::mcts_training(board.clone(), MCTS_NODES, params, TEMPERATURE)
+            mcts::mcts_training(
+                board.clone(),
+                MCTS_NODES,
+                value_params,
+                policy_params,
+                TEMPERATURE,
+            )
         } else {
-            mcts::mcts_training(board.clone(), MCTS_NODES, params, 0.1)
+            mcts::mcts_training(board.clone(), MCTS_NODES, value_params, policy_params, 0.1)
         };
         board.do_move(best_move.clone());
         game_moves.push(best_move);
@@ -43,7 +49,12 @@ pub fn play_game(params: &[f32]) -> Game<Board> {
 /// Play an infinite match between two parameter sets
 /// Prints the match score continuously
 /// In each iteration, each side plays one white and one black game
-pub fn play_match_between_params(params1: &[f32], params2: &[f32]) -> ! {
+pub fn play_match_between_params(
+    value_params1: &[f32],
+    value_params2: &[f32],
+    policy_params1: &[f32],
+    policy_params2: &[f32],
+) -> ! {
     const NODES: u64 = 100_000;
     const TEMPERATURE: f64 = 0.5;
 
@@ -59,8 +70,20 @@ pub fn play_match_between_params(params1: &[f32], params2: &[f32]) -> ! {
                 break;
             }
             let (best_move, _) = match board.side_to_move() {
-                Color::White => mcts::mcts_training(board.clone(), NODES, params1, TEMPERATURE),
-                Color::Black => mcts::mcts_training(board.clone(), NODES, params2, TEMPERATURE),
+                Color::White => mcts::mcts_training(
+                    board.clone(),
+                    NODES,
+                    value_params1,
+                    policy_params1,
+                    TEMPERATURE,
+                ),
+                Color::Black => mcts::mcts_training(
+                    board.clone(),
+                    NODES,
+                    value_params2,
+                    policy_params2,
+                    TEMPERATURE,
+                ),
             };
             board.do_move(best_move.clone());
         }
@@ -79,8 +102,20 @@ pub fn play_match_between_params(params1: &[f32], params2: &[f32]) -> ! {
                 break;
             }
             let (best_move, _) = match board.side_to_move() {
-                Color::White => mcts::mcts_training(board.clone(), NODES, params2, TEMPERATURE),
-                Color::Black => mcts::mcts_training(board.clone(), NODES, params1, TEMPERATURE),
+                Color::White => mcts::mcts_training(
+                    board.clone(),
+                    NODES,
+                    value_params2,
+                    policy_params2,
+                    TEMPERATURE,
+                ),
+                Color::Black => mcts::mcts_training(
+                    board.clone(),
+                    NODES,
+                    value_params1,
+                    policy_params1,
+                    TEMPERATURE,
+                ),
             };
             board.do_move(best_move.clone());
         }

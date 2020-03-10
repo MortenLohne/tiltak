@@ -106,8 +106,8 @@ fn main() {
                 0.092443414,
                 0.6003906,
             ];
-            let params2 = Board::PARAMS;
-            play_match_between_params(params1, params2);
+            let params2 = Board::VALUE_PARAMS;
+            play_match_between_params(params1, params2, Board::POLICY_PARAMS, Board::POLICY_PARAMS);
         }
         s => println!("Unknown option \"{}\"", s),
     }
@@ -192,7 +192,8 @@ fn test_position() {
     for i in 0.. {
         tree.select(
             &mut board.clone(),
-            Board::PARAMS,
+            Board::VALUE_PARAMS,
+            Board::POLICY_PARAMS,
             &mut simple_moves,
             &mut moves,
         );
@@ -328,7 +329,13 @@ fn mem_usage() {
     println!("MCTS node: {} bytes.", mem::size_of::<mcts::Tree>());
     let mut board = board::Board::default();
     let mut tree = mcts::Tree::new_root();
-    tree.select(&mut board, Board::PARAMS, &mut vec![], &mut vec![]);
+    tree.select(
+        &mut board,
+        Board::VALUE_PARAMS,
+        Board::POLICY_PARAMS,
+        &mut vec![],
+        &mut vec![],
+    );
     println!(
         "MCTS node's children: {} bytes.",
         tree.children.len() * mem::size_of::<(mcts::Tree, board::Move)>()
