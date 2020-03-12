@@ -13,6 +13,24 @@ impl Board {
         simple_moves: &mut Vec<Move>,
         moves: &mut Vec<(Move, mcts::Score)>,
     ) {
+        moves.extend(simple_moves.drain(..).map(|mv| {
+            (
+                mv.clone(),
+                self.prob_factor_for_move_colortr::<Us, Them>(params, &mv),
+            )
+        }));
+
+        let p_sum: f32 = moves.iter().map(|(_mv, p)| p).sum();
+        for (_mv, p) in moves.iter_mut() {
+            *p /= p_sum;
+        }
+    }
+
+    pub(crate) fn prob_factor_for_move_colortr<Us: ColorTr, Them: ColorTr>(
+        &self,
+        params: &[f32],
+        mv: &Move,
+    ) -> f32 {
         const NEXT_TO_LAST_TURNS_STONE: usize = 0;
         const FLAT_PIECE_NEXT_TO_TWO_FLAT_PIECES: usize = NEXT_TO_LAST_TURNS_STONE + 1;
         const EXTEND_ROW_OF_TWO_FLATS: usize = FLAT_PIECE_NEXT_TO_TWO_FLAT_PIECES + 1;
@@ -25,96 +43,92 @@ impl Board {
             BLOCKING_STONE_BLOCKS_EXTENSIONS_OF_TWO_FLATS + 1;
         const _NEXT_CONST: usize = STACK_MOVEMENT_THAT_GIVES_US_TOP_PIECES + 4;
 
-        moves.extend(simple_moves.drain(..).map(|mv| (mv, 1.0)));
-        for (mv, prob) in moves.iter_mut() {
-            match mv {
-                Move::Place(piece, square) if *piece == Us::flat_piece() => {
-                    // If square is next to a road stone laid on our last turn
-                    if let Some(Move::Place(last_piece, last_square)) =
-                        self.moves().get(self.moves().len() - 2)
+        let mut prob = 1.0;
+
+        match mv {
+            Move::Place(piece, square) if *piece == Us::flat_piece() => {
+                // If square is next to a road stone laid on our last turn
+                if let Some(Move::Place(last_piece, last_square)) =
+                    self.moves().get(self.moves().len() - 2)
+                {
+                    if Us::is_road_stone(*last_piece)
+                        && square.neighbours().any(|neigh| neigh == *last_square)
                     {
-                        if Us::is_road_stone(*last_piece)
-                            && square.neighbours().any(|neigh| neigh == *last_square)
-                        {
-                            *prob += params[NEXT_TO_LAST_TURNS_STONE];
-                        }
+                        prob += params[NEXT_TO_LAST_TURNS_STONE];
                     }
-                    // If square has two or more of your own pieces around it
-                    if square
-                        .neighbours()
-                        .filter_map(|neighbour| self[neighbour].top_stone())
-                        .filter(|neighbour_piece| Us::is_road_stone(*neighbour_piece))
-                        .count()
-                        >= 2
-                    {
-                        *prob += params[FLAT_PIECE_NEXT_TO_TWO_FLAT_PIECES];
-                    }
-                    for direction in square.directions() {
-                        let neighbour = square.go_direction(direction).unwrap();
-                        if self[neighbour]
-                            .top_stone()
+                }
+                // If square has two or more of your own pieces around it
+                if square
+                    .neighbours()
+                    .filter_map(|neighbour| self[neighbour].top_stone())
+                    .filter(|neighbour_piece| Us::is_road_stone(*neighbour_piece))
+                    .count()
+                    >= 2
+                {
+                    prob += params[FLAT_PIECE_NEXT_TO_TWO_FLAT_PIECES];
+                }
+                for direction in square.directions() {
+                    let neighbour = square.go_direction(direction).unwrap();
+                    if self[neighbour]
+                        .top_stone()
+                        .map(Us::is_road_stone)
+                        .unwrap_or_default()
+                        && neighbour
+                            .go_direction(direction)
+                            .and_then(|sq| self[sq].top_stone())
                             .map(Us::is_road_stone)
                             .unwrap_or_default()
-                            && neighbour
-                                .go_direction(direction)
-                                .and_then(|sq| self[sq].top_stone())
-                                .map(Us::is_road_stone)
-                                .unwrap_or_default()
-                        {
-                            *prob += params[EXTEND_ROW_OF_TWO_FLATS];
-                        }
-                    }
-                }
-                Move::Place(_piece, square) => {
-                    // If square has two or more opponent flatstones around it
-                    if square
-                        .neighbours()
-                        .filter_map(|neighbour| self[neighbour].top_stone())
-                        .filter(|neighbour_piece| *neighbour_piece == Them::flat_piece())
-                        .count()
-                        >= 2
                     {
-                        *prob += params[BLOCKING_STONE_NEXT_TO_TWO_OF_THEIR_FLATS];
-                    }
-                    for direction in square.directions() {
-                        let neighbour = square.go_direction(direction).unwrap();
-                        if self[neighbour]
-                            .top_stone()
-                            .map(Them::is_road_stone)
-                            .unwrap_or_default()
-                            && neighbour
-                                .go_direction(direction)
-                                .and_then(|sq| self[sq].top_stone())
-                                .map(Them::is_road_stone)
-                                .unwrap_or_default()
-                        {
-                            *prob += params[BLOCKING_STONE_BLOCKS_EXTENSIONS_OF_TWO_FLATS];
-                        }
-                    }
-                }
-                Move::Move(square, _direction, stack_movement) => {
-                    let mut our_pieces = 0;
-                    let mut their_pieces = 0;
-                    for piece in self
-                        .top_stones_left_behind_by_move(*square, stack_movement)
-                        .flatten()
-                    {
-                        if Us::piece_is_ours(piece) {
-                            our_pieces += 1;
-                        } else {
-                            their_pieces += 1;
-                        }
-                    }
-                    if their_pieces == 0 && our_pieces > 1 {
-                        *prob += params[STACK_MOVEMENT_THAT_GIVES_US_TOP_PIECES + our_pieces - 2];
+                        prob += params[EXTEND_ROW_OF_TWO_FLATS];
                     }
                 }
             }
+            Move::Place(_piece, square) => {
+                // If square has two or more opponent flatstones around it
+                if square
+                    .neighbours()
+                    .filter_map(|neighbour| self[neighbour].top_stone())
+                    .filter(|neighbour_piece| *neighbour_piece == Them::flat_piece())
+                    .count()
+                    >= 2
+                {
+                    prob += params[BLOCKING_STONE_NEXT_TO_TWO_OF_THEIR_FLATS];
+                }
+                for direction in square.directions() {
+                    let neighbour = square.go_direction(direction).unwrap();
+                    if self[neighbour]
+                        .top_stone()
+                        .map(Them::is_road_stone)
+                        .unwrap_or_default()
+                        && neighbour
+                            .go_direction(direction)
+                            .and_then(|sq| self[sq].top_stone())
+                            .map(Them::is_road_stone)
+                            .unwrap_or_default()
+                    {
+                        prob += params[BLOCKING_STONE_BLOCKS_EXTENSIONS_OF_TWO_FLATS];
+                    }
+                }
+            }
+            Move::Move(square, _direction, stack_movement) => {
+                let mut our_pieces = 0;
+                let mut their_pieces = 0;
+                for piece in self
+                    .top_stones_left_behind_by_move(*square, stack_movement)
+                    .flatten()
+                {
+                    if Us::piece_is_ours(piece) {
+                        our_pieces += 1;
+                    } else {
+                        their_pieces += 1;
+                    }
+                }
+                if their_pieces == 0 && our_pieces > 1 {
+                    prob += params[STACK_MOVEMENT_THAT_GIVES_US_TOP_PIECES + our_pieces - 2];
+                }
+            }
         }
-        let p_sum: f32 = moves.iter().map(|(_mv, p)| p).sum();
-        for (_mv, p) in moves.iter_mut() {
-            *p /= p_sum;
-        }
+        prob
     }
 
     pub(crate) fn generate_moves_colortr<Us: ColorTr, Them: ColorTr>(

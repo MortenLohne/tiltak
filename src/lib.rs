@@ -34,7 +34,7 @@ mod bitboard;
 pub mod board;
 pub mod mcts;
 pub mod minmax;
-mod move_gen;
+pub mod move_gen;
 mod tests;
 
 pub use mcts::mcts;

@@ -7,7 +7,7 @@ use std::io;
 use std::io::Write;
 use taik::board::BOARD_SIZE;
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Game<B: BoardTrait> {
     pub start_board: B,
     pub moves: Vec<(B::Move, String)>,

@@ -1,32 +1,32 @@
 use board_game_traits::board::Board as BoardTrait;
-use board_game_traits::board::GameResult;
 use pgn_traits::pgn::PgnBoard;
 use rayon::prelude::*;
 use std::fmt::Debug;
 use taik::board::TunableBoard;
-use taik::mcts;
+use taik::mcts::Score;
 
-pub fn gradient_descent<B>(
+pub fn gradient_descent_policy<B>(
     positions: &[B],
-    results: &[GameResult],
+    move_scores: &[Vec<(<B as BoardTrait>::Move, Score)>],
     test_positions: &[B],
-    test_results: &[GameResult],
+    test_move_scores: &[Vec<(<B as BoardTrait>::Move, Score)>],
     params: &[f32],
 ) -> Vec<f32>
 where
     B: TunableBoard + BoardTrait + PgnBoard + Send + Debug + Sync + Clone,
+    <B as BoardTrait>::Move: Send + Sync,
 {
-    assert_eq!(positions.len(), results.len());
-    assert_eq!(test_positions.len(), test_results.len());
+    assert_eq!(positions.len(), move_scores.len());
+    assert_eq!(test_positions.len(), test_move_scores.len());
 
-    let mut eta = 0.1;
+    let mut eta = 0.2;
     let beta = 0.8;
 
     // If error is not reduced this number of times, reduce eta, or abort if eta is already low
     const MAX_TRIES: usize = 8;
-    const MIN_SIGNIFICANT_IMPROVEMENT: f32 = 0.00001;
+    const MIN_SIGNIFICANT_IMPROVEMENT: f32 = 0.000001;
 
-    let initial_error = average_error(test_positions, test_results, params);
+    let initial_error = average_error(test_positions, test_move_scores, params);
     println!(
         "Running gradient descent on {} positions and {} test positions",
         positions.len(),
@@ -44,23 +44,23 @@ where
 
     for i in 0.. {
         let last_params = parameter_sets.last().unwrap().clone();
-        let slopes = calc_slope(positions, results, &last_params);
+        let slopes = calc_slope(positions, move_scores, &last_params);
         gradients = gradients
             .iter()
             .zip(slopes)
             .map(|(gradient, slope)| beta * gradient + (1.0 - beta) * slope)
             .collect();
-        trace!("Gradients: {:?}", gradients);
+        println!("Gradients: {:?}", gradients);
 
         let new_params: Vec<f32> = last_params
             .iter()
             .zip(gradients.iter())
             .map(|(param, gradient)| param + gradient * eta)
             .collect();
-        trace!("New parameters: {:?}", new_params);
+        println!("New parameters: {:?}", new_params);
 
-        let error = average_error(test_positions, test_results, &new_params);
-        trace!("Error now {}\n", error);
+        let error = average_error(test_positions, test_move_scores, &new_params);
+        println!("Error now {}\n", error);
 
         if error < lowest_error {
             lowest_error = error;
@@ -69,7 +69,7 @@ where
                 best_iteration = i;
             }
         } else if i - best_iteration > MAX_TRIES {
-            if eta < 0.005 {
+            if eta < 0.0015 {
                 println!(
                     "Finished gradient descent, error is {}. Parameters:\n{:?}",
                     lowest_error, best_parameter_set
@@ -91,12 +91,17 @@ where
 }
 
 /// For each parameter, calculate the slope for that dimension
-fn calc_slope<B>(positions: &[B], results: &[GameResult], params: &[f32]) -> Vec<f32>
+fn calc_slope<B>(
+    positions: &[B],
+    mcts_move_scores: &[Vec<(<B as BoardTrait>::Move, Score)>],
+    params: &[f32],
+) -> Vec<f32>
 where
-    B: TunableBoard + BoardTrait + PgnBoard + Send + Sync + Clone,
+    B: TunableBoard + BoardTrait + PgnBoard + Send + Sync + Debug + Clone,
+    <B as BoardTrait>::Move: Send + Sync,
 {
-    const EPSILON: f32 = 0.001;
-
+    const EPSILON: f32 = 0.01;
+    /*
     params
         .par_iter()
         .enumerate()
@@ -105,45 +110,67 @@ where
             params_hat[i] = p + EPSILON;
             positions
                 .iter()
-                .zip(results)
-                .map(|(board, &game_result)| {
-                    let score1 = board.static_eval_with_params(params);
-                    let score2 = board.static_eval_with_params(&params_hat);
-                    error(score1, game_result) - error(score2, game_result)
+                .zip(mcts_move_scores.iter())
+                .map(|(board, mcts_move_score)| {
+                    error::<B>(board, &mcts_move_score, params)
+                        - error::<B>(board, &mcts_move_score, &params_hat)
                 })
-                .sum::<f32>()
-                / (positions.len() as f32 * EPSILON)
+                .sum::<f32>() / (positions.len() as f32 * EPSILON)
+        })
+        .collect()
+        */
+
+    params
+        .par_iter()
+        .enumerate()
+        .map(|(i, p)| {
+            let mut params_hat: Vec<f32> = params.to_vec();
+            params_hat[i] = p + EPSILON;
+
+            let error_old = average_error(positions, mcts_move_scores, params);
+
+            let error_new = average_error(positions, mcts_move_scores, &params_hat);
+
+            (error_old - error_new) / EPSILON
         })
         .collect()
 }
 
-/// Mean squared error of the parameter set, measured against given results and positions
-fn average_error<B>(positions: &[B], results: &[GameResult], params: &[f32]) -> f32
+/// Mean squared error of the parameter set, measured against given positions and move scores
+fn average_error<B>(
+    positions: &[B],
+    move_scores: &[Vec<(<B as BoardTrait>::Move, Score)>],
+    params: &[f32],
+) -> f32
 where
     B: TunableBoard + BoardTrait + PgnBoard + Send + Debug + Sync,
+    <B as BoardTrait>::Move: Send + Sync,
 {
-    assert_eq!(positions.len(), results.len());
+    assert_eq!(positions.len(), move_scores.len());
     positions
         .into_par_iter()
-        .zip(results)
-        .map(|(board, game_result)| {
-            let eval = board.static_eval_with_params(params);
-            error(eval, *game_result)
-        })
+        .zip(move_scores)
+        .map(|(board, mcts_move_score)| error::<B>(&board, mcts_move_score, params))
         .sum::<f32>()
         / (positions.len() as f32)
 }
-/// Squared error of a single centipawn evaluation
-fn error(eval: f32, game_result: GameResult) -> f32 {
-    let answer = match game_result {
-        GameResult::WhiteWin => 1.0,
-        GameResult::Draw => 0.5,
-        GameResult::BlackWin => 0.0,
-    };
+/// MSE of a single move generation
+fn error<B: TunableBoard>(board: &B, mcts_move_score: &[(B::Move, f32)], params: &[f32]) -> f32 {
+    let mut static_probs: Vec<f32> = mcts_move_score
+        .iter()
+        .map(|(mv, _)| board.prob_factor_for_move(params, mv))
+        .collect();
 
-    f32::powf(answer - sigmoid(eval), 2.0)
-}
+    let prob_factor_sum: f32 = static_probs.iter().sum();
 
-fn sigmoid(eval: f32) -> f32 {
-    mcts::cp_to_win_percentage(eval)
+    for p in static_probs.iter_mut() {
+        *p /= prob_factor_sum
+    }
+
+    mcts_move_score
+        .iter()
+        .zip(static_probs)
+        .map(|((_move, mcts_score), static_prob)| f32::powf(static_prob - *mcts_score, 2.0))
+        .sum::<f32>()
+        / mcts_move_score.len() as f32
 }

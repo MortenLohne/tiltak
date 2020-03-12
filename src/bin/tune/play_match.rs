@@ -10,12 +10,16 @@ use taik::mcts;
 use taik::mcts::Score;
 
 /// Play a single training game between the same parameter set
-pub fn play_game(value_params: &[f32], policy_params: &[f32]) -> Game<Board> {
-    const MCTS_NODES: u64 = 20_000;
+pub fn play_game(
+    value_params: &[f32],
+    policy_params: &[f32],
+) -> (Game<Board>, Vec<Vec<(Move, Score)>>) {
+    const MCTS_NODES: u64 = 10_000;
     const TEMPERATURE: f64 = 1.0;
 
     let mut board = Board::start_board();
     let mut game_moves = vec![];
+    let mut move_scores = vec![];
 
     while board.game_result().is_none() {
         let num_plies = game_moves.len();
@@ -33,16 +37,20 @@ pub fn play_game(value_params: &[f32], policy_params: &[f32]) -> Game<Board> {
         };
         board.do_move(best_move.clone());
         game_moves.push(best_move);
+        move_scores.push(moves_scores);
     }
-    Game {
-        start_board: Board::default(),
-        moves: game_moves
-            .into_iter()
-            .map(|mv| (mv, String::new()))
-            .collect::<Vec<_>>(),
-        game_result: board.game_result(),
-        tags: vec![],
-    }
+    (
+        Game {
+            start_board: Board::default(),
+            moves: game_moves
+                .into_iter()
+                .map(|mv| (mv, String::new()))
+                .collect::<Vec<_>>(),
+            game_result: board.game_result(),
+            tags: vec![],
+        },
+        move_scores,
+    )
 }
 
 pub fn best_move(temperature: f64, move_scores: &[(Move, Score)]) -> Move {

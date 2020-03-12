@@ -22,7 +22,7 @@ use std::ops::{Index, IndexMut};
 use std::{fmt, iter, ops};
 
 /// Extra items for tuning evaluation constants.
-pub trait TunableBoard {
+pub trait TunableBoard: BoardTrait {
     const VALUE_PARAMS: &'static [f32];
     const POLICY_PARAMS: &'static [f32];
 
@@ -31,9 +31,11 @@ pub trait TunableBoard {
     fn generate_moves_with_params(
         &self,
         params: &[f32],
-        simple_moves: &mut Vec<Move>,
-        moves: &mut Vec<(Move, mcts::Score)>,
+        simple_moves: &mut Vec<<Self as BoardTrait>::Move>,
+        moves: &mut Vec<(<Self as BoardTrait>::Move, mcts::Score)>,
     );
+
+    fn prob_factor_for_move(&self, params: &[f32], mv: &Self::Move) -> f32;
 }
 
 pub(crate) trait ColorTr {
@@ -1191,8 +1193,8 @@ impl TunableBoard for Board {
     fn generate_moves_with_params(
         &self,
         params: &[f32],
-        simple_moves: &mut Vec<Move>,
-        moves: &mut Vec<(Move, f32)>,
+        simple_moves: &mut Vec<Self::Move>,
+        moves: &mut Vec<(Self::Move, f32)>,
     ) {
         debug_assert!(simple_moves.is_empty());
         self.generate_moves(simple_moves);
@@ -1207,6 +1209,13 @@ impl TunableBoard for Board {
                 simple_moves,
                 moves,
             ),
+        }
+    }
+
+    fn prob_factor_for_move(&self, params: &[f32], mv: &Move) -> f32 {
+        match self.side_to_move() {
+            Color::White => self.prob_factor_for_move_colortr::<WhiteTr, BlackTr>(params, mv),
+            Color::Black => self.prob_factor_for_move_colortr::<BlackTr, WhiteTr>(params, mv),
         }
     }
 }

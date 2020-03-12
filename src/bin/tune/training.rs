@@ -1,3 +1,4 @@
+use crate::tune::gradient_descent_policy::gradient_descent_policy;
 use crate::tune::pgn_parse::Game;
 use crate::tune::play_match::play_game;
 use crate::tune::{gradient_descent, pgn_parse, play_match};
@@ -6,31 +7,37 @@ use board_game_traits::board::GameResult;
 use rand::prelude::*;
 use rayon::prelude::*;
 use std::io::Read;
-use std::{error, fs, io};
+use std::{error, fs, io, iter};
 use taik::board::Board;
 use taik::board::TunableBoard;
 
 pub fn train_from_scratch(training_id: usize) -> Result<(), Box<dyn error::Error>> {
-    const BATCH_SIZE: usize = 1000;
+    const BATCH_SIZE: usize = 100;
     // Only train from the last n batches
     const BATCHES_FOR_TRAINING: usize = 10;
 
     let mut rng = rand::thread_rng();
-    let initial_value_params: Vec<f32> = vec![rng.gen_range(-0.1, 0.1); Board::VALUE_PARAMS.len()];
-    let initial_policy_params: Vec<f32> =
-        vec![rng.gen_range(-0.1, 0.1); Board::POLICY_PARAMS.len()];
+    let initial_value_params: Vec<f32> = iter::from_fn(|| Some(rng.gen_range(-0.1, 0.1)))
+        .take(Board::VALUE_PARAMS.len())
+        .collect();
+    let initial_policy_params: Vec<f32> = iter::from_fn(|| Some(rng.gen_range(-1.0, 1.0)))
+        .take(Board::POLICY_PARAMS.len())
+        .collect();
 
     let mut all_games = vec![];
+    let mut all_move_scores = vec![];
     let mut value_params = initial_value_params;
     let mut policy_params = initial_policy_params;
 
     let mut batch_id = 0;
 
     loop {
-        let games: Vec<Game<Board>> = (0..BATCH_SIZE)
+        let (games, move_scores): (Vec<_>, Vec<_>) = (0..BATCH_SIZE)
             .into_par_iter()
             .map(|_| play_game(&value_params, &policy_params))
-            .collect();
+            .unzip();
+
+        all_move_scores.extend_from_slice(&move_scores[..]);
         all_games.extend_from_slice(&games[..]);
 
         let file_name = format!("games{}_batch{}.ptn", training_id, batch_id);
@@ -53,16 +60,22 @@ pub fn train_from_scratch(training_id: usize) -> Result<(), Box<dyn error::Error
             games.len(), all_games.len(), game_stats.white_wins, game_stats.draws, game_stats.black_wins, game_stats.aborted
         );
 
-        let mut training_games = all_games
+        let mut training_games_and_move_scores = all_games
             .iter()
             .cloned()
+            .zip(all_move_scores.iter().cloned())
             .rev()
             .take(BATCH_SIZE * BATCHES_FOR_TRAINING)
             .collect::<Vec<_>>();
 
-        training_games.shuffle(&mut rng);
+        training_games_and_move_scores.shuffle(&mut rng);
+
+        let (training_games, training_move_scores): (Vec<_>, Vec<_>) =
+            training_games_and_move_scores.into_iter().unzip();
 
         let (positions, results) = positions_and_results_from_games(training_games);
+        let gradient_descent_move_scores: Vec<_> =
+            training_move_scores.iter().flatten().cloned().collect();
         let middle_index = positions.len() / 2;
 
         value_params = gradient_descent::gradient_descent(
@@ -71,6 +84,14 @@ pub fn train_from_scratch(training_id: usize) -> Result<(), Box<dyn error::Error
             &positions[middle_index..],
             &results[middle_index..],
             &value_params,
+        );
+
+        policy_params = gradient_descent_policy(
+            &positions[0..middle_index],
+            &gradient_descent_move_scores[0..middle_index],
+            &positions[middle_index..],
+            &gradient_descent_move_scores[middle_index..],
+            &policy_params,
         );
 
         batch_id += 1;
@@ -130,11 +151,11 @@ pub fn tune_from_file() -> Result<(), Box<dyn error::Error>> {
 pub fn positions_and_results_from_games(games: Vec<Game<Board>>) -> (Vec<Board>, Vec<GameResult>) {
     let mut positions = vec![];
     let mut results = vec![];
-    for game in games.into_iter().filter(|game| game.game_result.is_some()) {
+    for game in games.into_iter() {
         let mut board = game.start_board;
         for (mv, _) in game.moves {
             positions.push(board.clone());
-            results.push(game.game_result.unwrap());
+            results.push(game.game_result.unwrap_or(GameResult::Draw));
             board.do_move(mv);
             // Deliberately skip the final position
         }
