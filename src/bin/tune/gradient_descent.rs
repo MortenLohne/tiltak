@@ -24,7 +24,6 @@ where
 
     // If error is not reduced this number of times, reduce eta, or abort if eta is already low
     const MAX_TRIES: usize = 8;
-    const MIN_SIGNIFICANT_IMPROVEMENT: f32 = 0.00001;
 
     let initial_error = average_error(test_positions, test_results, params);
     println!(
@@ -65,9 +64,7 @@ where
         if error < lowest_error {
             lowest_error = error;
             best_parameter_set = new_params.to_vec();
-            if error + MIN_SIGNIFICANT_IMPROVEMENT < lowest_error {
-                best_iteration = i;
-            }
+            best_iteration = i;
         } else if i - best_iteration > MAX_TRIES {
             if eta < 0.005 {
                 println!(

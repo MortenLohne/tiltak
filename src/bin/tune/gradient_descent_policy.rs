@@ -19,12 +19,11 @@ where
     assert_eq!(positions.len(), move_scores.len());
     assert_eq!(test_positions.len(), test_move_scores.len());
 
-    let mut eta = 0.2;
+    let mut eta = 5.0;
     let beta = 0.8;
 
     // If error is not reduced this number of times, reduce eta, or abort if eta is already low
     const MAX_TRIES: usize = 8;
-    const MIN_SIGNIFICANT_IMPROVEMENT: f32 = 0.000001;
 
     let initial_error = average_error(test_positions, test_move_scores, params);
     println!(
@@ -65,11 +64,9 @@ where
         if error < lowest_error {
             lowest_error = error;
             best_parameter_set = new_params.to_vec();
-            if error + MIN_SIGNIFICANT_IMPROVEMENT < lowest_error {
-                best_iteration = i;
-            }
+            best_iteration = i;
         } else if i - best_iteration > MAX_TRIES {
-            if eta < 0.0015 {
+            if eta < 0.15 {
                 println!(
                     "Finished gradient descent, error is {}. Parameters:\n{:?}",
                     lowest_error, best_parameter_set
@@ -100,7 +97,7 @@ where
     B: TunableBoard + BoardTrait + PgnBoard + Send + Sync + Debug + Clone,
     <B as BoardTrait>::Move: Send + Sync,
 {
-    const EPSILON: f32 = 0.01;
+    const EPSILON: f32 = 0.001;
     /*
     params
         .par_iter()
@@ -150,12 +147,20 @@ where
     positions
         .into_par_iter()
         .zip(move_scores)
-        .map(|(board, mcts_move_score)| error::<B>(&board, mcts_move_score, params))
+        .map(|(board, mcts_move_score)| {
+            let error = error::<B>(&board, mcts_move_score, params);
+            println!("Error for individual position: {}", error);
+            error
+        })
         .sum::<f32>()
         / (positions.len() as f32)
 }
 /// MSE of a single move generation
-fn error<B: TunableBoard>(board: &B, mcts_move_score: &[(B::Move, f32)], params: &[f32]) -> f32 {
+fn error<B: TunableBoard + Debug>(
+    board: &B,
+    mcts_move_score: &[(B::Move, f32)],
+    params: &[f32],
+) -> f32 {
     let mut static_probs: Vec<f32> = mcts_move_score
         .iter()
         .map(|(mv, _)| board.prob_factor_for_move(params, mv))
@@ -170,7 +175,19 @@ fn error<B: TunableBoard>(board: &B, mcts_move_score: &[(B::Move, f32)], params:
     mcts_move_score
         .iter()
         .zip(static_probs)
-        .map(|((_move, mcts_score), static_prob)| f32::powf(static_prob - *mcts_score, 2.0))
+        .map(|((_move, mcts_score), static_prob)| {
+            let error = f32::powf(static_prob - *mcts_score, 2.0);
+            assert!(
+                error >= 0.0 && error <= 1.0,
+                "Error was {} for static prob {}, mcts score {} for move {:?} on board\n{:?}",
+                error,
+                static_prob,
+                mcts_score,
+                _move,
+                board
+            );
+            error
+        })
         .sum::<f32>()
         / mcts_move_score.len() as f32
 }

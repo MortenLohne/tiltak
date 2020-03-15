@@ -1077,7 +1077,7 @@ impl TunableBoard for Board {
         0.092443414,
         0.6003906,
     ];
-    const POLICY_PARAMS: &'static [f32] = &[3.0, 4.0, 2.0, 2.0, 1.0, 2.0, 4.0, 8.0, 16.0];
+    const POLICY_PARAMS: &'static [f32] = &[0.03, 0.04, 0.02, 0.02, 0.01, 0.02, 0.04, 0.08, 0.16];
 
     fn static_eval_with_params(&self, params: &[f32]) -> f32 {
         debug_assert!(self.game_result().is_none());

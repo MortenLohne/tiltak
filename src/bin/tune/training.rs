@@ -12,7 +12,7 @@ use taik::board::Board;
 use taik::board::TunableBoard;
 
 pub fn train_from_scratch(training_id: usize) -> Result<(), Box<dyn error::Error>> {
-    const BATCH_SIZE: usize = 100;
+    const BATCH_SIZE: usize = 20;
     // Only train from the last n batches
     const BATCHES_FOR_TRAINING: usize = 10;
 
@@ -20,7 +20,7 @@ pub fn train_from_scratch(training_id: usize) -> Result<(), Box<dyn error::Error
     let initial_value_params: Vec<f32> = iter::from_fn(|| Some(rng.gen_range(-0.1, 0.1)))
         .take(Board::VALUE_PARAMS.len())
         .collect();
-    let initial_policy_params: Vec<f32> = iter::from_fn(|| Some(rng.gen_range(-1.0, 1.0)))
+    let initial_policy_params: Vec<f32> = iter::from_fn(|| Some(rng.gen_range(-0.1, 0.1)))
         .take(Board::POLICY_PARAMS.len())
         .collect();
 

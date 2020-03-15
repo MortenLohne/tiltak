@@ -43,7 +43,7 @@ impl Board {
             BLOCKING_STONE_BLOCKS_EXTENSIONS_OF_TWO_FLATS + 1;
         const _NEXT_CONST: usize = STACK_MOVEMENT_THAT_GIVES_US_TOP_PIECES + 4;
 
-        let mut prob = 1.0;
+        let mut prob = 0.01;
 
         match mv {
             Move::Place(piece, square) if *piece == Us::flat_piece() => {
