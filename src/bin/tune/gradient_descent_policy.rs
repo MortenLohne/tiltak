@@ -19,7 +19,7 @@ where
     assert_eq!(positions.len(), move_scores.len());
     assert_eq!(test_positions.len(), test_move_scores.len());
 
-    let mut eta = 5.0;
+    let mut eta = 1.0;
     let beta = 0.8;
 
     // If error is not reduced this number of times, reduce eta, or abort if eta is already low
@@ -32,7 +32,11 @@ where
         test_positions.len()
     );
     println!("Initial parameters: {:?}", params);
-    println!("Initial error: {}", initial_error);
+    println!("Initial test error: {}", initial_error);
+    println!(
+        "Initial training error: {}",
+        average_error(positions, move_scores, params)
+    );
 
     let mut error_sets = vec![initial_error];
     let mut best_iteration = 0;
@@ -61,12 +65,14 @@ where
         let error = average_error(test_positions, test_move_scores, &new_params);
         println!("Error now {}\n", error);
 
-        if error < lowest_error {
+        if error < lowest_error && i - best_iteration <= MAX_TRIES {
+            if lowest_error / error > 1.00001 {
+                best_iteration = i;
+            }
             lowest_error = error;
             best_parameter_set = new_params.to_vec();
-            best_iteration = i;
         } else if i - best_iteration > MAX_TRIES {
-            if eta < 0.15 {
+            if eta < 0.5 {
                 println!(
                     "Finished gradient descent, error is {}. Parameters:\n{:?}",
                     lowest_error, best_parameter_set
@@ -147,11 +153,7 @@ where
     positions
         .into_par_iter()
         .zip(move_scores)
-        .map(|(board, mcts_move_score)| {
-            let error = error::<B>(&board, mcts_move_score, params);
-            println!("Error for individual position: {}", error);
-            error
-        })
+        .map(|(board, mcts_move_score)| error::<B>(&board, mcts_move_score, params))
         .sum::<f32>()
         / (positions.len() as f32)
 }
@@ -163,13 +165,13 @@ fn error<B: TunableBoard + Debug>(
 ) -> f32 {
     let mut static_probs: Vec<f32> = mcts_move_score
         .iter()
-        .map(|(mv, _)| board.prob_factor_for_move(params, mv))
+        .map(|(mv, _)| board.probability_for_move(params, mv))
         .collect();
 
-    let prob_factor_sum: f32 = static_probs.iter().sum();
+    let prob_sum: f32 = static_probs.iter().sum();
 
     for p in static_probs.iter_mut() {
-        *p /= prob_factor_sum
+        *p /= prob_sum
     }
 
     mcts_move_score

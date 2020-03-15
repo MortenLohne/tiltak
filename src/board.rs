@@ -35,7 +35,7 @@ pub trait TunableBoard: BoardTrait {
         moves: &mut Vec<(<Self as BoardTrait>::Move, mcts::Score)>,
     );
 
-    fn prob_factor_for_move(&self, params: &[f32], mv: &Self::Move) -> f32;
+    fn probability_for_move(&self, params: &[f32], mv: &Self::Move) -> f32;
 }
 
 pub(crate) trait ColorTr {
@@ -1212,10 +1212,10 @@ impl TunableBoard for Board {
         }
     }
 
-    fn prob_factor_for_move(&self, params: &[f32], mv: &Move) -> f32 {
+    fn probability_for_move(&self, params: &[f32], mv: &Move) -> f32 {
         match self.side_to_move() {
-            Color::White => self.prob_factor_for_move_colortr::<WhiteTr, BlackTr>(params, mv),
-            Color::Black => self.prob_factor_for_move_colortr::<BlackTr, WhiteTr>(params, mv),
+            Color::White => self.probability_for_move_colortr::<WhiteTr, BlackTr>(params, mv),
+            Color::Black => self.probability_for_move_colortr::<BlackTr, WhiteTr>(params, mv),
         }
     }
 }

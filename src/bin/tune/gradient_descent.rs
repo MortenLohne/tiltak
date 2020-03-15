@@ -32,7 +32,11 @@ where
         test_positions.len()
     );
     println!("Initial parameters: {:?}", params);
-    println!("Initial error: {}", initial_error);
+    println!("Initial test error: {}", initial_error);
+    println!(
+        "Initial training error: {}",
+        average_error(positions, results, params)
+    );
 
     let mut error_sets = vec![initial_error];
     let mut best_iteration = 0;
@@ -49,22 +53,24 @@ where
             .zip(slopes)
             .map(|(gradient, slope)| beta * gradient + (1.0 - beta) * slope)
             .collect();
-        trace!("Gradients: {:?}", gradients);
+        println!("Gradients: {:?}", gradients);
 
         let new_params: Vec<f32> = last_params
             .iter()
             .zip(gradients.iter())
             .map(|(param, gradient)| param + gradient * eta)
             .collect();
-        trace!("New parameters: {:?}", new_params);
+        println!("New parameters: {:?}", new_params);
 
         let error = average_error(test_positions, test_results, &new_params);
-        trace!("Error now {}\n", error);
+        println!("Error now {}\n", error);
 
-        if error < lowest_error {
+        if error < lowest_error && i - best_iteration <= MAX_TRIES {
+            if lowest_error / error > 1.00001 {
+                best_iteration = i;
+            }
             lowest_error = error;
             best_parameter_set = new_params.to_vec();
-            best_iteration = i;
         } else if i - best_iteration > MAX_TRIES {
             if eta < 0.005 {
                 println!(

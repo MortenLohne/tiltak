@@ -18,7 +18,7 @@ use crate::tune::pgn_parse::Game;
 #[cfg(feature = "constant-tuning")]
 use crate::tune::play_match::play_match_between_params;
 #[cfg(feature = "constant-tuning")]
-use crate::tune::training::train_from_scratch;
+use crate::tune::training;
 use board_game_traits::board::Board as BoardTrait;
 use board_game_traits::board::{Color, GameResult};
 use pgn_traits::pgn::PgnBoard;
@@ -54,7 +54,20 @@ fn main() {
             for i in 0.. {
                 let file_name = format!("games{}_batch0.ptn", i);
                 if !Path::new(&file_name).exists() {
-                    train_from_scratch(i).unwrap();
+                    training::train_from_scratch(i).unwrap();
+                    break;
+                } else {
+                    println!("File {} already exists, trying next.", file_name);
+                }
+            }
+        }
+        #[cfg(feature = "constant-tuning")]
+        "train" => {
+            for i in 0.. {
+                let file_name = format!("games{}_batch0.ptn", i);
+                if !Path::new(&file_name).exists() {
+                    training::train_perpetually(i, Board::VALUE_PARAMS, Board::POLICY_PARAMS)
+                        .unwrap();
                     break;
                 } else {
                     println!("File {} already exists, trying next.", file_name);

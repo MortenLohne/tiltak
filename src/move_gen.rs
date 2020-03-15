@@ -16,7 +16,7 @@ impl Board {
         moves.extend(simple_moves.drain(..).map(|mv| {
             (
                 mv.clone(),
-                self.prob_factor_for_move_colortr::<Us, Them>(params, &mv),
+                self.probability_for_move_colortr::<Us, Them>(params, &mv),
             )
         }));
 
@@ -26,7 +26,7 @@ impl Board {
         }
     }
 
-    pub(crate) fn prob_factor_for_move_colortr<Us: ColorTr, Them: ColorTr>(
+    pub(crate) fn probability_for_move_colortr<Us: ColorTr, Them: ColorTr>(
         &self,
         params: &[f32],
         mv: &Move,
@@ -43,7 +43,7 @@ impl Board {
             BLOCKING_STONE_BLOCKS_EXTENSIONS_OF_TWO_FLATS + 1;
         const _NEXT_CONST: usize = STACK_MOVEMENT_THAT_GIVES_US_TOP_PIECES + 4;
 
-        let mut prob = 0.01;
+        let mut prob = 0.0;
 
         match mv {
             Move::Place(piece, square) if *piece == Us::flat_piece() => {
@@ -128,7 +128,7 @@ impl Board {
                 }
             }
         }
-        prob
+        mcts::cp_to_win_percentage(prob)
     }
 
     pub(crate) fn generate_moves_colortr<Us: ColorTr, Them: ColorTr>(

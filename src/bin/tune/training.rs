@@ -12,11 +12,8 @@ use taik::board::Board;
 use taik::board::TunableBoard;
 
 pub fn train_from_scratch(training_id: usize) -> Result<(), Box<dyn error::Error>> {
-    const BATCH_SIZE: usize = 20;
-    // Only train from the last n batches
-    const BATCHES_FOR_TRAINING: usize = 10;
-
     let mut rng = rand::thread_rng();
+
     let initial_value_params: Vec<f32> = iter::from_fn(|| Some(rng.gen_range(-0.1, 0.1)))
         .take(Board::VALUE_PARAMS.len())
         .collect();
@@ -24,10 +21,24 @@ pub fn train_from_scratch(training_id: usize) -> Result<(), Box<dyn error::Error
         .take(Board::POLICY_PARAMS.len())
         .collect();
 
+    train_perpetually(training_id, &initial_value_params, &initial_policy_params)
+}
+
+pub fn train_perpetually(
+    training_id: usize,
+    initial_value_params: &[f32],
+    initial_policy_params: &[f32],
+) -> Result<(), Box<dyn error::Error>> {
+    const BATCH_SIZE: usize = 100;
+    // Only train from the last n batches
+    const BATCHES_FOR_TRAINING: usize = 20;
+
+    let mut rng = rand::thread_rng();
+
     let mut all_games = vec![];
     let mut all_move_scores = vec![];
-    let mut value_params = initial_value_params;
-    let mut policy_params = initial_policy_params;
+    let mut value_params = initial_value_params.to_vec();
+    let mut policy_params = initial_policy_params.to_vec();
 
     let mut batch_id = 0;
 
