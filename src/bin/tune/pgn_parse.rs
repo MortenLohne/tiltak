@@ -137,17 +137,17 @@ pub fn parse_pgn<B: PgnBoard + Debug + Clone>(
                     .map(|(a, b)| ((*a).to_string(), (*b).to_string()))
                     .collect();
 
-                let game_result =
-                    tags.iter()
-                        .find(|(name, _)| name == "Result")
-                        .map(|(_, result)| match result.as_ref() {
-                            "1-0" => Some(GameResult::WhiteWin),
-                            "1/2-1/2" => Some(GameResult::Draw),
-                            "0-1" => Some(GameResult::BlackWin),
-                            "*" => None,
-                            _ => panic!("No result for game."), // TODO: Failure to read a single game should be recoverable
-                        })
-                        .flatten();
+                let game_result = tags
+                    .iter()
+                    .find(|(name, _)| name == "Result")
+                    .map(|(_, result)| match result.as_ref() {
+                        "1-0" => Some(GameResult::WhiteWin),
+                        "1/2-1/2" => Some(GameResult::Draw),
+                        "0-1" => Some(GameResult::BlackWin),
+                        "*" => None,
+                        _ => panic!("No result for game."), // TODO: Failure to read a single game should be recoverable
+                    })
+                    .flatten();
 
                 let game = Game {
                     start_board: B::start_board(),
