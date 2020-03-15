@@ -1077,7 +1077,18 @@ impl TunableBoard for Board {
         0.092443414,
         0.6003906,
     ];
-    const POLICY_PARAMS: &'static [f32] = &[0.03, 0.04, 0.02, 0.02, 0.01, 0.02, 0.04, 0.08, 0.16];
+    #[allow(clippy::unreadable_literal)]
+    const POLICY_PARAMS: &'static [f32] = &[
+        0.038381916,
+        0.0491587,
+        0.031898748,
+        0.018819356,
+        0.009084657,
+        0.020691695,
+        0.039978735,
+        0.07973039,
+        0.15955997,
+    ];
 
     fn static_eval_with_params(&self, params: &[f32]) -> f32 {
         debug_assert!(self.game_result().is_none());
