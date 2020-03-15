@@ -19,7 +19,7 @@ where
     assert_eq!(positions.len(), move_scores.len());
     assert_eq!(test_positions.len(), test_move_scores.len());
 
-    let mut eta = 1.0;
+    let mut eta = 5.0;
     let beta = 0.8;
 
     // If error is not reduced this number of times, reduce eta, or abort if eta is already low
@@ -104,24 +104,6 @@ where
     <B as BoardTrait>::Move: Send + Sync,
 {
     const EPSILON: f32 = 0.001;
-    /*
-    params
-        .par_iter()
-        .enumerate()
-        .map(|(i, p)| {
-            let mut params_hat: Vec<f32> = params.to_vec();
-            params_hat[i] = p + EPSILON;
-            positions
-                .iter()
-                .zip(mcts_move_scores.iter())
-                .map(|(board, mcts_move_score)| {
-                    error::<B>(board, &mcts_move_score, params)
-                        - error::<B>(board, &mcts_move_score, &params_hat)
-                })
-                .sum::<f32>() / (positions.len() as f32 * EPSILON)
-        })
-        .collect()
-        */
 
     params
         .par_iter()
@@ -131,7 +113,6 @@ where
             params_hat[i] = p + EPSILON;
 
             let error_old = average_error(positions, mcts_move_scores, params);
-
             let error_new = average_error(positions, mcts_move_scores, &params_hat);
 
             (error_old - error_new) / EPSILON

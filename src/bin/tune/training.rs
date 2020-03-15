@@ -29,7 +29,7 @@ pub fn train_perpetually(
     initial_value_params: &[f32],
     initial_policy_params: &[f32],
 ) -> Result<(), Box<dyn error::Error>> {
-    const BATCH_SIZE: usize = 100;
+    const BATCH_SIZE: usize = 200;
     // Only train from the last n batches
     const BATCHES_FOR_TRAINING: usize = 20;
 
@@ -133,7 +133,7 @@ impl GameStats {
 }
 
 pub fn tune_from_file() -> Result<(), Box<dyn error::Error>> {
-    let mut file = fs::File::open("output3.ptn")?;
+    let mut file = fs::File::open("games0_all.ptn")?;
     let mut input = String::new();
     file.read_to_string(&mut input)?;
     let games: Vec<Game<Board>> = pgn_parse::parse_pgn(&input)?;

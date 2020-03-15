@@ -19,7 +19,7 @@ where
     assert_eq!(positions.len(), results.len());
     assert_eq!(test_positions.len(), test_results.len());
 
-    let mut eta = 0.1;
+    let mut eta = 5.0;
     let beta = 0.8;
 
     // If error is not reduced this number of times, reduce eta, or abort if eta is already low
@@ -96,7 +96,7 @@ where
 /// For each parameter, calculate the slope for that dimension
 fn calc_slope<B>(positions: &[B], results: &[GameResult], params: &[f32]) -> Vec<f32>
 where
-    B: TunableBoard + BoardTrait + PgnBoard + Send + Sync + Clone,
+    B: TunableBoard + BoardTrait + PgnBoard + Send + Sync + Clone + Debug,
 {
     const EPSILON: f32 = 0.001;
 
@@ -106,16 +106,11 @@ where
         .map(|(i, p)| {
             let mut params_hat: Vec<f32> = params.to_vec();
             params_hat[i] = p + EPSILON;
-            positions
-                .iter()
-                .zip(results)
-                .map(|(board, &game_result)| {
-                    let score1 = board.static_eval_with_params(params);
-                    let score2 = board.static_eval_with_params(&params_hat);
-                    error(score1, game_result) - error(score2, game_result)
-                })
-                .sum::<f32>()
-                / (positions.len() as f32 * EPSILON)
+
+            let error_old = average_error(positions, results, params);
+            let error_new = average_error(positions, results, &params_hat);
+
+            (error_old - error_new) / EPSILON
         })
         .collect()
 }
