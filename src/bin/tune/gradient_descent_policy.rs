@@ -19,11 +19,11 @@ where
     assert_eq!(positions.len(), move_scores.len());
     assert_eq!(test_positions.len(), test_move_scores.len());
 
-    let mut eta = 5.0;
+    let mut eta = 500.0;
     let beta = 0.8;
 
     // If error is not reduced this number of times, reduce eta, or abort if eta is already low
-    const MAX_TRIES: usize = 8;
+    const MAX_TRIES: usize = 20;
 
     let initial_error = average_error(test_positions, test_move_scores, params);
     println!(
@@ -72,7 +72,7 @@ where
             lowest_error = error;
             best_parameter_set = new_params.to_vec();
         } else if i - best_iteration > MAX_TRIES {
-            if eta < 0.5 {
+            if eta < 10.0 {
                 println!(
                     "Finished gradient descent, error is {}. Parameters:\n{:?}",
                     lowest_error, best_parameter_set

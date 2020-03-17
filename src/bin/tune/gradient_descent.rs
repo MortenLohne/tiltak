@@ -23,7 +23,7 @@ where
     let beta = 0.8;
 
     // If error is not reduced this number of times, reduce eta, or abort if eta is already low
-    const MAX_TRIES: usize = 8;
+    const MAX_TRIES: usize = 12;
 
     let initial_error = average_error(test_positions, test_results, params);
     println!(
@@ -72,7 +72,7 @@ where
             lowest_error = error;
             best_parameter_set = new_params.to_vec();
         } else if i - best_iteration > MAX_TRIES {
-            if eta < 0.005 {
+            if eta < 0.01 {
                 println!(
                     "Finished gradient descent, error is {}. Parameters:\n{:?}",
                     lowest_error, best_parameter_set
