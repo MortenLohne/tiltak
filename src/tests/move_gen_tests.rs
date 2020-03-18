@@ -161,6 +161,12 @@ pub fn perft_check_answers(board: &mut Board, answers: &[u64]) {
             board
         );
         assert_eq!(
+            perft(&mut board.flip_colors(), depth as u16),
+            answer,
+            "Wrong perft result on\n{:?}",
+            board
+        );
+        assert_eq!(
             perft(&mut board.rotate_board(), depth as u16),
             answer,
             "Wrong perft result on\n{:?}",

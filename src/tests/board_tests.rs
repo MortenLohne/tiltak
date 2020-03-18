@@ -2,7 +2,7 @@ use crate::board::Piece::{BlackCap, BlackFlat, WhiteFlat, WhiteStanding};
 use crate::board::{squares_iterator, Board, Direction::*, Move, Piece, Role, Square, BOARD_SIZE};
 use crate::tests::do_moves_and_check_validity;
 use crate::{board as board_mod, board};
-use board_game_traits::board::Board as BoardTrait;
+use board_game_traits::board::{Board as BoardTrait, EvalBoard};
 use board_game_traits::board::{GameResult, GameResult::*};
 use pgn_traits::pgn::PgnBoard;
 use rand::seq::SliceRandom;
@@ -173,10 +173,22 @@ fn play_random_games_test() {
     let mut duration = 0;
 
     let mut rng = rand::thread_rng();
-    for _ in 0..2000 {
+    for _ in 0..5_000 {
         let mut board = board_mod::Board::default();
         let mut moves = vec![];
         for i in 0.. {
+            assert_eq!(board, board.flip_colors().flip_colors());
+
+            let eval = board.static_eval();
+            for rotation in board.rotations_and_symmetries() {
+                if board.side_to_move() == rotation.side_to_move() {
+                    assert!(rotation.static_eval() - eval < 0.0001);
+                }
+                else {
+                    assert!(rotation.static_eval() - eval.abs() < 0.0001);
+                }
+            }
+
             moves.clear();
             board.generate_moves(&mut moves);
             let mv = moves
@@ -185,7 +197,18 @@ fn play_random_games_test() {
                 .clone();
             assert_eq!(mv, board.move_from_san(&board.move_to_san(&mv)).unwrap());
             board.do_move(mv);
-            match board.game_result() {
+
+            let result = board.game_result();
+            for rotation in board.rotations_and_symmetries() {
+                if board.side_to_move() == rotation.side_to_move() {
+                    assert_eq!(rotation.game_result(), result);
+                }
+                else {
+                    assert_eq!(rotation.game_result().map(|r|!r), result);
+                }
+            }
+
+            match result {
                 None => (),
                 Some(WhiteWin) => {
                     white_wins += 1;

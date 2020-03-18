@@ -18,6 +18,8 @@ use pgn_traits::pgn;
 use std::cmp::Ordering;
 use std::fmt::Write;
 use std::iter::FromIterator;
+#[cfg(test)]
+use std::mem;
 use std::ops::{Index, IndexMut};
 use std::{fmt, iter, ops};
 
@@ -292,6 +294,17 @@ impl Piece {
 
     pub fn is_road_piece(self) -> bool {
         WhiteTr::is_road_stone(self) || BlackTr::is_road_stone(self)
+    }
+
+    pub fn flip_color(self) -> Self {
+        match self {
+            WhiteFlat => BlackFlat,
+            BlackFlat => WhiteFlat,
+            WhiteStanding => BlackStanding,
+            BlackStanding => WhiteStanding,
+            WhiteCap => BlackCap,
+            BlackCap => WhiteCap,
+        }
     }
 }
 
@@ -667,6 +680,50 @@ impl Board {
         new_board.black_road_pieces = new_board.black_road_pieces_from_scratch();
         new_board.white_road_pieces = new_board.white_road_pieces_from_scratch();
         new_board
+    }
+
+    #[cfg(test)]
+    pub fn flip_colors(&self) -> Board {
+        let mut new_board = self.clone();
+        for square in squares_iterator() {
+            new_board[square] = Stack::default();
+            for piece in self[square].clone() {
+                new_board[square].push(piece.flip_color());
+            }
+        }
+        mem::swap(
+            &mut new_board.white_stones_left,
+            &mut new_board.black_stones_left,
+        );
+        mem::swap(
+            &mut new_board.white_capstones_left,
+            &mut new_board.black_capstones_left,
+        );
+        mem::swap(
+            &mut new_board.white_road_pieces,
+            &mut new_board.black_road_pieces,
+        );
+        for mv in new_board.moves.iter_mut() {
+            match mv {
+                Move::Place(piece, _) => *piece = piece.flip_color(),
+
+                Move::Move(_, _, _) => (),
+            }
+        }
+        new_board.to_move = !new_board.to_move;
+        new_board
+    }
+
+    #[cfg(test)]
+    pub fn rotations_and_symmetries(&self) -> Vec<Board> {
+        vec![
+            self.flip_board_x(),
+            self.flip_board_y(),
+            self.rotate_board(),
+            self.rotate_board().rotate_board(),
+            self.rotate_board().rotate_board().rotate_board(),
+            self.flip_colors(),
+        ]
     }
 
     /// Move generation that includes a heuristic probability of each move being played.
