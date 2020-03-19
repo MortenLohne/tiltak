@@ -6,6 +6,10 @@ use crate::board::{
 use crate::{board, mcts};
 use arrayvec::ArrayVec;
 
+pub fn sigmoid(x: f32) -> f32 {
+    1.0 / (1.0 + f32::exp(-x))
+}
+
 impl Board {
     pub(crate) fn generate_moves_with_probabilities_colortr<Us: ColorTr, Them: ColorTr>(
         &self,
@@ -19,11 +23,6 @@ impl Board {
                 self.probability_for_move_colortr::<Us, Them>(params, &mv),
             )
         }));
-
-        let p_sum: f32 = moves.iter().map(|(_mv, p)| p).sum();
-        for (_mv, p) in moves.iter_mut() {
-            *p /= p_sum;
-        }
     }
 
     pub(crate) fn probability_for_move_colortr<Us: ColorTr, Them: ColorTr>(
@@ -31,7 +30,12 @@ impl Board {
         params: &[f32],
         mv: &Move,
     ) -> f32 {
-        const NEXT_TO_LAST_TURNS_STONE: usize = 0;
+        use crate::board::SQUARE_SYMMETRIES;
+
+        const FLAT_STONE_PSQT: usize = 0;
+        const STANDING_STONE_PSQT: usize = FLAT_STONE_PSQT + 6;
+        const CAPSTONE_PSQT: usize = STANDING_STONE_PSQT + 6;
+        const NEXT_TO_LAST_TURNS_STONE: usize = CAPSTONE_PSQT + 6;
         const FLAT_PIECE_NEXT_TO_TWO_FLAT_PIECES: usize = NEXT_TO_LAST_TURNS_STONE + 1;
         const EXTEND_ROW_OF_TWO_FLATS: usize = FLAT_PIECE_NEXT_TO_TWO_FLAT_PIECES + 1;
 
@@ -39,14 +43,19 @@ impl Board {
         const BLOCKING_STONE_BLOCKS_EXTENSIONS_OF_TWO_FLATS: usize =
             BLOCKING_STONE_NEXT_TO_TWO_OF_THEIR_FLATS + 1;
 
-        const STACK_MOVEMENT_THAT_GIVES_US_TOP_PIECES: usize =
-            BLOCKING_STONE_BLOCKS_EXTENSIONS_OF_TWO_FLATS + 1;
+        const MOVEMENT_BASE_BONUS: usize = BLOCKING_STONE_NEXT_TO_TWO_OF_THEIR_FLATS + 1;
+        const STACK_MOVEMENT_THAT_GIVES_US_TOP_PIECES: usize = MOVEMENT_BASE_BONUS + 1;
         const _NEXT_CONST: usize = STACK_MOVEMENT_THAT_GIVES_US_TOP_PIECES + 4;
 
-        let mut prob = 0.0;
-
         match mv {
-            Move::Place(piece, square) if *piece == Us::flat_piece() => {
+            Move::Place(piece, square) if piece.role() == Flat => {
+                // Apply PSQT
+                let mut score = if *piece == Us::flat_piece() {
+                    params[FLAT_STONE_PSQT + SQUARE_SYMMETRIES[square.0 as usize]]
+                } else {
+                    // Reverse score if it's the first/second move
+                    - params[FLAT_STONE_PSQT + SQUARE_SYMMETRIES[square.0 as usize]]
+                };
                 // If square is next to a road stone laid on our last turn
                 if let Some(Move::Place(last_piece, last_square)) =
                     self.moves().get(self.moves().len() - 2)
@@ -54,7 +63,7 @@ impl Board {
                     if Us::is_road_stone(*last_piece)
                         && square.neighbours().any(|neigh| neigh == *last_square)
                     {
-                        prob += params[NEXT_TO_LAST_TURNS_STONE];
+                        score += params[NEXT_TO_LAST_TURNS_STONE];
                     }
                 }
                 // If square has two or more of your own pieces around it
@@ -65,7 +74,7 @@ impl Board {
                     .count()
                     >= 2
                 {
-                    prob += params[FLAT_PIECE_NEXT_TO_TWO_FLAT_PIECES];
+                    score += params[FLAT_PIECE_NEXT_TO_TWO_FLAT_PIECES];
                 }
                 for direction in square.directions() {
                     let neighbour = square.go_direction(direction).unwrap();
@@ -79,11 +88,23 @@ impl Board {
                             .map(Us::is_road_stone)
                             .unwrap_or_default()
                     {
-                        prob += params[EXTEND_ROW_OF_TWO_FLATS];
+                        score += params[EXTEND_ROW_OF_TWO_FLATS];
                     }
                 }
+                sigmoid(score)
             }
-            Move::Place(_piece, square) => {
+            Move::Place(piece, square) => {
+                // Apply PSQT:
+                let mut score = if *piece == Us::standing_piece() {
+                    params[STANDING_STONE_PSQT + SQUARE_SYMMETRIES[square.0 as usize]]
+                } else if *piece == Us::cap_piece() {
+                    params[CAPSTONE_PSQT + SQUARE_SYMMETRIES[square.0 as usize]]
+                } else {
+                    unreachable!(
+                        "Tried to place {:?} with move {} on board\n{:?}",
+                        piece, mv, self
+                    );
+                };
                 // If square has two or more opponent flatstones around it
                 if square
                     .neighbours()
@@ -92,7 +113,7 @@ impl Board {
                     .count()
                     >= 2
                 {
-                    prob += params[BLOCKING_STONE_NEXT_TO_TWO_OF_THEIR_FLATS];
+                    score += params[BLOCKING_STONE_NEXT_TO_TWO_OF_THEIR_FLATS];
                 }
                 for direction in square.directions() {
                     let neighbour = square.go_direction(direction).unwrap();
@@ -106,11 +127,13 @@ impl Board {
                             .map(Them::is_road_stone)
                             .unwrap_or_default()
                     {
-                        prob += params[BLOCKING_STONE_BLOCKS_EXTENSIONS_OF_TWO_FLATS];
+                        score += params[BLOCKING_STONE_BLOCKS_EXTENSIONS_OF_TWO_FLATS];
                     }
                 }
+                sigmoid(score)
             }
             Move::Move(square, _direction, stack_movement) => {
+                let mut score = params[MOVEMENT_BASE_BONUS];
                 let mut our_pieces = 0;
                 let mut their_pieces = 0;
                 for piece in self
@@ -124,11 +147,11 @@ impl Board {
                     }
                 }
                 if their_pieces == 0 && our_pieces > 1 {
-                    prob += params[STACK_MOVEMENT_THAT_GIVES_US_TOP_PIECES + our_pieces - 2];
+                    score += params[STACK_MOVEMENT_THAT_GIVES_US_TOP_PIECES + our_pieces - 2];
                 }
+                sigmoid(score)
             }
         }
-        mcts::cp_to_win_percentage(prob)
     }
 
     pub(crate) fn generate_moves_colortr<Us: ColorTr, Them: ColorTr>(

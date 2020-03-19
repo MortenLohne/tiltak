@@ -30,6 +30,14 @@ use taik::mcts;
 use taik::minmax;
 
 fn main() {
+    for &x in [
+        -5.0, -4.0, -3.0, -2.0, -1.0, -0.1, -0.01, 0.0, 0.01, 0.01, 0.1, 1.0, 2.0, 3.0, 4.0, 5.0,
+    ]
+    .iter()
+    {
+        println!("S({}): {}", x, taik::move_gen::sigmoid(x));
+    }
+
     println!("play: Play against the mcts AI");
     println!("aimatch: Watch the minmax and mcts AIs play");
     println!("analyze: Mcts analysis of a hardcoded position");

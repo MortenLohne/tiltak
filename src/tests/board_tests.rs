@@ -183,8 +183,7 @@ fn play_random_games_test() {
             for rotation in board.rotations_and_symmetries() {
                 if board.side_to_move() == rotation.side_to_move() {
                     assert!(rotation.static_eval() - eval < 0.0001);
-                }
-                else {
+                } else {
                     assert!(rotation.static_eval() - eval.abs() < 0.0001);
                 }
             }
@@ -202,9 +201,8 @@ fn play_random_games_test() {
             for rotation in board.rotations_and_symmetries() {
                 if board.side_to_move() == rotation.side_to_move() {
                     assert_eq!(rotation.game_result(), result);
-                }
-                else {
-                    assert_eq!(rotation.game_result().map(|r|!r), result);
+                } else {
+                    assert_eq!(rotation.game_result().map(|r| !r), result);
                 }
             }
 

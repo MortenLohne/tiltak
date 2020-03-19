@@ -19,7 +19,7 @@ where
     assert_eq!(positions.len(), move_scores.len());
     assert_eq!(test_positions.len(), test_move_scores.len());
 
-    let mut eta = 500.0;
+    let mut eta = 10.0;
     let beta = 0.8;
 
     // If error is not reduced this number of times, reduce eta, or abort if eta is already low
@@ -72,7 +72,7 @@ where
             lowest_error = error;
             best_parameter_set = new_params.to_vec();
         } else if i - best_iteration > MAX_TRIES {
-            if eta < 10.0 {
+            if eta < 0.5 {
                 println!(
                     "Finished gradient descent, error is {}. Parameters:\n{:?}",
                     lowest_error, best_parameter_set
@@ -144,16 +144,10 @@ fn error<B: TunableBoard + Debug>(
     mcts_move_score: &[(B::Move, f32)],
     params: &[f32],
 ) -> f32 {
-    let mut static_probs: Vec<f32> = mcts_move_score
+    let static_probs: Vec<f32> = mcts_move_score
         .iter()
         .map(|(mv, _)| board.probability_for_move(params, mv))
         .collect();
-
-    let prob_sum: f32 = static_probs.iter().sum();
-
-    for p in static_probs.iter_mut() {
-        *p /= prob_sum
-    }
 
     mcts_move_score
         .iter()
