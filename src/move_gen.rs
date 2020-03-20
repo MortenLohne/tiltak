@@ -43,9 +43,11 @@ impl Board {
         const BLOCKING_STONE_BLOCKS_EXTENSIONS_OF_TWO_FLATS: usize =
             BLOCKING_STONE_NEXT_TO_TWO_OF_THEIR_FLATS + 1;
 
-        const MOVEMENT_BASE_BONUS: usize = BLOCKING_STONE_NEXT_TO_TWO_OF_THEIR_FLATS + 1;
+        const MOVEMENT_BASE_BONUS: usize = BLOCKING_STONE_BLOCKS_EXTENSIONS_OF_TWO_FLATS + 1;
         const STACK_MOVEMENT_THAT_GIVES_US_TOP_PIECES: usize = MOVEMENT_BASE_BONUS + 1;
         const _NEXT_CONST: usize = STACK_MOVEMENT_THAT_GIVES_US_TOP_PIECES + 4;
+
+        assert_eq!(params.len(), _NEXT_CONST);
 
         match mv {
             Move::Place(piece, square) if piece.role() == Flat => {
@@ -53,8 +55,8 @@ impl Board {
                 let mut score = if *piece == Us::flat_piece() {
                     params[FLAT_STONE_PSQT + SQUARE_SYMMETRIES[square.0 as usize]]
                 } else {
-                    // Reverse score if it's the first/second move
-                    - params[FLAT_STONE_PSQT + SQUARE_SYMMETRIES[square.0 as usize]]
+                    // If it's the first/second move, give every move equal probability
+                    return 0.04;
                 };
                 // If square is next to a road stone laid on our last turn
                 if let Some(Move::Place(last_piece, last_square)) =
