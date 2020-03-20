@@ -183,10 +183,7 @@ fn test_position() {
     let mut board = Board::default();
     let mut moves = vec![];
 
-    let move_strings: &[&str] = &[
-        "c3", "c2", "d2", "d3", "d2+", "c4", "d2", "b4", "c2+", "c4-", "2d3<", "d4", "b2", "a5",
-        "c2", "a2", "b1", "a2>", "b1+", "d4-", "5c3>23",
-    ];
+    let move_strings: &[&str] = &["e1", "a5"];
 
     for mv_san in move_strings.iter() {
         let mv = board.move_from_san(&mv_san).unwrap();
