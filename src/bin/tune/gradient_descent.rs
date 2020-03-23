@@ -1,20 +1,20 @@
 use board_game_traits::board::Board as BoardTrait;
-use board_game_traits::board::GameResult;
 use pgn_traits::pgn::PgnBoard;
 use rayon::prelude::*;
-use std::fmt::Debug;
 use taik::board::TunableBoard;
-use taik::mcts;
 
-pub fn gradient_descent<B>(
+pub fn gradient_descent<B, T, F>(
     positions: &[B],
-    results: &[GameResult],
+    results: &[T],
     test_positions: &[B],
-    test_results: &[GameResult],
+    test_results: &[T],
     params: &[f32],
+    error: F,
 ) -> Vec<f32>
 where
-    B: TunableBoard + BoardTrait + PgnBoard + Send + Debug + Sync + Clone,
+    B: TunableBoard + BoardTrait + PgnBoard + Send + Sync + Clone,
+    T: Send + Sync,
+    F: Fn(&B, &T, &[f32]) -> f32 + Send + Sync,
 {
     assert_eq!(positions.len(), results.len());
     assert_eq!(test_positions.len(), test_results.len());
@@ -25,7 +25,7 @@ where
     // If error is not reduced this number of times, reduce eta, or abort if eta is already low
     const MAX_TRIES: usize = 12;
 
-    let initial_error = average_error(test_positions, test_results, params);
+    let initial_error = average_error(test_positions, test_results, params, &error);
     println!(
         "Running gradient descent on {} positions and {} test positions",
         positions.len(),
@@ -35,7 +35,7 @@ where
     println!("Initial test error: {}", initial_error);
     println!(
         "Initial training error: {}",
-        average_error(positions, results, params)
+        average_error(positions, results, params, &error)
     );
 
     let mut error_sets = vec![initial_error];
@@ -47,7 +47,7 @@ where
 
     for i in 0.. {
         let last_params = parameter_sets.last().unwrap().clone();
-        let slopes = calc_slope(positions, results, &last_params);
+        let slopes = calc_slope(positions, results, &last_params, &error);
         gradients = gradients
             .iter()
             .zip(slopes)
@@ -62,7 +62,7 @@ where
             .collect();
         println!("New parameters: {:?}", new_params);
 
-        let error = average_error(test_positions, test_results, &new_params);
+        let error = average_error(test_positions, test_results, &new_params, &error);
         println!("Error now {}\n", error);
 
         if error < lowest_error && i - best_iteration <= MAX_TRIES {
@@ -94,9 +94,11 @@ where
 }
 
 /// For each parameter, calculate the slope for that dimension
-fn calc_slope<B>(positions: &[B], results: &[GameResult], params: &[f32]) -> Vec<f32>
+fn calc_slope<B, T, F>(positions: &[B], results: &[T], params: &[f32], error: &F) -> Vec<f32>
 where
-    B: TunableBoard + BoardTrait + PgnBoard + Send + Sync + Clone + Debug,
+    B: TunableBoard + BoardTrait + PgnBoard + Send + Sync + Clone,
+    T: Send + Sync,
+    F: Fn(&B, &T, &[f32]) -> f32 + Send + Sync,
 {
     const EPSILON: f32 = 0.001;
 
@@ -107,8 +109,8 @@ where
             let mut params_hat: Vec<f32> = params.to_vec();
             params_hat[i] = p + EPSILON;
 
-            let error_old = average_error(positions, results, params);
-            let error_new = average_error(positions, results, &params_hat);
+            let error_old = average_error(positions, results, params, error);
+            let error_new = average_error(positions, results, &params_hat, error);
 
             (error_old - error_new) / EPSILON
         })
@@ -116,32 +118,19 @@ where
 }
 
 /// Mean squared error of the parameter set, measured against given results and positions
-fn average_error<B>(positions: &[B], results: &[GameResult], params: &[f32]) -> f32
+fn average_error<B, T, F>(positions: &[B], results: &[T], params: &[f32], error: &F) -> f32
 where
-    B: TunableBoard + BoardTrait + PgnBoard + Send + Debug + Sync,
+    B: TunableBoard + BoardTrait + PgnBoard + Send + Sync,
+    T: Send + Sync,
+    F: Fn(&B, &T, &[f32]) -> f32 + Send + Sync,
 {
     assert_eq!(positions.len(), results.len());
     positions
         .into_par_iter()
         .zip(results)
         .map(|(board, game_result)| {
-            let eval = board.static_eval_with_params(params);
-            error(eval, *game_result)
+            error(board, game_result, params)
         })
         .sum::<f32>()
         / (positions.len() as f32)
-}
-/// Squared error of a single centipawn evaluation
-fn error(eval: f32, game_result: GameResult) -> f32 {
-    let answer = match game_result {
-        GameResult::WhiteWin => 1.0,
-        GameResult::Draw => 0.5,
-        GameResult::BlackWin => 0.0,
-    };
-
-    f32::powf(answer - sigmoid(eval), 2.0)
-}
-
-fn sigmoid(eval: f32) -> f32 {
-    mcts::cp_to_win_percentage(eval)
 }

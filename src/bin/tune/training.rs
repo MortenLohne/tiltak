@@ -1,7 +1,7 @@
 use crate::tune::gradient_descent_policy::gradient_descent_policy;
 use crate::tune::pgn_parse::Game;
 use crate::tune::play_match::play_game;
-use crate::tune::{gradient_descent, pgn_parse, play_match};
+use crate::tune::{gradient_descent_value, pgn_parse, play_match};
 use board_game_traits::board::Board as BoardTrait;
 use board_game_traits::board::GameResult;
 use rand::prelude::*;
@@ -97,7 +97,7 @@ pub fn train_perpetually(
         let middle_index = positions.len() / 2;
 
         let value_tuning_start_time = time::Instant::now();
-        value_params = gradient_descent::gradient_descent(
+        value_params = gradient_descent_value::gradient_descent(
             &positions[0..middle_index],
             &results[0..middle_index],
             &positions[middle_index..],
@@ -163,7 +163,7 @@ pub fn tune_from_file() -> Result<(), Box<dyn error::Error>> {
 
     println!(
         "Final parameters: {:?}",
-        gradient_descent::gradient_descent(
+        gradient_descent_value::gradient_descent(
             &positions[0..middle_index],
             &results[0..middle_index],
             &positions[middle_index..],
