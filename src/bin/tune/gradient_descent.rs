@@ -1,20 +1,17 @@
-use board_game_traits::board::Board as BoardTrait;
-use pgn_traits::pgn::PgnBoard;
 use rayon::prelude::*;
-use taik::board::TunableBoard;
 
-pub fn gradient_descent<B, T, F>(
+pub fn gradient_descent<B, R, F>(
     positions: &[B],
-    results: &[T],
+    results: &[R],
     test_positions: &[B],
-    test_results: &[T],
+    test_results: &[R],
     params: &[f32],
     error_function: F,
 ) -> Vec<f32>
 where
-    B: TunableBoard + BoardTrait + PgnBoard + Send + Sync + Clone,
-    T: Send + Sync,
-    F: Fn(&B, &T, &[f32]) -> f32 + Send + Sync,
+    B: Send + Sync,
+    R: Send + Sync,
+    F: Fn(&B, &R, &[f32]) -> f32 + Send + Sync,
 {
     assert_eq!(positions.len(), results.len());
     assert_eq!(test_positions.len(), test_results.len());
@@ -92,11 +89,11 @@ where
 }
 
 /// For each parameter, calculate the slope for that dimension
-fn calc_slope<B, T, F>(positions: &[B], results: &[T], params: &[f32], error: &F) -> Vec<f32>
+fn calc_slope<B, R, F>(positions: &[B], results: &[R], params: &[f32], error: &F) -> Vec<f32>
 where
-    B: TunableBoard + BoardTrait + PgnBoard + Send + Sync + Clone,
-    T: Send + Sync,
-    F: Fn(&B, &T, &[f32]) -> f32 + Send + Sync,
+    B: Send + Sync,
+    R: Send + Sync,
+    F: Fn(&B, &R, &[f32]) -> f32 + Send + Sync,
 {
     const EPSILON: f32 = 0.001;
 
@@ -116,11 +113,11 @@ where
 }
 
 /// Mean squared error of the parameter set, measured against given results and positions
-fn average_error<B, T, F>(positions: &[B], results: &[T], params: &[f32], error: &F) -> f32
+fn average_error<B, R, F>(positions: &[B], results: &[R], params: &[f32], error: &F) -> f32
 where
-    B: TunableBoard + BoardTrait + PgnBoard + Send + Sync,
-    T: Send + Sync,
-    F: Fn(&B, &T, &[f32]) -> f32 + Send + Sync,
+    B: Send + Sync,
+    R: Send + Sync,
+    F: Fn(&B, &R, &[f32]) -> f32 + Send + Sync,
 {
     assert_eq!(positions.len(), results.len());
     positions

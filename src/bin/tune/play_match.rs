@@ -14,7 +14,7 @@ pub fn play_game(
     value_params: &[f32],
     policy_params: &[f32],
 ) -> (Game<Board>, Vec<Vec<(Move, Score)>>) {
-    const MCTS_NODES: u64 = 20_000;
+    const MCTS_NODES: u64 = 1_000;
     const TEMPERATURE: f64 = 1.0;
 
     let mut board = Board::start_board();
