@@ -22,7 +22,7 @@ where
         test_positions,
         test_move_scores,
         params,
-        &[1000.0, 100.0, 10.0],
+        &[10000.0, 1000.0, 100.0],
         |a, b, c| error(a, b, c),
     )
 }
@@ -34,7 +34,7 @@ fn error<B: TunableBoard + Debug>(
 ) -> f32 {
     let static_probs: Vec<f32> = mcts_move_score
         .iter()
-        .map(|(mv, _)| board.probability_for_move(params, mv))
+        .map(|(mv, _)| board.probability_for_move(params, mv, mcts_move_score.len()))
         .collect();
 
     mcts_move_score

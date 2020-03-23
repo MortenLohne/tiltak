@@ -20,7 +20,7 @@ where
     let beta = 0.8;
 
     // If error is not reduced this number of times, reduce eta, or abort if eta is already low
-    const MAX_TRIES: usize = 8;
+    const MAX_TRIES: usize = 10;
 
     let initial_error = average_error(test_positions, test_results, params, &error_function);
     println!(
@@ -71,7 +71,7 @@ where
 
             if error < lowest_error {
                 iterations_since_improvement = 0;
-                if lowest_error / error > 1.00001 {
+                if lowest_error / error > 1.00002 {
                     iterations_since_large_improvement = 0;
                 } else {
                     iterations_since_large_improvement += 1;

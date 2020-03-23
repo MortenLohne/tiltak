@@ -10,6 +10,10 @@ pub fn sigmoid(x: f32) -> f32 {
     1.0 / (1.0 + f32::exp(-x))
 }
 
+pub fn inverse_sigmoid(x: f32) -> f32 {
+    -f32::ln(1.0 / x - 1.0)
+}
+
 impl Board {
     pub(crate) fn generate_moves_with_probabilities_colortr<Us: ColorTr, Them: ColorTr>(
         &self,
@@ -17,10 +21,11 @@ impl Board {
         simple_moves: &mut Vec<Move>,
         moves: &mut Vec<(Move, mcts::Score)>,
     ) {
+        let num_moves = simple_moves.len();
         moves.extend(simple_moves.drain(..).map(|mv| {
             (
                 mv.clone(),
-                self.probability_for_move_colortr::<Us, Them>(params, &mv),
+                self.probability_for_move_colortr::<Us, Them>(params, &mv, num_moves),
             )
         }));
     }
@@ -29,6 +34,7 @@ impl Board {
         &self,
         params: &[f32],
         mv: &Move,
+        num_moves: usize,
     ) -> f32 {
         use crate::board::SQUARE_SYMMETRIES;
 
@@ -49,15 +55,18 @@ impl Board {
 
         assert_eq!(params.len(), _NEXT_CONST);
 
+        let base_score = inverse_sigmoid(1.0 / num_moves as f32);
+
+        // If it's the first move, give every move equal probability
+        if self.half_moves_played() < 2 {
+            return 0.04;
+        }
+
         match mv {
             Move::Place(piece, square) if piece.role() == Flat => {
                 // Apply PSQT
-                let mut score = if *piece == Us::flat_piece() {
-                    params[FLAT_STONE_PSQT + SQUARE_SYMMETRIES[square.0 as usize]]
-                } else {
-                    // If it's the first/second move, give every move equal probability
-                    return 0.04;
-                };
+                let mut score =
+                    base_score + params[FLAT_STONE_PSQT + SQUARE_SYMMETRIES[square.0 as usize]];
                 // If square is next to a road stone laid on our last turn
                 if let Some(Move::Place(last_piece, last_square)) =
                     self.moves().get(self.moves().len() - 2)
@@ -97,10 +106,11 @@ impl Board {
             }
             Move::Place(piece, square) => {
                 // Apply PSQT:
-                let mut score = if *piece == Us::standing_piece() {
-                    params[STANDING_STONE_PSQT + SQUARE_SYMMETRIES[square.0 as usize]]
+                let mut score = base_score;
+                if *piece == Us::standing_piece() {
+                    score += params[STANDING_STONE_PSQT + SQUARE_SYMMETRIES[square.0 as usize]]
                 } else if *piece == Us::cap_piece() {
-                    params[CAPSTONE_PSQT + SQUARE_SYMMETRIES[square.0 as usize]]
+                    score += params[CAPSTONE_PSQT + SQUARE_SYMMETRIES[square.0 as usize]]
                 } else {
                     unreachable!(
                         "Tried to place {:?} with move {} on board\n{:?}",
@@ -135,7 +145,8 @@ impl Board {
                 sigmoid(score)
             }
             Move::Move(square, _direction, stack_movement) => {
-                let mut score = params[MOVEMENT_BASE_BONUS];
+                let mut score = base_score;
+                score += params[MOVEMENT_BASE_BONUS];
                 let mut our_pieces = 0;
                 let mut their_pieces = 0;
                 for piece in self
@@ -160,8 +171,9 @@ impl Board {
         &self,
         params: &[f32],
         mv: &Move,
+        num_moves: usize,
     ) -> f32 {
-        self.probability_for_game_phase::<Us, Them>(params, mv)
+        self.probability_for_game_phase::<Us, Them>(params, mv, num_moves)
     }
 
     pub(crate) fn generate_moves_colortr<Us: ColorTr, Them: ColorTr>(
