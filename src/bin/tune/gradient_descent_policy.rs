@@ -1,9 +1,9 @@
+use crate::tune::gradient_descent;
 use board_game_traits::board::Board as BoardTrait;
 use pgn_traits::pgn::PgnBoard;
 use std::fmt::Debug;
 use taik::board::TunableBoard;
 use taik::mcts::Score;
-use crate::tune::gradient_descent;
 
 pub fn gradient_descent_policy<B>(
     positions: &[B],
@@ -16,7 +16,14 @@ where
     B: TunableBoard + BoardTrait + PgnBoard + Send + Debug + Sync + Clone,
     <B as BoardTrait>::Move: Send + Sync,
 {
-    gradient_descent::gradient_descent(positions, move_scores, test_positions, test_move_scores, params, |a, b, c| error(a, b, c))
+    gradient_descent::gradient_descent(
+        positions,
+        move_scores,
+        test_positions,
+        test_move_scores,
+        params,
+        |a, b, c| error(a, b, c),
+    )
 }
 /// MSE of a single move generation
 fn error<B: TunableBoard + Debug>(

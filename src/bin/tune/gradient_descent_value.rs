@@ -1,10 +1,10 @@
+use crate::tune::gradient_descent;
 use board_game_traits::board::Board as BoardTrait;
 use board_game_traits::board::GameResult;
 use pgn_traits::pgn::PgnBoard;
 use std::fmt::Debug;
 use taik::board::TunableBoard;
 use taik::mcts;
-use crate::tune::gradient_descent;
 
 pub fn gradient_descent<B>(
     positions: &[B],
@@ -16,7 +16,14 @@ pub fn gradient_descent<B>(
 where
     B: TunableBoard + BoardTrait + PgnBoard + Send + Debug + Sync + Clone,
 {
-    gradient_descent::gradient_descent(positions, results, test_positions, test_results, params, |a, b, c| error(a, *b, c))
+    gradient_descent::gradient_descent(
+        positions,
+        results,
+        test_positions,
+        test_results,
+        params,
+        |a, b, c| error(a, *b, c),
+    )
 }
 /// Squared error of a single centipawn evaluation
 fn error<B: TunableBoard>(board: &B, game_result: GameResult, params: &[f32]) -> f32 {
