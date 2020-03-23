@@ -7,6 +7,7 @@ use board_game_traits::board::GameResult;
 use rand::prelude::*;
 use rayon::prelude::*;
 use std::io::Read;
+use std::time;
 use std::{error, fs, io, iter};
 use taik::board::Board;
 use taik::board::TunableBoard;
@@ -41,12 +42,18 @@ pub fn train_perpetually(
     let mut policy_params = initial_policy_params.to_vec();
 
     let mut batch_id = 0;
+    let start_time = time::Instant::now();
+    let mut playing_time = time::Duration::default();
+    let mut value_tuning_time = time::Duration::default();
+    let mut policy_tuning_time = time::Duration::default();
 
     loop {
+        let playing_start_time = time::Instant::now();
         let (games, move_scores): (Vec<_>, Vec<_>) = (0..BATCH_SIZE)
             .into_par_iter()
             .map(|_| play_game(&value_params, &policy_params))
             .unzip();
+        playing_time += playing_start_time.elapsed();
 
         all_move_scores.extend_from_slice(&move_scores[..]);
         all_games.extend_from_slice(&games[..]);
@@ -89,6 +96,7 @@ pub fn train_perpetually(
             training_move_scores.iter().flatten().cloned().collect();
         let middle_index = positions.len() / 2;
 
+        let value_tuning_start_time = time::Instant::now();
         value_params = gradient_descent::gradient_descent(
             &positions[0..middle_index],
             &results[0..middle_index],
@@ -96,7 +104,9 @@ pub fn train_perpetually(
             &results[middle_index..],
             &value_params,
         );
+        value_tuning_time += value_tuning_start_time.elapsed();
 
+        let policy_tuning_start_time = time::Instant::now();
         policy_params = gradient_descent_policy(
             &positions[0..middle_index],
             &gradient_descent_move_scores[0..middle_index],
@@ -104,8 +114,14 @@ pub fn train_perpetually(
             &gradient_descent_move_scores[middle_index..],
             &policy_params,
         );
+        policy_tuning_time += policy_tuning_start_time.elapsed();
 
         batch_id += 1;
+        println!("{}s elapsed. Time use breakdown: {:.2}% playing games, {:.2}% tuning value parameters, {:.2}% tuning policy parameters.",
+                 start_time.elapsed().as_secs(),
+                 100.0 * playing_time.as_secs_f64() / start_time.elapsed().as_secs_f64(),
+                 100.0 * value_tuning_time.as_secs_f64() / start_time.elapsed().as_secs_f64(),
+                 100.0 * policy_tuning_time.as_secs_f64() / start_time.elapsed().as_secs_f64());
     }
 }
 
