@@ -140,7 +140,7 @@ impl Tree {
             children: vec![],
             visits: 0,
             total_action_value: 0.0,
-            mean_action_value: 0.5,
+            mean_action_value: 0.1,
             heuristic_score,
             is_terminal: false,
         }
