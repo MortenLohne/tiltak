@@ -66,7 +66,7 @@ where
         println!("Error now {}\n", error);
 
         if error < lowest_error && i - best_iteration <= MAX_TRIES {
-            if lowest_error / error > 1.00001 {
+            if lowest_error / error > 1.000005 {
                 best_iteration = i;
             }
             lowest_error = error;

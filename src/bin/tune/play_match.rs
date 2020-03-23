@@ -14,7 +14,7 @@ pub fn play_game(
     value_params: &[f32],
     policy_params: &[f32],
 ) -> (Game<Board>, Vec<Vec<(Move, Score)>>) {
-    const MCTS_NODES: u64 = 10_000;
+    const MCTS_NODES: u64 = 20_000;
     const TEMPERATURE: f64 = 1.0;
 
     let mut board = Board::start_board();
@@ -30,7 +30,7 @@ pub fn play_game(
         let moves_scores =
             mcts::mcts_training(board.clone(), MCTS_NODES, value_params, policy_params);
         // Turn off temperature in the middle-game, when all games are expected to be unique
-        let best_move = if board.moves_played() < 20 {
+        let best_move = if board.half_moves_played() < 20 {
             best_move(TEMPERATURE, &moves_scores[..])
         } else {
             best_move(0.1, &moves_scores[..])
@@ -92,7 +92,7 @@ pub fn play_match_between_params(
         let mut board = Board::start_board();
 
         while board.game_result().is_none() {
-            if board.moves_played() > 200 {
+            if board.half_moves_played() > 200 {
                 break;
             }
             let moves_scores = match board.side_to_move() {
@@ -117,7 +117,7 @@ pub fn play_match_between_params(
         board = Board::start_board();
 
         while board.game_result().is_none() {
-            if board.moves_played() > 200 {
+            if board.half_moves_played() > 200 {
                 break;
             }
             let moves_scores = match board.side_to_move() {

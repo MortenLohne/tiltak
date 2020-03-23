@@ -25,7 +25,7 @@ impl Board {
         }));
     }
 
-    pub(crate) fn probability_for_move_colortr<Us: ColorTr, Them: ColorTr>(
+    fn probability_for_game_phase<Us: ColorTr, Them: ColorTr>(
         &self,
         params: &[f32],
         mv: &Move,
@@ -154,6 +154,14 @@ impl Board {
                 sigmoid(score)
             }
         }
+    }
+
+    pub(crate) fn probability_for_move_colortr<Us: ColorTr, Them: ColorTr>(
+        &self,
+        params: &[f32],
+        mv: &Move,
+    ) -> f32 {
+        self.probability_for_game_phase::<Us, Them>(params, mv)
     }
 
     pub(crate) fn generate_moves_colortr<Us: ColorTr, Them: ColorTr>(

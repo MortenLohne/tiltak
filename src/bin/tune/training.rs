@@ -29,7 +29,7 @@ pub fn train_perpetually(
     initial_value_params: &[f32],
     initial_policy_params: &[f32],
 ) -> Result<(), Box<dyn error::Error>> {
-    const BATCH_SIZE: usize = 100;
+    const BATCH_SIZE: usize = 1000;
     // Only train from the last n batches
     const BATCHES_FOR_TRAINING: usize = 20;
 

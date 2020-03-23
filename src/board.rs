@@ -631,7 +631,7 @@ impl Board {
     }
 
     /// Number of moves/plies played in the game
-    pub fn moves_played(&self) -> u8 {
+    pub fn half_moves_played(&self) -> u8 {
         self.moves_played
     }
 
@@ -787,6 +787,115 @@ impl Board {
                 }
             })
             .chain(std::iter::once(self[square].top_stone()))
+    }
+
+    fn static_eval_game_phase(&self, params: &[f32]) -> f32 {
+        const FLAT_PSQT: usize = 0;
+        const STAND_PSQT: usize = FLAT_PSQT + 6;
+        const CAP_PSQT: usize = STAND_PSQT + 6;
+
+        let mut material_psqt = 0.0;
+        for square in squares_iterator() {
+            if let Some(piece) = self[square].top_stone() {
+                let i = square.0 as usize;
+                material_psqt += match piece {
+                    WhiteFlat => params[FLAT_PSQT + SQUARE_SYMMETRIES[i]],
+                    BlackFlat => params[FLAT_PSQT + SQUARE_SYMMETRIES[i]] * -1.0,
+                    WhiteStanding => params[STAND_PSQT + SQUARE_SYMMETRIES[i]],
+                    BlackStanding => params[STAND_PSQT + SQUARE_SYMMETRIES[i]] * -1.0,
+                    WhiteCap => params[CAP_PSQT + SQUARE_SYMMETRIES[i]],
+                    BlackCap => params[CAP_PSQT + SQUARE_SYMMETRIES[i]] * -1.0,
+                }
+            }
+        }
+
+        const TO_MOVE: usize = CAP_PSQT + 6;
+
+        let to_move = match self.side_to_move() {
+            Color::White => params[TO_MOVE],
+            Color::Black => -params[TO_MOVE],
+        };
+
+        const STACK: usize = TO_MOVE + 1;
+
+        let stacks: f32 = squares_iterator()
+            .map(|sq| &self[sq])
+            .filter(|stack| stack.len() > 1)
+            .map(|stack| {
+                let top_stone = stack.top_stone().unwrap();
+                let controlling_player = top_stone.color();
+                let mut val = stack
+                    .clone()
+                    .into_iter()
+                    .take(stack.len() as usize - 1)
+                    .map(|piece| {
+                        if piece.color() == controlling_player {
+                            params[STACK]
+                        } else {
+                            -params[STACK + 1]
+                        }
+                    })
+                    .sum::<f32>();
+
+                // Extra bonus for having your capstone over your own piece
+                if top_stone.role() == Cap
+                    && stack.get(stack.len() - 2).unwrap().color() == controlling_player
+                {
+                    val += params[STACK + 2];
+                }
+
+                match top_stone.role() {
+                    Cap => val += params[STACK + 3],
+                    Flat => (),
+                    Standing => val += params[STACK + 4],
+                }
+
+                match top_stone.color() {
+                    Color::White => val,
+                    Color::Black => val * -1.0,
+                }
+            })
+            .sum();
+
+        // Number of pieces in each rank/file
+        const RANK_FILE_CONTROL: usize = STACK + 5;
+        // Number of ranks/files with at least one road stone
+        const NUM_RANKS_FILES_OCCUPIED: usize = RANK_FILE_CONTROL + 6;
+
+        let mut num_ranks_occupied_white = 0;
+        let mut num_files_occupied_white = 0;
+        let mut num_ranks_occupied_black = 0;
+        let mut num_files_occupied_black = 0;
+        let mut pieces_in_rank_file_score = 0.0;
+
+        for rank in (0..BOARD_SIZE as u8).map(|i| self.white_road_pieces().rank(i)) {
+            num_ranks_occupied_white += if rank.is_empty() { 0 } else { 1 };
+            pieces_in_rank_file_score += params[RANK_FILE_CONTROL + rank.count() as usize] as f32;
+        }
+
+        for file in (0..BOARD_SIZE as u8).map(|i| self.white_road_pieces().file(i)) {
+            num_files_occupied_white += if file.is_empty() { 0 } else { 1 };
+            pieces_in_rank_file_score += params[RANK_FILE_CONTROL + file.count() as usize] as f32;
+        }
+
+        for rank in (0..BOARD_SIZE as u8).map(|i| self.black_road_pieces().rank(i)) {
+            num_ranks_occupied_black += if rank.is_empty() { 0 } else { 1 };
+            pieces_in_rank_file_score -= params[RANK_FILE_CONTROL + rank.count() as usize] as f32;
+        }
+
+        for file in (0..BOARD_SIZE as u8).map(|i| self.black_road_pieces().file(i)) {
+            num_files_occupied_black += if file.is_empty() { 0 } else { 1 };
+            pieces_in_rank_file_score -= params[RANK_FILE_CONTROL + file.count() as usize] as f32;
+        }
+
+        let num_ranks_occupied_score = params[NUM_RANKS_FILES_OCCUPIED + num_ranks_occupied_white]
+            + params[NUM_RANKS_FILES_OCCUPIED + num_files_occupied_white]
+            - params[NUM_RANKS_FILES_OCCUPIED + num_ranks_occupied_black]
+            - params[NUM_RANKS_FILES_OCCUPIED + num_files_occupied_black];
+
+        const _NEXT_CONST: usize = NUM_RANKS_FILES_OCCUPIED + 6;
+
+        material_psqt + to_move + stacks + pieces_in_rank_file_score + num_ranks_occupied_score
     }
 }
 
@@ -1169,112 +1278,7 @@ impl TunableBoard for Board {
     fn static_eval_with_params(&self, params: &[f32]) -> f32 {
         debug_assert!(self.game_result().is_none());
 
-        const FLAT_PSQT: usize = 0;
-        const STAND_PSQT: usize = FLAT_PSQT + 6;
-        const CAP_PSQT: usize = STAND_PSQT + 6;
-
-        let mut material_psqt = 0.0;
-        for square in squares_iterator() {
-            if let Some(piece) = self[square].top_stone() {
-                let i = square.0 as usize;
-                material_psqt += match piece {
-                    WhiteFlat => params[FLAT_PSQT + SQUARE_SYMMETRIES[i]],
-                    BlackFlat => params[FLAT_PSQT + SQUARE_SYMMETRIES[i]] * -1.0,
-                    WhiteStanding => params[STAND_PSQT + SQUARE_SYMMETRIES[i]],
-                    BlackStanding => params[STAND_PSQT + SQUARE_SYMMETRIES[i]] * -1.0,
-                    WhiteCap => params[CAP_PSQT + SQUARE_SYMMETRIES[i]],
-                    BlackCap => params[CAP_PSQT + SQUARE_SYMMETRIES[i]] * -1.0,
-                }
-            }
-        }
-
-        const TO_MOVE: usize = CAP_PSQT + 6;
-
-        let to_move = match self.side_to_move() {
-            Color::White => params[TO_MOVE],
-            Color::Black => -params[TO_MOVE],
-        };
-
-        const STACK: usize = TO_MOVE + 1;
-
-        let stacks: f32 = squares_iterator()
-            .map(|sq| &self[sq])
-            .filter(|stack| stack.len() > 1)
-            .map(|stack| {
-                let top_stone = stack.top_stone().unwrap();
-                let controlling_player = top_stone.color();
-                let mut val = stack
-                    .clone()
-                    .into_iter()
-                    .take(stack.len() as usize - 1)
-                    .map(|piece| {
-                        if piece.color() == controlling_player {
-                            params[STACK]
-                        } else {
-                            -params[STACK + 1]
-                        }
-                    })
-                    .sum::<f32>();
-
-                // Extra bonus for having your capstone over your own piece
-                if top_stone.role() == Cap
-                    && stack.get(stack.len() - 2).unwrap().color() == controlling_player
-                {
-                    val += params[STACK + 2];
-                }
-
-                match top_stone.role() {
-                    Cap => val += params[STACK + 3],
-                    Flat => (),
-                    Standing => val += params[STACK + 4],
-                }
-
-                match top_stone.color() {
-                    Color::White => val,
-                    Color::Black => val * -1.0,
-                }
-            })
-            .sum();
-
-        // Number of pieces in each rank/file
-        const RANK_FILE_CONTROL: usize = STACK + 5;
-        // Number of ranks/files with at least one road stone
-        const NUM_RANKS_FILES_OCCUPIED: usize = RANK_FILE_CONTROL + 6;
-
-        let mut num_ranks_occupied_white = 0;
-        let mut num_files_occupied_white = 0;
-        let mut num_ranks_occupied_black = 0;
-        let mut num_files_occupied_black = 0;
-        let mut pieces_in_rank_file_score = 0.0;
-
-        for rank in (0..BOARD_SIZE as u8).map(|i| self.white_road_pieces().rank(i)) {
-            num_ranks_occupied_white += if rank.is_empty() { 0 } else { 1 };
-            pieces_in_rank_file_score += params[RANK_FILE_CONTROL + rank.count() as usize] as f32;
-        }
-
-        for file in (0..BOARD_SIZE as u8).map(|i| self.white_road_pieces().file(i)) {
-            num_files_occupied_white += if file.is_empty() { 0 } else { 1 };
-            pieces_in_rank_file_score += params[RANK_FILE_CONTROL + file.count() as usize] as f32;
-        }
-
-        for rank in (0..BOARD_SIZE as u8).map(|i| self.black_road_pieces().rank(i)) {
-            num_ranks_occupied_black += if rank.is_empty() { 0 } else { 1 };
-            pieces_in_rank_file_score -= params[RANK_FILE_CONTROL + rank.count() as usize] as f32;
-        }
-
-        for file in (0..BOARD_SIZE as u8).map(|i| self.black_road_pieces().file(i)) {
-            num_files_occupied_black += if file.is_empty() { 0 } else { 1 };
-            pieces_in_rank_file_score -= params[RANK_FILE_CONTROL + file.count() as usize] as f32;
-        }
-
-        let num_ranks_occupied_score = params[NUM_RANKS_FILES_OCCUPIED + num_ranks_occupied_white]
-            + params[NUM_RANKS_FILES_OCCUPIED + num_files_occupied_white]
-            - params[NUM_RANKS_FILES_OCCUPIED + num_ranks_occupied_black]
-            - params[NUM_RANKS_FILES_OCCUPIED + num_files_occupied_black];
-
-        const _NEXT_CONST: usize = NUM_RANKS_FILES_OCCUPIED + 6;
-
-        material_psqt + to_move + stacks + pieces_in_rank_file_score + num_ranks_occupied_score
+        self.static_eval_game_phase(params)
     }
 
     fn generate_moves_with_params(
