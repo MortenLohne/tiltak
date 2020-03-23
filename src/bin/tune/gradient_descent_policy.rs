@@ -22,6 +22,7 @@ where
         test_positions,
         test_move_scores,
         params,
+        &[1000.0, 100.0, 10.0],
         |a, b, c| error(a, b, c),
     )
 }

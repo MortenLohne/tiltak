@@ -22,6 +22,7 @@ where
         test_positions,
         test_results,
         params,
+        &[5.0, 0.5, 0.05],
         |a, b, c| error(a, *b, c),
     )
 }

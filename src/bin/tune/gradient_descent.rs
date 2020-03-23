@@ -6,6 +6,7 @@ pub fn gradient_descent<B, R, F>(
     test_positions: &[B],
     test_results: &[R],
     params: &[f32],
+    etas: &[f32],
     error_function: F,
 ) -> Vec<f32>
 where
@@ -16,11 +17,10 @@ where
     assert_eq!(positions.len(), results.len());
     assert_eq!(test_positions.len(), test_results.len());
 
-    let etas = &[5.0, 0.5, 0.05];
     let beta = 0.8;
 
     // If error is not reduced this number of times, reduce eta, or abort if eta is already low
-    const MAX_TRIES: usize = 12;
+    const MAX_TRIES: usize = 8;
 
     let initial_error = average_error(test_positions, test_results, params, &error_function);
     println!(
@@ -39,12 +39,13 @@ where
     let mut best_parameter_set = params.to_vec();
 
     for eta in etas {
-        let mut best_iteration = 0;
+        let mut iterations_since_improvement = 0;
+        let mut iterations_since_large_improvement = 0;
 
         let mut parameter_set = best_parameter_set.clone();
         let mut gradients = vec![0.0; params.len()];
 
-        for i in 0.. {
+        loop {
             let slopes = calc_slope(positions, results, &parameter_set, &error_function);
             gradients = gradients
                 .iter()
@@ -68,14 +69,23 @@ where
             );
             println!("Error now {}\n", error);
 
-            if error < lowest_error && i - best_iteration <= MAX_TRIES {
+            if error < lowest_error {
+                iterations_since_improvement = 0;
                 if lowest_error / error > 1.00001 {
-                    best_iteration = i;
+                    iterations_since_large_improvement = 0;
+                } else {
+                    iterations_since_large_improvement += 1;
+                    if iterations_since_large_improvement >= MAX_TRIES * 2 {
+                        break;
+                    }
                 }
                 lowest_error = error;
                 best_parameter_set = parameter_set.clone();
-            } else if i - best_iteration > MAX_TRIES {
-                break;
+            } else {
+                iterations_since_improvement += 1;
+                if iterations_since_improvement >= MAX_TRIES {
+                    break;
+                }
             }
         }
         println!("Reduced eta to {}, best error was {}\n", eta, lowest_error);
