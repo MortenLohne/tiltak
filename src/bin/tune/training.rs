@@ -78,7 +78,7 @@ pub fn train_perpetually(
             games.len(), all_games.len(), game_stats.white_wins, game_stats.draws, game_stats.black_wins, game_stats.aborted
         );
 
-        let mut training_games_and_move_scores = all_games
+        let mut games_and_move_scores = all_games
             .iter()
             .cloned()
             .zip(all_move_scores.iter().cloned())
@@ -86,32 +86,55 @@ pub fn train_perpetually(
             .take(BATCH_SIZE * BATCHES_FOR_TRAINING)
             .collect::<Vec<_>>();
 
-        training_games_and_move_scores.shuffle(&mut rng);
+        games_and_move_scores.shuffle(&mut rng);
 
-        let (training_games, training_move_scores): (Vec<_>, Vec<_>) =
-            training_games_and_move_scores.into_iter().unzip();
+        let middle_index = games_and_move_scores.len() / 2;
 
-        let (positions, results) = positions_and_results_from_games(training_games);
-        let gradient_descent_move_scores: Vec<_> =
-            training_move_scores.iter().flatten().cloned().collect();
-        let middle_index = positions.len() / 2;
+        let (training_games, training_move_scores): (Vec<_>, Vec<_>) = games_and_move_scores
+            .iter()
+            .take(middle_index)
+            .cloned()
+            .unzip();
+
+        let (test_games, test_move_scores): (Vec<_>, Vec<_>) = games_and_move_scores
+            .iter()
+            .skip(middle_index)
+            .cloned()
+            .unzip();
+
+        let (training_positions, training_results) =
+            positions_and_results_from_games(training_games);
+
+        let (test_positions, test_results) = positions_and_results_from_games(test_games);
 
         let value_tuning_start_time = time::Instant::now();
         value_params = gradient_descent_value::gradient_descent(
-            &positions[0..middle_index],
-            &results[0..middle_index],
-            &positions[middle_index..],
-            &results[middle_index..],
+            &training_positions,
+            &training_results,
+            &test_positions,
+            &test_results,
             &value_params,
         );
         value_tuning_time += value_tuning_start_time.elapsed();
 
+        let flat_training_move_scores = training_move_scores
+            .iter()
+            .flatten()
+            .cloned()
+            .collect::<Vec<_>>();
+
+        let flat_test_move_scores = test_move_scores
+            .iter()
+            .flatten()
+            .cloned()
+            .collect::<Vec<_>>();
+
         let policy_tuning_start_time = time::Instant::now();
         policy_params = gradient_descent_policy(
-            &positions[0..middle_index],
-            &gradient_descent_move_scores[0..middle_index],
-            &positions[middle_index..],
-            &gradient_descent_move_scores[middle_index..],
+            &training_positions,
+            &flat_training_move_scores,
+            &test_positions,
+            &flat_test_move_scores,
             &policy_params,
         );
         policy_tuning_time += policy_tuning_start_time.elapsed();
