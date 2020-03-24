@@ -17,10 +17,10 @@ where
     assert_eq!(positions.len(), results.len());
     assert_eq!(test_positions.len(), test_results.len());
 
-    let beta = 0.8;
+    let beta = 0.9;
 
     // If error is not reduced this number of times, reduce eta, or abort if eta is already low
-    const MAX_TRIES: usize = 10;
+    const MAX_TRIES: usize = 16;
 
     let initial_error = average_error(test_positions, test_results, params, &error_function);
     println!(
@@ -71,7 +71,7 @@ where
 
             if error < lowest_error {
                 iterations_since_improvement = 0;
-                if lowest_error / error > 1.00002 {
+                if lowest_error / error > 1.00001 {
                     iterations_since_large_improvement = 0;
                 } else {
                     iterations_since_large_improvement += 1;
@@ -83,6 +83,7 @@ where
                 best_parameter_set = parameter_set.clone();
             } else {
                 iterations_since_improvement += 1;
+                iterations_since_large_improvement += 1;
                 if iterations_since_improvement >= MAX_TRIES {
                     break;
                 }
