@@ -96,7 +96,7 @@ pub fn play_match_between_params(
     policy_params2: &[f32],
 ) -> ! {
     const NODES: u64 = 100_000;
-    const TEMPERATURE: f64 = 0.5;
+    const TEMPERATURE: f64 = 0.8;
 
     let player1_wins = AtomicU64::new(0);
     let player2_wins = AtomicU64::new(0);
