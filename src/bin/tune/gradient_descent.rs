@@ -52,14 +52,14 @@ where
                 .zip(slopes)
                 .map(|(gradient, slope)| beta * gradient + (1.0 - beta) * slope)
                 .collect();
-            println!("Gradients: {:?}", gradients);
+            trace!("Gradients: {:?}", gradients);
 
             parameter_set = parameter_set
                 .iter()
                 .zip(gradients.iter())
                 .map(|(param, gradient)| param + gradient * eta)
                 .collect();
-            println!("New parameters: {:?}", parameter_set);
+            trace!("New parameters: {:?}", parameter_set);
 
             let error = average_error(
                 test_positions,
@@ -67,7 +67,7 @@ where
                 &parameter_set,
                 &error_function,
             );
-            println!("Error now {}\n", error);
+            trace!("Error now {}\n", error);
 
             if error < lowest_error {
                 iterations_since_improvement = 0;
