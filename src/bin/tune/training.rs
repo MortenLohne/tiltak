@@ -7,6 +7,7 @@ use board_game_traits::board::GameResult;
 use rand::prelude::*;
 use rayon::prelude::*;
 use std::io::Read;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time;
 use std::{error, fs, io, iter};
 use taik::board::Board;
@@ -38,6 +39,10 @@ pub fn train_perpetually(
 
     let mut all_games = vec![];
     let mut all_move_scores = vec![];
+
+    let mut last_value_params = initial_value_params.to_vec();
+    let mut last_policy_params = initial_policy_params.to_vec();
+
     let mut value_params = initial_value_params.to_vec();
     let mut policy_params = initial_policy_params.to_vec();
 
@@ -48,10 +53,49 @@ pub fn train_perpetually(
     let mut policy_tuning_time = time::Duration::default();
 
     loop {
+        let current_params_wins: AtomicU64 = AtomicU64::new(0);
+        let last_params_wins: AtomicU64 = AtomicU64::new(0);
+
         let playing_start_time = time::Instant::now();
         let (games, move_scores): (Vec<_>, Vec<_>) = (0..BATCH_SIZE)
             .into_par_iter()
-            .map(|_| play_game(&value_params, &policy_params))
+            .map(|i| {
+                if i % 2 == 0 {
+                    let game = play_game(
+                        &value_params,
+                        &policy_params,
+                        &last_value_params,
+                        &last_policy_params,
+                    );
+                    match game.0.game_result {
+                        Some(GameResult::WhiteWin) => {
+                            current_params_wins.fetch_add(1, Ordering::Relaxed);
+                        }
+                        Some(GameResult::BlackWin) => {
+                            last_params_wins.fetch_add(1, Ordering::Relaxed);
+                        }
+                        Some(GameResult::Draw) | None => (),
+                    };
+                    game
+                } else {
+                    let game = play_game(
+                        &last_value_params,
+                        &last_policy_params,
+                        &value_params,
+                        &policy_params,
+                    );
+                    match game.0.game_result {
+                        Some(GameResult::BlackWin) => {
+                            current_params_wins.fetch_add(1, Ordering::Relaxed);
+                        }
+                        Some(GameResult::WhiteWin) => {
+                            last_params_wins.fetch_add(1, Ordering::Relaxed);
+                        }
+                        Some(GameResult::Draw) | None => (),
+                    };
+                    game
+                }
+            })
             .unzip();
         playing_time += playing_start_time.elapsed();
 
@@ -74,8 +118,12 @@ pub fn train_perpetually(
 
         let game_stats = GameStats::from_games(&games);
 
-        println!("Finished playing batch of {} games. {} games played in total. {} white wins, {} draws, {} black wins, {} aborted.",
-            games.len(), all_games.len(), game_stats.white_wins, game_stats.draws, game_stats.black_wins, game_stats.aborted
+        let wins = current_params_wins.into_inner();
+        let losses = last_params_wins.into_inner();
+        let draws = BATCH_SIZE as u64 - wins - losses;
+
+        println!("Finished playing batch of {} games. {} games played in total. {} white wins, {} draws, {} black wins, {} aborted. New vs old parameters was +{}-{}={}.",
+            games.len(), all_games.len(), game_stats.white_wins, game_stats.draws, game_stats.black_wins, game_stats.aborted, wins, losses, draws
         );
 
         let mut games_and_move_scores = all_games
@@ -107,13 +155,16 @@ pub fn train_perpetually(
 
         let (test_positions, test_results) = positions_and_results_from_games(test_games);
 
+        last_value_params = value_params;
+        last_policy_params = policy_params;
+
         let value_tuning_start_time = time::Instant::now();
         value_params = gradient_descent_value::gradient_descent(
             &training_positions,
             &training_results,
             &test_positions,
             &test_results,
-            &value_params,
+            &last_value_params,
         );
         value_tuning_time += value_tuning_start_time.elapsed();
 
@@ -135,7 +186,7 @@ pub fn train_perpetually(
             &flat_training_move_scores,
             &test_positions,
             &flat_test_move_scores,
-            &policy_params,
+            &last_policy_params,
         );
         policy_tuning_time += policy_tuning_start_time.elapsed();
 

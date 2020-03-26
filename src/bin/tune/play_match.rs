@@ -11,8 +11,10 @@ use taik::mcts::Score;
 
 /// Play a single training game between the same parameter set
 pub fn play_game(
-    value_params: &[f32],
-    policy_params: &[f32],
+    white_value_params: &[f32],
+    white_policy_params: &[f32],
+    black_value_params: &[f32],
+    black_policy_params: &[f32],
 ) -> (Game<Board>, Vec<Vec<(Move, Score)>>) {
     const MCTS_NODES: u64 = 10_000;
     const TEMPERATURE: f64 = 1.0;
@@ -27,8 +29,20 @@ pub fn play_game(
             break;
         }
 
-        let moves_scores =
-            mcts::mcts_training(board.clone(), MCTS_NODES, value_params, policy_params);
+        let moves_scores = match board.side_to_move() {
+            Color::White => mcts::mcts_training(
+                board.clone(),
+                MCTS_NODES,
+                white_value_params,
+                white_policy_params,
+            ),
+            Color::Black => mcts::mcts_training(
+                board.clone(),
+                MCTS_NODES,
+                black_value_params,
+                black_policy_params,
+            ),
+        };
         // Turn off temperature in the middle-game, when all games are expected to be unique
         let best_move = if board.half_moves_played() < 20 {
             best_move(TEMPERATURE, &moves_scores[..])
