@@ -185,7 +185,7 @@ fn plays_correct_move_property(move_strings: &[&str], correct_moves: TacticAnswe
     let mut moves = vec![];
     let mut simple_moves = vec![];
 
-    for i in 1..50000 {
+    for i in 1..100000 {
         mcts.select(
             &mut board.clone(),
             Board::VALUE_PARAMS,
@@ -193,7 +193,7 @@ fn plays_correct_move_property(move_strings: &[&str], correct_moves: TacticAnswe
             &mut simple_moves,
             &mut moves,
         );
-        if i % 10000 == 0 {
+        if i % 20000 == 0 {
             let (best_move, _score) = mcts.best_move(0.1);
             match correct_moves {
                 TacticAnswer::AvoidMoves(moves) =>
