@@ -15,7 +15,7 @@ use std::io::Write;
 use std::path::Path;
 
 #[cfg(feature = "constant-tuning")]
-use crate::tune::pgn_parse::Game;
+use crate::tune::pgn_writer::Game;
 #[cfg(feature = "constant-tuning")]
 use crate::tune::play_match::play_match_between_params;
 #[cfg(feature = "constant-tuning")]
@@ -356,7 +356,7 @@ fn pgn_to_move_list() {
     let mut file = fs::File::open("game.ptn").unwrap();
     let mut input = String::new();
     file.read_to_string(&mut input).unwrap();
-    let games: Vec<Game<Board>> = tune::pgn_parse::parse_pgn(&input).unwrap();
+    let games: Vec<Game<Board>> = tune::pgn_parser::parse_pgn(&input).unwrap();
     println!("Parsed {} games", games.len());
     print!("[");
     for (mv, _) in games[0].moves.iter() {

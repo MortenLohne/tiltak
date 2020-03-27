@@ -1,5 +1,5 @@
-use crate::tune::pgn_parse;
-use crate::tune::pgn_parse::Game;
+use crate::tune::pgn_writer;
+use crate::tune::pgn_writer::Game;
 use board_game_traits::board::{Board as BoardTrait, Color, GameResult};
 use rand::Rng;
 use rayon::prelude::*;
@@ -178,7 +178,7 @@ pub fn game_to_ptn<W: io::Write>(game: &Game<Board>, writer: &mut W) -> Result<(
         game_result,
         tags,
     } = game;
-    pgn_parse::game_to_pgn(
+    pgn_writer::game_to_pgn(
         &mut start_board.clone(),
         &moves,
         "",

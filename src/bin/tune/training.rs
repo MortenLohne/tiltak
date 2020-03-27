@@ -1,7 +1,7 @@
 use crate::tune::gradient_descent_policy::gradient_descent_policy;
-use crate::tune::pgn_parse::Game;
+use crate::tune::pgn_writer::Game;
 use crate::tune::play_match::play_game;
-use crate::tune::{gradient_descent_value, pgn_parse, play_match};
+use crate::tune::{gradient_descent_value, pgn_parser, play_match};
 use board_game_traits::board::Board as BoardTrait;
 use board_game_traits::board::GameResult;
 use rand::prelude::*;
@@ -226,7 +226,7 @@ pub fn tune_from_file() -> Result<(), Box<dyn error::Error>> {
     let mut file = fs::File::open("games0_all.ptn")?;
     let mut input = String::new();
     file.read_to_string(&mut input)?;
-    let games: Vec<Game<Board>> = pgn_parse::parse_pgn(&input)?;
+    let games: Vec<Game<Board>> = pgn_parser::parse_pgn(&input)?;
 
     let (positions, results) = positions_and_results_from_games(games);
 
