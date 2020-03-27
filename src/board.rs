@@ -548,7 +548,7 @@ pub struct Board {
     black_stones_left: u8,
     white_capstones_left: u8,
     black_capstones_left: u8,
-    moves_played: u8,
+    moves_played: u16,
     moves: Vec<Move>,
 }
 
@@ -631,7 +631,7 @@ impl Board {
     }
 
     /// Number of moves/plies played in the game
-    pub fn half_moves_played(&self) -> u8 {
+    pub fn half_moves_played(&self) -> u16 {
         self.moves_played
     }
 
