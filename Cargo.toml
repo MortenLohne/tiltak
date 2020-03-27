@@ -6,6 +6,7 @@ edition = "2018"
 repository = "https://github.com/MortenLohne/taik/"
 readme = "README.md"
 license = "GPL-3.0-or-later"
+default-run = "main"
 
 [profile.release]
 debug = true
