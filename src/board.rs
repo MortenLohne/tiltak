@@ -673,8 +673,10 @@ impl Board {
         let mut new_board = self.clone();
         for x in 0..BOARD_SIZE as u8 {
             for y in 0..BOARD_SIZE as u8 {
+                let new_x = y;
+                let new_y = BOARD_SIZE as u8 - x - 1;
                 new_board[Square(y * BOARD_SIZE as u8 + x)] =
-                    self[Square(x * BOARD_SIZE as u8 + y)].clone();
+                    self[Square(new_y * BOARD_SIZE as u8 + new_x)].clone();
             }
         }
         new_board.black_road_pieces = new_board.black_road_pieces_from_scratch();
@@ -722,6 +724,8 @@ impl Board {
             self.rotate_board(),
             self.rotate_board().rotate_board(),
             self.rotate_board().rotate_board().rotate_board(),
+            self.rotate_board().flip_board_x(),
+            self.rotate_board().flip_board_y(),
             self.flip_colors(),
         ]
     }
