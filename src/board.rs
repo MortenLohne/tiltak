@@ -231,7 +231,7 @@ impl Square {
     fn parse_square(input: &str) -> Square {
         assert_eq!(input.len(), 2, "Couldn't parse square {}", input);
         Square(
-            (input.chars().nth(0).unwrap() as u8 - b'a')
+            (input.chars().next().unwrap() as u8 - b'a')
                 + (BOARD_SIZE as u8 + b'0' - input.chars().nth(1).unwrap() as u8)
                     * BOARD_SIZE as u8,
         )
