@@ -96,7 +96,7 @@ where
         "Finished gradient descent, error is {}. Parameters:\n{:?}",
         lowest_error, best_parameter_set
     );
-    return best_parameter_set;
+    best_parameter_set
 }
 
 /// For each parameter, calculate the slope for that dimension

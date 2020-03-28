@@ -9,10 +9,7 @@ use pgn_traits::pgn::PgnBoard;
 fn win_in_two_moves_test() {
     let move_strings = ["e5", "c3", "c2", "d5", "c1", "c5", "d3", "a4", "e3"];
 
-    plays_correct_move_property(
-        &move_strings,
-        &["b4", "b5", "Cb4", "Cb5"],
-    );
+    plays_correct_move_property(&move_strings, &["b4", "b5", "Cb4", "Cb5"]);
 }
 
 #[test]
@@ -23,10 +20,7 @@ fn black_win_in_one_move_test() {
         "d1", "e1<", "a5", "e1", "b5", "b3+", "2c4<", "e1+",
     ];
 
-    plays_correct_move_property(
-        &move_strings,
-        &["3b4-", "b3", "Cb3", "e4", "Ce4", "c3<"],
-    );
+    plays_correct_move_property(&move_strings, &["3b4-", "b3", "Cb3", "e4", "Ce4", "c3<"]);
 }
 
 #[test]
@@ -40,10 +34,7 @@ fn white_can_win_in_one_move_test() {
 fn black_avoid_loss_in_one_test() {
     let move_strings = ["b4", "c2", "d2", "c4", "b2", "d4", "e2"];
 
-    plays_correct_move_property(
-        &move_strings,
-        &["a2", "Ca2", "Sa2"],
-    );
+    plays_correct_move_property(&move_strings, &["a2", "Ca2", "Sa2"]);
 }
 
 #[test]
@@ -63,10 +54,7 @@ fn black_avoid_less_in_one_test5() {
         "c4", "b4", "3d4<12", "d2", "d1+", "4c2>", "3b4-", "b2+", "d4-", "3b3-12",
     ];
 
-    plays_correct_move_property(
-        &move_strings,
-        &["Sb4", "Cb4", "Sb5", "Cb5", "c4<", "2c4<"],
-    );
+    plays_correct_move_property(&move_strings, &["Sb4", "Cb4", "Sb5", "Cb5", "c4<", "2c4<"]);
 }
 
 #[test]
@@ -78,10 +66,7 @@ fn white_avoid_loss_in_one_test() {
         "b4", "2c4<", "3b3+", "2c3-", "2b2>", "3d1<", "3c2-", "d1", "5b4-14",
     ];
 
-    plays_correct_move_property(
-        &move_strings,
-        &["Cb5", "Sb5", "b5", "c5<", "d1<"],
-    );
+    plays_correct_move_property(&move_strings, &["Cb5", "Sb5", "b5", "c5<", "d1<"]);
 }
 
 #[test]
@@ -93,10 +78,7 @@ fn white_avoid_loss_in_one_test2() {
         "3b4-", "b4", "c4<", "d3", "c4", "d3+", "c4>", "e4", "2d4>", "2e3+", "2d4>", "d3", "a4",
     ];
 
-    plays_correct_move_property(
-        &move_strings,
-        &["Cd4", "Sd4", "Cc4", "Sc4"],
-    );
+    plays_correct_move_property(&move_strings, &["Cd4", "Sd4", "Cc4", "Sc4"]);
 }
 
 #[test]
