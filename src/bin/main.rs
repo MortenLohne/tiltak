@@ -212,8 +212,9 @@ fn test_position() {
     let mut board = Board::default();
     let mut moves = vec![];
 
-    let move_strings: &[&str] = &["e1", "a5", "Cc3"];
-
+    let move_strings = [
+        "b5", "e2", "Cc3", "b3", "b2", "Cc2", "b4", "c4", "d3", "c5", "e3", "c2<",
+    ];
     for mv_san in move_strings.iter() {
         let mv = board.move_from_san(&mv_san).unwrap();
         board.generate_moves(&mut moves);
@@ -244,7 +245,7 @@ fn test_position() {
             &mut simple_moves,
             &mut moves,
         );
-        if i % 100_000 == 0 {
+        if i % 50_000 == 0 {
             println!("{} visits, val={}", tree.visits, tree.mean_action_value);
             tree.print_info();
             if i > 0 {
