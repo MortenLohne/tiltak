@@ -28,6 +28,8 @@ use taik::board::Board;
 use taik::board::TunableBoard;
 use taik::mcts;
 use taik::minmax;
+#[cfg(feature = "pgn-writer")]
+use taik::pgn_writer::Game;
 
 fn main() {
     println!("play: Play against the mcts AI");
