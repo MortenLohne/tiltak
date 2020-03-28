@@ -11,7 +11,7 @@ fn win_in_two_moves_test() {
 
     plays_correct_move_property(
         &move_strings,
-        TacticAnswer::PlayMoves(&["b4", "b5", "Cb4", "Cb5"]),
+        &["b4", "b5", "Cb4", "Cb5"],
     );
 }
 
@@ -25,7 +25,7 @@ fn black_win_in_one_move_test() {
 
     plays_correct_move_property(
         &move_strings,
-        TacticAnswer::PlayMoves(&["3b4-", "b3", "Cb3", "e4", "Ce4", "c3<"]),
+        &["3b4-", "b3", "Cb3", "e4", "Ce4", "c3<"],
     );
 }
 
@@ -33,7 +33,7 @@ fn black_win_in_one_move_test() {
 fn white_can_win_in_one_move_test() {
     let move_strings = ["b4", "c2", "d2", "c4", "b2", "d4", "e2", "c3"];
 
-    plays_correct_move_property(&move_strings, TacticAnswer::PlayMoves(&["a2", "Ca2"]));
+    plays_correct_move_property(&move_strings, &["a2", "Ca2"]);
 }
 
 #[test]
@@ -42,7 +42,7 @@ fn black_avoid_loss_in_one_test() {
 
     plays_correct_move_property(
         &move_strings,
-        TacticAnswer::PlayMoves(&["a2", "Ca2", "Sa2"]),
+        &["a2", "Ca2", "Sa2"],
     );
 }
 
@@ -52,7 +52,7 @@ fn black_avoid_loss_in_one_test2() {
         "b4", "c2", "d2", "d4", "b2", "c4", "e2", "a2", "c3", "b3", "b2+", "c4-", "c2+", "b2",
         "b1", "d1", "c2", "a3", "2b3-", "a2>", "b1+",
     ];
-    plays_correct_move_property(&move_strings, TacticAnswer::PlayMoves(&["d1+"]));
+    plays_correct_move_property(&move_strings, &["d1+"]);
 }
 
 #[test]
@@ -65,7 +65,7 @@ fn black_avoid_less_in_one_test5() {
 
     plays_correct_move_property(
         &move_strings,
-        TacticAnswer::PlayMoves(&["Sb4", "Cb4", "Sb5", "Cb5", "c4<", "2c4<"]),
+        &["Sb4", "Cb4", "Sb5", "Cb5", "c4<", "2c4<"],
     );
 }
 
@@ -80,7 +80,7 @@ fn white_avoid_loss_in_one_test() {
 
     plays_correct_move_property(
         &move_strings,
-        TacticAnswer::PlayMoves(&["Cb5", "Sb5", "b5", "c5<", "d1<"]),
+        &["Cb5", "Sb5", "b5", "c5<", "d1<"],
     );
 }
 
@@ -95,7 +95,7 @@ fn white_avoid_loss_in_one_test2() {
 
     plays_correct_move_property(
         &move_strings,
-        TacticAnswer::PlayMoves(&["Cd4", "Sd4", "Cc4", "Sc4"]),
+        &["Cd4", "Sd4", "Cc4", "Sc4"],
     );
 }
 
@@ -150,13 +150,7 @@ fn do_not_suicide_as_black_test3() {
     // plays_correct_move_property(&moves_strings, TacticAnswer::AvoidMoves(&["2b5>1"]));
 }
 
-/// The correct answer to a tactic can be either a lost of winning/non-losing moves, or simply a list of moves to specifically avoid
-enum TacticAnswer {
-    AvoidMoves(&'static [&'static str]),
-    PlayMoves(&'static [&'static str]),
-}
-
-fn plays_correct_move_property(move_strings: &[&str], correct_moves: TacticAnswer) {
+fn plays_correct_move_property(move_strings: &[&str], correct_moves: &[&str]) {
     let mut board = Board::default();
     let mut moves = vec![];
 
@@ -165,11 +159,7 @@ fn plays_correct_move_property(move_strings: &[&str], correct_moves: TacticAnswe
     board.generate_moves(&mut moves);
     let mut mcts = mcts::Tree::new_root();
 
-    let relevant_moves = match correct_moves {
-        TacticAnswer::AvoidMoves(a) | TacticAnswer::PlayMoves(a) => a,
-    };
-
-    for move_string in relevant_moves {
+    for move_string in correct_moves {
         assert_eq!(
             *move_string,
             board.move_to_san(&board.move_from_san(move_string).unwrap())
@@ -195,20 +185,11 @@ fn plays_correct_move_property(move_strings: &[&str], correct_moves: TacticAnswe
         );
         if i % 20000 == 0 {
             let (best_move, _score) = mcts.best_move(0.1);
-            match correct_moves {
-                TacticAnswer::AvoidMoves(moves) =>
-                    assert!(moves
-                        .iter()
-                        .all(|mv| best_move != board.move_from_san(mv).unwrap()),
-                            "{} played {}, one of the losing moves {:?} after {} iterations on board:\n{:?}",
-                            board.side_to_move(), board.move_to_san(&best_move), moves, i, board),
-                TacticAnswer::PlayMoves(moves) =>
-                    assert!(moves
+            assert!(correct_moves
                                 .iter()
                                 .any(|mv| best_move == board.move_from_san(mv).unwrap()),
                             "{} didn't play one of {:?} to avoid loss, {} played instead after {} iterations on board:\n{:?}",
-                            board.side_to_move(), moves, board.move_to_san(&best_move), i, board),
-            }
+                            board.side_to_move(), moves, board.move_to_san(&best_move), i, board);
         }
     }
 }
