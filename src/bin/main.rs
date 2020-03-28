@@ -5,9 +5,13 @@ extern crate nom;
 #[macro_use]
 extern crate log;
 
-#[cfg(feature = "constant-tuning")]
+#[cfg(feature = "pgn-writer")]
 mod tune;
+
 pub mod uti;
+
+#[cfg(feature = "pgn-writer")]
+pub use crate::tune::pgn_writer;
 
 use std::io;
 use std::io::Write;

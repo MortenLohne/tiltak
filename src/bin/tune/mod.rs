@@ -1,7 +1,14 @@
+#[cfg(feature = "constant-tuning")]
 pub mod gradient_descent;
+#[cfg(feature = "constant-tuning")]
 pub mod gradient_descent_policy;
+#[cfg(feature = "constant-tuning")]
 pub mod gradient_descent_value;
+#[cfg(feature = "constant-tuning")]
 pub mod pgn_parser;
+#[cfg(feature = "pgn-writer")]
 pub mod pgn_writer;
+#[cfg(feature = "constant-tuning")]
 pub mod play_match;
+#[cfg(feature = "constant-tuning")]
 pub mod training;

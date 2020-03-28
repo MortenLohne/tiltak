@@ -12,7 +12,8 @@ default-run = "main"
 debug = true
 
 [features]
-constant-tuning = ["rayon", "log", "nom"]
+pgn-writer = []
+constant-tuning = ["rayon", "log", "nom", "pgn-writer"]
 
 [dependencies]
 board-game-traits = "0.1"
