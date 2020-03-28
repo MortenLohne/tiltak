@@ -1,9 +1,9 @@
+use crate::board::BOARD_SIZE;
 use board_game_traits::board::Board as BoardTrait;
 use board_game_traits::board::{Color, GameResult};
 use pgn_traits::pgn::PgnBoard;
 use std::io;
 use std::io::Write;
-use taik::board::BOARD_SIZE;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Game<B: BoardTrait> {

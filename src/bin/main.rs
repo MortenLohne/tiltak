@@ -5,21 +5,16 @@ extern crate nom;
 #[macro_use]
 extern crate log;
 
-#[cfg(feature = "pgn-writer")]
+#[cfg(feature = "constant-tuning")]
 mod tune;
 
 pub mod uti;
-
-#[cfg(feature = "pgn-writer")]
-pub use crate::tune::pgn_writer;
 
 use std::io;
 use std::io::Write;
 #[cfg(feature = "constant-tuning")]
 use std::path::Path;
 
-#[cfg(feature = "constant-tuning")]
-use crate::tune::pgn_writer::Game;
 #[cfg(feature = "constant-tuning")]
 use crate::tune::play_match::play_match_between_params;
 #[cfg(feature = "constant-tuning")]

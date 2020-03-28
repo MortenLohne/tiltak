@@ -1,5 +1,4 @@
 use crate::tune::gradient_descent_policy::gradient_descent_policy;
-use crate::tune::pgn_writer::Game;
 use crate::tune::play_match::play_game;
 use crate::tune::{gradient_descent_value, pgn_parser, play_match};
 use board_game_traits::board::Board as BoardTrait;
@@ -12,6 +11,7 @@ use std::time;
 use std::{error, fs, io, iter};
 use taik::board::Board;
 use taik::board::TunableBoard;
+use taik::pgn_writer::Game;
 
 pub fn train_from_scratch(training_id: usize) -> Result<(), Box<dyn error::Error>> {
     let mut rng = rand::thread_rng();

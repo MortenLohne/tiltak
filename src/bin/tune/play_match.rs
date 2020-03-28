@@ -1,13 +1,12 @@
-use crate::tune::pgn_writer;
-use crate::tune::pgn_writer::Game;
 use board_game_traits::board::{Board as BoardTrait, Color, GameResult};
 use rand::Rng;
 use rayon::prelude::*;
 use std::io;
 use std::sync::atomic::{AtomicU64, Ordering};
 use taik::board::{Board, Move};
-use taik::mcts;
 use taik::mcts::Score;
+use taik::pgn_writer::Game;
+use taik::{mcts, pgn_writer};
 
 /// Play a single training game between the same parameter set
 pub fn play_game(

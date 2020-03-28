@@ -38,3 +38,6 @@ pub mod move_gen;
 mod tests;
 
 pub use mcts::mcts;
+
+#[cfg(feature = "pgn-writer")]
+pub mod pgn_writer;
