@@ -6,7 +6,7 @@ use crate::board::{Board, Move, TunableBoard};
 use board_game_traits::board::{Board as BoardTrait, Color, GameResult};
 use rand::Rng;
 
-const C_PUCT: Score = 3.0;
+const C_PUCT: Score = 1.0;
 
 /// Type alias for winning probability, used for scoring positions.
 pub type Score = f32;
