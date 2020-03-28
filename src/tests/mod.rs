@@ -4,6 +4,8 @@ mod board_tests;
 mod mcts_tests;
 #[cfg(test)]
 mod move_gen_tests;
+#[cfg(test)]
+mod tactics_test;
 
 #[cfg(test)]
 use crate::board::Board;
