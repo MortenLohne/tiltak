@@ -20,6 +20,10 @@ cargo build --release
 cargo run --release 
 ```
 
+Either command will automatically fetch and build dependencies. 
+
+A standalone binary will also be written to `taik/target/release`.
+
 # Tests
 
 Use `cargo test` to run tests, `cargo test --release` to run without debugging checks (recommended).
