@@ -820,7 +820,11 @@ impl Board {
             Color::Black => -params[TO_MOVE],
         };
 
-        const STACK: usize = TO_MOVE + 1;
+        const PIECES_IN_OUR_STACK: usize = TO_MOVE + 1;
+        const PIECES_IN_THEIR_STACK: usize = PIECES_IN_OUR_STACK + 1;
+        const CAPSTONE_OVER_OWN_PIECE: usize = PIECES_IN_THEIR_STACK + 1;
+        const CAPSTONE_ON_STACK: usize = CAPSTONE_OVER_OWN_PIECE + 1;
+        const STANDING_STONE_ON_STACK: usize = CAPSTONE_ON_STACK + 1;
 
         let stacks: f32 = squares_iterator()
             .map(|sq| &self[sq])
@@ -834,9 +838,9 @@ impl Board {
                     .take(stack.len() as usize - 1)
                     .map(|piece| {
                         if piece.color() == controlling_player {
-                            params[STACK]
+                            params[PIECES_IN_OUR_STACK]
                         } else {
-                            -params[STACK + 1]
+                            -params[PIECES_IN_THEIR_STACK]
                         }
                     })
                     .sum::<f32>();
@@ -845,13 +849,13 @@ impl Board {
                 if top_stone.role() == Cap
                     && stack.get(stack.len() - 2).unwrap().color() == controlling_player
                 {
-                    val += params[STACK + 2];
+                    val += params[CAPSTONE_OVER_OWN_PIECE];
                 }
 
                 match top_stone.role() {
-                    Cap => val += params[STACK + 3],
+                    Cap => val += params[CAPSTONE_ON_STACK],
                     Flat => (),
-                    Standing => val += params[STACK + 4],
+                    Standing => val += params[STANDING_STONE_ON_STACK],
                 }
 
                 match top_stone.color() {
@@ -862,7 +866,7 @@ impl Board {
             .sum();
 
         // Number of pieces in each rank/file
-        const RANK_FILE_CONTROL: usize = STACK + 5;
+        const RANK_FILE_CONTROL: usize = STANDING_STONE_ON_STACK + 1;
         // Number of ranks/files with at least one road stone
         const NUM_RANKS_FILES_OCCUPIED: usize = RANK_FILE_CONTROL + 6;
 
