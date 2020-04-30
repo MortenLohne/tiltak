@@ -108,12 +108,16 @@ impl Tree {
 
         best_children.iter().take(8).for_each(|(child, mv)| {
             println!(
-                "Move {}: {} visits, {:.3} mean action value, {:.3} static score, {:.3} exploration value, best reply {:?}",
+                "Move {}: {} visits, {:.3} mean action value, {:.3} static score, {:.3} exploration value, pv {}",
                 mv, child.visits, child.mean_action_value, child.heuristic_score,
                 child.exploration_value((parent_visits as Score).sqrt()),
-                if child.children.is_empty() { "".to_string() } else { format!("{:?}", child.best_move(0.1).0) }
+                child.pv().map(|mv| mv.to_string() + " ").collect::<String>()
             )
         });
+    }
+
+    pub fn pv<'a>(&'a self) -> impl Iterator<Item = Move> + 'a {
+        PV::new(self)
     }
 
     pub fn best_move(&self, temperature: f64) -> (Move, Score) {
@@ -251,6 +255,31 @@ impl Tree {
     fn exploration_value(&self, parent_visits_sqrt: Score) -> Score {
         (1.0 - self.mean_action_value)
             + C_PUCT * self.heuristic_score * parent_visits_sqrt / (1 + self.visits) as Score
+    }
+}
+
+struct PV<'a> {
+    tree: &'a Tree,
+}
+
+impl<'a> PV<'a> {
+    fn new(tree: &'a Tree) -> PV<'a> {
+        PV { tree }
+    }
+}
+
+impl<'a> Iterator for PV<'a> {
+    type Item = Move;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.tree
+            .children
+            .iter()
+            .max_by_key(|(child, _)| child.visits)
+            .map(|(child, mv)| {
+                self.tree = child;
+                mv.clone()
+            })
     }
 }
 

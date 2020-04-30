@@ -65,11 +65,13 @@ pub fn main() {
                         total_nodes += nodes_to_search;
                         let (best_move, score) = tree.best_move(0.1);
                         println!(
-                            "info score cp {:.3} nodes {} time {} pv {}",
+                            "info depth {} seldepth {} score cp {:.3} nodes {} time {} pv {}",
+                            i / 2 + 1,
+                            tree.pv().count(),
                             score,
                             total_nodes,
                             start_time.elapsed().as_millis(),
-                            position.move_to_lan(&best_move)
+                            tree.pv().map(|mv| mv.to_string() + " ").collect::<String>()
                         );
                         if start_time.elapsed().as_secs_f64() > movetime.as_secs_f64() * 0.7 {
                             println!("bestmove {}", position.move_to_san(&best_move));
