@@ -126,6 +126,10 @@ impl Tree {
         let mut cumulative_prob = 0.0;
 
         for (child, mv) in self.children.iter() {
+            // If a child node wins, ignore temperature and return it
+            if child.is_terminal && child.mean_action_value == 0.0 {
+                return (mv.clone(), 1.0 - child.mean_action_value);
+            }
             cumulative_prob += (child.visits as f64).powf(1.0 / temperature) / self.visits as f64;
             move_probabilities.push((mv, child.mean_action_value, cumulative_prob));
         }
@@ -200,7 +204,14 @@ impl Tree {
                 1.0 - child.select(board, value_params, policy_params, simple_moves, moves);
             self.visits += 1;
             self.total_action_value += result as f64;
-            self.mean_action_value = self.total_action_value as Score / self.visits as Score;
+
+            // If a child node is winning for us, this node is also a forced win
+            if child.is_terminal && child.mean_action_value == 0.0 {
+                self.is_terminal = true;
+                self.mean_action_value = result;
+            } else {
+                self.mean_action_value = self.total_action_value as Score / self.visits as Score;
+            }
             result
         }
     }
