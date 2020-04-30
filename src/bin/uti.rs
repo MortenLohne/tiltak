@@ -28,11 +28,17 @@ pub fn main() {
                 let mut words_iter = line.split_whitespace();
                 assert_eq!(words_iter.next(), Some("position"));
                 assert_eq!(words_iter.next(), Some("startpos"));
-                assert_eq!(words_iter.next(), Some("moves"));
 
                 position = Board::default();
-                for move_string in words_iter {
-                    position.do_move(position.move_from_san(move_string).unwrap());
+
+                match words_iter.next() {
+                    Some("moves") => {
+                        for move_string in words_iter {
+                            position.do_move(position.move_from_san(move_string).unwrap());
+                        }
+                    }
+                    Some(s) => panic!("Expected \"moves\" in \"{}\", got \"{}\".", line, s),
+                    None => (),
                 }
             }
             "go" => match line.split_whitespace().nth(1) {
@@ -44,13 +50,10 @@ pub fn main() {
                     let mut tree = mcts::Tree::new_root();
                     let mut simple_moves = vec![];
                     let mut moves = vec![];
-                    loop {
-                        if start_time.elapsed() > movetime + Duration::from_millis(100) {
-                            let (best_move, _score) = tree.best_move(0.1);
-                            println!("bestmove {}", position.move_to_san(&best_move));
-                            break;
-                        }
-                        for _ in 0..1000 {
+                    let mut total_nodes = 0;
+                    for i in 0.. {
+                        let nodes_to_search = (1000.0 * f64::powf(1.26, i as f64)) as u64;
+                        for _ in 0..nodes_to_search {
                             tree.select(
                                 &mut position.clone(),
                                 Board::VALUE_PARAMS,
@@ -58,6 +61,19 @@ pub fn main() {
                                 &mut simple_moves,
                                 &mut moves,
                             );
+                        }
+                        total_nodes += nodes_to_search;
+                        let (best_move, score) = tree.best_move(0.1);
+                        println!(
+                            "info score cp {:.3} nodes {} time {} pv {}",
+                            score,
+                            total_nodes,
+                            start_time.elapsed().as_millis(),
+                            position.move_to_lan(&best_move)
+                        );
+                        if start_time.elapsed().as_secs_f64() > movetime.as_secs_f64() * 0.7 {
+                            println!("bestmove {}", position.move_to_san(&best_move));
+                            break;
                         }
                     }
                 }
