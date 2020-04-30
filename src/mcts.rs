@@ -16,7 +16,7 @@ pub type Score = f32;
 pub struct Tree {
     pub children: Vec<(Tree, Move)>,
     pub visits: u64,
-    pub total_action_value: Score,
+    pub total_action_value: f64,
     pub mean_action_value: Score,
     pub heuristic_score: Score,
     pub is_terminal: bool,
@@ -39,7 +39,7 @@ pub fn mcts(board: Board, nodes: u64) -> (Move, Score) {
         );
     }
     let (mv, score) = tree.best_move(0.1);
-    (mv, 1.0 - score)
+    (mv, score)
 }
 
 /// Run mcts with specific static evaluation parameters, for optimization the parameter set.
@@ -129,7 +129,7 @@ impl Tree {
         let p = rng.gen_range(0.0, cumulative_prob);
         for (mv, action_value, p2) in move_probabilities {
             if p2 > p {
-                return (mv.clone(), action_value);
+                return (mv.clone(), 1.0 - action_value);
             }
         }
         unreachable!()
@@ -159,7 +159,7 @@ impl Tree {
     ) -> Score {
         if self.is_terminal {
             self.visits += 1;
-            self.total_action_value += self.mean_action_value;
+            self.total_action_value += self.mean_action_value as f64;
             self.mean_action_value
         } else if self.visits == 0 {
             self.expand(board, value_params)
@@ -195,8 +195,8 @@ impl Tree {
             let result =
                 1.0 - child.select(board, value_params, policy_params, simple_moves, moves);
             self.visits += 1;
-            self.total_action_value += result;
-            self.mean_action_value = self.total_action_value / self.visits as Score;
+            self.total_action_value += result as f64;
+            self.mean_action_value = self.total_action_value as Score / self.visits as Score;
             result
         }
     }
@@ -215,7 +215,7 @@ impl Tree {
             self.is_terminal = true;
             self.visits += 1;
             self.mean_action_value = result;
-            self.total_action_value += result;
+            self.total_action_value += result as f64;
             return result;
         }
 
@@ -224,7 +224,7 @@ impl Tree {
             static_eval = 1.0 - static_eval;
         }
         self.visits += 1;
-        self.total_action_value = static_eval;
+        self.total_action_value = static_eval as f64;
         self.mean_action_value = static_eval;
         static_eval
     }
