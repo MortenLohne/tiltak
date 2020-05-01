@@ -34,7 +34,14 @@ fn avoid_loss_in_three2() {
 
 #[test]
 fn find_win_in_two() {
-    let move_strings = ["a5", "e4", "Cc3", "c4", "b3", "Cd3", "b4", "b5", "d4", "d5", "a4", "c4>", "e4<", "d3+", "e3", "d3", "d2", "4d4<22", "a3", "3b4-", "c5", "2c4+", "a4+", "b2", "b4", "c4", "b1", "c2", "c1", "d1", "d4", "a2", "a4", "e2", "d2<", "c4<", "a4>", "d2", "c4", "b2>", "c1+", "b5-", "4c2>22", "4b4>22", "c3+", "d3-", "3c4>", "3d2>", "4d4-22", "5e2+122", "d4>", "2e3+", "d4>", "2e5-", "d4", "3e4<", "e3", "c2", "a4", "e1", "e3+", "4d4>", "a1", "a2+", "a2"];
+    let move_strings = [
+        "a5", "e4", "Cc3", "c4", "b3", "Cd3", "b4", "b5", "d4", "d5", "a4", "c4>", "e4<", "d3+",
+        "e3", "d3", "d2", "4d4<22", "a3", "3b4-", "c5", "2c4+", "a4+", "b2", "b4", "c4", "b1",
+        "c2", "c1", "d1", "d4", "a2", "a4", "e2", "d2<", "c4<", "a4>", "d2", "c4", "b2>", "c1+",
+        "b5-", "4c2>22", "4b4>22", "c3+", "d3-", "3c4>", "3d2>", "4d4-22", "5e2+122", "d4>",
+        "2e3+", "d4>", "2e5-", "d4", "3e4<", "e3", "c2", "a4", "e1", "e3+", "4d4>", "a1", "a2+",
+        "a2",
+    ];
 
     let mut board = Board::start_board();
 
@@ -65,11 +72,17 @@ fn plays_correct_hard_move_property(move_strings: &[&str], correct_moves: &[&str
             board
         );
     }
-    let (best_move, _score) = mcts::mcts(board.clone(), 100_000);
+    let (best_move, score) = mcts::mcts(board.clone(), 100_000);
 
-    assert!(correct_moves
-        .iter()
-        .any(|move_string| move_string == &board.move_to_san(&best_move)),
-            "{} didn't play one of the correct moves {:?}, {} played instead on board:\n{:?}",
-            board.side_to_move(), correct_moves, board.move_to_san(&best_move), board);
+    assert!(
+        correct_moves
+            .iter()
+            .any(|move_string| move_string == &board.move_to_san(&best_move)),
+        "{} didn't play one of the correct moves {:?}, {} {:.1}% played instead on board:\n{:?}",
+        board.side_to_move(),
+        correct_moves,
+        board.move_to_san(&best_move),
+        score * 100.0,
+        board
+    );
 }

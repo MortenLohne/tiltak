@@ -190,6 +190,17 @@ impl Tree {
             let mut best_child_node_index = 0;
 
             for (i, (child, _)) in self.children.iter().enumerate() {
+                if child.is_terminal && child.mean_action_value != 0.5 {
+                    // Immediately choose a move that wins
+                    if child.mean_action_value == 0.0 {
+                        best_child_node_index = i;
+                        break;
+                    }
+                    // Discard any move that loses
+                    else if child.mean_action_value == 1.0 {
+                        continue;
+                    }
+                }
                 let child_exploration_value = child.exploration_value(visits_sqrt);
                 if child_exploration_value >= best_exploration_value {
                     best_child_node_index = i;
