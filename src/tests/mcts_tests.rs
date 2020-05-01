@@ -170,7 +170,7 @@ fn plays_correct_move_property(move_strings: &[&str], correct_moves: &[&str]) {
             assert!(correct_moves
                                 .iter()
                                 .any(|mv| best_move == board.move_from_san(mv).unwrap()),
-                            "{} didn't play one of {:?} to avoid loss, {} played instead after {} iterations on board:\n{:?}",
+                            "{} didn't play one of the correct moves {:?}, {} played instead after {} iterations on board:\n{:?}",
                             board.side_to_move(), correct_moves, board.move_to_san(&best_move), i, board);
         }
     }

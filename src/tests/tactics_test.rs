@@ -58,5 +58,7 @@ fn plays_correct_hard_move_property(move_strings: &[&str], correct_moves: &[&str
 
     assert!(correct_moves
         .iter()
-        .any(|move_string| move_string == &board.move_to_san(&best_move)));
+        .any(|move_string| move_string == &board.move_to_san(&best_move)),
+            "{} didn't play one of the correct moves {:?}, {} played instead on board:\n{:?}",
+            board.side_to_move(), correct_moves, board.move_to_san(&best_move), board);
 }
