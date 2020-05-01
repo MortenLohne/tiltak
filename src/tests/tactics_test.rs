@@ -32,6 +32,17 @@ fn avoid_loss_in_three2() {
     plays_correct_hard_move_property(&move_strings, &["a3", "2c2+"]);
 }
 
+#[test]
+fn find_win_in_two() {
+    let move_strings = ["a5", "e4", "Cc3", "c4", "b3", "Cd3", "b4", "b5", "d4", "d5", "a4", "c4>", "e4<", "d3+", "e3", "d3", "d2", "4d4<22", "a3", "3b4-", "c5", "2c4+", "a4+", "b2", "b4", "c4", "b1", "c2", "c1", "d1", "d4", "a2", "a4", "e2", "d2<", "c4<", "a4>", "d2", "c4", "b2>", "c1+", "b5-", "4c2>22", "4b4>22", "c3+", "d3-", "3c4>", "3d2>", "4d4-22", "5e2+122", "d4>", "2e3+", "d4>", "2e5-", "d4", "3e4<", "e3", "c2", "a4", "e1", "e3+", "4d4>", "a1", "a2+", "a2"];
+
+    let mut board = Board::start_board();
+
+    do_moves_and_check_validity(&mut board, &move_strings);
+
+    plays_correct_hard_move_property(&move_strings, &["5e4+"]);
+}
+
 #[cfg(test)]
 fn plays_correct_hard_move_property(move_strings: &[&str], correct_moves: &[&str]) {
     let mut board = Board::default();
