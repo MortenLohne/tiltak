@@ -65,10 +65,10 @@ pub fn main() {
                         total_nodes += nodes_to_search;
                         let (best_move, score) = tree.best_move(0.1);
                         println!(
-                            "info depth {} seldepth {} score cp {:.3} nodes {} time {} pv {}",
+                            "info depth {} seldepth {} score cp {} nodes {} time {} pv {}",
                             i / 2 + 1,
                             tree.pv().count(),
-                            score,
+                            (score * 200.0 - 100.0) as i64,
                             total_nodes,
                             start_time.elapsed().as_millis(),
                             tree.pv().map(|mv| mv.to_string() + " ").collect::<String>()
