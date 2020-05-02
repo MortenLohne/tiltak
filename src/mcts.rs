@@ -101,7 +101,9 @@ impl Tree {
 
     /// Print human-readable information of the search's progress.
     pub fn print_info(&self) {
-        let mut best_children: Vec<(Tree, Move)> = self.shallow_clone(3).children;
+        let mut best_children: Vec<&(Tree, Move)> =
+            self.children.iter().map(|child| child).collect();
+
         best_children.sort_by_key(|(child, _)| child.visits);
         best_children.reverse();
         let parent_visits = self.visits;
