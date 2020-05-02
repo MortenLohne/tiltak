@@ -188,44 +188,55 @@ impl Tree {
                 board
             );
 
-            let mut best_exploration_value = self.children[0].0.exploration_value(visits_sqrt);
+            let mut best_exploration_value = 0.0;
             let mut best_child_node_index = 0;
 
             for (i, (child, _)) in self.children.iter().enumerate() {
                 if child.is_terminal && child.mean_action_value != 0.5 {
-                    // Immediately choose a move that wins
+                    // Immediately choose the move if it wins
                     if child.mean_action_value == 0.0 {
                         best_child_node_index = i;
                         break;
                     }
-                    // Discard any move that loses
-                    else if child.mean_action_value == 1.0 {
-                        continue;
+                    // Otherwise, it loses, and it is never picked
+                    debug_assert_eq!(child.mean_action_value, 1.0)
+                } else {
+                    let child_exploration_value = child.exploration_value(visits_sqrt);
+                    if child_exploration_value >= best_exploration_value {
+                        best_child_node_index = i;
+                        best_exploration_value = child_exploration_value;
                     }
-                }
-                let child_exploration_value = child.exploration_value(visits_sqrt);
-                if child_exploration_value >= best_exploration_value {
-                    best_child_node_index = i;
-                    best_exploration_value = child_exploration_value;
                 }
             }
 
             let (child, mv) = self.children.get_mut(best_child_node_index).unwrap();
-
-            board.do_move(mv.clone());
-            let result =
-                1.0 - child.select(board, value_params, policy_params, simple_moves, moves);
             self.visits += 1;
-            self.total_action_value += result as f64;
 
-            // If a child node is winning for us, this node is also a forced win
-            if child.is_terminal && child.mean_action_value == 0.0 {
+            // If we chose a child that is known to be lost for us,
+            // *every* child is lost for us.
+            if child.is_terminal && child.mean_action_value == 1.0 {
                 self.is_terminal = true;
+                let result = 1.0 - child.mean_action_value;
+                self.total_action_value += result as f64;
                 self.mean_action_value = result;
+                result
             } else {
-                self.mean_action_value = self.total_action_value as Score / self.visits as Score;
+                board.do_move(mv.clone());
+                let result =
+                    1.0 - child.select(board, value_params, policy_params, simple_moves, moves);
+
+                self.total_action_value += result as f64;
+
+                // If a child node is winning for us, this node is also a forced win
+                if child.is_terminal && child.mean_action_value == 0.0 {
+                    self.is_terminal = true;
+                    self.mean_action_value = result;
+                } else {
+                    self.mean_action_value =
+                        self.total_action_value as Score / self.visits as Score;
+                }
+                result
             }
-            result
         }
     }
 
@@ -243,7 +254,7 @@ impl Tree {
             self.is_terminal = true;
             self.visits += 1;
             self.mean_action_value = result;
-            self.total_action_value += result as f64;
+            self.total_action_value = result as f64;
             return result;
         }
 
@@ -299,7 +310,13 @@ impl<'a> Iterator for PV<'a> {
         self.tree
             .children
             .iter()
-            .max_by_key(|(child, _)| child.visits)
+            .max_by_key(|(child, _)| {
+                if child.is_terminal && child.mean_action_value == 0.0 {
+                    u64::MAX
+                } else {
+                    child.visits
+                }
+            })
             .map(|(child, mv)| {
                 self.tree = child;
                 mv.clone()
