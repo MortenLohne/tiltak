@@ -35,7 +35,7 @@ fn main() {
     println!("uti: enter uti mode (Tak version of the uci protocol for chess)");
     println!("play: Play against the mcts AI");
     println!("aimatch: Watch the minmax and mcts AIs play");
-    println!("analyze: Mcts analysis of a hardcoded position");
+    println!("analyze: Mcts analysis of a position, provided from a simple move list");
 
     let mut input = String::new();
     io::stdin().read_line(&mut input).unwrap();
@@ -213,8 +213,12 @@ fn test_position() {
     let mut board = Board::default();
     let mut moves = vec![];
 
-    let move_strings = ["e1", "a5", "Cc3"];
-    for mv_san in move_strings.iter() {
+    println!("Enter moves:");
+
+    let mut input = String::new();
+    io::stdin().read_line(&mut input).unwrap();
+
+    for mv_san in input.split_whitespace() {
         let mv = board.move_from_san(&mv_san).unwrap();
         board.generate_moves(&mut moves);
         assert!(moves.contains(&mv));

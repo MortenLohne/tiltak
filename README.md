@@ -8,7 +8,7 @@ Although mostly a library at this stage, it supports three commands through stdi
 
 * play: Play against the minmax-based AI.
 * aimatch: Watch the minmax and mcts AIs play.
-* analyze: Mcts analysis of a hardcoded position.
+* analyze: Mcts analysis of a position, provided from a simple move list.
 
 # Build
 
