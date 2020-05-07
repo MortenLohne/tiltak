@@ -85,7 +85,7 @@ fn plays_correct_hard_move_property(move_strings: &[&str], correct_moves: &[&str
             board
         );
     }
-    let (best_move, score) = mcts::mcts(board.clone(), 100_000);
+    let (best_move, score) = mcts::mcts(board.clone(), 50_000);
 
     assert!(
         correct_moves
