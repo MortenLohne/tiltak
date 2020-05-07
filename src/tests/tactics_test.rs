@@ -50,6 +50,19 @@ fn find_win_in_two() {
     plays_correct_hard_move_property(&move_strings, &["5e4+"]);
 }
 
+#[test]
+fn tactic_test1() {
+    let move_strings = [
+        "b4", "e1", "Cc3", "Cc4", "d4", "b3", "b2", "d3", "c2", "a3", "c3>", "e4", "c3",
+    ];
+
+    let mut board = Board::start_board();
+
+    do_moves_and_check_validity(&mut board, &move_strings);
+
+    plays_correct_hard_move_property(&move_strings, &["d5"]);
+}
+
 #[cfg(test)]
 fn plays_correct_hard_move_property(move_strings: &[&str], correct_moves: &[&str]) {
     let mut board = Board::default();
