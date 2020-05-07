@@ -231,6 +231,18 @@ impl Tree {
                 if child.is_terminal && child.mean_action_value == 0.0 {
                     self.is_terminal = true;
                     self.mean_action_value = result;
+                }
+                // If we discover that the child move loses for us, re-compute score for this node
+                // as if *every* visit to the child had a value of 0.0.
+                // Without this, we can become blind to certain losses, since lost children are
+                // never visited again, and don't affect the parent's score
+                else if child.is_terminal && child.mean_action_value == 1.0 {
+                    let delta = child.visits as f64 - child.total_action_value;
+                    //print!("Discovered that move {} with {} visits loses. Re-scoring self with {} visits and value={} to ", mv.to_string(), child.visits, self.visits, self.total_action_value);
+                    self.total_action_value -= delta;
+                    self.mean_action_value = self.total_action_value as Score / self.visits as Score;
+                    //println!("{}", self.total_action_value);
+                    // TODO: This score change should be propagated all the way to root
                 } else {
                     self.mean_action_value =
                         self.total_action_value as Score / self.visits as Score;
