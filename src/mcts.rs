@@ -5,6 +5,7 @@
 use crate::board::{Board, Move, TunableBoard};
 use board_game_traits::board::{Board as BoardTrait, Color, GameResult};
 use rand::Rng;
+use std::ops;
 
 const C_PUCT: Score = 1.0;
 
@@ -240,9 +241,10 @@ impl Tree {
                     let delta = child.visits as f64 - child.total_action_value;
                     //print!("Discovered that move {} with {} visits loses. Re-scoring self with {} visits and value={} to ", mv.to_string(), child.visits, self.visits, self.total_action_value);
                     self.total_action_value -= delta;
-                    self.mean_action_value = self.total_action_value as Score / self.visits as Score;
-                    //println!("{}", self.total_action_value);
-                    // TODO: This score change should be propagated all the way to root
+                    self.mean_action_value =
+                        self.total_action_value as Score / self.visits as Score;
+                //println!("{}", self.total_action_value);
+                // TODO: This score change should be propagated all the way to root
                 } else {
                     self.mean_action_value =
                         self.total_action_value as Score / self.visits as Score;
@@ -302,6 +304,43 @@ impl Tree {
     fn exploration_value(&self, parent_visits_sqrt: Score) -> Score {
         (1.0 - self.mean_action_value)
             + C_PUCT * self.heuristic_score * parent_visits_sqrt / (1 + self.visits) as Score
+    }
+}
+
+/// A game result from one side's perspective
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum GameResultForUs {
+    Win,
+    Loss,
+    Draw,
+}
+
+impl ops::Not for GameResultForUs {
+    type Output = Self;
+
+    fn not(self) -> Self::Output {
+        match self {
+            GameResultForUs::Win => GameResultForUs::Loss,
+            GameResultForUs::Loss => GameResultForUs::Win,
+            GameResultForUs::Draw => GameResultForUs::Draw,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum SearchResult {
+    Value(Score),
+    Win(u64, GameResultForUs)
+}
+
+impl ops::Not for SearchResult {
+    type Output = SearchResult;
+
+    fn not(self) -> Self::Output {
+        match self {
+            SearchResult::Value(score) => SearchResult::Value(1.0 - score),
+            SearchResult::Win(nodes, result) => SearchResult::Win(nodes, !result),
+        }
     }
 }
 
