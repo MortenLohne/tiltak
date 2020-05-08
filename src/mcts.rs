@@ -20,7 +20,7 @@ pub struct Tree {
     pub total_action_value: f64,
     pub mean_action_value: Score,
     pub heuristic_score: Score,
-    pub is_terminal: bool,
+    pub known_result: Option<GameResultForUs>,
 }
 
 // TODO: Winning percentage should be always be interpreted from the side to move's perspective
@@ -77,7 +77,7 @@ impl Tree {
             total_action_value: 0.0,
             mean_action_value: 0.5,
             heuristic_score: 0.0,
-            is_terminal: false,
+            known_result: None,
         }
     }
 
@@ -96,7 +96,7 @@ impl Tree {
             total_action_value: self.total_action_value,
             mean_action_value: self.mean_action_value,
             heuristic_score: self.heuristic_score,
-            is_terminal: self.is_terminal,
+            known_result: self.known_result,
         }
     }
 
@@ -129,8 +129,8 @@ impl Tree {
         let mut cumulative_prob = 0.0;
 
         for (child, mv) in self.children.iter() {
-            // If a child node wins, ignore temperature and return it
-            if child.is_terminal && child.mean_action_value == 0.0 {
+            // If a child node wins for us, ignore temperature and return it
+            if child.known_result == Some(GameResultForUs::Loss) {
                 return (mv.clone(), 1.0 - child.mean_action_value);
             }
             cumulative_prob += (child.visits as f64).powf(1.0 / temperature) / self.visits as f64;
@@ -153,7 +153,7 @@ impl Tree {
             total_action_value: 0.0,
             mean_action_value: 0.1,
             heuristic_score,
-            is_terminal: false,
+            known_result: None,
         }
     }
 
@@ -167,14 +167,26 @@ impl Tree {
         policy_params: &[f32],
         simple_moves: &mut Vec<Move>,
         moves: &mut Vec<(Move, Score)>,
-    ) -> Score {
-        if self.is_terminal {
+    ) -> SearchResult {
+        if self.known_result.is_some() {
             self.visits += 1;
             self.total_action_value += self.mean_action_value as f64;
-            self.mean_action_value
+            SearchResult::Value(self.mean_action_value)
         } else if self.visits == 0 {
             self.expand(board, value_params)
         } else {
+            debug_assert_eq!(
+                self.visits,
+                self.children
+                    .iter()
+                    .map(|(child, _)| child.visits)
+                    .sum::<u64>()
+                    + 1,
+                "{} visits, {} total action value, {} mean action value",
+                self.visits,
+                self.total_action_value,
+                self.mean_action_value
+            );
             // Only generate child moves on the 2nd visit
             if self.visits == 1 {
                 self.init_children(&board, simple_moves, policy_params, moves);
@@ -193,14 +205,15 @@ impl Tree {
             let mut best_child_node_index = 0;
 
             for (i, (child, _)) in self.children.iter().enumerate() {
-                if child.is_terminal && child.mean_action_value != 0.5 {
+                if child.known_result == Some(GameResultForUs::Win)
+                    || child.known_result == Some(GameResultForUs::Loss)
+                {
                     // Immediately choose the move if it wins
-                    if child.mean_action_value == 0.0 {
+                    if child.known_result == Some(GameResultForUs::Loss) {
                         best_child_node_index = i;
                         break;
                     }
-                    // Otherwise, it loses, and it is never picked
-                    debug_assert_eq!(child.mean_action_value, 1.0)
+                // Otherwise, it loses, and it is never picked
                 } else {
                     let child_exploration_value = child.exploration_value(visits_sqrt);
                     if child_exploration_value >= best_exploration_value {
@@ -211,44 +224,56 @@ impl Tree {
             }
 
             let (child, mv) = self.children.get_mut(best_child_node_index).unwrap();
-            self.visits += 1;
 
             // If we chose a child that is known to be lost for us,
             // *every* child is lost for us.
-            if child.is_terminal && child.mean_action_value == 1.0 {
-                self.is_terminal = true;
-                let result = 1.0 - child.mean_action_value;
-                self.total_action_value += result as f64;
-                self.mean_action_value = result;
-                result
+            // This node will never be selected again
+            // Re-score it, and propagate the score change
+            if child.known_result == Some(GameResultForUs::Win) {
+                let result_to_propagate = SearchResult::Decisive(
+                    self.visits,
+                    self.visits as f64 - self.total_action_value,
+                    GameResultForUs::Loss,
+                );
+                self.known_result = Some(GameResultForUs::Loss);
+                self.visits = 1;
+                self.total_action_value = 0.0;
+                self.mean_action_value = 0.0;
+                result_to_propagate
             } else {
                 board.do_move(mv.clone());
-                let result =
-                    1.0 - child.select(board, value_params, policy_params, simple_moves, moves);
+                let result = !child.select(board, value_params, policy_params, simple_moves, moves);
 
-                self.total_action_value += result as f64;
+                // If a child node is discovered to be winning for us, this node is also a forced win
+                // The result from selecting the child does not matter. This node will never be selected again,
+                // so re-score it from scratch and propagate this score change
+                if child.known_result == Some(GameResultForUs::Loss) {
+                    self.known_result = Some(GameResultForUs::Win);
+                    let result_to_propagate = SearchResult::Decisive(
+                        self.visits,
+                        self.total_action_value,
+                        GameResultForUs::Win,
+                    );
+                    self.visits = 1;
+                    self.mean_action_value = 1.0;
+                    self.total_action_value = 1.0;
+                    return result_to_propagate;
+                }
+                self.visits += 1;
+                match result {
+                    SearchResult::Decisive(nodes, action_value, result_for_us) => {
+                        self.visits -= nodes;
+                        self.total_action_value -= action_value;
+                        if result_for_us == GameResultForUs::Win {
+                            self.total_action_value += 1.0;
+                        }
+                    }
+                    SearchResult::Value(result) => {
+                        self.total_action_value += result as f64;
+                    }
+                }
 
-                // If a child node is winning for us, this node is also a forced win
-                if child.is_terminal && child.mean_action_value == 0.0 {
-                    self.is_terminal = true;
-                    self.mean_action_value = result;
-                }
-                // If we discover that the child move loses for us, re-compute score for this node
-                // as if *every* visit to the child had a value of 0.0.
-                // Without this, we can become blind to certain losses, since lost children are
-                // never visited again, and don't affect the parent's score
-                else if child.is_terminal && child.mean_action_value == 1.0 {
-                    let delta = child.visits as f64 - child.total_action_value;
-                    //print!("Discovered that move {} with {} visits loses. Re-scoring self with {} visits and value={} to ", mv.to_string(), child.visits, self.visits, self.total_action_value);
-                    self.total_action_value -= delta;
-                    self.mean_action_value =
-                        self.total_action_value as Score / self.visits as Score;
-                //println!("{}", self.total_action_value);
-                // TODO: This score change should be propagated all the way to root
-                } else {
-                    self.mean_action_value =
-                        self.total_action_value as Score / self.visits as Score;
-                }
+                self.mean_action_value = (self.total_action_value / self.visits as f64) as f32;
                 result
             }
         }
@@ -256,30 +281,35 @@ impl Tree {
 
     // Never inline, for profiling purposes
     #[inline(never)]
-    fn expand(&mut self, board: &mut Board, params: &[f32]) -> Score {
+    fn expand(&mut self, board: &mut Board, params: &[f32]) -> SearchResult {
         debug_assert!(self.children.is_empty());
 
         if let Some(game_result) = board.game_result() {
-            let result = match game_result {
-                GameResult::Draw => 0.5,
-                GameResult::WhiteWin => 0.0, // The side to move has lost
-                GameResult::BlackWin => 0.0, // The side to move has lost
+            let game_result_for_us = match game_result {
+                GameResult::Draw => GameResultForUs::Draw,
+                GameResult::WhiteWin => GameResultForUs::Loss, // The side to move has lost
+                GameResult::BlackWin => GameResultForUs::Loss, // The side to move has lost
             };
-            self.is_terminal = true;
-            self.visits += 1;
-            self.mean_action_value = result;
-            self.total_action_value = result as f64;
-            return result;
+            self.known_result = Some(game_result_for_us);
+            self.visits = 1;
+
+            let score = game_result_for_us.score();
+            self.mean_action_value = score;
+            self.total_action_value = score as f64;
+
+            // Since a decisive result was found on the first iteration,
+            // no nodes must be re-written further up in the tree.
+            return SearchResult::Value(score);
         }
 
         let mut static_eval = cp_to_win_percentage(board.static_eval_with_params(params));
         if board.side_to_move() == Color::Black {
             static_eval = 1.0 - static_eval;
         }
-        self.visits += 1;
+        self.visits = 1;
         self.total_action_value = static_eval as f64;
         self.mean_action_value = static_eval;
-        static_eval
+        SearchResult::Value(static_eval)
     }
 
     /// Do not initialize children in the expansion phase, for better fperformance
@@ -327,10 +357,20 @@ impl ops::Not for GameResultForUs {
     }
 }
 
+impl GameResultForUs {
+    fn score(self) -> Score {
+        match self {
+            GameResultForUs::Win => 1.0,
+            GameResultForUs::Loss => 0.0,
+            GameResultForUs::Draw => 0.5,
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum SearchResult {
     Value(Score),
-    Win(u64, GameResultForUs)
+    Decisive(u64, f64, GameResultForUs),
 }
 
 impl ops::Not for SearchResult {
@@ -339,7 +379,9 @@ impl ops::Not for SearchResult {
     fn not(self) -> Self::Output {
         match self {
             SearchResult::Value(score) => SearchResult::Value(1.0 - score),
-            SearchResult::Win(nodes, result) => SearchResult::Win(nodes, !result),
+            SearchResult::Decisive(nodes, total_action_value, result) => {
+                SearchResult::Decisive(nodes, nodes as f64 - total_action_value, !result)
+            }
         }
     }
 }
@@ -362,7 +404,7 @@ impl<'a> Iterator for PV<'a> {
             .children
             .iter()
             .max_by_key(|(child, _)| {
-                if child.is_terminal && child.mean_action_value == 0.0 {
+                if child.known_result == Some(GameResultForUs::Loss) {
                     u64::MAX
                 } else {
                     child.visits
