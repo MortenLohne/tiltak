@@ -17,7 +17,6 @@ pub type Score = f32;
 pub struct Tree {
     pub children: Vec<(Tree, Move)>,
     pub visits: u64,
-    pub total_visits: u64,
     pub total_action_value: f64,
     pub mean_action_value: Score,
     pub heuristic_score: Score,
@@ -75,7 +74,6 @@ impl Tree {
         Tree {
             children: vec![],
             visits: 0,
-            total_visits: 0,
             total_action_value: 0.0,
             mean_action_value: 0.5,
             heuristic_score: 0.0,
@@ -95,7 +93,6 @@ impl Tree {
                     .collect()
             },
             visits: self.visits,
-            total_visits: self.total_visits,
             total_action_value: self.total_action_value,
             mean_action_value: self.mean_action_value,
             heuristic_score: self.heuristic_score,
@@ -153,7 +150,6 @@ impl Tree {
         Tree {
             children: vec![],
             visits: 0,
-            total_visits: 0,
             total_action_value: 0.0,
             mean_action_value: 0.1,
             heuristic_score,
@@ -174,7 +170,6 @@ impl Tree {
     ) -> SearchResult {
         if self.known_result.is_some() {
             self.visits += 1;
-            self.total_visits += 1;
             self.total_action_value += self.mean_action_value as f64;
             SearchResult::Value(self.mean_action_value)
         } else if self.visits == 0 {
@@ -192,26 +187,12 @@ impl Tree {
                 self.total_action_value,
                 self.mean_action_value
             );
-
-            debug_assert_eq!(
-                self.total_visits,
-                self.children
-                    .iter()
-                    .map(|(child, _)| child.total_visits)
-                    .sum::<u64>()
-                    + 1,
-                "{} total visits, {} total action value, {} mean action value",
-                self.total_visits,
-                self.total_action_value,
-                self.mean_action_value
-            );
-
             // Only generate child moves on the 2nd visit
             if self.visits == 1 {
                 self.init_children(&board, simple_moves, policy_params, moves);
             }
 
-            let total_visits_sqrt = (self.total_visits as Score).sqrt();
+            let visits_sqrt = (self.visits as Score).sqrt();
 
             assert_ne!(
                 self.children.len(),
@@ -234,7 +215,7 @@ impl Tree {
                     }
                 // Otherwise, it loses, and it is never picked
                 } else {
-                    let child_exploration_value = child.exploration_value(total_visits_sqrt);
+                    let child_exploration_value = child.exploration_value(visits_sqrt);
                     if child_exploration_value >= best_exploration_value {
                         best_child_node_index = i;
                         best_exploration_value = child_exploration_value;
@@ -256,7 +237,6 @@ impl Tree {
                 );
                 self.known_result = Some(GameResultForUs::Loss);
                 self.visits = 1;
-                self.total_visits += 1;
                 self.total_action_value = 0.0;
                 self.mean_action_value = 0.0;
                 result_to_propagate
@@ -275,13 +255,11 @@ impl Tree {
                         GameResultForUs::Win,
                     );
                     self.visits = 1;
-                    self.total_visits += 1;
                     self.mean_action_value = 1.0;
                     self.total_action_value = 1.0;
                     return result_to_propagate;
                 }
                 self.visits += 1;
-                self.total_visits += 1;
                 match result {
                     SearchResult::Decisive(nodes, action_value, result_for_us) => {
                         self.visits -= nodes;
@@ -314,7 +292,6 @@ impl Tree {
             };
             self.known_result = Some(game_result_for_us);
             self.visits = 1;
-            self.total_visits = 1;
 
             let score = game_result_for_us.score();
             self.mean_action_value = score;
@@ -330,7 +307,6 @@ impl Tree {
             static_eval = 1.0 - static_eval;
         }
         self.visits = 1;
-        self.total_visits = 1;
         self.total_action_value = static_eval as f64;
         self.mean_action_value = static_eval;
         SearchResult::Value(static_eval)
@@ -357,7 +333,7 @@ impl Tree {
     #[inline]
     fn exploration_value(&self, parent_visits_sqrt: Score) -> Score {
         (1.0 - self.mean_action_value)
-            + C_PUCT * self.heuristic_score * parent_visits_sqrt / (1 + self.total_visits) as Score
+            + C_PUCT * self.heuristic_score * parent_visits_sqrt / (1 + self.visits) as Score
     }
 }
 
