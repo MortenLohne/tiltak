@@ -81,7 +81,12 @@ fn main() {
             }
         }
         #[cfg(feature = "constant-tuning")]
-        "tune_from_file" => tune::training::tune_from_file().unwrap(),
+        "tune_from_file" => {
+            let (value_params, policy_params) =
+                tune::training::tune_value_and_policy_from_file().unwrap();
+            println!("{:?}", value_params);
+            println!("{:?}", policy_params);
+        }
         #[cfg(feature = "constant-tuning")]
         "pgn_to_move_list" => pgn_to_move_list(),
         #[cfg(feature = "constant-tuning")]
