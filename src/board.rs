@@ -277,6 +277,17 @@ pub enum Piece {
 }
 
 impl Piece {
+    pub fn from_role_color(role: Role, color: Color) -> Self {
+        match (role, color) {
+            (Flat, Color::White) => WhiteFlat,
+            (Standing, Color::White) => WhiteStanding,
+            (Cap, Color::White) => WhiteCap,
+            (Flat, Color::Black) => BlackFlat,
+            (Standing, Color::Black) => BlackStanding,
+            (Cap, Color::Black) => BlackCap,
+        }
+    }
+
     pub fn role(self) -> Role {
         match self {
             WhiteFlat | BlackFlat => Flat,
@@ -443,17 +454,17 @@ impl IntoIterator for Stack {
 /// A legal move for a position.
 #[derive(Clone, PartialEq, Eq)]
 pub enum Move {
-    Place(Piece, Square),
+    Place(Role, Square),
     Move(Square, Direction, StackMovement), // Number of stones to take
 }
 
 impl fmt::Display for Move {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
         match self {
-            Move::Place(piece, square) => match piece {
-                WhiteCap | BlackCap => write!(f, "C{}", square)?,
-                WhiteFlat | BlackFlat => write!(f, "{}", square)?,
-                WhiteStanding | BlackStanding => write!(f, "S{}", square)?,
+            Move::Place(role, square) => match role {
+                Cap => write!(f, "C{}", square)?,
+                Flat => write!(f, "{}", square)?,
+                Standing => write!(f, "S{}", square)?,
             },
             Move::Move(square, direction, stack_movements) => {
                 let mut pieces_held = stack_movements.movements[0].pieces_to_take;
@@ -705,13 +716,6 @@ impl Board {
             &mut new_board.white_road_pieces,
             &mut new_board.black_road_pieces,
         );
-        for mv in new_board.moves.iter_mut() {
-            match mv {
-                Move::Place(piece, _) => *piece = piece.flip_color(),
-
-                Move::Move(_, _, _) => (),
-            }
-        }
         new_board.to_move = !new_board.to_move;
         new_board
     }
@@ -937,16 +941,10 @@ impl board::Board for Board {
         );
 
         match self.moves_played {
-            0 => {
-                for square in squares_iterator() {
-                    moves.push(Move::Place(BlackFlat, square));
-                }
-            }
-
-            1 => {
+            0 | 1 => {
                 for square in squares_iterator() {
                     if self[square].is_empty() {
-                        moves.push(Move::Place(WhiteFlat, square));
+                        moves.push(Move::Place(Flat, square));
                     }
                 }
             }
@@ -959,23 +957,29 @@ impl board::Board for Board {
 
     fn do_move(&mut self, mv: Self::Move) -> Self::ReverseMove {
         let reverse_move = match mv.clone() {
-            Move::Place(piece, to) => {
+            Move::Place(role, to) => {
                 debug_assert!(self[to].is_empty());
-                self[to].push(piece);
-                if piece.role() != Standing {
-                    match piece.color() {
+                // On the first move, the players place the opponent's color
+                let color_to_place = if self.moves_played > 1 {
+                    self.side_to_move()
+                } else {
+                    !self.side_to_move()
+                };
+                self[to].push(Piece::from_role_color(role, color_to_place));
+                if role != Standing {
+                    match color_to_place {
                         Color::White => self.white_road_pieces = self.white_road_pieces.set(to.0),
                         Color::Black => self.black_road_pieces = self.black_road_pieces.set(to.0),
                     };
                 }
 
-                match piece {
-                    WhiteFlat => self.white_stones_left -= 1,
-                    WhiteStanding => self.white_stones_left -= 1,
-                    WhiteCap => self.white_capstones_left -= 1,
-                    BlackFlat => self.black_stones_left -= 1,
-                    BlackStanding => self.black_stones_left -= 1,
-                    BlackCap => self.black_capstones_left -= 1,
+                match (color_to_place, role) {
+                    (Color::White, Flat) => self.white_stones_left -= 1,
+                    (Color::White, Standing) => self.white_stones_left -= 1,
+                    (Color::White, Cap) => self.white_capstones_left -= 1,
+                    (Color::Black, Flat) => self.black_stones_left -= 1,
+                    (Color::Black, Standing) => self.black_stones_left -= 1,
+                    (Color::Black, Cap) => self.black_capstones_left -= 1,
                 }
                 ReverseMove::Place(to)
             }
@@ -1364,15 +1368,7 @@ impl pgn_traits::pgn::PgnBoard for Board {
         match first_char {
             'a'..='e' if input.len() == 2 => {
                 let square = Square::parse_square(input);
-                let side = if self.moves_played < 2 {
-                    !self.side_to_move()
-                } else {
-                    self.side_to_move()
-                };
-                match side {
-                    Color::White => Ok(Move::Place(WhiteFlat, square)),
-                    Color::Black => Ok(Move::Place(BlackFlat, square)),
-                }
+                Ok(Move::Place(Flat, square))
             }
             'a'..='e' if input.len() == 3 => {
                 let square = Square::parse_square(&input[0..2]);
@@ -1381,20 +1377,8 @@ impl pgn_traits::pgn::PgnBoard for Board {
                 let movements = ArrayVec::from_iter(iter::once(Movement { pieces_to_take: 1 }));
                 Ok(Move::Move(square, direction, StackMovement { movements }))
             }
-            'C' if input.len() == 3 => match self.side_to_move() {
-                Color::White => Ok(Move::Place(WhiteCap, Square::parse_square(&input[1..]))),
-                Color::Black => Ok(Move::Place(BlackCap, Square::parse_square(&input[1..]))),
-            },
-            'S' if input.len() == 3 => match self.side_to_move() {
-                Color::White => Ok(Move::Place(
-                    WhiteStanding,
-                    Square::parse_square(&input[1..]),
-                )),
-                Color::Black => Ok(Move::Place(
-                    BlackStanding,
-                    Square::parse_square(&input[1..]),
-                )),
-            },
+            'C' if input.len() == 3 => Ok(Move::Place(Cap, Square::parse_square(&input[1..]))),
+            'S' if input.len() == 3 => Ok(Move::Place(Standing, Square::parse_square(&input[1..]))),
             '1'..='9' if input.len() > 3 => {
                 let square = Square::parse_square(&input[1..3]);
                 let direction = Direction::parse(input.chars().nth(3).unwrap());

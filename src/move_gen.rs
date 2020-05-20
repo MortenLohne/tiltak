@@ -63,16 +63,17 @@ impl Board {
         }
 
         match mv {
-            Move::Place(piece, square) if piece.role() == Flat => {
+            Move::Place(role, square) if *role == Flat => {
                 // Apply PSQT
                 let mut score =
                     base_score + params[FLAT_STONE_PSQT + SQUARE_SYMMETRIES[square.0 as usize]];
                 // If square is next to a road stone laid on our last turn
-                if let Some(Move::Place(last_piece, last_square)) =
+                if let Some(Move::Place(last_role, last_square)) =
                     self.moves().get(self.moves().len() - 2)
                 {
-                    if Us::is_road_stone(*last_piece)
-                        && square.neighbours().any(|neigh| neigh == *last_square)
+                    if *last_role == Flat
+                        || *last_role == Cap
+                            && square.neighbours().any(|neigh| neigh == *last_square)
                     {
                         score += params[NEXT_TO_LAST_TURNS_STONE];
                     }
@@ -104,17 +105,17 @@ impl Board {
                 }
                 sigmoid(score)
             }
-            Move::Place(piece, square) => {
+            Move::Place(role, square) => {
                 // Apply PSQT:
                 let mut score = base_score;
-                if *piece == Us::standing_piece() {
+                if *role == Standing {
                     score += params[STANDING_STONE_PSQT + SQUARE_SYMMETRIES[square.0 as usize]]
-                } else if *piece == Us::cap_piece() {
+                } else if *role == Cap {
                     score += params[CAPSTONE_PSQT + SQUARE_SYMMETRIES[square.0 as usize]]
                 } else {
                     unreachable!(
                         "Tried to place {:?} with move {} on board\n{:?}",
-                        piece, mv, self
+                        role, mv, self
                     );
                 };
                 // If square has two or more opponent flatstones around it
@@ -187,11 +188,11 @@ impl Board {
                     // since it is the same for every square
                     let mut pesudolegal_moves: ArrayVec<[Move; 3]> = ArrayVec::new();
                     if Us::stones_left(&self) > 0 {
-                        pesudolegal_moves.push(Move::Place(Us::flat_piece(), square));
-                        pesudolegal_moves.push(Move::Place(Us::standing_piece(), square));
+                        pesudolegal_moves.push(Move::Place(Flat, square));
+                        pesudolegal_moves.push(Move::Place(Standing, square));
                     }
                     if Us::capstones_left(&self) > 0 {
-                        pesudolegal_moves.push(Move::Place(Us::cap_piece(), square));
+                        pesudolegal_moves.push(Move::Place(Cap, square));
                     }
                     moves.extend(
                         pesudolegal_moves
@@ -361,7 +362,7 @@ impl Board {
                     false
                 }
             }
-            Move::Place(piece, _) => {
+            Move::Place(role, _) => {
                 // Placing a piece can only be suicide if this is our last piece
                 if Us::capstones_left(self) + Us::stones_left(self) == 1 {
                     // Count points
@@ -374,7 +375,7 @@ impl Board {
                             their_points += 1;
                         }
                     }
-                    match piece.role() {
+                    match role {
                         Flat => their_points > our_points + 1,
                         Cap | Standing => their_points > our_points,
                     }

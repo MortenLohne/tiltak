@@ -198,11 +198,24 @@ fn play_random_games_test() {
             board.do_move(mv);
 
             let result = board.game_result();
+            let static_eval = board.static_eval();
             for rotation in board.rotations_and_symmetries() {
                 if board.side_to_move() == rotation.side_to_move() {
                     assert_eq!(rotation.game_result(), result);
+                    assert!(
+                        rotation.static_eval() - static_eval < 0.0001,
+                        "Original static eval {}, rotated static eval {}",
+                        static_eval,
+                        rotation.static_eval()
+                    );
                 } else {
                     assert_eq!(rotation.game_result().map(|r| !r), result);
+                    assert!(
+                        rotation.static_eval() + static_eval < 0.0001,
+                        "Original static eval {}, rotated static eval {}",
+                        static_eval,
+                        rotation.static_eval()
+                    );
                 }
             }
 
@@ -236,21 +249,21 @@ fn play_random_games_test() {
 fn game_win_test() {
     let mut board = board_mod::Board::default();
     for mv in [
-        Move::Place(Piece::WhiteFlat, Square(12)),
-        Move::Place(Piece::BlackFlat, Square(13)),
-        Move::Place(Piece::WhiteFlat, Square(7)),
-        Move::Place(Piece::BlackFlat, Square(14)),
-        Move::Place(Piece::WhiteFlat, Square(2)),
-        Move::Place(Piece::BlackFlat, Square(11)),
-        Move::Place(Piece::WhiteFlat, Square(17)),
-        Move::Place(Piece::BlackFlat, Square(10)),
+        Move::Place(Role::Flat, Square(13)),
+        Move::Place(Role::Flat, Square(12)),
+        Move::Place(Role::Flat, Square(7)),
+        Move::Place(Role::Flat, Square(14)),
+        Move::Place(Role::Flat, Square(2)),
+        Move::Place(Role::Flat, Square(11)),
+        Move::Place(Role::Flat, Square(17)),
+        Move::Place(Role::Flat, Square(10)),
     ]
     .iter()
     {
         board.do_move(mv.clone());
         assert!(board.game_result().is_none());
     }
-    board.do_move(Move::Place(Piece::WhiteFlat, Square(22)));
+    board.do_move(Move::Place(Role::Flat, Square(22)));
     assert_eq!(board.game_result(), Some(GameResult::WhiteWin));
 }
 
@@ -258,21 +271,21 @@ fn game_win_test() {
 fn game_win_test2() {
     let mut board = board_mod::Board::default();
     for mv in [
-        Move::Place(Piece::WhiteFlat, Square(12)),
-        Move::Place(Piece::BlackFlat, Square(7)),
-        Move::Place(Piece::WhiteFlat, Square(14)),
-        Move::Place(Piece::BlackFlat, Square(2)),
-        Move::Place(Piece::WhiteFlat, Square(13)),
-        Move::Place(Piece::BlackFlat, Square(17)),
-        Move::Place(Piece::WhiteFlat, Square(11)),
-        Move::Place(Piece::BlackFlat, Square(22)),
+        Move::Place(Role::Flat, Square(7)),
+        Move::Place(Role::Flat, Square(12)),
+        Move::Place(Role::Flat, Square(14)),
+        Move::Place(Role::Flat, Square(2)),
+        Move::Place(Role::Flat, Square(13)),
+        Move::Place(Role::Flat, Square(17)),
+        Move::Place(Role::Flat, Square(11)),
+        Move::Place(Role::Flat, Square(22)),
     ]
     .iter()
     {
         board.do_move(mv.clone());
         assert!(board.game_result().is_none());
     }
-    board.do_move(Move::Place(Piece::WhiteFlat, Square(10)));
+    board.do_move(Move::Place(Role::Flat, Square(10)));
     assert_eq!(board.game_result(), Some(GameResult::WhiteWin));
 }
 
@@ -322,11 +335,9 @@ fn cannot_suicide_into_points_loss_test() {
     board.generate_moves(&mut moves);
     for mv in moves.iter() {
         match mv {
-            Move::Place(piece, _) => assert_ne!(
-                piece.role(),
-                Role::Standing,
-                "Placing a standing stone is suicide"
-            ),
+            Move::Place(role, _) => {
+                assert_ne!(*role, Role::Standing, "Placing a standing stone is suicide")
+            }
             _ => (),
         }
     }

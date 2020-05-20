@@ -34,7 +34,7 @@ pub fn train_perpetually(
     initial_value_params: &[f32],
     initial_policy_params: &[f32],
 ) -> Result<(), Box<dyn error::Error>> {
-    const BATCH_SIZE: usize = 100;
+    const BATCH_SIZE: usize = 1000;
     // Only train from the last n batches
     const BATCHES_FOR_TRAINING: usize = 20;
 
@@ -263,6 +263,22 @@ pub fn tune_from_file() -> Result<(), Box<dyn error::Error>> {
 pub fn tune_value_and_policy_from_file() -> Result<(Vec<f32>, Vec<f32>), Box<dyn error::Error>> {
     let move_scoress = read_move_scores_from_file()?;
     let games = read_games_from_file()?;
+
+    for (game, move_scores) in games.iter().zip(&move_scoress) {
+        let mut board = game.start_board.clone();
+        for (mv, move_score) in game.moves.iter().map(|(mv, _)| mv).zip(move_scores) {
+            assert!(
+                move_score
+                    .iter()
+                    .any(|(scored_move, _score)| *mv == *scored_move),
+                "Played move {} not among move scores {:?}\nBoard:\n{:?}",
+                mv,
+                move_score,
+                board
+            );
+            board.do_move(mv.clone());
+        }
+    }
 
     tune_value_and_policy(
         Board::VALUE_PARAMS,
