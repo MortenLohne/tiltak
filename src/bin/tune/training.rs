@@ -230,7 +230,7 @@ impl GameStats {
 }
 
 pub fn read_games_from_file() -> Result<Vec<Game<Board>>, Box<dyn error::Error>> {
-    let mut file = fs::File::open("games22_all.ptn")?;
+    let mut file = fs::File::open("games23_all.ptn")?;
     let mut input = String::new();
     file.read_to_string(&mut input)?;
     pgn_parser::parse_pgn(&input)
@@ -352,7 +352,7 @@ pub fn tune_value_and_policy(
 }
 
 pub fn read_move_scores_from_file() -> Result<Vec<Vec<Vec<(Move, f32)>>>, Box<dyn error::Error>> {
-    let mut file = fs::File::open("move_scores22_all.txt")?;
+    let mut file = fs::File::open("move_scores23_all.txt")?;
     let mut input = String::new();
     file.read_to_string(&mut input)?;
 
@@ -361,7 +361,6 @@ pub fn read_move_scores_from_file() -> Result<Vec<Vec<Vec<(Move, f32)>>>, Box<dy
     // Move scores grouped by the game they were played
     let mut move_scoress: Vec<Vec<Vec<(Move, f32)>>> = vec![vec![]];
     for line in input.lines() {
-        println!("Parsing move scores from {}", line);
         // Start a new game
         if line.trim().is_empty() {
             move_scoress.push(vec![]);
