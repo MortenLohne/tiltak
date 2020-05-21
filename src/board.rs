@@ -28,7 +28,14 @@ pub trait TunableBoard: BoardTrait {
     const VALUE_PARAMS: &'static [f32];
     const POLICY_PARAMS: &'static [f32];
 
-    fn static_eval_with_params(&self, params: &[f32]) -> f32;
+    fn static_eval_coefficients(&self, coefficients: &mut [f32]);
+
+    fn static_eval_with_params(&self, params: &[f32]) -> f32 {
+        // TODO: Using a vector here is inefficient, we would like to use an array
+        let mut coefficients: Vec<f32> = vec![0.0; params.len()];
+        self.static_eval_coefficients(&mut coefficients);
+        coefficients.iter().zip(params).map(|(a, b)| a * b).sum()
+    }
 
     fn generate_moves_with_params(
         &self,
@@ -797,31 +804,30 @@ impl Board {
             .chain(std::iter::once(self[square].top_stone()))
     }
 
-    fn static_eval_game_phase(&self, params: &[f32]) -> f32 {
+    fn static_eval_game_phase(&self, coefficients: &mut [f32]) {
         const FLAT_PSQT: usize = 0;
         const STAND_PSQT: usize = FLAT_PSQT + 6;
         const CAP_PSQT: usize = STAND_PSQT + 6;
 
-        let mut material_psqt = 0.0;
         for square in squares_iterator() {
             if let Some(piece) = self[square].top_stone() {
                 let i = square.0 as usize;
-                material_psqt += match piece {
-                    WhiteFlat => params[FLAT_PSQT + SQUARE_SYMMETRIES[i]],
-                    BlackFlat => params[FLAT_PSQT + SQUARE_SYMMETRIES[i]] * -1.0,
-                    WhiteStanding => params[STAND_PSQT + SQUARE_SYMMETRIES[i]],
-                    BlackStanding => params[STAND_PSQT + SQUARE_SYMMETRIES[i]] * -1.0,
-                    WhiteCap => params[CAP_PSQT + SQUARE_SYMMETRIES[i]],
-                    BlackCap => params[CAP_PSQT + SQUARE_SYMMETRIES[i]] * -1.0,
+                match piece {
+                    WhiteFlat => coefficients[FLAT_PSQT + SQUARE_SYMMETRIES[i]] += 1.0,
+                    BlackFlat => coefficients[FLAT_PSQT + SQUARE_SYMMETRIES[i]] -= 1.0,
+                    WhiteStanding => coefficients[STAND_PSQT + SQUARE_SYMMETRIES[i]] += 1.0,
+                    BlackStanding => coefficients[STAND_PSQT + SQUARE_SYMMETRIES[i]] -= 1.0,
+                    WhiteCap => coefficients[CAP_PSQT + SQUARE_SYMMETRIES[i]] += 1.0,
+                    BlackCap => coefficients[CAP_PSQT + SQUARE_SYMMETRIES[i]] -= 1.0,
                 }
             }
         }
 
         const TO_MOVE: usize = CAP_PSQT + 6;
 
-        let to_move = match self.side_to_move() {
-            Color::White => params[TO_MOVE],
-            Color::Black => -params[TO_MOVE],
+        match self.side_to_move() {
+            Color::White => coefficients[TO_MOVE] = 1.0,
+            Color::Black => coefficients[TO_MOVE] = -1.0,
         };
 
         const PIECES_IN_OUR_STACK: usize = TO_MOVE + 1;
@@ -830,44 +836,38 @@ impl Board {
         const CAPSTONE_ON_STACK: usize = CAPSTONE_OVER_OWN_PIECE + 1;
         const STANDING_STONE_ON_STACK: usize = CAPSTONE_ON_STACK + 1;
 
-        let stacks: f32 = squares_iterator()
+        squares_iterator()
             .map(|sq| &self[sq])
             .filter(|stack| stack.len() > 1)
-            .map(|stack| {
+            .for_each(|stack| {
                 let top_stone = stack.top_stone().unwrap();
                 let controlling_player = top_stone.color();
-                let mut val = stack
+                let color_factor = top_stone.color().multiplier() as f32;
+                stack
                     .clone()
                     .into_iter()
                     .take(stack.len() as usize - 1)
-                    .map(|piece| {
+                    .for_each(|piece| {
                         if piece.color() == controlling_player {
-                            params[PIECES_IN_OUR_STACK]
+                            coefficients[PIECES_IN_OUR_STACK] += color_factor
                         } else {
-                            -params[PIECES_IN_THEIR_STACK]
+                            coefficients[PIECES_IN_THEIR_STACK] -= color_factor
                         }
-                    })
-                    .sum::<f32>();
+                    });
 
                 // Extra bonus for having your capstone over your own piece
                 if top_stone.role() == Cap
                     && stack.get(stack.len() - 2).unwrap().color() == controlling_player
                 {
-                    val += params[CAPSTONE_OVER_OWN_PIECE];
+                    coefficients[CAPSTONE_OVER_OWN_PIECE] += color_factor;
                 }
 
                 match top_stone.role() {
-                    Cap => val += params[CAPSTONE_ON_STACK],
+                    Cap => coefficients[CAPSTONE_ON_STACK] += color_factor,
                     Flat => (),
-                    Standing => val += params[STANDING_STONE_ON_STACK],
+                    Standing => coefficients[STANDING_STONE_ON_STACK] += color_factor,
                 }
-
-                match top_stone.color() {
-                    Color::White => val,
-                    Color::Black => val * -1.0,
-                }
-            })
-            .sum();
+            });
 
         // Number of pieces in each rank/file
         const RANK_FILE_CONTROL: usize = STANDING_STONE_ON_STACK + 1;
@@ -878,36 +878,33 @@ impl Board {
         let mut num_files_occupied_white = 0;
         let mut num_ranks_occupied_black = 0;
         let mut num_files_occupied_black = 0;
-        let mut pieces_in_rank_file_score = 0.0;
 
         for rank in (0..BOARD_SIZE as u8).map(|i| self.white_road_pieces().rank(i)) {
             num_ranks_occupied_white += if rank.is_empty() { 0 } else { 1 };
-            pieces_in_rank_file_score += params[RANK_FILE_CONTROL + rank.count() as usize] as f32;
+            coefficients[RANK_FILE_CONTROL + rank.count() as usize] += 1.0;
         }
 
         for file in (0..BOARD_SIZE as u8).map(|i| self.white_road_pieces().file(i)) {
             num_files_occupied_white += if file.is_empty() { 0 } else { 1 };
-            pieces_in_rank_file_score += params[RANK_FILE_CONTROL + file.count() as usize] as f32;
+            coefficients[RANK_FILE_CONTROL + file.count() as usize] += 1.0;
         }
 
         for rank in (0..BOARD_SIZE as u8).map(|i| self.black_road_pieces().rank(i)) {
             num_ranks_occupied_black += if rank.is_empty() { 0 } else { 1 };
-            pieces_in_rank_file_score -= params[RANK_FILE_CONTROL + rank.count() as usize] as f32;
+            coefficients[RANK_FILE_CONTROL + rank.count() as usize] -= 1.0;
         }
 
         for file in (0..BOARD_SIZE as u8).map(|i| self.black_road_pieces().file(i)) {
             num_files_occupied_black += if file.is_empty() { 0 } else { 1 };
-            pieces_in_rank_file_score -= params[RANK_FILE_CONTROL + file.count() as usize] as f32;
+            coefficients[RANK_FILE_CONTROL + file.count() as usize] -= 1.0;
         }
 
-        let num_ranks_occupied_score = params[NUM_RANKS_FILES_OCCUPIED + num_ranks_occupied_white]
-            + params[NUM_RANKS_FILES_OCCUPIED + num_files_occupied_white]
-            - params[NUM_RANKS_FILES_OCCUPIED + num_ranks_occupied_black]
-            - params[NUM_RANKS_FILES_OCCUPIED + num_files_occupied_black];
+        coefficients[NUM_RANKS_FILES_OCCUPIED + num_ranks_occupied_white] += 1.0;
+        coefficients[NUM_RANKS_FILES_OCCUPIED + num_files_occupied_white] += 1.0;
+        coefficients[NUM_RANKS_FILES_OCCUPIED + num_ranks_occupied_black] -= 1.0;
+        coefficients[NUM_RANKS_FILES_OCCUPIED + num_files_occupied_black] -= 1.0;
 
         const _NEXT_CONST: usize = NUM_RANKS_FILES_OCCUPIED + 6;
-
-        material_psqt + to_move + stacks + pieces_in_rank_file_score + num_ranks_occupied_score
     }
 }
 
@@ -1287,10 +1284,10 @@ impl TunableBoard for Board {
         -2.9266522,
     ];
 
-    fn static_eval_with_params(&self, params: &[f32]) -> f32 {
+    fn static_eval_coefficients(&self, coefficients: &mut [f32]) {
         debug_assert!(self.game_result().is_none());
 
-        self.static_eval_game_phase(params)
+        self.static_eval_game_phase(coefficients)
     }
 
     fn generate_moves_with_params(

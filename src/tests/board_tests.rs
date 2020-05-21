@@ -198,20 +198,19 @@ fn play_random_games_test() {
             board.do_move(mv);
 
             let result = board.game_result();
-            let static_eval = board.static_eval();
             for rotation in board.rotations_and_symmetries() {
                 if board.side_to_move() == rotation.side_to_move() {
                     assert_eq!(rotation.game_result(), result);
-                    assert!(
-                        rotation.static_eval() - static_eval < 0.0001,
-                        "Original static eval {}, rotated static eval {}",
-                        static_eval,
-                        rotation.static_eval()
-                    );
                 } else {
                     assert_eq!(rotation.game_result().map(|r| !r), result);
+                }
+            }
+
+            if result.is_none() {
+                let static_eval = board.static_eval();
+                for rotation in board.rotations_and_symmetries() {
                     assert!(
-                        rotation.static_eval() + static_eval < 0.0001,
+                        rotation.static_eval().abs() - static_eval.abs() < 0.0001,
                         "Original static eval {}, rotated static eval {}",
                         static_eval,
                         rotation.static_eval()
