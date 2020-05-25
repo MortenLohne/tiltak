@@ -1,6 +1,6 @@
 use crate::tune::gradient_descent_policy::gradient_descent_policy;
 use crate::tune::play_match::play_game;
-use crate::tune::{gradient_descent_value, pgn_parser, play_match};
+use crate::tune::{gradient_descent_value, pgn_parser, play_match, real_gradient_descent};
 use board_game_traits::board::Board as BoardTrait;
 use board_game_traits::board::GameResult;
 use rand::prelude::*;
@@ -258,6 +258,55 @@ pub fn tune_from_file() -> Result<(), Box<dyn error::Error>> {
     );
 
     Ok(())
+}
+
+pub fn tune_real_from_file() -> Result<Vec<f64>, Box<dyn error::Error>> {
+    let games = read_games_from_file()?;
+
+    let (positions, results) = positions_and_results_from_games(games);
+
+    let coefficient_sets = positions
+        .iter()
+        .map(|position| {
+            let mut coefficients = vec![0.0; Board::VALUE_PARAMS.len()];
+            position.static_eval_coefficients(&mut coefficients);
+            coefficients.iter().map(|a| *a as f64).collect()
+        })
+        .collect::<Vec<Vec<f64>>>();
+
+    let f64_results = results
+        .iter()
+        .map(|res| match res {
+            GameResult::WhiteWin => 1.0,
+            GameResult::Draw => 0.5,
+            GameResult::BlackWin => 0.0,
+        })
+        .collect::<Vec<f64>>();
+
+    println!(
+        "{} results with sum {}",
+        f64_results.len(),
+        f64_results.iter().sum::<f64>()
+    );
+
+    let middle_index = positions.len() / 2;
+
+    let mut rng = rand::thread_rng();
+    let initial_params: Vec<f64> = iter::from_fn(|| Some(rng.gen_range(-0.1, 0.1)))
+        .take(Board::VALUE_PARAMS.len())
+        .collect();
+
+    let tuned_parameters = real_gradient_descent::gradient_descent(
+        &coefficient_sets[0..middle_index],
+        &f64_results[0..middle_index],
+        &coefficient_sets[middle_index..],
+        &f64_results[middle_index..],
+        &initial_params,
+    );
+
+    println!("Final parameters: {:?}", tuned_parameters);
+
+    Ok(tuned_parameters)
 }
 
 pub fn tune_value_and_policy_from_file() -> Result<(Vec<f32>, Vec<f32>), Box<dyn error::Error>> {

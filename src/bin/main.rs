@@ -88,6 +88,11 @@ fn main() {
             println!("{:?}", policy_params);
         }
         #[cfg(feature = "constant-tuning")]
+        "real" => {
+            let value_params = tune::training::tune_real_from_file().unwrap();
+            println!("{:?}", value_params);
+        }
+        #[cfg(feature = "constant-tuning")]
         "pgn_to_move_list" => pgn_to_move_list(),
         #[cfg(feature = "constant-tuning")]
         "play_params" => {
