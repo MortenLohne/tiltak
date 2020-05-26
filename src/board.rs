@@ -9,6 +9,7 @@ use crate::board::Piece::*;
 use crate::board::Role::Flat;
 use crate::board::Role::*;
 use crate::mcts;
+use crate::move_gen::{inverse_sigmoid, sigmoid};
 use arrayvec::ArrayVec;
 use board_game_traits::board;
 use board_game_traits::board::GameResult::{BlackWin, Draw, WhiteWin};
@@ -45,6 +46,8 @@ pub trait TunableBoard: BoardTrait {
     );
 
     fn probability_for_move(&self, params: &[f32], mv: &Self::Move, num_moves: usize) -> f32;
+
+    fn coefficients_for_move(&self, coefficients: &mut [f32], mv: &Move);
 }
 
 pub(crate) trait ColorTr {
@@ -1313,12 +1316,22 @@ impl TunableBoard for Board {
     }
 
     fn probability_for_move(&self, params: &[f32], mv: &Move, num_moves: usize) -> f32 {
+        let mut coefficients = vec![0.0; Self::POLICY_PARAMS.len()];
+        self.coefficients_for_move(&mut coefficients, mv);
+        let total_value: f32 = coefficients.iter().zip(params).map(|(c, p)| c * p).sum();
+
+        let base_score = inverse_sigmoid(1.0 / num_moves as f32);
+
+        sigmoid(total_value + base_score)
+    }
+
+    fn coefficients_for_move(&self, coefficients: &mut [f32], mv: &Move) {
         match self.side_to_move() {
             Color::White => {
-                self.probability_for_move_colortr::<WhiteTr, BlackTr>(params, mv, num_moves)
+                self.coefficients_for_move_colortr::<WhiteTr, BlackTr>(coefficients, mv)
             }
             Color::Black => {
-                self.probability_for_move_colortr::<BlackTr, WhiteTr>(params, mv, num_moves)
+                self.coefficients_for_move_colortr::<BlackTr, WhiteTr>(coefficients, mv)
             }
         }
     }

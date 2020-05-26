@@ -1,7 +1,7 @@
 use crate::board::Role::*;
 use crate::board::{
     squares_iterator, Board, ColorTr, Direction, Move, Movement, Piece, Square, StackMovement,
-    BOARD_SIZE,
+    TunableBoard, BOARD_SIZE,
 };
 use crate::{board, mcts};
 use arrayvec::ArrayVec;
@@ -30,12 +30,26 @@ impl Board {
         }));
     }
 
-    fn probability_for_game_phase<Us: ColorTr, Them: ColorTr>(
+    fn probability_for_move_colortr<Us: ColorTr, Them: ColorTr>(
         &self,
         params: &[f32],
         mv: &Move,
         num_moves: usize,
     ) -> f32 {
+        let mut coefficients = vec![0.0; Self::POLICY_PARAMS.len()];
+        self.coefficients_for_move_colortr::<Us, Them>(&mut coefficients, mv);
+        let total_value: f32 = coefficients.iter().zip(params).map(|(c, p)| c * p).sum();
+
+        let base_score = inverse_sigmoid(1.0 / num_moves as f32);
+
+        sigmoid(total_value + base_score)
+    }
+
+    pub(crate) fn coefficients_for_move_colortr<Us: ColorTr, Them: ColorTr>(
+        &self,
+        coefficients: &mut [f32],
+        mv: &Move,
+    ) {
         use crate::board::SQUARE_SYMMETRIES;
 
         const FLAT_STONE_PSQT: usize = 0;
@@ -53,20 +67,17 @@ impl Board {
         const STACK_MOVEMENT_THAT_GIVES_US_TOP_PIECES: usize = MOVEMENT_BASE_BONUS + 1;
         const _NEXT_CONST: usize = STACK_MOVEMENT_THAT_GIVES_US_TOP_PIECES + 4;
 
-        assert_eq!(params.len(), _NEXT_CONST);
-
-        let base_score = inverse_sigmoid(1.0 / num_moves as f32);
+        assert_eq!(coefficients.len(), _NEXT_CONST);
 
         // If it's the first move, give every move equal probability
         if self.half_moves_played() < 2 {
-            return 0.04;
+            return;
         }
 
         match mv {
             Move::Place(role, square) if *role == Flat => {
                 // Apply PSQT
-                let mut score =
-                    base_score + params[FLAT_STONE_PSQT + SQUARE_SYMMETRIES[square.0 as usize]];
+                coefficients[FLAT_STONE_PSQT + SQUARE_SYMMETRIES[square.0 as usize]] = 1.0;
                 // If square is next to a road stone laid on our last turn
                 if let Some(Move::Place(last_role, last_square)) =
                     self.moves().get(self.moves().len() - 2)
@@ -75,7 +86,7 @@ impl Board {
                         || *last_role == Cap
                             && square.neighbours().any(|neigh| neigh == *last_square)
                     {
-                        score += params[NEXT_TO_LAST_TURNS_STONE];
+                        coefficients[NEXT_TO_LAST_TURNS_STONE] = 1.0;
                     }
                 }
                 // If square has two or more of your own pieces around it
@@ -86,7 +97,7 @@ impl Board {
                     .count()
                     >= 2
                 {
-                    score += params[FLAT_PIECE_NEXT_TO_TWO_FLAT_PIECES];
+                    coefficients[FLAT_PIECE_NEXT_TO_TWO_FLAT_PIECES] = 1.0;
                 }
                 for direction in square.directions() {
                     let neighbour = square.go_direction(direction).unwrap();
@@ -100,18 +111,16 @@ impl Board {
                             .map(Us::is_road_stone)
                             .unwrap_or_default()
                     {
-                        score += params[EXTEND_ROW_OF_TWO_FLATS];
+                        coefficients[EXTEND_ROW_OF_TWO_FLATS] += 1.0;
                     }
                 }
-                sigmoid(score)
             }
             Move::Place(role, square) => {
                 // Apply PSQT:
-                let mut score = base_score;
                 if *role == Standing {
-                    score += params[STANDING_STONE_PSQT + SQUARE_SYMMETRIES[square.0 as usize]]
+                    coefficients[STANDING_STONE_PSQT + SQUARE_SYMMETRIES[square.0 as usize]] = 1.0;
                 } else if *role == Cap {
-                    score += params[CAPSTONE_PSQT + SQUARE_SYMMETRIES[square.0 as usize]]
+                    coefficients[CAPSTONE_PSQT + SQUARE_SYMMETRIES[square.0 as usize]] = 1.0;
                 } else {
                     unreachable!(
                         "Tried to place {:?} with move {} on board\n{:?}",
@@ -126,7 +135,7 @@ impl Board {
                     .count()
                     >= 2
                 {
-                    score += params[BLOCKING_STONE_NEXT_TO_TWO_OF_THEIR_FLATS];
+                    coefficients[BLOCKING_STONE_NEXT_TO_TWO_OF_THEIR_FLATS] = 1.0;
                 }
                 for direction in square.directions() {
                     let neighbour = square.go_direction(direction).unwrap();
@@ -140,14 +149,12 @@ impl Board {
                             .map(Them::is_road_stone)
                             .unwrap_or_default()
                     {
-                        score += params[BLOCKING_STONE_BLOCKS_EXTENSIONS_OF_TWO_FLATS];
+                        coefficients[BLOCKING_STONE_BLOCKS_EXTENSIONS_OF_TWO_FLATS] += 1.0;
                     }
                 }
-                sigmoid(score)
             }
             Move::Move(square, _direction, stack_movement) => {
-                let mut score = base_score;
-                score += params[MOVEMENT_BASE_BONUS];
+                coefficients[MOVEMENT_BASE_BONUS] = 1.0;
                 let mut our_pieces = 0;
                 let mut their_pieces = 0;
                 for piece in self
@@ -161,20 +168,10 @@ impl Board {
                     }
                 }
                 if their_pieces == 0 && our_pieces > 1 {
-                    score += params[STACK_MOVEMENT_THAT_GIVES_US_TOP_PIECES + our_pieces - 2];
+                    coefficients[STACK_MOVEMENT_THAT_GIVES_US_TOP_PIECES + our_pieces - 2] = 1.0;
                 }
-                sigmoid(score)
             }
         }
-    }
-
-    pub(crate) fn probability_for_move_colortr<Us: ColorTr, Them: ColorTr>(
-        &self,
-        params: &[f32],
-        mv: &Move,
-        num_moves: usize,
-    ) -> f32 {
-        self.probability_for_game_phase::<Us, Them>(params, mv, num_moves)
     }
 
     pub(crate) fn generate_moves_colortr<Us: ColorTr, Them: ColorTr>(
