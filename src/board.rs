@@ -9,7 +9,7 @@ use crate::board::Piece::*;
 use crate::board::Role::Flat;
 use crate::board::Role::*;
 use crate::mcts;
-use crate::move_gen::{inverse_sigmoid, sigmoid};
+use crate::move_gen::sigmoid;
 use arrayvec::ArrayVec;
 use board_game_traits::board;
 use board_game_traits::board::GameResult::{BlackWin, Draw, WhiteWin};
@@ -47,7 +47,7 @@ pub trait TunableBoard: BoardTrait {
 
     fn probability_for_move(&self, params: &[f32], mv: &Self::Move, num_moves: usize) -> f32;
 
-    fn coefficients_for_move(&self, coefficients: &mut [f32], mv: &Move);
+    fn coefficients_for_move(&self, coefficients: &mut [f32], mv: &Move, num_legal_moves: usize);
 }
 
 pub(crate) trait ColorTr {
@@ -1218,73 +1218,74 @@ pub(crate) const SQUARE_SYMMETRIES: [usize; 25] = [
 impl TunableBoard for Board {
     #[allow(clippy::unreadable_literal)]
     const VALUE_PARAMS: &'static [f32] = &[
-        -0.0149931805,
-        0.25723538,
-        0.2940058,
-        0.4238666,
-        0.52233166,
-        0.23532094,
-        0.46646726,
-        1.0888499,
-        0.93079275,
-        1.1300979,
-        1.2846224,
-        0.7606911,
-        -0.32218972,
-        -0.057136543,
-        -0.04489895,
-        0.29769522,
-        0.6452908,
-        1.1998287,
-        1.1865233,
-        1.470002,
-        1.0057858,
-        -0.11868016,
-        0.91616416,
-        0.93310755,
-        -1.8471444,
-        -1.4468176,
-        -0.56441724,
-        0.6747622,
-        2.052937,
-        -0.05114726,
-        0.8312374,
-        -0.99406725,
-        -0.6882456,
-        -0.5216054,
-        -0.038465776,
-        0.62074935,
+        0.06798862372401564,
+        0.20259085033581922,
+        0.21585217977224905,
+        0.3053121806170773,
+        0.3276436869901783,
+        0.21753735512647182,
+        0.9163058074024873,
+        0.7541043251760894,
+        0.6556998439577609,
+        0.8814242806416128,
+        0.9564210587704,
+        0.6429227369847341,
+        -0.13543795876293296,
+        0.027898351639045343,
+        0.02910467377437256,
+        0.3408277206437149,
+        0.4021272962686015,
+        0.8335701102089715,
+        0.749731373375841,
+        0.8033859543523918,
+        0.5157949599381465,
+        0.08701292297279936,
+        0.44991535028054314,
+        0.3655108729709695,
+        -0.8775383116565778,
+        -0.6651502986052945,
+        -0.13201251623650617,
+        0.5071361323880608,
+        1.3083265654895389,
+        0.03440143244083274,
+        0.5515548960037988,
+        -0.7194980647613614,
+        -0.3946589657704064,
+        -0.11580431518455152,
+        0.15893774181122383,
+        0.5385114208030143,
     ];
     #[allow(clippy::unreadable_literal)]
     const POLICY_PARAMS: &'static [f32] = &[
-        -0.22394775,
-        0.34828594,
-        0.5422076,
-        1.1771424,
-        1.4986687,
-        0.97388643,
-        -4.086922,
-        -3.4035506,
-        -3.1640594,
-        -3.1151621,
-        -1.7741977,
-        -2.3559997,
-        -3.1579914,
-        -3.0281982,
-        -1.5865799,
-        -0.90471375,
-        1.8511987,
-        6.350537,
-        0.9285992,
-        0.004892543,
-        1.0836914,
-        0.10171267,
-        1.6477052,
-        -0.4607415,
-        1.4072983,
-        2.4922855,
-        0.77424026,
-        -2.9266522,
+        0.9974053798007804,
+        -0.3202930918452704,
+        0.24288377555212576,
+        0.5909829474789371,
+        1.01111062851833,
+        1.5761801576890637,
+        0.7256325881717629,
+        -2.3642152124559894,
+        -2.5799556125512986,
+        -2.278244522607072,
+        -2.14829554420109,
+        -1.4036929533770148,
+        -1.1523229664291557,
+        -0.5182607943328745,
+        -0.9363663129885557,
+        -0.8441369930441627,
+        0.6223565639021081,
+        1.7631950540365375,
+        6.4139572197123105,
+        0.26549219942875835,
+        -0.00027854739050528395,
+        1.0979082288847897,
+        -0.653999299346063,
+        1.86648254098524,
+        -0.39143261884784364,
+        1.2399467634931605,
+        2.1903870072179634,
+        0.2560880588108338,
+        0.019122236093211273,
     ];
 
     fn static_eval_coefficients(&self, coefficients: &mut [f32]) {
@@ -1317,22 +1318,24 @@ impl TunableBoard for Board {
 
     fn probability_for_move(&self, params: &[f32], mv: &Move, num_moves: usize) -> f32 {
         let mut coefficients = vec![0.0; Self::POLICY_PARAMS.len()];
-        self.coefficients_for_move(&mut coefficients, mv);
+        self.coefficients_for_move(&mut coefficients, mv, num_moves);
         let total_value: f32 = coefficients.iter().zip(params).map(|(c, p)| c * p).sum();
 
-        let base_score = inverse_sigmoid(1.0 / num_moves as f32);
-
-        sigmoid(total_value + base_score)
+        sigmoid(total_value)
     }
 
-    fn coefficients_for_move(&self, coefficients: &mut [f32], mv: &Move) {
+    fn coefficients_for_move(&self, coefficients: &mut [f32], mv: &Move, num_legal_moves: usize) {
         match self.side_to_move() {
-            Color::White => {
-                self.coefficients_for_move_colortr::<WhiteTr, BlackTr>(coefficients, mv)
-            }
-            Color::Black => {
-                self.coefficients_for_move_colortr::<BlackTr, WhiteTr>(coefficients, mv)
-            }
+            Color::White => self.coefficients_for_move_colortr::<WhiteTr, BlackTr>(
+                coefficients,
+                mv,
+                num_legal_moves,
+            ),
+            Color::Black => self.coefficients_for_move_colortr::<BlackTr, WhiteTr>(
+                coefficients,
+                mv,
+                num_legal_moves,
+            ),
         }
     }
 }

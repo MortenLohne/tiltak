@@ -1,4 +1,5 @@
 use rayon::prelude::*;
+use std::time::Instant;
 
 pub fn gradient_descent(
     coefficient_sets: &[Vec<f64>],
@@ -6,14 +7,16 @@ pub fn gradient_descent(
     test_coefficient_sets: &[Vec<f64>],
     test_results: &[f64],
     params: &[f64],
+    initial_learning_rate: f64,
 ) -> Vec<f64> {
     assert_eq!(coefficient_sets.len(), results.len());
     assert_eq!(test_coefficient_sets.len(), test_results.len());
 
-    let beta = 0.9;
+    let start_time = Instant::now();
+    let beta = 0.95;
 
     // If error is not reduced this number of times, reduce eta, or abort if eta is already low
-    const MAX_TRIES: usize = 8;
+    const MAX_TRIES: usize = 50;
 
     let initial_error = average_error(test_coefficient_sets, test_results, params);
     println!(
@@ -31,64 +34,79 @@ pub fn gradient_descent(
     let mut lowest_error = initial_error;
     let mut best_parameter_set = params.to_vec();
 
-    let mut iterations_since_improvement = 0;
-    let mut iterations_since_large_improvement = 0;
-
-    let mut parameter_set = best_parameter_set.clone();
-    let mut gradients = vec![0.0; params.len()];
-
-    let eta = 1.0;
-
     println!("First n sets:");
     for (coefficients, result) in coefficient_sets.iter().zip(results).take(5) {
         println!("{:?}", coefficients);
-        println!("Result {}", result)
+        println!(
+            "Result {}, estimated {}",
+            result,
+            eval_from_params(coefficients, params)
+        );
     }
 
-    loop {
-        let slopes = calc_slope(coefficient_sets, results, &parameter_set);
-        println!("Slopes: {:?}", slopes);
-        gradients = gradients
-            .iter()
-            .zip(slopes)
-            .map(|(gradient, slope)| beta * gradient + (1.0 - beta) * slope)
-            .collect();
-        println!("Gradients: {:?}", gradients);
+    for eta in [
+        initial_learning_rate,
+        initial_learning_rate / 3.0,
+        initial_learning_rate / 10.0,
+        initial_learning_rate / 30.0,
+    ]
+    .iter()
+    {
+        println!("\nTuning with eta = {}\n", eta);
+        let mut parameter_set = best_parameter_set.clone();
+        let mut gradients = vec![0.0; params.len()];
 
-        parameter_set = parameter_set
-            .iter()
-            .zip(gradients.iter())
-            .map(|(param, gradient)| param - gradient * eta)
-            .collect();
-        println!("New parameters: {:?}", parameter_set);
+        let mut iterations_since_improvement = 0;
+        let mut iterations_since_large_improvement = 0;
+        loop {
+            let slopes = calc_slope(coefficient_sets, results, &parameter_set);
+            println!("Slopes: {:?}", slopes);
+            gradients = gradients
+                .iter()
+                .zip(slopes)
+                .map(|(gradient, slope)| beta * gradient + (1.0 - beta) * slope)
+                .collect();
+            println!("Gradients: {:?}", gradients);
 
-        let error = average_error(test_coefficient_sets, test_results, &parameter_set);
-        println!("Error now {}\n", error);
+            parameter_set = parameter_set
+                .iter()
+                .zip(gradients.iter())
+                .map(|(param, gradient)| param - gradient * eta)
+                .collect();
+            println!("New parameters: {:?}", parameter_set);
 
-        if error < lowest_error {
-            iterations_since_improvement = 0;
-            if lowest_error / error > 1.000_001 {
-                iterations_since_large_improvement = 0;
+            let error = average_error(test_coefficient_sets, test_results, &parameter_set);
+            println!("Error now {}, eta={}\n", error, eta);
+
+            if error < lowest_error {
+                iterations_since_improvement = 0;
+                if lowest_error / error > 1.000_001 {
+                    iterations_since_large_improvement = 0;
+                } else {
+                    iterations_since_large_improvement += 1;
+                    if iterations_since_large_improvement >= MAX_TRIES * 2 {
+                        break;
+                    }
+                }
+                lowest_error = error;
+                best_parameter_set = parameter_set.clone();
             } else {
+                iterations_since_improvement += 1;
                 iterations_since_large_improvement += 1;
-                if iterations_since_large_improvement >= MAX_TRIES * 2 {
+                if iterations_since_improvement >= MAX_TRIES {
                     break;
                 }
-            }
-            lowest_error = error;
-            best_parameter_set = parameter_set.clone();
-        } else {
-            iterations_since_improvement += 1;
-            iterations_since_large_improvement += 1;
-            if iterations_since_improvement >= MAX_TRIES {
-                break;
             }
         }
     }
 
+    let elapsed = start_time.elapsed();
+
     println!(
-        "Finished gradient descent, error is {}. Parameters:\n{:?}",
-        lowest_error, best_parameter_set
+        "Finished gradient descent in {:.1}s, error is {}. Parameters:\n{:?}",
+        elapsed.as_secs_f64(),
+        lowest_error,
+        best_parameter_set
     );
     best_parameter_set
 }

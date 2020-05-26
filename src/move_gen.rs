@@ -5,13 +5,15 @@ use crate::board::{
 };
 use crate::{board, mcts};
 use arrayvec::ArrayVec;
+use std::num::FpCategory;
 
 pub fn sigmoid(x: f32) -> f32 {
     1.0 / (1.0 + f32::exp(-x))
 }
 
 pub fn inverse_sigmoid(x: f32) -> f32 {
-    -f32::ln(1.0 / x - 1.0)
+    assert!(x > 0.0 && x < 1.0, "Tried to inverse sigmoid {}", x);
+    f32::ln(x / (1.0 - x))
 }
 
 impl Board {
@@ -37,22 +39,22 @@ impl Board {
         num_moves: usize,
     ) -> f32 {
         let mut coefficients = vec![0.0; Self::POLICY_PARAMS.len()];
-        self.coefficients_for_move_colortr::<Us, Them>(&mut coefficients, mv);
+        self.coefficients_for_move_colortr::<Us, Them>(&mut coefficients, mv, num_moves);
         let total_value: f32 = coefficients.iter().zip(params).map(|(c, p)| c * p).sum();
 
-        let base_score = inverse_sigmoid(1.0 / num_moves as f32);
-
-        sigmoid(total_value + base_score)
+        sigmoid(total_value)
     }
 
     pub(crate) fn coefficients_for_move_colortr<Us: ColorTr, Them: ColorTr>(
         &self,
         coefficients: &mut [f32],
         mv: &Move,
+        num_legal_moves: usize,
     ) {
         use crate::board::SQUARE_SYMMETRIES;
 
-        const FLAT_STONE_PSQT: usize = 0;
+        const MOVE_COUNT: usize = 0;
+        const FLAT_STONE_PSQT: usize = MOVE_COUNT + 1;
         const STANDING_STONE_PSQT: usize = FLAT_STONE_PSQT + 6;
         const CAPSTONE_PSQT: usize = STANDING_STONE_PSQT + 6;
         const NEXT_TO_LAST_TURNS_STONE: usize = CAPSTONE_PSQT + 6;
@@ -68,6 +70,18 @@ impl Board {
         const _NEXT_CONST: usize = STACK_MOVEMENT_THAT_GIVES_US_TOP_PIECES + 4;
 
         assert_eq!(coefficients.len(), _NEXT_CONST);
+
+        let initial_move_prob = 1.0 / num_legal_moves as f32;
+        coefficients[MOVE_COUNT] = inverse_sigmoid(initial_move_prob);
+        assert_eq!(
+            coefficients[MOVE_COUNT].classify(),
+            FpCategory::Normal,
+            "Got {} {} from input {}, ln of {}",
+            coefficients[MOVE_COUNT],
+            inverse_sigmoid(initial_move_prob),
+            initial_move_prob,
+            initial_move_prob / (1.0 - initial_move_prob)
+        );
 
         // If it's the first move, give every move equal probability
         if self.half_moves_played() < 2 {

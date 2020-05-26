@@ -419,5 +419,5 @@ impl<'a> Iterator for PV<'a> {
 
 /// Convert a static evaluation in centipawns to a winning probability between 0.0 and 1.0.
 pub fn cp_to_win_percentage(cp: f32) -> Score {
-    1.0 / (1.0 + Score::powf(10.0, -cp as Score / 3.0))
+    1.0 / (1.0 + Score::exp(-cp as Score))
 }

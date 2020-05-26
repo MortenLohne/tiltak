@@ -16,6 +16,8 @@ use taik::board::TunableBoard;
 use taik::board::{Board, Move};
 use taik::pgn_writer::Game;
 
+type MoveScoress = Vec<Vec<Vec<(Move, f32)>>>;
+
 pub fn train_from_scratch(training_id: usize) -> Result<(), Box<dyn error::Error>> {
     let mut rng = rand::thread_rng();
 
@@ -283,12 +285,6 @@ pub fn tune_real_from_file() -> Result<Vec<f64>, Box<dyn error::Error>> {
         })
         .collect::<Vec<f64>>();
 
-    println!(
-        "{} results with sum {}",
-        f64_results.len(),
-        f64_results.iter().sum::<f64>()
-    );
-
     let middle_index = positions.len() / 2;
 
     let mut rng = rand::thread_rng();
@@ -302,6 +298,7 @@ pub fn tune_real_from_file() -> Result<Vec<f64>, Box<dyn error::Error>> {
         &coefficient_sets[middle_index..],
         &f64_results[middle_index..],
         &initial_params,
+        50.0,
     );
 
     println!("Final parameters: {:?}", tuned_parameters);
@@ -309,25 +306,92 @@ pub fn tune_real_from_file() -> Result<Vec<f64>, Box<dyn error::Error>> {
     Ok(tuned_parameters)
 }
 
-pub fn tune_value_and_policy_from_file() -> Result<(Vec<f32>, Vec<f32>), Box<dyn error::Error>> {
-    let move_scoress = read_move_scores_from_file()?;
-    let games = read_games_from_file()?;
+pub fn tune_real_value_and_policy_from_file() -> Result<(Vec<f64>, Vec<f64>), Box<dyn error::Error>>
+{
+    let (games, move_scoress) = games_and_move_scoress_from_file()?;
+
+    let (positions, results) = positions_and_results_from_games(games.clone());
+
+    let value_coefficient_sets = positions
+        .iter()
+        .map(|position| {
+            let mut coefficients = vec![0.0; Board::VALUE_PARAMS.len()];
+            position.static_eval_coefficients(&mut coefficients);
+            coefficients.iter().map(|a| *a as f64).collect()
+        })
+        .collect::<Vec<Vec<f64>>>();
+
+    let value_results = results
+        .iter()
+        .map(|res| match res {
+            GameResult::WhiteWin => 1.0,
+            GameResult::Draw => 0.5,
+            GameResult::BlackWin => 0.0,
+        })
+        .collect::<Vec<f64>>();
+
+    let mut policy_coefficients_sets: Vec<Vec<f64>> = vec![];
+    let mut policy_results: Vec<f64> = vec![];
 
     for (game, move_scores) in games.iter().zip(&move_scoress) {
         let mut board = game.start_board.clone();
-        for (mv, move_score) in game.moves.iter().map(|(mv, _)| mv).zip(move_scores) {
-            assert!(
-                move_score
-                    .iter()
-                    .any(|(scored_move, _score)| *mv == *scored_move),
-                "Played move {} not among move scores {:?}\nBoard:\n{:?}",
-                mv,
-                move_score,
-                board
-            );
+
+        for (mv, move_scores) in game.moves.iter().map(|(mv, _)| mv).zip(move_scores) {
+            for (possible_move, score) in move_scores {
+                let mut coefficients = vec![0.0; Board::POLICY_PARAMS.len()];
+                board.coefficients_for_move(&mut coefficients, possible_move, move_scores.len());
+
+                policy_coefficients_sets.push(coefficients.into_iter().map(|c| c as f64).collect());
+                policy_results.push(*score as f64);
+            }
             board.do_move(mv.clone());
         }
     }
+
+    let middle_index = value_coefficient_sets.len() / 2;
+
+    let mut rng = rand::thread_rng();
+    let initial_value_params: Vec<f64> = iter::from_fn(|| Some(rng.gen_range(-0.1, 0.1)))
+        .take(Board::VALUE_PARAMS.len())
+        .collect();
+
+    let tuned_value_parameters = real_gradient_descent::gradient_descent(
+        &value_coefficient_sets[0..middle_index],
+        &value_results[0..middle_index],
+        &value_coefficient_sets[middle_index..],
+        &value_results[middle_index..],
+        &initial_value_params,
+        10.0,
+    );
+
+    println!("Final parameters: {:?}", tuned_value_parameters);
+
+    let middle_index = policy_coefficients_sets.len() / 2;
+
+    let mut initial_policy_params: Vec<f64> = iter::from_fn(|| Some(rng.gen_range(-0.1, 0.1)))
+        .take(Board::POLICY_PARAMS.len())
+        .collect();
+
+    // The move number parameter should always be around 1.0, so start it here
+    // If we don't, variation of this parameter completely dominates the other parameters
+    initial_policy_params[0] = 1.0;
+
+    let tuned_policy_parameters = real_gradient_descent::gradient_descent(
+        &policy_coefficients_sets[0..middle_index],
+        &policy_results[0..middle_index],
+        &policy_coefficients_sets[middle_index..],
+        &policy_results[middle_index..],
+        &initial_policy_params,
+        10000.0,
+    );
+
+    println!("Final parameters: {:?}", tuned_policy_parameters);
+
+    Ok((tuned_value_parameters, tuned_policy_parameters))
+}
+
+pub fn tune_value_and_policy_from_file() -> Result<(Vec<f32>, Vec<f32>), Box<dyn error::Error>> {
+    let (games, move_scoress) = games_and_move_scoress_from_file()?;
 
     tune_value_and_policy(
         Board::VALUE_PARAMS,
@@ -400,7 +464,33 @@ pub fn tune_value_and_policy(
     Ok((value_params, policy_params))
 }
 
-pub fn read_move_scores_from_file() -> Result<Vec<Vec<Vec<(Move, f32)>>>, Box<dyn error::Error>> {
+pub fn games_and_move_scoress_from_file(
+) -> Result<(Vec<Game<Board>>, MoveScoress), Box<dyn error::Error>> {
+    let mut move_scoress = read_move_scores_from_file()?;
+    let mut games = read_games_from_file()?;
+
+    move_scoress.truncate(5000);
+    games.truncate(5000);
+
+    for (game, move_scores) in games.iter().zip(&move_scoress) {
+        let mut board = game.start_board.clone();
+        for (mv, move_score) in game.moves.iter().map(|(mv, _)| mv).zip(move_scores) {
+            assert!(
+                move_score
+                    .iter()
+                    .any(|(scored_move, _score)| *mv == *scored_move),
+                "Played move {} not among move scores {:?}\nBoard:\n{:?}",
+                mv,
+                move_score,
+                board
+            );
+            board.do_move(mv.clone());
+        }
+    }
+    Ok((games, move_scoress))
+}
+
+pub fn read_move_scores_from_file() -> Result<MoveScoress, Box<dyn error::Error>> {
     let mut file = fs::File::open("move_scores23_all.txt")?;
     let mut input = String::new();
     file.read_to_string(&mut input)?;
