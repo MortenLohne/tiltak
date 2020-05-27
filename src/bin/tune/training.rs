@@ -301,7 +301,13 @@ pub fn tune_real_from_file() -> Result<Vec<f64>, Box<dyn error::Error>> {
         50.0,
     );
 
-    println!("Final parameters: {:?}", tuned_parameters);
+    println!(
+        "Final parameters: {:?}",
+        tuned_parameters
+            .iter()
+            .map(|f| *f as f32)
+            .collect::<Vec<f32>>()
+    );
 
     Ok(tuned_parameters)
 }

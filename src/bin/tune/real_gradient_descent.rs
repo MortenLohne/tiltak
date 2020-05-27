@@ -16,7 +16,7 @@ pub fn gradient_descent(
     let beta = 0.95;
 
     // If error is not reduced this number of times, reduce eta, or abort if eta is already low
-    const MAX_TRIES: usize = 50;
+    const MAX_TRIES: usize = 25;
 
     let initial_error = average_error(test_coefficient_sets, test_results, params);
     println!(
@@ -84,7 +84,7 @@ pub fn gradient_descent(
                     iterations_since_large_improvement = 0;
                 } else {
                     iterations_since_large_improvement += 1;
-                    if iterations_since_large_improvement >= MAX_TRIES * 2 {
+                    if iterations_since_large_improvement >= MAX_TRIES {
                         break;
                     }
                 }
@@ -103,10 +103,13 @@ pub fn gradient_descent(
     let elapsed = start_time.elapsed();
 
     println!(
-        "Finished gradient descent in {:.1}s, error is {}. Parameters:\n{:?}",
+        "Finished gradient descent in {:.1}s, error is {:.7}. Parameters:\n{:?}",
         elapsed.as_secs_f64(),
         lowest_error,
         best_parameter_set
+            .iter()
+            .map(|f| *f as f32)
+            .collect::<Vec<f32>>()
     );
     best_parameter_set
 }
