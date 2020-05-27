@@ -211,9 +211,11 @@ fn play_random_games_test() {
                 for rotation in board.rotations_and_symmetries() {
                     assert!(
                         rotation.static_eval().abs() - static_eval.abs() < 0.0001,
-                        "Original static eval {}, rotated static eval {}",
+                        "Original static eval {}, rotated static eval {}.Board:\n{:?}\nRotated board:\n{:?}",
                         static_eval,
-                        rotation.static_eval()
+                        rotation.static_eval(),
+                        board,
+                        rotation
                     );
                 }
             }

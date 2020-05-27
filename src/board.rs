@@ -3,6 +3,8 @@
 /// The size of the board. Only 5 works correctly for now.
 pub const BOARD_SIZE: usize = 5;
 
+pub const STARTING_CAPSTONES: u8 = 1;
+
 use crate::bitboard::BitBoard;
 use crate::board::Direction::*;
 use crate::board::Piece::*;
@@ -596,8 +598,8 @@ impl Default for Board {
             black_road_pieces: BitBoard::default(),
             white_stones_left: 21,
             black_stones_left: 21,
-            white_capstones_left: 1,
-            black_capstones_left: 1,
+            white_capstones_left: STARTING_CAPSTONES,
+            black_capstones_left: STARTING_CAPSTONES,
             moves_played: 0,
             moves: vec![],
         }
@@ -649,6 +651,14 @@ impl Board {
 
     pub(crate) fn black_road_pieces(&self) -> BitBoard {
         self.black_road_pieces
+    }
+
+    pub fn white_flat_tops_count(&self) -> u8 {
+        self.white_road_pieces().count() - (STARTING_CAPSTONES - self.white_capstones_left)
+    }
+
+    pub fn black_flat_tops_count(&self) -> u8 {
+        self.black_road_pieces().count() - (STARTING_CAPSTONES - self.black_capstones_left)
     }
 
     /// Number of moves/plies played in the game
@@ -826,14 +836,21 @@ impl Board {
             }
         }
 
-        const TO_MOVE: usize = CAP_PSQT + 6;
+        const FLATSTONE_LEAD: usize = CAP_PSQT + 6;
 
-        match self.side_to_move() {
-            Color::White => coefficients[TO_MOVE] = 1.0,
-            Color::Black => coefficients[TO_MOVE] = -1.0,
+        // Give the side to move a bonus/malus depending on flatstone lead
+        let flatstone_lead = match self.side_to_move() {
+            Color::White => self.white_flat_tops_count() as i8 - self.black_flat_tops_count() as i8,
+            Color::Black => self.black_flat_tops_count() as i8 - self.white_flat_tops_count() as i8,
         };
 
-        const PIECES_IN_OUR_STACK: usize = TO_MOVE + 1;
+        // Don't give extra bonus for flatstone leads greater than 3
+        let flatstone_lead_index = i8::min(i8::max(flatstone_lead + 3, 0), 6) as usize;
+
+        coefficients[FLATSTONE_LEAD + flatstone_lead_index] =
+            self.side_to_move().multiplier() as f32;
+
+        const PIECES_IN_OUR_STACK: usize = FLATSTONE_LEAD + 7;
         const PIECES_IN_THEIR_STACK: usize = PIECES_IN_OUR_STACK + 1;
         const CAPSTONE_OVER_OWN_PIECE: usize = PIECES_IN_THEIR_STACK + 1;
         const CAPSTONE_ON_STACK: usize = CAPSTONE_OVER_OWN_PIECE + 1;
@@ -1218,42 +1235,48 @@ pub(crate) const SQUARE_SYMMETRIES: [usize; 25] = [
 impl TunableBoard for Board {
     #[allow(clippy::unreadable_literal)]
     const VALUE_PARAMS: &'static [f32] = &[
-        0.06798862372401564,
-        0.20259085033581922,
-        0.21585217977224905,
-        0.3053121806170773,
-        0.3276436869901783,
-        0.21753735512647182,
-        0.9163058074024873,
-        0.7541043251760894,
-        0.6556998439577609,
-        0.8814242806416128,
-        0.9564210587704,
-        0.6429227369847341,
-        -0.13543795876293296,
-        0.027898351639045343,
-        0.02910467377437256,
-        0.3408277206437149,
-        0.4021272962686015,
-        0.8335701102089715,
-        0.749731373375841,
-        0.8033859543523918,
-        0.5157949599381465,
-        0.08701292297279936,
-        0.44991535028054314,
-        0.3655108729709695,
-        -0.8775383116565778,
-        -0.6651502986052945,
-        -0.13201251623650617,
-        0.5071361323880608,
-        1.3083265654895389,
-        0.03440143244083274,
-        0.5515548960037988,
-        -0.7194980647613614,
-        -0.3946589657704064,
-        -0.11580431518455152,
-        0.15893774181122383,
-        0.5385114208030143,
+        0.009813885,
+        0.13808799,
+        0.14958292,
+        0.23838286,
+        0.25623447,
+        0.15063402,
+        0.91223943,
+        0.7483996,
+        0.6539334,
+        0.87104195,
+        0.93474567,
+        0.65724564,
+        -0.057353713,
+        0.10412805,
+        0.101105064,
+        0.41277453,
+        0.4674504,
+        0.8792682,
+        0.6197543,
+        0.65151864,
+        0.59081304,
+        0.80493355,
+        0.7464765,
+        0.8859352,
+        0.8290378,
+        0.78635985,
+        0.50422025,
+        0.056885157,
+        0.44358328,
+        0.34040207,
+        -0.9271396,
+        -0.6785829,
+        -0.15457486,
+        0.47712648,
+        1.2640105,
+        0.06547172,
+        0.6244577,
+        -0.65153635,
+        -0.3645413,
+        -0.13633706,
+        0.09271197,
+        0.42613515,
     ];
     #[allow(clippy::unreadable_literal)]
     const POLICY_PARAMS: &'static [f32] = &[
