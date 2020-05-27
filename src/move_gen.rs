@@ -67,7 +67,8 @@ impl Board {
 
         const MOVEMENT_BASE_BONUS: usize = BLOCKING_STONE_BLOCKS_EXTENSIONS_OF_TWO_FLATS + 1;
         const STACK_MOVEMENT_THAT_GIVES_US_TOP_PIECES: usize = MOVEMENT_BASE_BONUS + 1;
-        const _NEXT_CONST: usize = STACK_MOVEMENT_THAT_GIVES_US_TOP_PIECES + 4;
+        const STACK_CAPTURED_BY_MOVEMENT: usize = STACK_MOVEMENT_THAT_GIVES_US_TOP_PIECES + 4;
+        const _NEXT_CONST: usize = STACK_CAPTURED_BY_MOVEMENT + 1;
 
         assert_eq!(coefficients.len(), _NEXT_CONST);
 
@@ -167,10 +168,20 @@ impl Board {
                     }
                 }
             }
-            Move::Move(square, _direction, stack_movement) => {
+            Move::Move(square, direction, stack_movement) => {
                 coefficients[MOVEMENT_BASE_BONUS] = 1.0;
+
+                let mut destination_square =
+                    if stack_movement.movements[0].pieces_to_take == self[*square].len() {
+                        square.go_direction(*direction).unwrap()
+                    } else {
+                        *square
+                    };
+
                 let mut our_pieces = 0;
                 let mut their_pieces = 0;
+
+                // This iterator skips the first square if we move the whole stack
                 for piece in self
                     .top_stones_left_behind_by_move(*square, stack_movement)
                     .flatten()
@@ -180,7 +191,25 @@ impl Board {
                     } else {
                         their_pieces += 1;
                     }
+
+                    let destination_stack = &self[destination_square];
+                    if let Some(destination_top_stone) = destination_stack.top_stone() {
+                        if piece.color() != destination_top_stone.color() {
+                            if Us::piece_is_ours(piece) {
+                                coefficients[STACK_CAPTURED_BY_MOVEMENT] +=
+                                    destination_stack.len() as f32;
+                            } else {
+                                coefficients[STACK_CAPTURED_BY_MOVEMENT] -=
+                                    destination_stack.len() as f32;
+                            }
+                        }
+                    }
+
+                    destination_square = destination_square
+                        .go_direction(*direction)
+                        .unwrap_or(destination_square);
                 }
+
                 if their_pieces == 0 && our_pieces > 1 {
                     coefficients[STACK_MOVEMENT_THAT_GIVES_US_TOP_PIECES + our_pieces - 2] = 1.0;
                 }
