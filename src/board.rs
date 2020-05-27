@@ -855,11 +855,14 @@ impl Board {
         const CAPSTONE_OVER_OWN_PIECE: usize = PIECES_IN_THEIR_STACK + 1;
         const CAPSTONE_ON_STACK: usize = CAPSTONE_OVER_OWN_PIECE + 1;
         const STANDING_STONE_ON_STACK: usize = CAPSTONE_ON_STACK + 1;
+        const FLAT_STONE_NEXT_TO_OUR_STACK: usize = STANDING_STONE_ON_STACK + 1;
+        const STANDING_STONE_NEXT_TO_OUR_STACK: usize = FLAT_STONE_NEXT_TO_OUR_STACK + 1;
+        const CAPSTONE_NEXT_TO_OUR_STACK: usize = STANDING_STONE_NEXT_TO_OUR_STACK + 1;
 
         squares_iterator()
-            .map(|sq| &self[sq])
-            .filter(|stack| stack.len() > 1)
-            .for_each(|stack| {
+            .map(|sq| (sq, &self[sq]))
+            .filter(|(_, stack)| stack.len() > 1)
+            .for_each(|(square, stack)| {
                 let top_stone = stack.top_stone().unwrap();
                 let controlling_player = top_stone.color();
                 let color_factor = top_stone.color().multiplier() as f32;
@@ -887,10 +890,34 @@ impl Board {
                     Flat => (),
                     Standing => coefficients[STANDING_STONE_ON_STACK] += color_factor,
                 }
+
+                // Malus for them having stones next to our stack with flat stones on top
+                for neighbour in square.neighbours() {
+                    if let Some(neighbour_top_stone) = self[neighbour].top_stone() {
+                        if top_stone.role() == Flat
+                            && neighbour_top_stone.color() != controlling_player
+                        {
+                            match neighbour_top_stone.role() {
+                                Flat => {
+                                    coefficients[FLAT_STONE_NEXT_TO_OUR_STACK] +=
+                                        color_factor * stack.len() as f32
+                                }
+                                Standing => {
+                                    coefficients[STANDING_STONE_NEXT_TO_OUR_STACK] +=
+                                        color_factor * stack.len() as f32
+                                }
+                                Cap => {
+                                    coefficients[CAPSTONE_NEXT_TO_OUR_STACK] +=
+                                        color_factor * stack.len() as f32
+                                }
+                            }
+                        }
+                    }
+                }
             });
 
         // Number of pieces in each rank/file
-        const RANK_FILE_CONTROL: usize = STANDING_STONE_ON_STACK + 1;
+        const RANK_FILE_CONTROL: usize = CAPSTONE_NEXT_TO_OUR_STACK + 1;
         // Number of ranks/files with at least one road stone
         const NUM_RANKS_FILES_OCCUPIED: usize = RANK_FILE_CONTROL + 6;
 
@@ -1235,48 +1262,51 @@ pub(crate) const SQUARE_SYMMETRIES: [usize; 25] = [
 impl TunableBoard for Board {
     #[allow(clippy::unreadable_literal)]
     const VALUE_PARAMS: &'static [f32] = &[
-        0.009813885,
-        0.13808799,
-        0.14958292,
-        0.23838286,
-        0.25623447,
-        0.15063402,
-        0.91223943,
-        0.7483996,
-        0.6539334,
-        0.87104195,
-        0.93474567,
-        0.65724564,
-        -0.057353713,
-        0.10412805,
-        0.101105064,
-        0.41277453,
-        0.4674504,
-        0.8792682,
-        0.6197543,
-        0.65151864,
-        0.59081304,
-        0.80493355,
-        0.7464765,
-        0.8859352,
-        0.8290378,
-        0.78635985,
-        0.50422025,
-        0.056885157,
-        0.44358328,
-        0.34040207,
-        -0.9271396,
-        -0.6785829,
-        -0.15457486,
-        0.47712648,
-        1.2640105,
-        0.06547172,
-        0.6244577,
-        -0.65153635,
-        -0.3645413,
-        -0.13633706,
-        0.09271197,
-        0.42613515,
+        -0.023855701,
+        0.10712812,
+        0.120720044,
+        0.22070226,
+        0.25140703,
+        0.14309339,
+        0.87056917,
+        0.64728224,
+        0.53890187,
+        0.74330074,
+        0.8339564,
+        0.5662105,
+        -0.0106771635,
+        0.097624965,
+        0.06867111,
+        0.35756034,
+        0.4232268,
+        0.82080626,
+        0.6489951,
+        0.694432,
+        0.6086404,
+        0.7955222,
+        0.7085198,
+        0.8509682,
+        0.83845186,
+        0.7921919,
+        0.4608781,
+        0.09535495,
+        0.3619073,
+        0.29760826,
+        -0.020944344,
+        -0.10234355,
+        -0.09309437,
+        -0.91278744,
+        -0.668023,
+        -0.12810864,
+        0.5082733,
+        1.3106203,
+        0.07168057,
+        0.5474482,
+        -0.68958706,
+        -0.37567952,
+        -0.12602654,
+        0.1269039,
+        0.48910183,
     ];
     #[allow(clippy::unreadable_literal)]
     const POLICY_PARAMS: &'static [f32] = &[
