@@ -34,16 +34,6 @@ pub fn gradient_descent(
     let mut lowest_error = initial_error;
     let mut best_parameter_set = params.to_vec();
 
-    println!("First n sets:");
-    for (coefficients, result) in coefficient_sets.iter().zip(results).take(5) {
-        println!("{:?}", coefficients);
-        println!(
-            "Result {}, estimated {}",
-            result,
-            eval_from_params(coefficients, params)
-        );
-    }
-
     for eta in [
         initial_learning_rate,
         initial_learning_rate / 3.0,
@@ -52,7 +42,7 @@ pub fn gradient_descent(
     ]
     .iter()
     {
-        println!("\nTuning with eta = {}\n", eta);
+        trace!("\nTuning with eta = {}\n", eta);
         let mut parameter_set = best_parameter_set.clone();
         let mut gradients = vec![0.0; params.len()];
 
@@ -60,23 +50,23 @@ pub fn gradient_descent(
         let mut iterations_since_large_improvement = 0;
         loop {
             let slopes = calc_slope(coefficient_sets, results, &parameter_set);
-            println!("Slopes: {:?}", slopes);
+            trace!("Slopes: {:?}", slopes);
             gradients = gradients
                 .iter()
                 .zip(slopes)
                 .map(|(gradient, slope)| beta * gradient + (1.0 - beta) * slope)
                 .collect();
-            println!("Gradients: {:?}", gradients);
+            trace!("Gradients: {:?}", gradients);
 
             parameter_set = parameter_set
                 .iter()
                 .zip(gradients.iter())
                 .map(|(param, gradient)| param - gradient * eta)
                 .collect();
-            println!("New parameters: {:?}", parameter_set);
+            trace!("New parameters: {:?}", parameter_set);
 
             let error = average_error(test_coefficient_sets, test_results, &parameter_set);
-            println!("Error now {}, eta={}\n", error, eta);
+            trace!("Error now {}, eta={}\n", error, eta);
 
             if error < lowest_error {
                 iterations_since_improvement = 0;

@@ -1,6 +1,5 @@
-use crate::tune::gradient_descent_policy::gradient_descent_policy;
 use crate::tune::play_match::play_game;
-use crate::tune::{gradient_descent_value, pgn_parser, play_match, real_gradient_descent};
+use crate::tune::{pgn_parser, play_match, real_gradient_descent};
 use board_game_traits::board::Board as BoardTrait;
 use board_game_traits::board::GameResult;
 use rand::prelude::*;
@@ -24,9 +23,14 @@ pub fn train_from_scratch(training_id: usize) -> Result<(), Box<dyn error::Error
     let initial_value_params: Vec<f32> = iter::from_fn(|| Some(rng.gen_range(-0.1, 0.1)))
         .take(Board::VALUE_PARAMS.len())
         .collect();
-    let initial_policy_params: Vec<f32> = iter::from_fn(|| Some(rng.gen_range(-0.1, 0.1)))
+
+    let mut initial_policy_params: Vec<f32> = iter::from_fn(|| Some(rng.gen_range(-0.1, 0.1)))
         .take(Board::POLICY_PARAMS.len())
         .collect();
+
+    // The move number parameter should always be around 1.0, so start it here
+    // If we don't, variation of this parameter completely dominates the other parameters
+    initial_policy_params[0] = 1.0;
 
     train_perpetually(training_id, &initial_value_params, &initial_policy_params)
 }
@@ -38,7 +42,7 @@ pub fn train_perpetually(
 ) -> Result<(), Box<dyn error::Error>> {
     const BATCH_SIZE: usize = 1000;
     // Only train from the last n batches
-    const BATCHES_FOR_TRAINING: usize = 20;
+    const BATCHES_FOR_TRAINING: usize = 5;
 
     let mut all_games = vec![];
     let mut all_move_scores = vec![];
@@ -137,18 +141,18 @@ pub fn train_perpetually(
 
         let value_tuning_start_time = time::Instant::now();
 
-        let (new_value_params, new_policy_params) = tune_value_and_policy(
-            &value_params,
-            &policy_params,
-            &move_scores_in_training_batch,
+        let (new_value_params, new_policy_params) = tune_real_value_and_policy(
             &games_in_training_batch,
+            &move_scores_in_training_batch,
+            &value_params.iter().map(|p| *p as f64).collect::<Vec<f64>>(),
+            &policy_params.iter().map(|p| *p as f64).collect::<Vec<f64>>(),
         )?;
 
         last_value_params = value_params;
         last_policy_params = policy_params;
 
-        value_params = new_value_params;
-        policy_params = new_policy_params;
+        value_params = new_value_params.iter().map(|p| *p as f32).collect::<Vec<f32>>();
+        policy_params = new_policy_params.iter().map(|p| *p as f32).collect::<Vec<f32>>();
 
         tuning_time += value_tuning_start_time.elapsed();
 
@@ -238,30 +242,6 @@ pub fn read_games_from_file() -> Result<Vec<Game<Board>>, Box<dyn error::Error>>
     pgn_parser::parse_pgn(&input)
 }
 
-pub fn tune_from_file() -> Result<(), Box<dyn error::Error>> {
-    let games = read_games_from_file()?;
-
-    let (positions, results) = positions_and_results_from_games(games);
-
-    let middle_index = positions.len() / 2;
-
-    let mut rng = rand::thread_rng();
-    let params: Vec<f32> = vec![rng.gen_range(-0.1, 0.1); Board::VALUE_PARAMS.len()];
-
-    println!(
-        "Final parameters: {:?}",
-        gradient_descent_value::gradient_descent(
-            &positions[0..middle_index],
-            &results[0..middle_index],
-            &positions[middle_index..],
-            &results[middle_index..],
-            &params,
-        )
-    );
-
-    Ok(())
-}
-
 pub fn tune_real_from_file() -> Result<Vec<f64>, Box<dyn error::Error>> {
     let games = read_games_from_file()?;
 
@@ -312,11 +292,8 @@ pub fn tune_real_from_file() -> Result<Vec<f64>, Box<dyn error::Error>> {
     Ok(tuned_parameters)
 }
 
-pub fn tune_real_value_and_policy_from_file() -> Result<(Vec<f64>, Vec<f64>), Box<dyn error::Error>>
-{
-    let (games, move_scoress) = games_and_move_scoress_from_file()?;
-
-    let (positions, results) = positions_and_results_from_games(games.clone());
+pub fn tune_real_value_and_policy(games: &[Game<Board>], move_scoress: &MoveScoress, initial_value_params: &[f64], initial_policy_params: &[f64]) -> Result<(Vec<f64>, Vec<f64>), Box<dyn error::Error>> {
+    let (positions, results) = positions_and_results_from_games(games.to_vec());
 
     let value_coefficient_sets = positions
         .iter()
@@ -339,7 +316,7 @@ pub fn tune_real_value_and_policy_from_file() -> Result<(Vec<f64>, Vec<f64>), Bo
     let mut policy_coefficients_sets: Vec<Vec<f64>> = vec![];
     let mut policy_results: Vec<f64> = vec![];
 
-    for (game, move_scores) in games.iter().zip(&move_scoress) {
+    for (game, move_scores) in games.iter().zip(move_scoress) {
         let mut board = game.start_board.clone();
 
         for (mv, move_scores) in game.moves.iter().map(|(mv, _)| mv).zip(move_scores) {
@@ -356,11 +333,6 @@ pub fn tune_real_value_and_policy_from_file() -> Result<(Vec<f64>, Vec<f64>), Bo
 
     let middle_index = value_coefficient_sets.len() / 2;
 
-    let mut rng = rand::thread_rng();
-    let initial_value_params: Vec<f64> = iter::from_fn(|| Some(rng.gen_range(-0.1, 0.1)))
-        .take(Board::VALUE_PARAMS.len())
-        .collect();
-
     let tuned_value_parameters = real_gradient_descent::gradient_descent(
         &value_coefficient_sets[0..middle_index],
         &value_results[0..middle_index],
@@ -373,14 +345,6 @@ pub fn tune_real_value_and_policy_from_file() -> Result<(Vec<f64>, Vec<f64>), Bo
     println!("Final parameters: {:?}", tuned_value_parameters);
 
     let middle_index = policy_coefficients_sets.len() / 2;
-
-    let mut initial_policy_params: Vec<f64> = iter::from_fn(|| Some(rng.gen_range(-0.1, 0.1)))
-        .take(Board::POLICY_PARAMS.len())
-        .collect();
-
-    // The move number parameter should always be around 1.0, so start it here
-    // If we don't, variation of this parameter completely dominates the other parameters
-    initial_policy_params[0] = 1.0;
 
     let tuned_policy_parameters = real_gradient_descent::gradient_descent(
         &policy_coefficients_sets[0..middle_index],
@@ -396,78 +360,24 @@ pub fn tune_real_value_and_policy_from_file() -> Result<(Vec<f64>, Vec<f64>), Bo
     Ok((tuned_value_parameters, tuned_policy_parameters))
 }
 
-pub fn tune_value_and_policy_from_file() -> Result<(Vec<f32>, Vec<f32>), Box<dyn error::Error>> {
+pub fn tune_real_value_and_policy_from_file() -> Result<(Vec<f64>, Vec<f64>), Box<dyn error::Error>>
+{
     let (games, move_scoress) = games_and_move_scoress_from_file()?;
 
-    tune_value_and_policy(
-        Board::VALUE_PARAMS,
-        Board::POLICY_PARAMS,
-        &move_scoress,
-        &games,
-    )
-}
-
-pub fn tune_value_and_policy(
-    value_params: &[f32],
-    policy_params: &[f32],
-    move_scores: &[Vec<Vec<(Move, f32)>>],
-    games: &[Game<Board>],
-) -> Result<(Vec<f32>, Vec<f32>), Box<dyn error::Error>> {
-    let mut games_and_move_scores: Vec<(Game<Board>, Vec<Vec<(Move, f32)>>)> = games
-        .iter()
-        .cloned()
-        .zip(move_scores.iter().cloned())
-        .collect::<Vec<_>>();
-
     let mut rng = rand::thread_rng();
-    games_and_move_scores.shuffle(&mut rng);
 
-    let middle_index = games_and_move_scores.len() / 2;
+    let initial_value_params: Vec<f64> = iter::from_fn(|| Some(rng.gen_range(-0.1, 0.1)))
+        .take(Board::VALUE_PARAMS.len())
+        .collect();
 
-    let (training_games, training_move_scores): (Vec<_>, Vec<_>) = games_and_move_scores
-        .iter()
-        .take(middle_index)
-        .cloned()
-        .unzip();
+    let mut initial_policy_params: Vec<f64> = iter::from_fn(|| Some(rng.gen_range(-0.1, 0.1)))
+        .take(Board::POLICY_PARAMS.len())
+        .collect();
 
-    let (test_games, test_move_scores): (Vec<_>, Vec<_>) = games_and_move_scores
-        .iter()
-        .skip(middle_index)
-        .cloned()
-        .unzip();
-
-    let (training_positions, training_results) = positions_and_results_from_games(training_games);
-
-    let (test_positions, test_results) = positions_and_results_from_games(test_games);
-
-    let value_params = gradient_descent_value::gradient_descent(
-        &training_positions,
-        &training_results,
-        &test_positions,
-        &test_results,
-        &value_params,
-    );
-
-    let flat_training_move_scores = training_move_scores
-        .iter()
-        .flatten()
-        .cloned()
-        .collect::<Vec<_>>();
-
-    let flat_test_move_scores = test_move_scores
-        .iter()
-        .flatten()
-        .cloned()
-        .collect::<Vec<_>>();
-
-    let policy_params = gradient_descent_policy(
-        &training_positions,
-        &flat_training_move_scores,
-        &test_positions,
-        &flat_test_move_scores,
-        &policy_params,
-    );
-    Ok((value_params, policy_params))
+    // The move number parameter should always be around 1.0, so start it here
+    // If we don't, variation of this parameter completely dominates the other parameters
+    initial_policy_params[0] = 1.0;
+    tune_real_value_and_policy(&games, &move_scoress, &initial_value_params, &initial_policy_params)
 }
 
 pub fn games_and_move_scoress_from_file(

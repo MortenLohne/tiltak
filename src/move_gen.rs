@@ -5,7 +5,6 @@ use crate::board::{
 };
 use crate::{board, mcts};
 use arrayvec::ArrayVec;
-use std::num::FpCategory;
 
 pub fn sigmoid(x: f32) -> f32 {
     1.0 / (1.0 + f32::exp(-x))
@@ -72,17 +71,10 @@ impl Board {
 
         assert_eq!(coefficients.len(), _NEXT_CONST);
 
-        let initial_move_prob = 1.0 / num_legal_moves as f32;
+        let initial_move_prob = 1.0 / num_legal_moves.max(2) as f32;
+
         coefficients[MOVE_COUNT] = inverse_sigmoid(initial_move_prob);
-        assert_eq!(
-            coefficients[MOVE_COUNT].classify(),
-            FpCategory::Normal,
-            "Got {} {} from input {}, ln of {}",
-            coefficients[MOVE_COUNT],
-            inverse_sigmoid(initial_move_prob),
-            initial_move_prob,
-            initial_move_prob / (1.0 - initial_move_prob)
-        );
+
 
         // If it's the first move, give every move equal probability
         if self.half_moves_played() < 2 {
