@@ -15,7 +15,11 @@ use taik::board::TunableBoard;
 use taik::board::{Board, Move};
 use taik::pgn_writer::Game;
 
-type MoveScoress = Vec<Vec<Vec<(Move, f32)>>>;
+// The score, or probability of being played, for a given move
+type MoveScore = (Move, f32);
+
+// The probability of each possible move being played, through a whole game.
+type MoveScoresForGame = Vec<Vec<MoveScore>>;
 
 pub fn train_from_scratch(training_id: usize) -> Result<(), Box<dyn error::Error>> {
     let mut rng = rand::thread_rng();
@@ -40,7 +44,7 @@ pub fn train_perpetually(
     initial_value_params: &[f32],
     initial_policy_params: &[f32],
 ) -> Result<(), Box<dyn error::Error>> {
-    const BATCH_SIZE: usize = 1000;
+    const BATCH_SIZE: usize = 100;
     // Only train from the last n batches
     const BATCHES_FOR_TRAINING: usize = 5;
 
@@ -145,14 +149,23 @@ pub fn train_perpetually(
             &games_in_training_batch,
             &move_scores_in_training_batch,
             &value_params.iter().map(|p| *p as f64).collect::<Vec<f64>>(),
-            &policy_params.iter().map(|p| *p as f64).collect::<Vec<f64>>(),
+            &policy_params
+                .iter()
+                .map(|p| *p as f64)
+                .collect::<Vec<f64>>(),
         )?;
 
         last_value_params = value_params;
         last_policy_params = policy_params;
 
-        value_params = new_value_params.iter().map(|p| *p as f32).collect::<Vec<f32>>();
-        policy_params = new_policy_params.iter().map(|p| *p as f32).collect::<Vec<f32>>();
+        value_params = new_value_params
+            .iter()
+            .map(|p| *p as f32)
+            .collect::<Vec<f32>>();
+        policy_params = new_policy_params
+            .iter()
+            .map(|p| *p as f32)
+            .collect::<Vec<f32>>();
 
         tuning_time += value_tuning_start_time.elapsed();
 
@@ -292,8 +305,21 @@ pub fn tune_real_from_file() -> Result<Vec<f64>, Box<dyn error::Error>> {
     Ok(tuned_parameters)
 }
 
-pub fn tune_real_value_and_policy(games: &[Game<Board>], move_scoress: &MoveScoress, initial_value_params: &[f64], initial_policy_params: &[f64]) -> Result<(Vec<f64>, Vec<f64>), Box<dyn error::Error>> {
-    let (positions, results) = positions_and_results_from_games(games.to_vec());
+pub fn tune_real_value_and_policy(
+    games: &[Game<Board>],
+    move_scoress: &[MoveScoresForGame],
+    initial_value_params: &[f64],
+    initial_policy_params: &[f64],
+) -> Result<(Vec<f64>, Vec<f64>), Box<dyn error::Error>> {
+    let mut games_and_move_scoress: Vec<(&Game<Board>, &MoveScoresForGame)> =
+        games.iter().zip(move_scoress).collect();
+
+    games_and_move_scoress.shuffle(&mut rand::thread_rng());
+
+    let (games, move_scoress): (Vec<_>, Vec<_>) = games_and_move_scoress.into_iter().unzip();
+
+    let (positions, results) =
+        positions_and_results_from_games(games.iter().cloned().cloned().collect());
 
     let value_coefficient_sets = positions
         .iter()
@@ -377,11 +403,16 @@ pub fn tune_real_value_and_policy_from_file() -> Result<(Vec<f64>, Vec<f64>), Bo
     // The move number parameter should always be around 1.0, so start it here
     // If we don't, variation of this parameter completely dominates the other parameters
     initial_policy_params[0] = 1.0;
-    tune_real_value_and_policy(&games, &move_scoress, &initial_value_params, &initial_policy_params)
+    tune_real_value_and_policy(
+        &games,
+        &move_scoress,
+        &initial_value_params,
+        &initial_policy_params,
+    )
 }
 
 pub fn games_and_move_scoress_from_file(
-) -> Result<(Vec<Game<Board>>, MoveScoress), Box<dyn error::Error>> {
+) -> Result<(Vec<Game<Board>>, Vec<MoveScoresForGame>), Box<dyn error::Error>> {
     let mut move_scoress = read_move_scores_from_file()?;
     let mut games = read_games_from_file()?;
 
@@ -406,7 +437,7 @@ pub fn games_and_move_scoress_from_file(
     Ok((games, move_scoress))
 }
 
-pub fn read_move_scores_from_file() -> Result<MoveScoress, Box<dyn error::Error>> {
+pub fn read_move_scores_from_file() -> Result<Vec<MoveScoresForGame>, Box<dyn error::Error>> {
     let mut file = fs::File::open("move_scores23_all.txt")?;
     let mut input = String::new();
     file.read_to_string(&mut input)?;

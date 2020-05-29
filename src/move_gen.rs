@@ -75,7 +75,6 @@ impl Board {
 
         coefficients[MOVE_COUNT] = inverse_sigmoid(initial_move_prob);
 
-
         // If it's the first move, give every move equal probability
         if self.half_moves_played() < 2 {
             return;
