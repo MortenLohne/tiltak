@@ -836,21 +836,38 @@ impl Board {
             }
         }
 
-        const FLATSTONE_LEAD: usize = CAP_PSQT + 6;
+        const SIDE_TO_MOVE: usize = CAP_PSQT + 6;
+        const FLATSTONE_LEAD: usize = SIDE_TO_MOVE + 3;
 
         // Give the side to move a bonus/malus depending on flatstone lead
-        let flatstone_lead = match self.side_to_move() {
-            Color::White => self.white_flat_tops_count() as i8 - self.black_flat_tops_count() as i8,
-            Color::Black => self.black_flat_tops_count() as i8 - self.white_flat_tops_count() as i8,
-        };
+        let white_flatstone_lead =
+            self.white_flat_tops_count() as i8 - self.black_flat_tops_count() as i8;
 
-        // Don't give extra bonus for flatstone leads greater than 3
-        let flatstone_lead_index = i8::min(i8::max(flatstone_lead + 3, 0), 6) as usize;
+        let opening_scale_factor = f32::min(
+            f32::max((24.0 - self.half_moves_played() as f32) / 12.0, 0.0),
+            1.0,
+        );
+        let endgame_scale_factor = f32::min(
+            f32::max((self.half_moves_played() as f32 - 24.0) / 24.0, 0.0),
+            1.0,
+        );
+        let middlegame_scale_factor = 1.0 - opening_scale_factor - endgame_scale_factor;
 
-        coefficients[FLATSTONE_LEAD + flatstone_lead_index] =
-            self.side_to_move().multiplier() as f32;
+        debug_assert!(middlegame_scale_factor <= 1.0);
+        debug_assert!(opening_scale_factor == 0.0 || endgame_scale_factor == 0.0);
 
-        const PIECES_IN_OUR_STACK: usize = FLATSTONE_LEAD + 7;
+        coefficients[SIDE_TO_MOVE] = self.side_to_move().multiplier() as f32 * opening_scale_factor;
+        coefficients[FLATSTONE_LEAD] = white_flatstone_lead as f32 * opening_scale_factor;
+
+        coefficients[SIDE_TO_MOVE + 1] =
+            self.side_to_move().multiplier() as f32 * middlegame_scale_factor;
+        coefficients[FLATSTONE_LEAD + 1] = white_flatstone_lead as f32 * middlegame_scale_factor;
+
+        coefficients[SIDE_TO_MOVE + 2] =
+            self.side_to_move().multiplier() as f32 * endgame_scale_factor;
+        coefficients[FLATSTONE_LEAD + 2] = white_flatstone_lead as f32 * endgame_scale_factor;
+
+        const PIECES_IN_OUR_STACK: usize = FLATSTONE_LEAD + 3;
         const PIECES_IN_THEIR_STACK: usize = PIECES_IN_OUR_STACK + 1;
         const CAPSTONE_OVER_OWN_PIECE: usize = PIECES_IN_THEIR_STACK + 1;
         const CAPSTONE_ON_STACK: usize = CAPSTONE_OVER_OWN_PIECE + 1;
@@ -1248,7 +1265,6 @@ impl TunableBoard for Board {
         -0.37567952,
         -0.12602654,
         0.1269039,
-        0.48910183,
     ];
     #[allow(clippy::unreadable_literal)]
     const POLICY_PARAMS: &'static [f32] = &[
