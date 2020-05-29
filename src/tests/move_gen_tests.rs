@@ -110,8 +110,8 @@ fn suicide_perf_test() {
 
     let mut board = Board::default();
     do_moves_and_check_validity(&mut board, &move_strings);
-    perft_check_answers(&mut board, &[1, 83, 11_204]);
-    perft_check_answers(&mut board, &[1, 83, 11_204, 942_217]);
+    perft_check_answers(&mut board, &[1, 85, 11_485]);
+    perft_check_answers(&mut board, &[1, 85, 11_485, 966481]);
 }
 
 pub fn perft(board: &mut Board, depth: u16) -> u64 {

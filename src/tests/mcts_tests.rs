@@ -82,7 +82,7 @@ fn white_avoid_loss_in_one_test2() {
 }
 
 #[test]
-fn do_not_suicide_as_black_test() {
+fn do_not_play_suicide_move_as_black_test() {
     let move_strings = [
         "c4", "c2", "d2", "c3", "b2", "d3", "d2+", "b3", "d2", "b4", "c2+", "b3>", "2d3<", "c4-",
         "d4", "5c3<23", "c2", "c4", "d4<", "d3", "d2+", "c3+", "Cc3", "2c4>", "c3<", "d2", "c3",
@@ -95,11 +95,12 @@ fn do_not_suicide_as_black_test() {
 
     let mut moves = vec![];
     board.generate_moves(&mut moves);
-    assert!(!moves.contains(&board.move_from_san("2a3-11").unwrap()));
+    assert!(moves.contains(&board.move_from_san("2a3-11").unwrap()));
+    assert!(mcts::mcts(board.clone(), 10_000).0 != board.move_from_san("2a3-11").unwrap());
 }
 
 #[test]
-fn do_not_suicide_as_black_test2() {
+fn do_not_play_suicide_move_as_black_test2() {
     let move_strings = [
         "d3", "c2", "d2", "c3", "d2+", "c4", "d2", "b3", "c2+", "b3>", "2d3<", "c4-", "b2",
         "5c3+23", "c2", "d3", "d2+", "b4", "d2", "d4", "2d3+", "b3", "b2+", "b4-", "d3", "b2",
@@ -112,11 +113,12 @@ fn do_not_suicide_as_black_test2() {
 
     let mut moves = vec![];
     board.generate_moves(&mut moves);
-    assert!(!moves.contains(&board.move_from_san("2c5>11").unwrap()));
+    assert!(moves.contains(&board.move_from_san("2c5>11").unwrap()));
+    assert!(mcts::mcts(board.clone(), 10_000).0 != board.move_from_san("2c5>11").unwrap());
 }
 
 #[test]
-fn do_not_suicide_as_black_test3() {
+fn do_not_play_suicide_move_as_black_test3() {
     let move_strings = [
         "c3", "c2", "d2", "b4", "c2+", "d4", "c2", "b2", "c2<", "d5", "c2", "a3", "e2", "a2", "b1",
         "a1", "d3", "c4", "2c3+", "d4<", "Cc3", "3c4>12", "c3+", "e1", "c3", "a1>", "d1", "c5",
@@ -128,8 +130,8 @@ fn do_not_suicide_as_black_test3() {
 
     let mut moves = vec![];
     board.generate_moves(&mut moves);
-    assert!(!moves.contains(&board.move_from_san("2b5>11").unwrap()));
-    // plays_correct_move_property(&moves_strings, TacticAnswer::AvoidMoves(&["2b5>1"]));
+    assert!(moves.contains(&board.move_from_san("2b5>11").unwrap()));
+    assert!(mcts::mcts(board.clone(), 10_000).0 != board.move_from_san("2b5>11").unwrap());
 }
 
 fn plays_correct_move_property(move_strings: &[&str], correct_moves: &[&str]) {

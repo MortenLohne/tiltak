@@ -335,19 +335,29 @@ fn cannot_suicide_into_points_loss_test() {
     let mut moves = vec![];
     board.generate_moves(&mut moves);
     for mv in moves.iter() {
+        let reverse_move = board.do_move(mv.clone());
         match mv {
-            Move::Place(role, _) => {
-                assert_ne!(*role, Role::Standing, "Placing a standing stone is suicide")
-            }
+            Move::Place(Role::Standing, _) => assert_eq!(
+                board.game_result(),
+                Some(GameResult::WhiteWin),
+                "Placing a standing stone is suicide"
+            ),
+            Move::Place(Role::Flat, _) => assert_eq!(
+                board.game_result(),
+                Some(GameResult::Draw),
+                "Placing a flatstone is a draw"
+            ),
             _ => (),
         }
+        board.reverse_move(reverse_move);
     }
 
-    assert!(moves.iter().any(|mv| if let Move::Place(_, _) = mv {
-        true
-    } else {
-        false
-    }));
+    assert!(moves
+        .iter()
+        .any(|mv| matches!(mv, Move::Place(Role::Standing, _))));
+    assert!(moves
+        .iter()
+        .any(|mv| matches!(mv, Move::Place(Role::Flat, _))));
 }
 
 #[test]
@@ -372,7 +382,7 @@ fn games_ends_when_board_is_full_test() {
 }
 
 #[test]
-fn game_declared_loss_when_every_move_is_suicide() {
+fn every_move_is_suicide_test() {
     let mut board = Board::start_board();
 
     do_moves_and_check_validity(&mut board, &["b3", "c4", "c4-", "b3>"]);
@@ -380,7 +390,13 @@ fn game_declared_loss_when_every_move_is_suicide() {
     for _ in 0..20 {
         do_moves_and_check_validity(&mut board, &["c4", "b3", "c4-", "b3>"]);
     }
-    assert_eq!(board.game_result(), Some(BlackWin));
+    let mut moves = vec![];
+    board.generate_moves(&mut moves);
+    for mv in moves {
+        let reverse_move = board.do_move(mv);
+        assert_eq!(board.game_result(), Some(BlackWin));
+        board.reverse_move(reverse_move);
+    }
 }
 
 #[test]

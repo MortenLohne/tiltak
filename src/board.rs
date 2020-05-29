@@ -1185,64 +1185,6 @@ impl board::Board for Board {
                 Ordering::Less => Some(BlackWin),
                 Ordering::Equal => Some(Draw),
             }
-        // If the only legal move is to suicidally place our capstone, we lose
-        } else if (self.side_to_move() == Color::White
-            && self.white_stones_left == 0
-            && self.white_capstones_left == 1)
-            || (self.side_to_move() == Color::Black
-                && self.black_stones_left == 0
-                && self.black_capstones_left == 1)
-        {
-            // Count points
-            let mut white_points = 0;
-            let mut black_points = 0;
-            for square in squares_iterator() {
-                match self[square].top_stone() {
-                    Some(WhiteFlat) => white_points += 1,
-                    Some(BlackFlat) => black_points += 1,
-                    _ => (),
-                }
-            }
-            match self.side_to_move() {
-                Color::White => {
-                    if black_points > white_points {
-                        for square in squares_iterator() {
-                            if let Some(piece) = self[square].top_stone() {
-                                if piece.color() == Color::White
-                                    && square
-                                        .neighbours()
-                                        .filter_map(|sq| self[sq].top_stone())
-                                        .any(|piece| piece.role() == Flat)
-                                {
-                                    return None;
-                                }
-                            }
-                        }
-                        Some(BlackWin)
-                    } else {
-                        None
-                    }
-                }
-                Color::Black => {
-                    if white_points > black_points {
-                        for square in squares_iterator() {
-                            if let Some(piece) = self[square].top_stone() {
-                                if piece.color() == Color::Black
-                                    && square
-                                        .neighbours()
-                                        .filter_map(|sq| self[sq].top_stone())
-                                        .any(|piece| piece.role() == Flat)
-                                {
-                                    return None;
-                                }
-                            }
-                        }
-                        Some(WhiteWin)
-                    } else {
-                        None
-                    }
-                }
-            }
         } else {
             None
         }

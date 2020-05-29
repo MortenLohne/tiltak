@@ -285,10 +285,12 @@ impl Tree {
         debug_assert!(self.children.is_empty());
 
         if let Some(game_result) = board.game_result() {
-            let game_result_for_us = match game_result {
-                GameResult::Draw => GameResultForUs::Draw,
-                GameResult::WhiteWin => GameResultForUs::Loss, // The side to move has lost
-                GameResult::BlackWin => GameResultForUs::Loss, // The side to move has lost
+            let game_result_for_us = match (game_result, board.side_to_move()) {
+                (GameResult::Draw, _) => GameResultForUs::Draw,
+                (GameResult::WhiteWin, Color::Black) => GameResultForUs::Loss, // The side to move has lost
+                (GameResult::BlackWin, Color::White) => GameResultForUs::Loss, // The side to move has lost
+                (GameResult::WhiteWin, Color::White) => GameResultForUs::Win, // The side to move has lost
+                (GameResult::BlackWin, Color::Black) => GameResultForUs::Win, // The side to move has lost
             };
             self.known_result = Some(game_result_for_us);
             self.visits = 1;
