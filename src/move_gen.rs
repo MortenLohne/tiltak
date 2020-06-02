@@ -58,9 +58,11 @@ impl Board {
         const CAPSTONE_PSQT: usize = STANDING_STONE_PSQT + 6;
         const NEXT_TO_LAST_TURNS_STONE: usize = CAPSTONE_PSQT + 6;
         const FLAT_PIECE_NEXT_TO_TWO_FLAT_PIECES: usize = NEXT_TO_LAST_TURNS_STONE + 1;
-        const EXTEND_ROW_OF_TWO_FLATS: usize = FLAT_PIECE_NEXT_TO_TWO_FLAT_PIECES + 1;
+        const EXTEND_STRONG_RANK_FILE: usize = FLAT_PIECE_NEXT_TO_TWO_FLAT_PIECES + 1;
+        const ATTACK_FLATSTONE: usize = EXTEND_STRONG_RANK_FILE + 4;
+        const ATTACK_STRONG_FLATSTONE: usize = ATTACK_FLATSTONE + 3;
 
-        const BLOCKING_STONE_NEXT_TO_TWO_OF_THEIR_FLATS: usize = EXTEND_ROW_OF_TWO_FLATS + 1;
+        const BLOCKING_STONE_NEXT_TO_TWO_OF_THEIR_FLATS: usize = ATTACK_STRONG_FLATSTONE + 1;
         const BLOCKING_STONE_BLOCKS_EXTENSIONS_OF_TWO_FLATS: usize =
             BLOCKING_STONE_NEXT_TO_TWO_OF_THEIR_FLATS + 1;
 
@@ -105,19 +107,41 @@ impl Board {
                 {
                     coefficients[FLAT_PIECE_NEXT_TO_TWO_FLAT_PIECES] = 1.0;
                 }
-                for direction in square.directions() {
-                    let neighbour = square.go_direction(direction).unwrap();
-                    if self[neighbour]
-                        .top_stone()
-                        .map(Us::is_road_stone)
-                        .unwrap_or_default()
-                        && neighbour
-                            .go_direction(direction)
-                            .and_then(|sq| self[sq].top_stone())
-                            .map(Us::is_road_stone)
-                            .unwrap_or_default()
-                    {
-                        coefficients[EXTEND_ROW_OF_TWO_FLATS] += 1.0;
+
+                // Bonus for laying flatstones in rank/files where we already have stones
+                let road_pieces_in_rank = Us::road_stones(self).rank(square.rank());
+
+                if !road_pieces_in_rank.is_empty() {
+                    coefficients
+                        [EXTEND_STRONG_RANK_FILE + road_pieces_in_rank.count() as usize - 1] += 1.0;
+                }
+
+                let road_pieces_in_file = Us::road_stones(self).file(square.file());
+
+                if !road_pieces_in_file.is_empty() {
+                    coefficients
+                        [EXTEND_STRONG_RANK_FILE + road_pieces_in_file.count() as usize - 1] += 1.0;
+                }
+
+                // Bonus for "attacking" an enemy flatstone
+                let enemy_flatstone_neighbours = square
+                    .neighbours()
+                    .filter(|sq| self[*sq].top_stone() == Some(Them::flat_piece()))
+                    .count();
+
+                if enemy_flatstone_neighbours > 0 {
+                    coefficients[ATTACK_FLATSTONE + usize::max(enemy_flatstone_neighbours, 3)] =
+                        1.0;
+                }
+
+                // Bonus for attacking a flatstone in a rank/file where we are strong
+                for neighbour in square.neighbours() {
+                    if self[neighbour].top_stone() == Some(Them::flat_piece()) {
+                        let our_road_stones = Us::road_stones(self).rank(neighbour.rank()).count()
+                            + Us::road_stones(self).file(neighbour.file()).count();
+                        if our_road_stones >= 2 {
+                            coefficients[ATTACK_STRONG_FLATSTONE] += (our_road_stones - 1) as f32;
+                        }
                     }
                 }
             }
