@@ -157,6 +157,11 @@ impl ColorTr for BlackTr {
 pub struct Square(pub u8);
 
 impl Square {
+    pub fn from_rank_file(rank: u8, file: u8) -> Self {
+        debug_assert!(rank < BOARD_SIZE as u8 && file < BOARD_SIZE as u8);
+        Square(rank * BOARD_SIZE as u8 + file as u8)
+    }
+
     pub fn rank(self) -> u8 {
         self.0 / BOARD_SIZE as u8
     }
@@ -934,33 +939,27 @@ impl Board {
             });
 
         // Number of pieces in each rank/file
-        const RANK_FILE_CONTROL: usize = CAPSTONE_NEXT_TO_OUR_STACK + 1;
+        const NUM_RANKS_FILES_OCCUPIED: usize = CAPSTONE_NEXT_TO_OUR_STACK + 1;
         // Number of ranks/files with at least one road stone
-        const NUM_RANKS_FILES_OCCUPIED: usize = RANK_FILE_CONTROL + 6;
+        const RANK_FILE_CONTROL: usize = NUM_RANKS_FILES_OCCUPIED + 6;
 
         let mut num_ranks_occupied_white = 0;
         let mut num_files_occupied_white = 0;
         let mut num_ranks_occupied_black = 0;
         let mut num_files_occupied_black = 0;
 
-        for rank in (0..BOARD_SIZE as u8).map(|i| self.white_road_pieces().rank(i)) {
-            num_ranks_occupied_white += if rank.is_empty() { 0 } else { 1 };
-            coefficients[RANK_FILE_CONTROL + rank.count() as usize] += 1.0;
+        for i in 0..BOARD_SIZE as u8 {
+            num_ranks_occupied_white +=
+                self.rank_score::<WhiteTr, BlackTr>(i, coefficients, RANK_FILE_CONTROL);
+            num_ranks_occupied_black +=
+                self.rank_score::<BlackTr, WhiteTr>(i, coefficients, RANK_FILE_CONTROL);
         }
 
-        for file in (0..BOARD_SIZE as u8).map(|i| self.white_road_pieces().file(i)) {
-            num_files_occupied_white += if file.is_empty() { 0 } else { 1 };
-            coefficients[RANK_FILE_CONTROL + file.count() as usize] += 1.0;
-        }
-
-        for rank in (0..BOARD_SIZE as u8).map(|i| self.black_road_pieces().rank(i)) {
-            num_ranks_occupied_black += if rank.is_empty() { 0 } else { 1 };
-            coefficients[RANK_FILE_CONTROL + rank.count() as usize] -= 1.0;
-        }
-
-        for file in (0..BOARD_SIZE as u8).map(|i| self.black_road_pieces().file(i)) {
-            num_files_occupied_black += if file.is_empty() { 0 } else { 1 };
-            coefficients[RANK_FILE_CONTROL + file.count() as usize] -= 1.0;
+        for i in 0..BOARD_SIZE as u8 {
+            num_files_occupied_white +=
+                self.file_score::<WhiteTr, BlackTr>(i, coefficients, RANK_FILE_CONTROL);
+            num_files_occupied_black +=
+                self.file_score::<BlackTr, WhiteTr>(i, coefficients, RANK_FILE_CONTROL);
         }
 
         coefficients[NUM_RANKS_FILES_OCCUPIED + num_ranks_occupied_white] += 1.0;
@@ -968,7 +967,74 @@ impl Board {
         coefficients[NUM_RANKS_FILES_OCCUPIED + num_ranks_occupied_black] -= 1.0;
         coefficients[NUM_RANKS_FILES_OCCUPIED + num_files_occupied_black] -= 1.0;
 
-        const _NEXT_CONST: usize = NUM_RANKS_FILES_OCCUPIED + 6;
+        const _NEXT_CONST: usize = RANK_FILE_CONTROL + 10;
+        assert_eq!(_NEXT_CONST, coefficients.len());
+    }
+
+    fn rank_score<Us: ColorTr, Them: ColorTr>(
+        &self,
+        rank_id: u8,
+        coefficients: &mut [f32],
+        rank_file_control: usize,
+    ) -> usize {
+        let rank = Us::road_stones(self).rank(rank_id);
+        let num_ranks_occupied = if rank.is_empty() { 0 } else { 1 };
+        let road_pieces_in_rank = rank.count();
+        coefficients[rank_file_control + road_pieces_in_rank as usize] +=
+            Us::color().multiplier() as f32;
+
+        let block_rank_file_with_capstone = rank_file_control + 6;
+        let block_rank_file_with_standing_stone = block_rank_file_with_capstone + 2;
+
+        // Give them a bonus for capstones/standing stones in our strong ranks
+        if road_pieces_in_rank >= 3 {
+            for file_id in 0..BOARD_SIZE as u8 {
+                let square = Square::from_rank_file(rank_id, file_id);
+                if self[square].top_stone() == Some(Them::cap_piece()) {
+                    coefficients
+                        [block_rank_file_with_capstone + road_pieces_in_rank as usize - 3] +=
+                        Them::color().multiplier() as f32
+                } else if self[square].top_stone() == Some(Them::standing_piece()) {
+                    coefficients
+                        [block_rank_file_with_standing_stone + road_pieces_in_rank as usize - 3] +=
+                        Them::color().multiplier() as f32
+                }
+            }
+        }
+        num_ranks_occupied
+    }
+
+    fn file_score<Us: ColorTr, Them: ColorTr>(
+        &self,
+        file_id: u8,
+        coefficients: &mut [f32],
+        rank_file_control: usize,
+    ) -> usize {
+        let rank = Us::road_stones(self).file(file_id);
+        let num_ranks_occupied = if rank.is_empty() { 0 } else { 1 };
+        let road_pieces_in_rank = rank.count();
+        coefficients[rank_file_control + road_pieces_in_rank as usize] +=
+            Us::color().multiplier() as f32;
+
+        let block_rank_file_with_capstone = rank_file_control + 6;
+        let block_rank_file_with_standing_stone = block_rank_file_with_capstone + 2;
+
+        // Give them a bonus for capstones/standing stones in our strong files
+        if road_pieces_in_rank >= 3 {
+            for rank_id in 0..BOARD_SIZE as u8 {
+                let square = Square::from_rank_file(rank_id, file_id);
+                if self[square].top_stone() == Some(Them::cap_piece()) {
+                    coefficients
+                        [block_rank_file_with_capstone + road_pieces_in_rank as usize - 3] +=
+                        Them::color().multiplier() as f32
+                } else if self[square].top_stone() == Some(Them::standing_piece()) {
+                    coefficients
+                        [block_rank_file_with_standing_stone + road_pieces_in_rank as usize - 3] +=
+                        Them::color().multiplier() as f32
+                }
+            }
+        }
+        num_ranks_occupied
     }
 }
 
@@ -1221,50 +1287,54 @@ pub(crate) const SQUARE_SYMMETRIES: [usize; 25] = [
 impl TunableBoard for Board {
     #[allow(clippy::unreadable_literal)]
     const VALUE_PARAMS: &'static [f32] = &[
-        -0.20332047,
-        -0.021774242,
-        -0.041733645,
-        0.0705031,
-        0.1236233,
-        0.0647096,
-        0.84567624,
-        0.73414874,
-        0.7125012,
-        0.7785012,
-        0.87599593,
-        0.81686115,
-        0.20357244,
-        0.43646276,
-        0.5537992,
-        0.8587915,
-        0.9456294,
-        1.2837381,
-        1.0264606,
-        0.6046003,
-        0.9217404,
-        0.35721022,
-        -0.48464403,
-        -0.046345234,
-        0.99560803,
-        0.64020175,
-        0.23939872,
-        0.44188556,
-        0.32445642,
-        -0.0317946,
-        -0.123255104,
-        -0.13352974,
-        -1.3549473,
-        -1.0956708,
-        -0.27448577,
-        0.7003144,
-        1.8573806,
-        0.0007799005,
-        0.7751885,
-        -0.7885322,
-        -0.60781616,
-        -0.372192,
-        0.16619538,
-        0.86622083,
+        -0.25570056,
+        -0.06306428,
+        -0.050129674,
+        0.04116685,
+        0.09316665,
+        0.12340328,
+        0.75012887,
+        0.65594965,
+        0.7024855,
+        0.75259584,
+        0.84324247,
+        0.79217625,
+        0.050678793,
+        0.47513855,
+        0.58207846,
+        0.82165027,
+        0.94676894,
+        1.2289112,
+        1.0558432,
+        0.64327145,
+        0.93969756,
+        0.4018749,
+        -0.42575312,
+        -0.01285331,
+        1.0200886,
+        0.6514834,
+        0.23788722,
+        0.4270889,
+        0.38664544,
+        -0.028407635,
+        -0.13549738,
+        -0.13895814,
+        0.7804223,
+        -0.82711303,
+        -0.6252435,
+        -0.3598254,
+        0.17267509,
+        0.85429937,
+        -1.3655918,
+        -1.0816205,
+        -0.24295154,
+        0.75123227,
+        1.9697832,
+        0.089783624,
+        0.12940928,
+        0.33033335,
+        0.018162066,
+        0.24058251,
     ];
     #[allow(clippy::unreadable_literal)]
     const POLICY_PARAMS: &'static [f32] = &[
