@@ -424,3 +424,21 @@ fn bitboard_full_board_file_rank_test() {
         }
     }
 }
+
+#[test]
+fn square_rank_file_test() {
+    let mut board = Board::start_board();
+    for rank_id in 0..BOARD_SIZE as u8 {
+        for file_id in 0..BOARD_SIZE as u8 {
+            let square = Square::from_rank_file(rank_id, file_id);
+            assert_eq!(rank_id, square.rank());
+            assert_eq!(file_id, square.file());
+
+            let mv = Move::Place(Role::Flat, square);
+            let reverse_move = board.do_move(mv);
+            assert_eq!(board.black_road_pieces().rank(rank_id).count(), 1);
+            assert_eq!(board.black_road_pieces().file(file_id).count(), 1);
+            board.reverse_move(reverse_move);
+        }
+    }
+}
