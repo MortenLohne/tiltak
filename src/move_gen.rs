@@ -90,9 +90,8 @@ impl Board {
                 if let Some(Move::Place(last_role, last_square)) =
                     self.moves().get(self.moves().len() - 2)
                 {
-                    if *last_role == Flat
-                        || *last_role == Cap
-                            && square.neighbours().any(|neigh| neigh == *last_square)
+                    if (*last_role == Flat || *last_role == Cap)
+                        && square.neighbours().any(|neigh| neigh == *last_square)
                     {
                         coefficients[NEXT_TO_LAST_TURNS_STONE] = 1.0;
                     }
