@@ -58,7 +58,9 @@ impl Board {
         const CAPSTONE_PSQT: usize = STANDING_STONE_PSQT + 6;
         const NEXT_TO_OUR_LAST_STONE: usize = CAPSTONE_PSQT + 6;
         const NEXT_TO_THEIR_LAST_STONE: usize = NEXT_TO_OUR_LAST_STONE + 1;
-        const FLAT_PIECE_NEXT_TO_TWO_FLAT_PIECES: usize = NEXT_TO_THEIR_LAST_STONE + 1;
+        const DIAGONAL_TO_OUR_LAST_STONE: usize = NEXT_TO_THEIR_LAST_STONE + 1;
+        const DIAGONAL_TO_THEIR_LAST_STONE: usize = DIAGONAL_TO_OUR_LAST_STONE + 1;
+        const FLAT_PIECE_NEXT_TO_TWO_FLAT_PIECES: usize = DIAGONAL_TO_THEIR_LAST_STONE + 1;
         const EXTEND_STRONG_RANK_FILE: usize = FLAT_PIECE_NEXT_TO_TWO_FLAT_PIECES + 1;
         const ATTACK_FLATSTONE: usize = EXTEND_STRONG_RANK_FILE + 4;
         const ATTACK_STRONG_FLATSTONE: usize = ATTACK_FLATSTONE + 3;
@@ -92,18 +94,27 @@ impl Board {
                 if let Some(Move::Place(last_role, last_square)) =
                     self.moves().get(self.moves().len() - 2)
                 {
-                    if (*last_role == Flat || *last_role == Cap)
-                        && square.neighbours().any(|neigh| neigh == *last_square)
-                    {
-                        coefficients[NEXT_TO_OUR_LAST_STONE] = 1.0;
+                    if *last_role == Flat || *last_role == Cap {
+                        if square.neighbours().any(|neigh| neigh == *last_square) {
+                            coefficients[NEXT_TO_OUR_LAST_STONE] = 1.0;
+                        } else if (square.rank() as i8 - last_square.rank() as i8).abs() == 1
+                            && (square.file() as i8 - last_square.file() as i8).abs() == 1
+                        {
+                            coefficients[DIAGONAL_TO_OUR_LAST_STONE] = 1.0;
+                        }
                     }
                 }
 
                 // If square is next to a road stone laid on their last turn
                 if let Some(Move::Place(last_role, last_square)) = self.moves().last() {
-                    if *last_role == Flat && square.neighbours().any(|neigh| neigh == *last_square)
-                    {
-                        coefficients[NEXT_TO_THEIR_LAST_STONE] = 1.0;
+                    if *last_role == Flat {
+                        if square.neighbours().any(|neigh| neigh == *last_square) {
+                            coefficients[NEXT_TO_THEIR_LAST_STONE] = 1.0;
+                        } else if (square.rank() as i8 - last_square.rank() as i8).abs() == 1
+                            && (square.file() as i8 - last_square.file() as i8).abs() == 1
+                        {
+                            coefficients[DIAGONAL_TO_THEIR_LAST_STONE] = 1.0;
+                        }
                     }
                 }
 
