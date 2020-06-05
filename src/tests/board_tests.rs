@@ -179,10 +179,14 @@ fn play_random_games_test() {
         for i in 0.. {
             assert_eq!(board, board.flip_colors().flip_colors());
 
+            assert!((board.white_road_pieces() & board.black_road_pieces()).is_empty());
+            assert!((board.white_road_pieces() & board.white_blocking_pieces()).count() <= 1);
+
             let eval = board.static_eval();
             for rotation in board.rotations_and_symmetries() {
                 if board.side_to_move() == rotation.side_to_move() {
-                    assert!(rotation.static_eval() - eval < 0.0001);
+                    assert!(rotation.static_eval() - eval < 0.0001,
+                    "Static eval changed with rotation from {} to {} on board\n{:?}Rotated board:\n{:?}", eval, rotation.static_eval(), board, rotation);
                 } else {
                     assert!(rotation.static_eval() - eval.abs() < 0.0001);
                 }
