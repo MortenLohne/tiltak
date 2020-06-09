@@ -24,11 +24,11 @@ type MoveScoresForGame = Vec<Vec<MoveScore>>;
 pub fn train_from_scratch(training_id: usize) -> Result<(), Box<dyn error::Error>> {
     let mut rng = rand::thread_rng();
 
-    let initial_value_params: Vec<f32> = iter::from_fn(|| Some(rng.gen_range(-0.1, 0.1)))
+    let initial_value_params: Vec<f32> = iter::from_fn(|| Some(rng.gen_range(-0.01, 0.01)))
         .take(Board::VALUE_PARAMS.len())
         .collect();
 
-    let mut initial_policy_params: Vec<f32> = iter::from_fn(|| Some(rng.gen_range(-0.1, 0.1)))
+    let mut initial_policy_params: Vec<f32> = iter::from_fn(|| Some(rng.gen_range(-0.01, 0.01)))
         .take(Board::POLICY_PARAMS.len())
         .collect();
 
@@ -281,7 +281,7 @@ pub fn tune_real_from_file() -> Result<Vec<f64>, Box<dyn error::Error>> {
     let middle_index = positions.len() / 2;
 
     let mut rng = rand::thread_rng();
-    let initial_params: Vec<f64> = iter::from_fn(|| Some(rng.gen_range(-0.1, 0.1)))
+    let initial_params: Vec<f64> = iter::from_fn(|| Some(rng.gen_range(-0.01, 0.01)))
         .take(Board::VALUE_PARAMS.len())
         .collect();
 
@@ -392,11 +392,11 @@ pub fn tune_real_value_and_policy_from_file() -> Result<(Vec<f64>, Vec<f64>), Bo
 
     let mut rng = rand::thread_rng();
 
-    let initial_value_params: Vec<f64> = iter::from_fn(|| Some(rng.gen_range(-0.1, 0.1)))
+    let initial_value_params: Vec<f64> = iter::from_fn(|| Some(rng.gen_range(-0.01, 0.01)))
         .take(Board::VALUE_PARAMS.len())
         .collect();
 
-    let mut initial_policy_params: Vec<f64> = iter::from_fn(|| Some(rng.gen_range(-0.1, 0.1)))
+    let mut initial_policy_params: Vec<f64> = iter::from_fn(|| Some(rng.gen_range(-0.01, 0.01)))
         .take(Board::POLICY_PARAMS.len())
         .collect();
 
