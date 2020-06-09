@@ -249,7 +249,7 @@ impl GameStats {
 }
 
 pub fn read_games_from_file() -> Result<Vec<Game<Board>>, Box<dyn error::Error>> {
-    let mut file = fs::File::open("games23_all.ptn")?;
+    let mut file = fs::File::open("games24_all.ptn")?;
     let mut input = String::new();
     file.read_to_string(&mut input)?;
     pgn_parser::parse_pgn(&input)
@@ -416,8 +416,8 @@ pub fn games_and_move_scoress_from_file(
     let mut move_scoress = read_move_scores_from_file()?;
     let mut games = read_games_from_file()?;
 
-    move_scoress.truncate(5000);
-    games.truncate(5000);
+    move_scoress.truncate(6000);
+    games.truncate(6000);
 
     for (game, move_scores) in games.iter().zip(&move_scoress) {
         let mut board = game.start_board.clone();
@@ -438,7 +438,7 @@ pub fn games_and_move_scoress_from_file(
 }
 
 pub fn read_move_scores_from_file() -> Result<Vec<MoveScoresForGame>, Box<dyn error::Error>> {
-    let mut file = fs::File::open("move_scores23_all.txt")?;
+    let mut file = fs::File::open("move_scores24_all.txt")?;
     let mut input = String::new();
     file.read_to_string(&mut input)?;
 
