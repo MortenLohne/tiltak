@@ -255,7 +255,7 @@ impl Square {
         }
     }
 
-    fn parse_square(input: &str) -> Square {
+    pub fn parse_square(input: &str) -> Square {
         assert_eq!(input.len(), 2, "Couldn't parse square {}", input);
         Square(
             (input.chars().next().unwrap() as u8 - b'a')

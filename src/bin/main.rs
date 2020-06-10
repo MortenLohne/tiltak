@@ -8,10 +8,11 @@ extern crate log;
 #[cfg(feature = "constant-tuning")]
 mod tune;
 
+pub mod playtak;
 pub mod uti;
 
 use std::io;
-use std::io::Write;
+use std::io::{BufRead, Write};
 #[cfg(feature = "constant-tuning")]
 use std::path::Path;
 
@@ -39,9 +40,22 @@ fn main() {
 
     let mut input = String::new();
     io::stdin().read_line(&mut input).unwrap();
-    match input.trim() {
+    let words = input.split_whitespace().collect::<Vec<_>>();
+    match words[0] {
         "uti" => {
             uti::main();
+        }
+        "playtak" => {
+            let mut connection = playtak::connect(words[1], words[2], words[3]).unwrap();
+            let mut line = String::new();
+            for i in 0..20 {
+                connection.read_line(&mut line).unwrap();
+                println!("{}", line);
+                line.clear();
+                if i == 6 {
+                    writeln!(connection, "quit").unwrap();
+                }
+            }
         }
         "play" => {
             let board = Board::default();

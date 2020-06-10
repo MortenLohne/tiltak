@@ -19,6 +19,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5cb754816c075082acb2dc2dcd311ade978c5ef9df46c623126046125d52be51"
 
 [[package]]
+name = "bufstream"
+version = "0.1.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "40e38929add23cdf8a366df9b0e088953150724bcbe5fc330b0d8eb3b328eec8"
+
+[[package]]
 name = "c2-chacha"
 version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -284,6 +290,7 @@ version = "0.1.0"
 dependencies = [
  "arrayvec",
  "board-game-traits",
+ "bufstream",
  "log",
  "nom",
  "pgn-traits",
