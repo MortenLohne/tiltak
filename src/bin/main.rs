@@ -46,7 +46,7 @@ fn main() {
             uti::main();
         }
         "playtak" => {
-            let mut connection = playtak::connect(words[1], words[2], words[3]).unwrap();
+            let mut connection = playtak::main::connect(words[1], words[2], words[3]).unwrap();
             let mut line = String::new();
             for i in 0..20 {
                 connection.read_line(&mut line).unwrap();
