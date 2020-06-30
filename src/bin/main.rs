@@ -67,7 +67,7 @@ fn main() {
             }
         }
         "analyze" => test_position(),
-        "mem usage" => mem_usage(),
+        "mem_usage" => mem_usage(),
         "bench" => bench(),
         #[cfg(feature = "constant-tuning")]
         "train_from_scratch" => {
@@ -422,13 +422,15 @@ fn mem_usage() {
     println!("MCTS node: {} bytes.", mem::size_of::<mcts::Tree>());
     let mut board = board::Board::default();
     let mut tree = mcts::Tree::new_root();
-    tree.select(
-        &mut board,
-        Board::VALUE_PARAMS,
-        Board::POLICY_PARAMS,
-        &mut vec![],
-        &mut vec![],
-    );
+    for i in 0..2 {
+        tree.select(
+            &mut board,
+            Board::VALUE_PARAMS,
+            Board::POLICY_PARAMS,
+            &mut vec![],
+            &mut vec![],
+        );
+    }
     println!(
         "MCTS node's children: {} bytes.",
         tree.children.len() * mem::size_of::<(mcts::Tree, board::Move)>()
