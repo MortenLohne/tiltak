@@ -1,10 +1,11 @@
 use std::cmp::Ordering;
-use std::iter;
 use std::str::FromStr;
+use std::iter;
 
 use arrayvec::ArrayVec;
+use std::fmt::Write;
 use taik::board;
-use taik::board::{Direction, Movement, Role, StackMovement};
+use taik::board::{Direction, Move, Movement, Role, StackMovement};
 
 pub fn parse_game_command(input: &str) {}
 
@@ -66,5 +67,36 @@ pub fn parse_move(input: &str) -> board::Move {
         )
     } else {
         unreachable!()
+    }
+}
+
+pub fn write_move(mv: board::Move, w: &mut String) {
+    match mv {
+        board::Move::Place(Role::Flat, square) => write!(w, "P {}", square).unwrap(),
+        board::Move::Place(Role::Standing, square) => write!(w, "P {} W", square).unwrap(),
+        board::Move::Place(Role::Cap, square) => write!(w, "P {} C", square).unwrap(),
+        Move::Move(start_square, direction, stack_movement) => {
+            let mut end_square = start_square;
+            let mut pieces_held = stack_movement.movements[0].pieces_to_take;
+            let pieces_to_leave: Vec<u8> = stack_movement
+                .movements
+                .iter()
+                .skip(1)
+                .map(|Movement { pieces_to_take }| {
+                    end_square = end_square.go_direction(direction).unwrap();
+                    let pieces_to_leave = pieces_held - pieces_to_take;
+                    pieces_held = *pieces_to_take;
+                    pieces_to_leave
+                })
+                .collect();
+
+            end_square = end_square.go_direction(direction).unwrap();
+
+            write!(w, "M {} {} ", start_square, end_square).unwrap();
+            for num_to_leave in pieces_to_leave {
+                write!(w, "{} ", num_to_leave).unwrap();
+            }
+            write!(w, "{}", pieces_held).unwrap();
+        }
     }
 }
