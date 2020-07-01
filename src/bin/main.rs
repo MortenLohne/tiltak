@@ -422,7 +422,7 @@ fn mem_usage() {
     println!("MCTS node: {} bytes.", mem::size_of::<mcts::Tree>());
     let mut board = board::Board::default();
     let mut tree = mcts::Tree::new_root();
-    for i in 0..2 {
+    for _ in 0..2 {
         tree.select(
             &mut board,
             Board::VALUE_PARAMS,
