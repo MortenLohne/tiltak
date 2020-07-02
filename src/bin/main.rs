@@ -12,7 +12,7 @@ pub mod playtak;
 pub mod uti;
 
 use std::io;
-use std::io::{BufRead, Write};
+use std::io::Write;
 #[cfg(feature = "constant-tuning")]
 use std::path::Path;
 
@@ -46,16 +46,7 @@ fn main() {
             uti::main();
         }
         "playtak" => {
-            let mut connection = playtak::main::connect(words[1], words[2], words[3]).unwrap();
-            let mut line = String::new();
-            for i in 0..20 {
-                connection.read_line(&mut line).unwrap();
-                println!("{}", line);
-                line.clear();
-                if i == 6 {
-                    writeln!(connection, "quit").unwrap();
-                }
-            }
+            playtak::main::main().unwrap();
         }
         "play" => {
             let board = Board::default();

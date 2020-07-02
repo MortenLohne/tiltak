@@ -1,13 +1,11 @@
 use std::cmp::Ordering;
-use std::str::FromStr;
 use std::iter;
+use std::str::FromStr;
 
 use arrayvec::ArrayVec;
 use std::fmt::Write;
 use taik::board;
 use taik::board::{Direction, Move, Movement, Role, StackMovement};
-
-pub fn parse_game_command(input: &str) {}
 
 pub fn parse_move(input: &str) -> board::Move {
     let words: Vec<&str> = input.split_whitespace().collect();
