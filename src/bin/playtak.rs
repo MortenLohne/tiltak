@@ -141,7 +141,7 @@ impl PlaytakSession {
             if board.side_to_move() == our_color {
                 let (best_move, score) = mcts::mcts(board.clone(), 1_000_000);
                 board.do_move(best_move.clone());
-                moves.push((best_move.clone(), score));
+                moves.push((best_move.clone(), score.to_string()));
 
                 let mut output_string = format!("Game#{} ", game_no);
                 write_move(best_move, &mut output_string);
@@ -156,17 +156,40 @@ impl PlaytakSession {
                                 let move_string = words[1..].join(" ");
                                 let move_played = parse_move(&move_string);
                                 board.do_move(move_played.clone());
-                                moves.push((move_played, 0.0));
+                                moves.push((move_played, "0.0".to_string()));
                                 break;
                             }
                             "Abandoned" | "Over" => break 'gameloop,
                             _ => println!("Unknown game message \"{}\"", line),
                         }
+                    } else if words[0] == "NOK" {
+                        self.send_line("quit")?;
+                        return Ok(());
                     }
                 }
             }
         }
-        self.wait_for_game()
+
+        #[cfg(feature = "pgn-writer")]
+        {
+            println!("Game finished. Pgn: ");
+
+            taik::pgn_writer::game_to_pgn(
+                &mut Board::start_board(),
+                &moves,
+                "Playtak challenge",
+                "playtak.com",
+                "",
+                "",
+                white_player,
+                black_player,
+                board.game_result(),
+                &[],
+                &mut io::stdout(),
+            )?;
+        }
+
+        self.seek_game()
     }
 }
 
