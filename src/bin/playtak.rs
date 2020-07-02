@@ -25,16 +25,18 @@ pub fn main() -> Result<()> {
 
     let mut session = PlaytakSession::new()?;
     session.login("Taik", &user, &pwd)?;
-    session.wait_for_game()?;
-    Ok(())
+    session.seek_game()
 }
 
 struct PlaytakSession {
     connection: BufStream<TcpStream>,
-    ping_thread: thread::JoinHandle<io::Result<()>>,
+    // The server requires regular pings, to not kick the user
+    // This thread does nothing but provide those pings
+    _ping_thread: thread::JoinHandle<io::Result<()>>,
 }
 
 impl PlaytakSession {
+    /// Initialize a connection to playtak.com. Does not log in or play games.
     fn new() -> Result<Self> {
         let connection = connect()?;
         let mut ping_thread_connection = connection.get_ref().try_clone()?;
@@ -45,10 +47,11 @@ impl PlaytakSession {
         });
         Ok(PlaytakSession {
             connection,
-            ping_thread,
+            _ping_thread: ping_thread,
         })
     }
 
+    /// Login with the provided name, username and password
     fn login(&mut self, client_name: &str, user: &str, pwd: &str) -> Result<()> {
         loop {
             let line = self.read_line()?;
@@ -83,7 +86,9 @@ impl PlaytakSession {
         Ok(())
     }
 
-    pub fn wait_for_game(&mut self) -> io::Result<()> {
+    /// Place a game seek (challenge) on playtak, and wait for somebody to accept
+    /// Mutually recursive with `play_game` when the challenge is accepted
+    pub fn seek_game(&mut self) -> io::Result<()> {
         self.send_line("Seek 5 900 10")?;
 
         loop {
@@ -101,7 +106,11 @@ impl PlaytakSession {
                         "black" => Color::Black,
                         color => panic!("Bad color \"{}\"", color),
                     };
-                    self.start_game(game_no, board_size, white_player, black_player, color)?;
+                    self.play_game(game_no, board_size, white_player, black_player, color)?;
+                    return Ok(());
+                }
+                "NOK" => {
+                    self.send_line("quit")?;
                     return Ok(());
                 }
                 _ => println!("Unrecognized message \"{}\"", input.trim()),
@@ -109,10 +118,12 @@ impl PlaytakSession {
         }
     }
 
-    fn start_game(
+    /// The main game loop of a playtak game.
+    /// Mutually recursive with `seek_game`, which places a new seek as soon as the game finishes.
+    fn play_game(
         &mut self,
         game_no: u64,
-        board_size: usize,
+        _board_size: usize,
         white_player: &str,
         black_player: &str,
         our_color: Color,
