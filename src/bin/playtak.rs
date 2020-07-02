@@ -123,7 +123,7 @@ impl PlaytakSession {
         );
         let mut board = Board::start_board();
         let mut moves = vec![];
-        loop {
+        'gameloop: loop {
             if board.game_result().is_some() {
                 break;
             }
@@ -131,10 +131,28 @@ impl PlaytakSession {
                 let (best_move, score) = mcts::mcts(board.clone(), 1_000_000);
                 board.do_move(best_move.clone());
                 moves.push((best_move.clone(), score));
-                let mut output_string = format!("Game{} ", game_no);
+
+                let mut output_string = format!("Game#{} ", game_no);
                 write_move(best_move, &mut output_string);
                 self.send_line(&output_string)?;
             } else {
+                loop {
+                    let line = self.read_line()?;
+                    let words: Vec<&str> = line.split_whitespace().collect();
+                    if words[0] == format!("Game#{}", game_no) {
+                        match words[1] {
+                            "P" | "M" => {
+                                let move_string = words[1..].join(" ");
+                                let move_played = parse_move(&move_string);
+                                board.do_move(move_played.clone());
+                                moves.push((move_played, 0.0));
+                                break;
+                            }
+                            "Abandoned" | "Over" => break 'gameloop,
+                            _ => println!("Unknown game message \"{}\"", line),
+                        }
+                    }
+                }
             }
         }
         self.wait_for_game()
