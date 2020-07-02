@@ -8,6 +8,9 @@ extern crate log;
 #[cfg(feature = "constant-tuning")]
 mod tune;
 
+#[cfg(test)]
+mod tests;
+
 pub mod playtak;
 pub mod uti;
 
@@ -42,12 +45,6 @@ fn main() {
     io::stdin().read_line(&mut input).unwrap();
     let words = input.split_whitespace().collect::<Vec<_>>();
     match words[0] {
-        "uti" => {
-            uti::main();
-        }
-        "playtak" => {
-            playtak::main::main().unwrap();
-        }
         "play" => {
             let board = Board::default();
             play_human(board);

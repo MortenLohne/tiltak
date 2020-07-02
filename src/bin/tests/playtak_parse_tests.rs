@@ -1,5 +1,5 @@
 use crate::board::Board;
-use crate::playtak::parse;
+use crate::playtak;
 use board_game_traits::board::Board as BoardTrait;
 use pgn_traits::pgn::PgnBoard;
 use std::io::Cursor;
@@ -16,7 +16,7 @@ fn parse_place_move_test() {
 
     for (playtak_move_string, san_move_string) in move_strings.iter() {
         assert_eq!(
-            parse::parse_move(playtak_move_string).to_string(),
+            playtak::parse_move(playtak_move_string).to_string(),
             *san_move_string
         );
     }
@@ -28,7 +28,7 @@ fn parse_move_move_test() {
 
     for (playtak_move_string, san_move_string) in move_strings.iter() {
         assert_eq!(
-            parse::parse_move(playtak_move_string).to_string(),
+            playtak::parse_move(playtak_move_string).to_string(),
             *san_move_string
         );
     }
@@ -46,7 +46,7 @@ fn write_place_move_test() {
     for (playtak_move_string, san_move_string) in move_strings.iter() {
         let board = Board::start_board();
         let mut sink = String::new();
-        parse::write_move(board.move_from_san(san_move_string).unwrap(), &mut sink);
+        playtak::write_move(board.move_from_san(san_move_string).unwrap(), &mut sink);
         assert_eq!(sink, *playtak_move_string);
     }
 }
@@ -58,7 +58,7 @@ fn write_move_move_test() {
     for (playtak_move_string, san_move_string) in move_strings.iter() {
         let board = Board::start_board();
         let mut sink = String::new();
-        parse::write_move(board.move_from_san(san_move_string).unwrap(), &mut sink);
+        playtak::write_move(board.move_from_san(san_move_string).unwrap(), &mut sink);
         assert_eq!(sink, *playtak_move_string);
     }
 }
