@@ -160,7 +160,7 @@ use taik::board::{Direction, Move, Movement, Role, StackMovement};
 pub fn parse_move(input: &str) -> board::Move {
     let words: Vec<&str> = input.split_whitespace().collect();
     if words[0] == "P" {
-        let square = board::Square::parse_square(words[1]);
+        let square = board::Square::parse_square(&words[1].to_lowercase());
         let role = match words.get(2) {
             Some(&"C") => Role::Cap,
             Some(&"W") => Role::Standing,
@@ -169,8 +169,8 @@ pub fn parse_move(input: &str) -> board::Move {
         };
         board::Move::Place(role, square)
     } else if words[0] == "M" {
-        let start_square = board::Square::parse_square(words[1]);
-        let end_square = board::Square::parse_square(words[2]);
+        let start_square = board::Square::parse_square(&words[1].to_lowercase());
+        let end_square = board::Square::parse_square(&words[2].to_lowercase());
         let pieces_dropped: ArrayVec<[u8; board::BOARD_SIZE - 1]> = words
             .iter()
             .skip(3)
@@ -220,9 +220,15 @@ pub fn parse_move(input: &str) -> board::Move {
 
 pub fn write_move(mv: board::Move, w: &mut String) {
     match mv {
-        board::Move::Place(Role::Flat, square) => write!(w, "P {}", square).unwrap(),
-        board::Move::Place(Role::Standing, square) => write!(w, "P {} W", square).unwrap(),
-        board::Move::Place(Role::Cap, square) => write!(w, "P {} C", square).unwrap(),
+        board::Move::Place(role, square) => {
+            let role_string = match role {
+                Role::Flat => "",
+                Role::Standing => " W",
+                Role::Cap => " C",
+            };
+            let square_string = square.to_string().to_uppercase();
+            write!(w, "P {}{}", square_string, role_string).unwrap();
+        }
         Move::Move(start_square, direction, stack_movement) => {
             let mut end_square = start_square;
             let mut pieces_held = stack_movement.movements[0].pieces_to_take;
@@ -240,7 +246,13 @@ pub fn write_move(mv: board::Move, w: &mut String) {
 
             end_square = end_square.go_direction(direction).unwrap();
 
-            write!(w, "M {} {} ", start_square, end_square).unwrap();
+            write!(
+                w,
+                "M {} {} ",
+                start_square.to_string().to_uppercase(),
+                end_square.to_string().to_uppercase()
+            )
+            .unwrap();
             for num_to_leave in pieces_to_leave {
                 write!(w, "{} ", num_to_leave).unwrap();
             }

@@ -8,10 +8,10 @@ use taik::board::Move;
 #[test]
 fn parse_place_move_test() {
     let move_strings = [
-        ("P a1", "a1"),
-        ("P a1 W", "Sa1"),
-        ("P a1 C", "Ca1"),
-        ("P d3 W", "Sd3"),
+        ("P A1", "a1"),
+        ("P A1 W", "Sa1"),
+        ("P A1 C", "Ca1"),
+        ("P D3 W", "Sd3"),
     ];
 
     for (playtak_move_string, san_move_string) in move_strings.iter() {
@@ -24,7 +24,7 @@ fn parse_place_move_test() {
 
 #[test]
 fn parse_move_move_test() {
-    let move_strings = [("M a1 c1 1 2", "3a1>12"), ("M c2 c3 1", "c2+")];
+    let move_strings = [("M A1 C1 1 2", "3a1>12"), ("M C2 C3 1", "c2+")];
 
     for (playtak_move_string, san_move_string) in move_strings.iter() {
         assert_eq!(
@@ -37,10 +37,10 @@ fn parse_move_move_test() {
 #[test]
 fn write_place_move_test() {
     let move_strings = [
-        ("P a1", "a1"),
-        ("P a1 W", "Sa1"),
-        ("P a1 C", "Ca1"),
-        ("P d3 W", "Sd3"),
+        ("P A1", "a1"),
+        ("P A1 W", "Sa1"),
+        ("P A1 C", "Ca1"),
+        ("P D3 W", "Sd3"),
     ];
 
     for (playtak_move_string, san_move_string) in move_strings.iter() {
@@ -53,7 +53,7 @@ fn write_place_move_test() {
 
 #[test]
 fn write_move_move_test() {
-    let move_strings = [("M a1 c1 1 2", "3a1>12"), ("M c2 c3 1", "c2+")];
+    let move_strings = [("M A1 C1 1 2", "3a1>12"), ("M C2 C3 1", "c2+")];
 
     for (playtak_move_string, san_move_string) in move_strings.iter() {
         let board = Board::start_board();
