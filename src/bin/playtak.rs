@@ -1,5 +1,6 @@
 use board_game_traits::board::{Board as BoardTrait, Color};
 use bufstream::BufStream;
+use clap::{App, Arg};
 use std::fmt::Write as FmtWrite;
 use std::io::{BufRead, Result, Write};
 use std::net::TcpStream;
@@ -10,21 +11,36 @@ use taik::board::Board;
 use taik::mcts;
 
 pub fn main() -> Result<()> {
-    let mut input = String::new();
-
-    print!("Username: ");
-    io::stdout().flush()?;
-    io::stdin().read_line(&mut input)?;
-    let user = input.trim().to_string();
-    input.clear();
-
-    print!("Password: ");
-    io::stdout().flush()?;
-    io::stdin().read_line(&mut input)?;
-    let pwd = input.trim();
+    let matches = App::new("Taik playtak client")
+        .version("0.1")
+        .author("Morten Lohne")
+        .arg(
+            Arg::with_name("username")
+                .requires("password")
+                .short("u")
+                .long("username")
+                .value_name("USER")
+                .help("playtak.com username")
+                .takes_value(true),
+        )
+        .arg(
+            Arg::with_name("password")
+                .short("p")
+                .long("password")
+                .value_name("PASS")
+                .help("playtak.com password")
+                .takes_value(true),
+        )
+        .get_matches();
 
     let mut session = PlaytakSession::new()?;
-    session.login("Taik", &user, &pwd)?;
+
+    if let (Some(user), Some(pwd)) = (matches.value_of("username"), matches.value_of("password")) {
+        session.login("Taik", &user, &pwd)?;
+    } else {
+        session.login_guest()?;
+    }
+
     session.seek_game()
 }
 
@@ -59,9 +75,28 @@ impl PlaytakSession {
                 break;
             }
         }
-        println!("Logging in: ");
+
         self.send_line(&format!("client {}", client_name))?;
         self.send_line(&format!("Login {} {}", user, pwd))?;
+
+        loop {
+            let line = self.read_line()?;
+            if line.starts_with("Welcome ") {
+                break;
+            }
+        }
+        Ok(())
+    }
+
+    fn login_guest(&mut self) -> Result<()> {
+        loop {
+            let line = self.read_line()?;
+            if line.starts_with("Login") {
+                break;
+            }
+        }
+
+        self.send_line("Login Guest")?;
 
         loop {
             let line = self.read_line()?;
