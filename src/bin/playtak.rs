@@ -10,6 +10,8 @@ use std::{io, net, thread};
 use taik::board::Board;
 use taik::mcts;
 
+use log::{debug, info, warn};
+
 pub fn main() -> Result<()> {
     let matches = App::new("Taik playtak client")
         .version("0.1")
@@ -31,13 +33,50 @@ pub fn main() -> Result<()> {
                 .help("playtak.com password")
                 .takes_value(true),
         )
+        .arg(
+            Arg::with_name("logfile")
+                .short("l")
+                .long("logfile")
+                .value_name("taik.log")
+                .help("Name of debug logfile")
+                .takes_value(true),
+        )
         .get_matches();
+
+    let log_dispatcher = fern::Dispatch::new().format(|out, message, record| {
+        out.finish(format_args!(
+            "{}[{}][{}] {}",
+            chrono::Local::now().format("[%Y-%m-%d][%H:%M:%S]"),
+            record.target(),
+            record.level(),
+            message
+        ))
+    });
+
+    if let Some(log_file) = matches.value_of("logfile") {
+        log_dispatcher
+            .chain(fern::log_file(log_file)?)
+            .chain(
+                fern::Dispatch::new()
+                    .level(log::LevelFilter::Info)
+                    .chain(io::stderr()),
+            )
+            .apply()
+            .unwrap()
+    } else {
+        log_dispatcher
+            .level(log::LevelFilter::Info)
+            .chain(io::stderr())
+            .apply()
+            .unwrap()
+    }
 
     let mut session = PlaytakSession::new()?;
 
     if let (Some(user), Some(pwd)) = (matches.value_of("username"), matches.value_of("password")) {
         session.login("Taik", &user, &pwd)?;
     } else {
+        warn!("No username/password provided, logging in as guest");
         session.login_guest()?;
     }
 
@@ -110,14 +149,14 @@ impl PlaytakSession {
     fn read_line(&mut self) -> Result<String> {
         let mut input = String::new();
         self.connection.read_line(&mut input)?;
-        println!("> {}", input.trim());
+        info!("> {}", input.trim());
         Ok(input)
     }
 
     fn send_line(&mut self, output: &str) -> Result<()> {
         writeln!(self.connection, "{}", output)?;
         self.connection.flush()?;
-        println!("< {}", output);
+        info!("< {}", output);
         Ok(())
     }
 
@@ -148,7 +187,7 @@ impl PlaytakSession {
                     self.send_line("quit")?;
                     return Ok(());
                 }
-                _ => println!("Unrecognized message \"{}\"", input.trim()),
+                _ => debug!("Ignoring server message \"{}\"", input.trim()),
             }
         }
     }
@@ -163,7 +202,7 @@ impl PlaytakSession {
         black_player: &str,
         our_color: Color,
     ) -> io::Result<()> {
-        println!(
+        info!(
             "Starting game #{}, {} vs {} as {}",
             game_no, white_player, black_player, our_color
         );
@@ -195,7 +234,7 @@ impl PlaytakSession {
                                 break;
                             }
                             "Abandoned" | "Over" => break 'gameloop,
-                            _ => println!("Unknown game message \"{}\"", line),
+                            _ => debug!("Ignoring server message \"{}\"", line),
                         }
                     } else if words[0] == "NOK" {
                         self.send_line("quit")?;
@@ -207,7 +246,7 @@ impl PlaytakSession {
 
         #[cfg(feature = "pgn-writer")]
         {
-            println!("Game finished. Pgn: ");
+            info!("Game finished. Pgn: ");
 
             taik::pgn_writer::game_to_pgn(
                 &mut Board::start_board(),
