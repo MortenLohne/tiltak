@@ -36,7 +36,6 @@ use taik::minmax;
 use taik::pgn_writer::Game;
 
 fn main() {
-    println!("uti: enter uti mode (Tak version of the uci protocol for chess)");
     println!("play: Play against the mcts AI");
     println!("aimatch: Watch the minmax and mcts AIs play");
     println!("analyze: Mcts analysis of a position, provided from a simple move list");
