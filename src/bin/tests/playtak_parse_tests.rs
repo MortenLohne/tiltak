@@ -2,8 +2,6 @@ use crate::board::Board;
 use crate::playtak;
 use board_game_traits::board::Board as BoardTrait;
 use pgn_traits::pgn::PgnBoard;
-use std::io::Cursor;
-use taik::board::Move;
 
 #[test]
 fn parse_place_move_test() {
