@@ -248,6 +248,8 @@ impl PlaytakSession {
         {
             info!("Game finished. Pgn: ");
 
+            let mut pgn = Vec::new();
+
             taik::pgn_writer::game_to_pgn(
                 &mut Board::start_board(),
                 &moves,
@@ -259,9 +261,19 @@ impl PlaytakSession {
                 black_player,
                 board.game_result(),
                 &[],
-                &mut io::stdout(),
+                &mut pgn,
             )?;
+
+            info!("{}", String::from_utf8(pgn).unwrap());
         }
+
+        let mut move_list = vec![];
+
+        for (mv, _) in moves {
+            move_list.push(mv.to_string());
+        }
+
+        info!("Move list: {}", move_list.join(" "));
 
         self.seek_game()
     }
