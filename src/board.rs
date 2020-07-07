@@ -3,6 +3,8 @@
 /// The size of the board. Only 5 works correctly for now.
 pub const BOARD_SIZE: usize = 5;
 
+pub const BOARD_AREA: usize = BOARD_SIZE * BOARD_SIZE;
+
 pub const STARTING_CAPSTONES: u8 = 1;
 
 use crate::bitboard::BitBoard;
@@ -592,6 +594,8 @@ pub struct Board {
     black_capstones_left: u8,
     moves_played: u16,
     moves: Vec<Move>,
+    groups: AbstractBoard<u8>,
+    amount_in_group: [u8; BOARD_AREA + 1],
 }
 
 impl Index<Square> for Board {
@@ -625,6 +629,8 @@ impl Default for Board {
             black_capstones_left: STARTING_CAPSTONES,
             moves_played: 0,
             moves: vec![],
+            groups: Default::default(),
+            amount_in_group: [0; BOARD_AREA + 1],
         }
     }
 }
@@ -834,6 +840,27 @@ impl Board {
                 Some(BlackCap) => self.black_capstones = self.black_capstones.set(square.0),
                 None => (),
             }
+        }
+    }
+
+    pub fn update_group_connectedness(&mut self) {
+        let mut highest_component_id = 1;
+
+        connected_components_graph(
+            self.white_road_pieces(),
+            &mut self.groups,
+            &mut highest_component_id,
+        );
+        connected_components_graph(
+            self.black_road_pieces(),
+            &mut self.groups,
+            &mut highest_component_id,
+        );
+
+        self.amount_in_group = [0; BOARD_AREA + 1];
+
+        for square in squares_iterator() {
+            self.amount_in_group[self.groups[square] as usize] += 1;
         }
     }
 
@@ -1269,9 +1296,19 @@ impl board::Board for Board {
     }
 
     fn game_result(&self) -> Option<GameResult> {
-        let (components, highest_component_id) = match self.side_to_move() {
-            Color::White => connected_components_graph(self.black_road_pieces()),
-            Color::Black => connected_components_graph(self.white_road_pieces()),
+        let mut components = AbstractBoard::default();
+        let mut highest_component_id = 1;
+        match self.side_to_move() {
+            Color::White => connected_components_graph(
+                self.black_road_pieces(),
+                &mut components,
+                &mut highest_component_id,
+            ),
+            Color::Black => connected_components_graph(
+                self.white_road_pieces(),
+                &mut components,
+                &mut highest_component_id,
+            ),
         };
 
         if let Some(square) = is_win_by_road(&components, highest_component_id) {
@@ -1593,17 +1630,17 @@ impl<T> IndexMut<Square> for AbstractBoard<T> {
     }
 }
 
-pub(crate) fn connected_components_graph(road_pieces: BitBoard) -> (AbstractBoard<u8>, u8) {
-    let mut components: AbstractBoard<u8> = Default::default();
-    let mut id = 1;
-
+pub(crate) fn connected_components_graph(
+    road_pieces: BitBoard,
+    components: &mut AbstractBoard<u8>,
+    id: &mut u8,
+) {
     for square in squares_iterator() {
         if components[square] == 0 && road_pieces.get(square.0) {
-            connect_component(road_pieces, &mut components, square, id);
-            id += 1;
+            connect_component(road_pieces, components, square, *id);
+            *id += 1;
         }
     }
-    (components, id)
 }
 
 fn connect_component(
