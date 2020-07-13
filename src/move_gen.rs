@@ -56,7 +56,10 @@ impl Board {
         const FLAT_STONE_PSQT: usize = MOVE_COUNT + 1;
         const STANDING_STONE_PSQT: usize = FLAT_STONE_PSQT + 6;
         const CAPSTONE_PSQT: usize = STANDING_STONE_PSQT + 6;
-        const NEXT_TO_OUR_LAST_STONE: usize = CAPSTONE_PSQT + 6;
+        const EXTEND_GROUP: usize = CAPSTONE_PSQT + 6;
+        const MERGE_TWO_GROUPS: usize = EXTEND_GROUP + 1;
+        const BLOCK_MERGER: usize = MERGE_TWO_GROUPS + 1;
+        const NEXT_TO_OUR_LAST_STONE: usize = BLOCK_MERGER + 1;
         const NEXT_TO_THEIR_LAST_STONE: usize = NEXT_TO_OUR_LAST_STONE + 1;
         const DIAGONAL_TO_OUR_LAST_STONE: usize = NEXT_TO_THEIR_LAST_STONE + 1;
         const DIAGONAL_TO_THEIR_LAST_STONE: usize = DIAGONAL_TO_OUR_LAST_STONE + 1;
@@ -89,6 +92,38 @@ impl Board {
             Move::Place(role, square) if *role == Flat => {
                 // Apply PSQT
                 coefficients[FLAT_STONE_PSQT + SQUARE_SYMMETRIES[square.0 as usize]] = 1.0;
+
+                // If square is next to a group
+                let mut our_unique_neighbour_groups: ArrayVec<[(Square, u8); 4]> = ArrayVec::new();
+                let mut their_unique_neighbour_groups: ArrayVec<[(Square, u8); 4]> =
+                    ArrayVec::new();
+                for neighbour in square.neighbours().filter(|sq| !self[*sq].is_empty()) {
+                    let neighbour_group_id = self.groups()[neighbour];
+                    if Us::piece_is_ours(self[neighbour].top_stone().unwrap()) {
+                        if our_unique_neighbour_groups
+                            .iter()
+                            .all(|(_sq, id)| *id != neighbour_group_id)
+                        {
+                            our_unique_neighbour_groups.push((neighbour, neighbour_group_id));
+                        }
+                    } else if their_unique_neighbour_groups
+                        .iter()
+                        .all(|(_sq, id)| *id != neighbour_group_id)
+                    {
+                        their_unique_neighbour_groups.push((neighbour, neighbour_group_id));
+                    }
+                }
+                if our_unique_neighbour_groups.len() > 1 {
+                    coefficients[MERGE_TWO_GROUPS] += 1.0;
+                }
+
+                if their_unique_neighbour_groups.len() > 1 {
+                    coefficients[BLOCK_MERGER] += 1.0;
+                }
+
+                for (_, group_id) in our_unique_neighbour_groups {
+                    coefficients[EXTEND_GROUP] += self.amount_in_group()[group_id as usize] as f32;
+                }
 
                 // If square is next to a road stone laid on our last turn
                 if let Some(Move::Place(last_role, last_square)) =
