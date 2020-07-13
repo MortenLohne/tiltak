@@ -614,7 +614,7 @@ impl IndexMut<Square> for Board {
 
 impl Default for Board {
     fn default() -> Self {
-        Board {
+        let mut board = Board {
             cells: Default::default(),
             to_move: Color::White,
             white_flat_stones: Default::default(),
@@ -631,7 +631,9 @@ impl Default for Board {
             moves: vec![],
             groups: Default::default(),
             amount_in_group: [0; BOARD_AREA + 1],
-        }
+        };
+        board.amount_in_group[0] = BOARD_AREA as u8;
+        board
     }
 }
 
@@ -669,6 +671,8 @@ impl fmt::Debug for Board {
         writeln!(f, "{} to move.", self.side_to_move())?;
         writeln!(f, "White road stones: {:b}", self.white_road_pieces().board)?;
         writeln!(f, "Black road stones: {:b}", self.black_road_pieces().board)?;
+        writeln!(f, "Groups: {:?}", self.groups)?;
+        writeln!(f, "Amount in groups: {:?}", self.amount_in_group)?;
         Ok(())
     }
 }
@@ -718,6 +722,7 @@ impl Board {
             }
         }
         new_board.bitboards_from_scratch();
+        new_board.update_group_connectedness();
         new_board
     }
 
@@ -731,6 +736,7 @@ impl Board {
             }
         }
         new_board.bitboards_from_scratch();
+        new_board.update_group_connectedness();
         new_board
     }
 
@@ -746,6 +752,7 @@ impl Board {
             }
         }
         new_board.bitboards_from_scratch();
+        new_board.update_group_connectedness();
         new_board
     }
 
@@ -779,6 +786,7 @@ impl Board {
             &mut new_board.black_capstones,
         );
         new_board.to_move = !new_board.to_move;
+        new_board.update_group_connectedness();
         new_board
     }
 
@@ -845,6 +853,8 @@ impl Board {
 
     pub fn update_group_connectedness(&mut self) {
         let mut highest_component_id = 1;
+
+        self.groups = Default::default();
 
         connected_components_graph(
             self.white_road_pieces(),
@@ -1098,6 +1108,37 @@ impl Board {
         }
         num_ranks_occupied
     }
+
+    /// Check if either side has completed a road
+    /// Returns one of the winning squares in the road
+    pub(crate) fn is_win_by_road(
+        &self,
+        components: &AbstractBoard<u8>,
+        highest_component_id: u8,
+    ) -> Option<Square> {
+        // If the side to move is already winning,
+        // the last move was either a suicide, or a double win
+        let mut suicide_win_square = None;
+
+        // TODO: Include highest id?
+        for id in 1..highest_component_id {
+            if (components.raw[0].iter().any(|&cell| cell == id)
+                && components.raw[BOARD_SIZE - 1]
+                    .iter()
+                    .any(|&cell| cell == id))
+                || ((0..BOARD_SIZE).any(|y| components.raw[y][0] == id)
+                    && (0..BOARD_SIZE).any(|y| components.raw[y][BOARD_SIZE - 1] == id))
+            {
+                let square = squares_iterator().find(|&sq| components[sq] == id).unwrap();
+                if self[square].top_stone.unwrap().color() == self.side_to_move() {
+                    suicide_win_square = Some(square)
+                } else {
+                    return Some(square);
+                }
+            }
+        }
+        suicide_win_square
+    }
 }
 
 impl board::Board for Board {
@@ -1232,6 +1273,8 @@ impl board::Board for Board {
             self
         );
 
+        self.update_group_connectedness();
+
         self.moves.push(mv);
         self.to_move = !self.to_move;
         self.moves_played += 1;
@@ -1290,36 +1333,30 @@ impl board::Board for Board {
                 self.bitboards_from_scratch();
             }
         }
+
+        self.update_group_connectedness();
+
         self.moves.pop();
         self.moves_played -= 1;
         self.to_move = !self.to_move;
     }
 
     fn game_result(&self) -> Option<GameResult> {
-        let mut components = AbstractBoard::default();
-        let mut highest_component_id = 1;
-        match self.side_to_move() {
-            Color::White => connected_components_graph(
-                self.black_road_pieces(),
-                &mut components,
-                &mut highest_component_id,
-            ),
-            Color::Black => connected_components_graph(
-                self.white_road_pieces(),
-                &mut components,
-                &mut highest_component_id,
-            ),
-        };
+        let highest_component_id = self
+            .amount_in_group
+            .iter()
+            .enumerate()
+            .skip(1)
+            .find(|(_i, v)| **v == 0)
+            .map(|(i, _v)| i)
+            .unwrap_or(BOARD_AREA + 1) as u8;
 
-        if let Some(square) = is_win_by_road(&components, highest_component_id) {
+        if let Some(square) = self.is_win_by_road(&self.groups, highest_component_id) {
             debug_assert!(self[square].top_stone().unwrap().is_road_piece());
-            debug_assert_ne!(
-                self[square].top_stone().unwrap().color(),
-                self.side_to_move()
-            );
-            return match self.side_to_move() {
-                Color::White => Some(BlackWin),
-                Color::Black => Some(WhiteWin),
+            return if self[square].top_stone().unwrap().color() == Color::White {
+                Some(GameResult::WhiteWin)
+            } else {
+                Some(GameResult::BlackWin)
             };
         };
 
@@ -1655,25 +1692,4 @@ fn connect_component(
             connect_component(road_pieces, components, neighbour, id);
         }
     }
-}
-
-/// Check if either side has completed a road
-/// Returns one of the winning squares in the road
-pub(crate) fn is_win_by_road(
-    components: &AbstractBoard<u8>,
-    highest_component_id: u8,
-) -> Option<Square> {
-    for id in 1..highest_component_id {
-        if (components.raw[0].iter().any(|&cell| cell == id)
-            && components.raw[BOARD_SIZE - 1]
-                .iter()
-                .any(|&cell| cell == id))
-            || ((0..BOARD_SIZE).any(|y| components.raw[y][0] == id)
-                && (0..BOARD_SIZE).any(|y| components.raw[y][BOARD_SIZE - 1] == id))
-        {
-            let square = squares_iterator().find(|&sq| components[sq] == id).unwrap();
-            return Some(square);
-        }
-    }
-    None
 }
