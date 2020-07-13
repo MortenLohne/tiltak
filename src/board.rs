@@ -915,10 +915,26 @@ impl Board {
 
         const SIDE_TO_MOVE: usize = CAP_PSQT + 6;
         const FLATSTONE_LEAD: usize = SIDE_TO_MOVE + 3;
+        const NUMBER_OF_GROUPS: usize = FLATSTONE_LEAD + 3;
 
         // Give the side to move a bonus/malus depending on flatstone lead
         let white_flatstone_lead =
             self.white_flat_tops_count() as i8 - self.black_flat_tops_count() as i8;
+
+        // Bonus/malus depending on the number of groups each side has
+        let mut seen_groups = [false; BOARD_AREA + 1];
+        seen_groups[0] = true;
+        let number_of_groups = squares_iterator()
+            .map(|square| {
+                let group_id = self.groups[square] as usize;
+                if !seen_groups[group_id] {
+                    seen_groups[group_id] = true;
+                    self[square].top_stone.unwrap().color().multiplier()
+                } else {
+                    0
+                }
+            })
+            .sum::<isize>() as f32;
 
         let opening_scale_factor = f32::min(
             f32::max((24.0 - self.half_moves_played() as f32) / 12.0, 0.0),
@@ -935,16 +951,19 @@ impl Board {
 
         coefficients[SIDE_TO_MOVE] = self.side_to_move().multiplier() as f32 * opening_scale_factor;
         coefficients[FLATSTONE_LEAD] = white_flatstone_lead as f32 * opening_scale_factor;
+        coefficients[NUMBER_OF_GROUPS] = number_of_groups * opening_scale_factor;
 
         coefficients[SIDE_TO_MOVE + 1] =
             self.side_to_move().multiplier() as f32 * middlegame_scale_factor;
         coefficients[FLATSTONE_LEAD + 1] = white_flatstone_lead as f32 * middlegame_scale_factor;
+        coefficients[NUMBER_OF_GROUPS + 1] = number_of_groups * middlegame_scale_factor;
 
         coefficients[SIDE_TO_MOVE + 2] =
             self.side_to_move().multiplier() as f32 * endgame_scale_factor;
         coefficients[FLATSTONE_LEAD + 2] = white_flatstone_lead as f32 * endgame_scale_factor;
+        coefficients[NUMBER_OF_GROUPS + 2] = number_of_groups * endgame_scale_factor;
 
-        const PIECES_IN_OUR_STACK: usize = FLATSTONE_LEAD + 3;
+        const PIECES_IN_OUR_STACK: usize = NUMBER_OF_GROUPS + 3;
         const PIECES_IN_THEIR_STACK: usize = PIECES_IN_OUR_STACK + 1;
         const CAPSTONE_OVER_OWN_PIECE: usize = PIECES_IN_THEIR_STACK + 1;
         const CAPSTONE_ON_STACK: usize = CAPSTONE_OVER_OWN_PIECE + 1;
@@ -1040,6 +1059,7 @@ impl Board {
         coefficients[NUM_RANKS_FILES_OCCUPIED + num_files_occupied_black] -= 1.0;
 
         const _NEXT_CONST: usize = RANK_FILE_CONTROL + 10;
+
         assert_eq!(_NEXT_CONST, coefficients.len());
     }
 
@@ -1398,54 +1418,57 @@ pub(crate) const SQUARE_SYMMETRIES: [usize; 25] = [
 impl TunableBoard for Board {
     #[allow(clippy::unreadable_literal)]
     const VALUE_PARAMS: &'static [f32] = &[
-        -0.25570056,
-        -0.06306428,
-        -0.050129674,
-        0.04116685,
-        0.09316665,
-        0.12340328,
-        0.75012887,
-        0.65594965,
-        0.7024855,
-        0.75259584,
-        0.84324247,
-        0.79217625,
-        0.050678793,
-        0.47513855,
-        0.58207846,
-        0.82165027,
-        0.94676894,
-        1.2289112,
-        1.0558432,
-        0.64327145,
-        0.93969756,
-        0.4018749,
-        -0.42575312,
-        -0.01285331,
-        1.0200886,
-        0.6514834,
-        0.23788722,
-        0.4270889,
-        0.38664544,
-        -0.028407635,
-        -0.13549738,
-        -0.13895814,
-        0.7804223,
-        -0.82711303,
-        -0.6252435,
-        -0.3598254,
-        0.17267509,
-        0.85429937,
-        -1.3655918,
-        -1.0816205,
-        -0.24295154,
-        0.75123227,
-        1.9697832,
-        0.089783624,
-        0.12940928,
-        0.33033335,
-        0.018162066,
-        0.24058251,
+        -0.21487005,
+        -0.0406565,
+        -0.018901477,
+        0.030663004,
+        0.079226784,
+        0.11530221,
+        0.743739,
+        0.65239054,
+        0.6930186,
+        0.74156344,
+        0.8289646,
+        0.78372926,
+        0.08004124,
+        0.5119432,
+        0.6198412,
+        0.84567523,
+        0.96913385,
+        1.2360283,
+        1.0609382,
+        0.6352445,
+        0.91007096,
+        0.43367025,
+        -0.42892265,
+        -0.037731387,
+        -0.26795357,
+        -0.08676032,
+        -0.012233485,
+        1.0000367,
+        0.6400831,
+        0.23976964,
+        0.42723274,
+        0.38668478,
+        -0.027503295,
+        -0.13108984,
+        -0.13363458,
+        0.7972735,
+        -0.806871,
+        -0.57120854,
+        -0.3215248,
+        0.1548999,
+        0.75791836,
+        -1.4084904,
+        -1.0300877,
+        -0.20436336,
+        0.7446849,
+        1.8981309,
+        0.010878452,
+        0.10515187,
+        0.2837778,
+        0.018385313,
+        0.22821361,
     ];
     #[allow(clippy::unreadable_literal)]
     const POLICY_PARAMS: &'static [f32] = &[
