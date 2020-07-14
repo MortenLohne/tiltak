@@ -56,7 +56,8 @@ impl Board {
         const FLAT_STONE_PSQT: usize = MOVE_COUNT + 1;
         const STANDING_STONE_PSQT: usize = FLAT_STONE_PSQT + 6;
         const CAPSTONE_PSQT: usize = STANDING_STONE_PSQT + 6;
-        const EXTEND_GROUP: usize = CAPSTONE_PSQT + 6;
+        const ROAD_STONES_IN_RANK_FILE: usize = CAPSTONE_PSQT + 6;
+        const EXTEND_GROUP: usize = ROAD_STONES_IN_RANK_FILE + 15;
         const MERGE_TWO_GROUPS: usize = EXTEND_GROUP + 1;
         const BLOCK_MERGER: usize = MERGE_TWO_GROUPS + 1;
         const NEXT_TO_OUR_LAST_STONE: usize = BLOCK_MERGER + 1;
@@ -92,6 +93,18 @@ impl Board {
             Move::Place(role, square) if *role == Flat => {
                 // Apply PSQT
                 coefficients[FLAT_STONE_PSQT + SQUARE_SYMMETRIES[square.0 as usize]] = 1.0;
+
+                // Bonus for laying stones in files/ranks where we already have road stones
+                // Implemented as a 2D table. Because of symmetries,
+                // only 15 squares are needed, not all 25
+                let road_stones_in_rank = Us::road_stones(&self).rank(square.rank()).count();
+                let road_stones_in_file = Us::road_stones(&self).file(square.file()).count();
+
+                let n_low = u8::min(road_stones_in_file, road_stones_in_rank);
+                let n_high = u8::max(road_stones_in_file, road_stones_in_rank);
+                let i = (11 * n_low - n_low * n_low) / 2 + n_high - n_low;
+                debug_assert!(i < 15);
+                coefficients[ROAD_STONES_IN_RANK_FILE + i as usize] += 1.0;
 
                 // If square is next to a group
                 let mut our_unique_neighbour_groups: ArrayVec<[(Square, u8); 4]> = ArrayVec::new();
