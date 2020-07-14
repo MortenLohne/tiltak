@@ -65,8 +65,7 @@ impl Board {
         const DIAGONAL_TO_OUR_LAST_STONE: usize = NEXT_TO_THEIR_LAST_STONE + 1;
         const DIAGONAL_TO_THEIR_LAST_STONE: usize = DIAGONAL_TO_OUR_LAST_STONE + 1;
         const FLAT_PIECE_NEXT_TO_TWO_FLAT_PIECES: usize = DIAGONAL_TO_THEIR_LAST_STONE + 1;
-        const EXTEND_STRONG_RANK_FILE: usize = FLAT_PIECE_NEXT_TO_TWO_FLAT_PIECES + 1;
-        const ATTACK_FLATSTONE: usize = EXTEND_STRONG_RANK_FILE + 4;
+        const ATTACK_FLATSTONE: usize = FLAT_PIECE_NEXT_TO_TWO_FLAT_PIECES + 1;
         const ATTACK_STRONG_FLATSTONE: usize = ATTACK_FLATSTONE + 3;
 
         const BLOCKING_STONE_NEXT_TO_TWO_OF_THEIR_FLATS: usize = ATTACK_STRONG_FLATSTONE + 1;
@@ -175,21 +174,6 @@ impl Board {
                     >= 2
                 {
                     coefficients[FLAT_PIECE_NEXT_TO_TWO_FLAT_PIECES] = 1.0;
-                }
-
-                // Bonus for laying flatstones in rank/files where we already have stones
-                let road_pieces_in_rank = Us::road_stones(self).rank(square.rank());
-
-                if !road_pieces_in_rank.is_empty() {
-                    coefficients
-                        [EXTEND_STRONG_RANK_FILE + road_pieces_in_rank.count() as usize - 1] += 1.0;
-                }
-
-                let road_pieces_in_file = Us::road_stones(self).file(square.file());
-
-                if !road_pieces_in_file.is_empty() {
-                    coefficients
-                        [EXTEND_STRONG_RANK_FILE + road_pieces_in_file.count() as usize - 1] += 1.0;
                 }
 
                 // Bonus for "attacking" an enemy flatstone
