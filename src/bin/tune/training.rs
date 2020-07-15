@@ -416,8 +416,8 @@ pub fn games_and_move_scoress_from_file(
     let mut move_scoress = read_move_scores_from_file()?;
     let mut games = read_games_from_file()?;
 
-    move_scoress.truncate(6000);
-    games.truncate(6000);
+    move_scoress.truncate(4000);
+    games.truncate(4000);
 
     for (game, move_scores) in games.iter().zip(&move_scoress) {
         let mut board = game.start_board.clone();
