@@ -72,9 +72,9 @@ impl Board {
         const BLOCKING_STONE_BLOCKS_EXTENSIONS_OF_TWO_FLATS: usize =
             BLOCKING_STONE_NEXT_TO_TWO_OF_THEIR_FLATS + 1;
 
-        const MOVEMENT_BASE_BONUS: usize = BLOCKING_STONE_BLOCKS_EXTENSIONS_OF_TWO_FLATS + 1;
-        const STACK_MOVEMENT_THAT_GIVES_US_TOP_PIECES: usize = MOVEMENT_BASE_BONUS + 1;
-        const STACK_CAPTURED_BY_MOVEMENT: usize = STACK_MOVEMENT_THAT_GIVES_US_TOP_PIECES + 4;
+        const STACK_MOVEMENT_THAT_GIVES_US_TOP_PIECES: usize =
+            BLOCKING_STONE_BLOCKS_EXTENSIONS_OF_TWO_FLATS + 1;
+        const STACK_CAPTURED_BY_MOVEMENT: usize = STACK_MOVEMENT_THAT_GIVES_US_TOP_PIECES + 9;
         const _NEXT_CONST: usize = STACK_CAPTURED_BY_MOVEMENT + 1;
 
         assert_eq!(coefficients.len(), _NEXT_CONST);
@@ -237,8 +237,6 @@ impl Board {
                 }
             }
             Move::Move(square, direction, stack_movement) => {
-                coefficients[MOVEMENT_BASE_BONUS] = 1.0;
-
                 let mut destination_square =
                     if stack_movement.movements[0].pieces_to_take == self[*square].len() {
                         square.go_direction(*direction).unwrap()
@@ -262,6 +260,8 @@ impl Board {
 
                     let destination_stack = &self[destination_square];
                     if let Some(destination_top_stone) = destination_stack.top_stone() {
+                        // When a stack gets captured, give a linear bonus or malus depending on
+                        // whether it's captured by us or them
                         if piece.color() != destination_top_stone.color() {
                             if Us::piece_is_ours(piece) {
                                 coefficients[STACK_CAPTURED_BY_MOVEMENT] +=
@@ -278,8 +278,21 @@ impl Board {
                         .unwrap_or(destination_square);
                 }
 
-                if their_pieces == 0 && our_pieces > 1 {
-                    coefficients[STACK_MOVEMENT_THAT_GIVES_US_TOP_PIECES + our_pieces - 2] = 1.0;
+                if their_pieces == 0 {
+                    coefficients[STACK_MOVEMENT_THAT_GIVES_US_TOP_PIECES] = 1.0;
+                    coefficients[STACK_MOVEMENT_THAT_GIVES_US_TOP_PIECES + 1] = our_pieces as f32;
+                    coefficients[STACK_MOVEMENT_THAT_GIVES_US_TOP_PIECES + 2] =
+                        (our_pieces * our_pieces) as f32;
+                } else if their_pieces == 1 {
+                    coefficients[STACK_MOVEMENT_THAT_GIVES_US_TOP_PIECES + 3] = 1.0;
+                    coefficients[STACK_MOVEMENT_THAT_GIVES_US_TOP_PIECES + 4] = our_pieces as f32;
+                    coefficients[STACK_MOVEMENT_THAT_GIVES_US_TOP_PIECES + 5] =
+                        (our_pieces * our_pieces) as f32;
+                } else {
+                    coefficients[STACK_MOVEMENT_THAT_GIVES_US_TOP_PIECES + 6] = 1.0;
+                    coefficients[STACK_MOVEMENT_THAT_GIVES_US_TOP_PIECES + 7] = our_pieces as f32;
+                    coefficients[STACK_MOVEMENT_THAT_GIVES_US_TOP_PIECES + 8] =
+                        (our_pieces * our_pieces) as f32;
                 }
             }
         }
