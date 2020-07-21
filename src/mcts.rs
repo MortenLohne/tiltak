@@ -7,7 +7,8 @@ use board_game_traits::board::{Board as BoardTrait, Color, GameResult};
 use rand::Rng;
 use std::ops;
 
-const C_PUCT: Score = 1.0;
+const C_PUCT_INIT: Score = 1.0;
+const C_PUCT_BASE: Score = 1.0;
 
 /// Type alias for winning probability, used for scoring positions.
 pub type Score = f32;
@@ -108,12 +109,14 @@ impl Tree {
         best_children.sort_by_key(|(child, _)| child.visits);
         best_children.reverse();
         let parent_visits = self.visits;
+        let dynamic_cpuct =
+            C_PUCT_INIT + Score::ln((1.0 + self.visits as Score + C_PUCT_BASE) / C_PUCT_BASE);
 
         best_children.iter().take(8).for_each(|(child, mv)| {
             println!(
                 "Move {}: {} visits, {:.3} mean action value, {:.3} static score, {:.3} exploration value, pv {}",
                 mv, child.visits, child.mean_action_value, child.heuristic_score,
-                child.exploration_value((parent_visits as Score).sqrt()),
+                child.exploration_value((parent_visits as Score).sqrt(), dynamic_cpuct),
                 child.pv().map(|mv| mv.to_string() + " ").collect::<String>()
             )
         });
@@ -207,6 +210,8 @@ impl Tree {
             }
 
             let visits_sqrt = (self.visits as Score).sqrt();
+            let dynamic_cpuct =
+                C_PUCT_INIT + Score::ln((1.0 + self.visits as Score + C_PUCT_BASE) / C_PUCT_BASE);
 
             assert_ne!(
                 self.children.len(),
@@ -229,7 +234,8 @@ impl Tree {
                     }
                 // Otherwise, it loses, and it is never picked
                 } else {
-                    let child_exploration_value = child.exploration_value(visits_sqrt);
+                    let child_exploration_value =
+                        child.exploration_value(visits_sqrt, dynamic_cpuct);
                     if child_exploration_value >= best_exploration_value {
                         best_child_node_index = i;
                         best_exploration_value = child_exploration_value;
@@ -347,9 +353,9 @@ impl Tree {
     }
 
     #[inline]
-    fn exploration_value(&self, parent_visits_sqrt: Score) -> Score {
+    fn exploration_value(&self, parent_visits_sqrt: Score, cpuct: Score) -> Score {
         (1.0 - self.mean_action_value)
-            + C_PUCT * self.heuristic_score * parent_visits_sqrt / (1 + self.visits) as Score
+            + cpuct * self.heuristic_score * parent_visits_sqrt / (1 + self.visits) as Score
     }
 }
 
