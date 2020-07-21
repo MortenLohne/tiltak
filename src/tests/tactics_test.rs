@@ -63,22 +63,6 @@ fn tactic_test1() {
     plays_correct_hard_move_property(&move_strings, &["d5"]);
 }
 
-#[test]
-fn find_only_saving_move() {
-    let move_strings = [
-        "a5", "e2", "Cc3", "c2", "b3", "Cd3", "b2", "d1", "b1", "d4", "c4", "c2<", "d5", "c2",
-        "d2", "a2", "a3", "d3-", "b3-", "d3", "2b2>", "2d2<", "c5", "4c2<13", "b3", "3a2+", "b1+",
-        "c2<", "c2", "4b2>22", "b2", "d4<", "a4", "d4", "b4", "e4", "e5", "2c4<11", "b4<", "4a3+",
-        "c4", "5a4>14", "c3>", "5c4<",
-    ];
-
-    let mut board = Board::start_board();
-
-    do_moves_and_check_validity(&mut board, &move_strings);
-
-    plays_correct_hard_move_property(&move_strings, &["d3+"]);
-}
-
 #[cfg(test)]
 fn plays_correct_hard_move_property(move_strings: &[&str], correct_moves: &[&str]) {
     let mut board = Board::default();
