@@ -71,7 +71,7 @@ pub fn main() {
                             );
                         }
                         total_nodes += nodes_to_search;
-                        let (best_move, score) = tree.best_move(0.1);
+                        let (best_move, score) = tree.best_move();
                         println!(
                             "info depth {} seldepth {} score cp {} nodes {} time {} pv {}",
                             i / 2 + 1,

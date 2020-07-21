@@ -280,9 +280,6 @@ fn test_position() {
         if i % 100_000 == 0 {
             println!("{} visits, val={}", tree.visits, tree.mean_action_value);
             tree.print_info();
-            if i > 0 {
-                println!("A good move: {}", tree.best_move(1.0).0);
-            }
         }
     }
 }

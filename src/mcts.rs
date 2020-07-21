@@ -39,7 +39,7 @@ pub fn mcts(board: Board, nodes: u64) -> (Move, Score) {
             &mut moves,
         );
     }
-    let (mv, score) = tree.best_move(0.1);
+    let (mv, score) = tree.best_move();
     (mv, score)
 }
 
@@ -123,7 +123,21 @@ impl Tree {
         PV::new(self)
     }
 
-    pub fn best_move(&self, temperature: f64) -> (Move, Score) {
+    pub fn best_move(&self) -> (Move, Score) {
+        self.children
+            .iter()
+            .max_by_key(|(child, _)| {
+                if child.known_result == Some(GameResultForUs::Loss) {
+                    u64::max_value()
+                } else {
+                    child.visits
+                }
+            })
+            .map(|(child, mv)| (mv.clone(), 1.0 - child.mean_action_value))
+            .unwrap()
+    }
+
+    pub fn best_move_temperature(&self, temperature: f64) -> (Move, Score) {
         let mut rng = rand::thread_rng();
         let mut move_probabilities = vec![];
         let mut cumulative_prob = 0.0;
