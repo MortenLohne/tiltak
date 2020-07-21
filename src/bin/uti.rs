@@ -9,6 +9,14 @@ use taik::board::{Board, TunableBoard};
 use taik::mcts;
 
 pub fn main() {
+    loop {
+        let mut input = String::new();
+        io::stdin().read_line(&mut input).unwrap();
+        if input.trim() == "uti" {
+            break;
+        }
+    }
+
     println!("id name taik");
     println!("id author Morten Lohne");
     println!("utiok");
