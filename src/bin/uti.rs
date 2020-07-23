@@ -4,9 +4,10 @@ use std::io;
 use std::io::{BufRead, BufReader};
 use std::str::FromStr;
 use std::time::{Duration, Instant};
-use taik::board::{Board, TunableBoard};
+use taik::board::Board;
 
 use taik::mcts;
+use taik::mcts::MctsSetting;
 
 pub fn main() {
     loop {
@@ -58,14 +59,14 @@ pub fn main() {
                     let mut tree = mcts::Tree::new_root();
                     let mut simple_moves = vec![];
                     let mut moves = vec![];
+                    let settings = MctsSetting::default();
                     let mut total_nodes = 0;
                     for i in 0.. {
                         let nodes_to_search = (1000.0 * f64::powf(1.26, i as f64)) as u64;
                         for _ in 0..nodes_to_search {
                             tree.select(
                                 &mut position.clone(),
-                                Board::VALUE_PARAMS,
-                                Board::POLICY_PARAMS,
+                                &settings,
                                 &mut simple_moves,
                                 &mut moves,
                             );

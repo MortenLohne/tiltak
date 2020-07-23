@@ -31,6 +31,7 @@ use taik::board;
 use taik::board::Board;
 use taik::board::TunableBoard;
 use taik::mcts;
+use taik::mcts::MctsSetting;
 use taik::minmax;
 #[cfg(feature = "pgn-writer")]
 use taik::pgn_writer::Game;
@@ -269,17 +270,12 @@ fn test_position() {
     let mut tree = mcts::Tree::new_root();
     let mut simple_moves = vec![];
     let mut moves = vec![];
+    let settings = MctsSetting::default();
     for i in 0.. {
-        tree.select(
-            &mut board.clone(),
-            Board::VALUE_PARAMS,
-            Board::POLICY_PARAMS,
-            &mut simple_moves,
-            &mut moves,
-        );
+        tree.select(&mut board.clone(), &settings, &mut simple_moves, &mut moves);
         if i % 100_000 == 0 {
             println!("{} visits, val={}", tree.visits, tree.mean_action_value);
-            tree.print_info();
+            tree.print_info(&settings);
         }
     }
 }
@@ -409,8 +405,7 @@ fn mem_usage() {
     for _ in 0..2 {
         tree.select(
             &mut board,
-            Board::VALUE_PARAMS,
-            Board::POLICY_PARAMS,
+            &MctsSetting::default(),
             &mut vec![],
             &mut vec![],
         );

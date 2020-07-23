@@ -7,8 +7,23 @@ use board_game_traits::board::{Board as BoardTrait, Color, GameResult};
 use rand::Rng;
 use std::ops;
 
-const C_PUCT_INIT: Score = 1.0;
-const C_PUCT_BASE: Score = 1.0;
+pub struct MctsSetting {
+    value_params: Vec<f32>,
+    policy_params: Vec<f32>,
+    c_puct_init: Score,
+    c_puct_base: Score,
+}
+
+impl Default for MctsSetting {
+    fn default() -> Self {
+        MctsSetting {
+            value_params: Vec::from(Board::VALUE_PARAMS),
+            policy_params: Vec::from(Board::POLICY_PARAMS),
+            c_puct_init: 1.0,
+            c_puct_base: 1.0,
+        }
+    }
+}
 
 /// Type alias for winning probability, used for scoring positions.
 pub type Score = f32;
@@ -31,14 +46,10 @@ pub fn mcts(board: Board, nodes: u64) -> (Move, Score) {
     let mut tree = Tree::new_root();
     let mut moves = vec![];
     let mut simple_moves = vec![];
+    let settings = MctsSetting::default();
+
     for _ in 0..nodes.max(2) {
-        tree.select(
-            &mut board.clone(),
-            Board::VALUE_PARAMS,
-            Board::POLICY_PARAMS,
-            &mut simple_moves,
-            &mut moves,
-        );
+        tree.select(&mut board.clone(), &settings, &mut simple_moves, &mut moves);
     }
     let (mv, score) = tree.best_move();
     (mv, score)
@@ -54,14 +65,15 @@ pub fn mcts_training(
     let mut tree = Tree::new_root();
     let mut moves = vec![];
     let mut simple_moves = vec![];
+    let settings = MctsSetting {
+        value_params: Vec::from(value_params),
+        policy_params: Vec::from(policy_params),
+        c_puct_base: 1.0,
+        c_puct_init: 1.0,
+    };
+
     for _ in 0..nodes {
-        tree.select(
-            &mut board.clone(),
-            value_params,
-            policy_params,
-            &mut simple_moves,
-            &mut moves,
-        );
+        tree.select(&mut board.clone(), &settings, &mut simple_moves, &mut moves);
     }
     let child_visits: u64 = tree.children.iter().map(|(child, _)| child.visits).sum();
     tree.children
@@ -102,15 +114,15 @@ impl Tree {
     }
 
     /// Print human-readable information of the search's progress.
-    pub fn print_info(&self) {
+    pub fn print_info(&self, settings: &MctsSetting) {
         let mut best_children: Vec<&(Tree, Move)> =
             self.children.iter().map(|child| child).collect();
 
         best_children.sort_by_key(|(child, _)| child.visits);
         best_children.reverse();
         let parent_visits = self.visits;
-        let dynamic_cpuct =
-            C_PUCT_INIT + Score::ln((1.0 + self.visits as Score + C_PUCT_BASE) / C_PUCT_BASE);
+        let dynamic_cpuct = settings.c_puct_init
+            + Score::ln((1.0 + self.visits as Score + settings.c_puct_base) / settings.c_puct_base);
 
         best_children.iter().take(8).for_each(|(child, mv)| {
             println!(
@@ -180,8 +192,7 @@ impl Tree {
     pub fn select(
         &mut self,
         board: &mut Board,
-        value_params: &[f32],
-        policy_params: &[f32],
+        settings: &MctsSetting,
         simple_moves: &mut Vec<Move>,
         moves: &mut Vec<(Move, Score)>,
     ) -> SearchResult {
@@ -190,7 +201,7 @@ impl Tree {
             self.total_action_value += self.mean_action_value as f64;
             SearchResult::Value(self.mean_action_value)
         } else if self.visits == 0 {
-            self.expand(board, value_params)
+            self.expand(board, &settings.value_params)
         } else {
             debug_assert_eq!(
                 self.visits,
@@ -206,12 +217,14 @@ impl Tree {
             );
             // Only generate child moves on the 2nd visit
             if self.visits == 1 {
-                self.init_children(&board, simple_moves, policy_params, moves);
+                self.init_children(&board, simple_moves, &settings.policy_params, moves);
             }
 
             let visits_sqrt = (self.visits as Score).sqrt();
-            let dynamic_cpuct =
-                C_PUCT_INIT + Score::ln((1.0 + self.visits as Score + C_PUCT_BASE) / C_PUCT_BASE);
+            let dynamic_cpuct = settings.c_puct_init
+                + Score::ln(
+                    (1.0 + self.visits as Score + settings.c_puct_base) / settings.c_puct_base,
+                );
 
             assert_ne!(
                 self.children.len(),
@@ -262,7 +275,7 @@ impl Tree {
                 result_to_propagate
             } else {
                 board.do_move(mv.clone());
-                let result = !child.select(board, value_params, policy_params, simple_moves, moves);
+                let result = !child.select(board, settings, simple_moves, moves);
 
                 // If a child node is discovered to be winning for us, this node is also a forced win
                 // The result from selecting the child does not matter. This node will never be selected again,
