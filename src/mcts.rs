@@ -25,6 +25,17 @@ impl Default for MctsSetting {
     }
 }
 
+impl MctsSetting {
+    pub fn with_params(value_params: Vec<f32>, policy_params: Vec<f32>) -> Self {
+        MctsSetting {
+            value_params,
+            policy_params,
+            c_puct_init: 1.0,
+            c_puct_base: 1.0,
+        }
+    }
+}
+
 /// Type alias for winning probability, used for scoring positions.
 pub type Score = f32;
 
@@ -56,21 +67,10 @@ pub fn mcts(board: Board, nodes: u64) -> (Move, Score) {
 }
 
 /// Run mcts with specific static evaluation parameters, for optimization the parameter set.
-pub fn mcts_training(
-    board: Board,
-    nodes: u64,
-    value_params: &[f32],
-    policy_params: &[f32],
-) -> Vec<(Move, Score)> {
+pub fn mcts_training(board: Board, nodes: u64, settings: &MctsSetting) -> Vec<(Move, Score)> {
     let mut tree = Tree::new_root();
     let mut moves = vec![];
     let mut simple_moves = vec![];
-    let settings = MctsSetting {
-        value_params: Vec::from(value_params),
-        policy_params: Vec::from(policy_params),
-        c_puct_base: 1.0,
-        c_puct_init: 1.0,
-    };
 
     for _ in 0..nodes {
         tree.select(&mut board.clone(), &settings, &mut simple_moves, &mut moves);

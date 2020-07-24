@@ -4,16 +4,14 @@ use rayon::prelude::*;
 use std::io;
 use std::sync::atomic::{AtomicU64, Ordering};
 use taik::board::{Board, Move};
-use taik::mcts::Score;
+use taik::mcts::{MctsSetting, Score};
 use taik::pgn_writer::Game;
 use taik::{mcts, pgn_writer};
 
-/// Play a single training game between the same parameter set
+/// Play a single training game between two parameter sets
 pub fn play_game(
-    white_value_params: &[f32],
-    white_policy_params: &[f32],
-    black_value_params: &[f32],
-    black_policy_params: &[f32],
+    white_settings: &MctsSetting,
+    black_settings: &MctsSetting,
 ) -> (Game<Board>, Vec<Vec<(Move, Score)>>) {
     const MCTS_NODES: u64 = 10_000;
     const TEMPERATURE: f64 = 1.0;
@@ -29,18 +27,8 @@ pub fn play_game(
         }
 
         let moves_scores = match board.side_to_move() {
-            Color::White => mcts::mcts_training(
-                board.clone(),
-                MCTS_NODES,
-                white_value_params,
-                white_policy_params,
-            ),
-            Color::Black => mcts::mcts_training(
-                board.clone(),
-                MCTS_NODES,
-                black_value_params,
-                black_policy_params,
-            ),
+            Color::White => mcts::mcts_training(board.clone(), MCTS_NODES, white_settings),
+            Color::Black => mcts::mcts_training(board.clone(), MCTS_NODES, black_settings),
         };
         // Turn off temperature in the middle-game, when all games are expected to be unique
         let best_move = if board.half_moves_played() < 20 {
@@ -96,6 +84,10 @@ pub fn play_match_between_params(
 ) -> ! {
     const NODES: u64 = 100_000;
     const TEMPERATURE: f64 = 0.8;
+    let player1_settings =
+        MctsSetting::with_params(value_params1.to_vec(), policy_params1.to_vec());
+    let player2_settings =
+        MctsSetting::with_params(value_params2.to_vec(), policy_params2.to_vec());
 
     let player1_wins = AtomicU64::new(0);
     let player2_wins = AtomicU64::new(0);
@@ -108,13 +100,10 @@ pub fn play_match_between_params(
             if board.half_moves_played() > 200 {
                 break;
             }
+
             let moves_scores = match board.side_to_move() {
-                Color::White => {
-                    mcts::mcts_training(board.clone(), NODES, value_params1, policy_params1)
-                }
-                Color::Black => {
-                    mcts::mcts_training(board.clone(), NODES, value_params2, policy_params2)
-                }
+                Color::White => mcts::mcts_training(board.clone(), NODES, &player1_settings),
+                Color::Black => mcts::mcts_training(board.clone(), NODES, &player2_settings),
             };
             let best_move = best_move(TEMPERATURE, &moves_scores[..]);
             board.do_move(best_move);
@@ -134,12 +123,8 @@ pub fn play_match_between_params(
                 break;
             }
             let moves_scores = match board.side_to_move() {
-                Color::White => {
-                    mcts::mcts_training(board.clone(), NODES, value_params2, policy_params2)
-                }
-                Color::Black => {
-                    mcts::mcts_training(board.clone(), NODES, value_params1, policy_params1)
-                }
+                Color::White => mcts::mcts_training(board.clone(), NODES, &player2_settings),
+                Color::Black => mcts::mcts_training(board.clone(), NODES, &player1_settings),
             };
             let best_move = best_move(TEMPERATURE, &moves_scores[..]);
             board.do_move(best_move.clone());

@@ -13,6 +13,7 @@ use std::time;
 use std::{error, fs, io, iter};
 use taik::board::TunableBoard;
 use taik::board::{Board, Move};
+use taik::mcts::MctsSetting;
 use taik::pgn_writer::Game;
 
 // The score, or probability of being played, for a given move
@@ -188,13 +189,11 @@ fn play_game_pair(
     last_params_wins: &AtomicU64,
     i: usize,
 ) -> (Game<Board>, Vec<Vec<(Move, f32)>>) {
+    let settings = MctsSetting::with_params(value_params.to_vec(), policy_params.to_vec());
+    let last_settings =
+        MctsSetting::with_params(last_value_params.to_vec(), last_policy_params.to_vec());
     if i % 2 == 0 {
-        let game = play_game(
-            &value_params,
-            &policy_params,
-            &last_value_params,
-            &last_policy_params,
-        );
+        let game = play_game(&settings, &last_settings);
         match game.0.game_result {
             Some(GameResult::WhiteWin) => {
                 current_params_wins.fetch_add(1, Ordering::Relaxed);
@@ -206,12 +205,7 @@ fn play_game_pair(
         };
         game
     } else {
-        let game = play_game(
-            &last_value_params,
-            &last_policy_params,
-            &value_params,
-            &policy_params,
-        );
+        let game = play_game(&last_settings, &settings);
         match game.0.game_result {
             Some(GameResult::BlackWin) => {
                 current_params_wins.fetch_add(1, Ordering::Relaxed);
