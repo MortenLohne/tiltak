@@ -85,9 +85,9 @@ pub fn play_match_between_params(
     const NODES: u64 = 100_000;
     const TEMPERATURE: f64 = 0.8;
     let player1_settings =
-        MctsSetting::with_params(value_params1.to_vec(), policy_params1.to_vec());
+        MctsSetting::with_eval_params(value_params1.to_vec(), policy_params1.to_vec());
     let player2_settings =
-        MctsSetting::with_params(value_params2.to_vec(), policy_params2.to_vec());
+        MctsSetting::with_eval_params(value_params2.to_vec(), policy_params2.to_vec());
 
     let player1_wins = AtomicU64::new(0);
     let player2_wins = AtomicU64::new(0);

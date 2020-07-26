@@ -10,8 +10,7 @@ use std::ops;
 pub struct MctsSetting {
     value_params: Vec<f32>,
     policy_params: Vec<f32>,
-    c_puct_init: Score,
-    c_puct_base: Score,
+    search_params: Vec<Score>,
 }
 
 impl Default for MctsSetting {
@@ -19,20 +18,34 @@ impl Default for MctsSetting {
         MctsSetting {
             value_params: Vec::from(Board::VALUE_PARAMS),
             policy_params: Vec::from(Board::POLICY_PARAMS),
-            c_puct_init: 1.0,
-            c_puct_base: 1.0,
+            search_params: vec![1.0, 1.0],
         }
     }
 }
 
 impl MctsSetting {
-    pub fn with_params(value_params: Vec<f32>, policy_params: Vec<f32>) -> Self {
+    pub fn with_eval_params(value_params: Vec<f32>, policy_params: Vec<f32>) -> Self {
         MctsSetting {
             value_params,
             policy_params,
-            c_puct_init: 1.0,
-            c_puct_base: 1.0,
+            search_params: vec![1.0, 1.0],
         }
+    }
+
+    pub fn with_search_params(search_params: Vec<Score>) -> Self {
+        MctsSetting {
+            value_params: Vec::from(Board::VALUE_PARAMS),
+            policy_params: Vec::from(Board::POLICY_PARAMS),
+            search_params,
+        }
+    }
+
+    pub fn c_puct_init(&self) -> Score {
+        self.search_params[0]
+    }
+
+    pub fn c_puct_base(&self) -> Score {
+        self.search_params[1]
     }
 }
 
@@ -121,8 +134,10 @@ impl Tree {
         best_children.sort_by_key(|(child, _)| child.visits);
         best_children.reverse();
         let parent_visits = self.visits;
-        let dynamic_cpuct = settings.c_puct_init
-            + Score::ln((1.0 + self.visits as Score + settings.c_puct_base) / settings.c_puct_base);
+        let dynamic_cpuct = settings.c_puct_init()
+            + Score::ln(
+                (1.0 + self.visits as Score + settings.c_puct_base()) / settings.c_puct_base(),
+            );
 
         best_children.iter().take(8).for_each(|(child, mv)| {
             println!(
@@ -221,9 +236,9 @@ impl Tree {
             }
 
             let visits_sqrt = (self.visits as Score).sqrt();
-            let dynamic_cpuct = settings.c_puct_init
+            let dynamic_cpuct = settings.c_puct_init()
                 + Score::ln(
-                    (1.0 + self.visits as Score + settings.c_puct_base) / settings.c_puct_base,
+                    (1.0 + self.visits as Score + settings.c_puct_base()) / settings.c_puct_base(),
                 );
 
             assert_ne!(

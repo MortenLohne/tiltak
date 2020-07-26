@@ -189,9 +189,9 @@ fn play_game_pair(
     last_params_wins: &AtomicU64,
     i: usize,
 ) -> (Game<Board>, Vec<Vec<(Move, f32)>>) {
-    let settings = MctsSetting::with_params(value_params.to_vec(), policy_params.to_vec());
+    let settings = MctsSetting::with_eval_params(value_params.to_vec(), policy_params.to_vec());
     let last_settings =
-        MctsSetting::with_params(last_value_params.to_vec(), last_policy_params.to_vec());
+        MctsSetting::with_eval_params(last_value_params.to_vec(), last_policy_params.to_vec());
     if i % 2 == 0 {
         let game = play_game(&settings, &last_settings);
         match game.0.game_result {
