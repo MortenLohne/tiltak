@@ -22,7 +22,10 @@ use std::path::Path;
 #[cfg(feature = "constant-tuning")]
 use crate::tune::play_match::play_match_between_params;
 #[cfg(feature = "constant-tuning")]
+use crate::tune::spsa;
+#[cfg(feature = "constant-tuning")]
 use crate::tune::training;
+
 use board_game_traits::board::Board as BoardTrait;
 use board_game_traits::board::{Color, GameResult};
 use pgn_traits::pgn::PgnBoard;
@@ -57,6 +60,18 @@ fn main() {
         "analyze" => test_position(),
         "mem_usage" => mem_usage(),
         "bench" => bench(),
+        #[cfg(feature = "constant-tuning")]
+        "spsa" => {
+            let mut variables = vec![
+                spsa::Variable {
+                    init: 1.0,
+                    delta: 0.2,
+                    apply_factor: 0.002
+                };
+                2
+            ];
+            spsa::tune(&mut variables);
+        }
         #[cfg(feature = "constant-tuning")]
         "train_from_scratch" => {
             for i in 0.. {
