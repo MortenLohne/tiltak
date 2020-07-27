@@ -42,9 +42,10 @@ pub fn tune(variables: &mut [Variable]) {
             }
         }
 
-        if i % 10 == 0 {
+        if i % 100 == 0 {
             println!(
-                "Variables: {:?}",
+                "{}: Variables: {:?}",
+                i,
                 mutex_variables
                     .lock()
                     .unwrap()
