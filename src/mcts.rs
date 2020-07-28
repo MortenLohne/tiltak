@@ -18,7 +18,7 @@ impl Default for MctsSetting {
         MctsSetting {
             value_params: Vec::from(Board::VALUE_PARAMS),
             policy_params: Vec::from(Board::POLICY_PARAMS),
-            search_params: vec![0.63, 2.01],
+            search_params: vec![0.71, 2.60],
         }
     }
 }
@@ -28,7 +28,7 @@ impl MctsSetting {
         MctsSetting {
             value_params,
             policy_params,
-            search_params: vec![0.63, 2.01],
+            search_params: vec![0.71, 2.60],
         }
     }
 
