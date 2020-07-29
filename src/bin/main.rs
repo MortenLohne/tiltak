@@ -64,12 +64,12 @@ fn main() {
         "spsa" => {
             let mut variables = vec![
                 spsa::Variable {
-                    init: 0.72,
+                    value: 0.72,
                     delta: 0.1,
                     apply_factor: 0.001,
                 },
                 spsa::Variable {
-                    init: 10000.0,
+                    value: 10000.0,
                     delta: 2000.0,
                     apply_factor: 0.002,
                 },

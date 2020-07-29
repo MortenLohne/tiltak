@@ -1,3 +1,5 @@
+/// Tune search variable using a version of SPSA (Simultaneous perturbation stochastic approximation),
+/// similar to [Stockfish's tuning method](https://www.chessprogramming.org/Stockfish%27s_Tuning_Method)
 use crate::tune::play_match::play_game;
 use board_game_traits::board::GameResult;
 use rand::SeedableRng;
@@ -7,18 +9,20 @@ use taik::mcts::MctsSetting;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Variable {
-    pub init: f32,
+    pub value: f32,
     pub delta: f32,
     pub apply_factor: f32,
 }
 
+/// In each iteration of SPSA, each variable can be increased, decreased or left unchanged.
 #[derive(Clone, Copy, Debug, PartialEq)]
-enum SPSAGameResult {
+enum SPSADirection {
     Increase,
     Decrease,
     NoChange,
 }
 
+/// Tune the variables indefinitely
 pub fn tune(variables: &mut [Variable]) {
     let mutex_variables = Mutex::new(variables);
 
@@ -31,13 +35,13 @@ pub fn tune(variables: &mut [Variable]) {
             let mut mut_variables = mutex_variables.lock().unwrap();
             for (variable, result) in (*mut_variables).iter_mut().zip(&result) {
                 match result {
-                    SPSAGameResult::Increase => {
-                        variable.init += variable.init * variable.apply_factor
+                    SPSADirection::Increase => {
+                        variable.value += variable.value * variable.apply_factor
                     }
-                    SPSAGameResult::Decrease => {
-                        variable.init -= variable.init * variable.apply_factor
+                    SPSADirection::Decrease => {
+                        variable.value -= variable.value * variable.apply_factor
                     }
-                    SPSAGameResult::NoChange => (),
+                    SPSADirection::NoChange => (),
                 }
             }
         }
@@ -50,23 +54,24 @@ pub fn tune(variables: &mut [Variable]) {
                     .lock()
                     .unwrap()
                     .iter()
-                    .map(|variable| variable.init)
+                    .map(|variable| variable.value)
                     .collect::<Vec<_>>()
             );
         }
     })
 }
 
-fn tuning_iteration<R: rand::Rng>(variables: &[Variable], rng: &mut R) -> Vec<SPSAGameResult> {
+/// Run one iteration of the SPSA algorithm
+fn tuning_iteration<R: rand::Rng>(variables: &[Variable], rng: &mut R) -> Vec<SPSADirection> {
     let (player1_variables, player2_variables): (
-        Vec<(SPSAGameResult, f32)>,
-        Vec<(SPSAGameResult, f32)>,
+        Vec<(SPSADirection, f32)>,
+        Vec<(SPSADirection, f32)>,
     ) = variables
         .iter()
         .map(|variable| {
             (
-                (SPSAGameResult::Increase, variable.init + variable.delta),
-                (SPSAGameResult::Decrease, variable.init - variable.delta),
+                (SPSADirection::Increase, variable.value + variable.delta),
+                (SPSADirection::Decrease, variable.value - variable.delta),
             )
         })
         .map(|(a, b)| if rng.gen() { (a, b) } else { (b, a) })
@@ -77,21 +82,10 @@ fn tuning_iteration<R: rand::Rng>(variables: &[Variable], rng: &mut R) -> Vec<SP
     let player2_settings =
         MctsSetting::with_search_params(player2_variables.iter().map(|(_, a)| *a).collect());
 
-    if rng.gen() {
-        let (game, _) = play_game(&player1_settings, &player2_settings);
-        match game.game_result {
-            None => vec![SPSAGameResult::NoChange; variables.len()],
-            Some(GameResult::WhiteWin) => player1_variables.iter().map(|(a, _)| *a).collect(),
-            Some(GameResult::BlackWin) => player2_variables.iter().map(|(a, _)| *a).collect(),
-            Some(GameResult::Draw) => vec![SPSAGameResult::NoChange; variables.len()],
-        }
-    } else {
-        let (game, _) = play_game(&player2_settings, &player1_settings);
-        match game.game_result {
-            None => vec![SPSAGameResult::NoChange; variables.len()],
-            Some(GameResult::WhiteWin) => player2_variables.iter().map(|(a, _)| *a).collect(),
-            Some(GameResult::BlackWin) => player1_variables.iter().map(|(a, _)| *a).collect(),
-            Some(GameResult::Draw) => vec![SPSAGameResult::NoChange; variables.len()],
-        }
+    let (game, _) = play_game(&player1_settings, &player2_settings);
+    match game.game_result {
+        Some(GameResult::WhiteWin) => player1_variables.iter().map(|(a, _)| *a).collect(),
+        Some(GameResult::BlackWin) => player2_variables.iter().map(|(a, _)| *a).collect(),
+        None | Some(GameResult::Draw) => vec![SPSADirection::NoChange; variables.len()],
     }
 }
