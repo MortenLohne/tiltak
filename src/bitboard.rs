@@ -1,7 +1,10 @@
 use crate::board::BOARD_SIZE;
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
 use std::{fmt, ops};
 
 #[derive(PartialEq, Eq, Clone, Copy, Hash, Default)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub(crate) struct BitBoard {
     pub board: u64,
 }
