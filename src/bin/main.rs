@@ -14,10 +14,10 @@ mod tests;
 pub mod playtak;
 pub mod uti;
 
-use std::io;
 use std::io::Write;
 #[cfg(feature = "constant-tuning")]
 use std::path::Path;
+use std::{io, time};
 
 #[cfg(feature = "constant-tuning")]
 use crate::tune::play_match::play_match_between_params;
@@ -60,6 +60,7 @@ fn main() {
         "analyze" => test_position(),
         "mem_usage" => mem_usage(),
         "bench" => bench(),
+        "selfplay" => mcts_selfplay(time::Duration::from_secs(10)),
         #[cfg(feature = "constant-tuning")]
         "spsa" => {
             let mut variables = vec![
@@ -194,6 +195,57 @@ fn main() {
         }
         s => println!("Unknown option \"{}\"", s),
     }
+}
+
+fn mcts_selfplay(max_time: time::Duration) {
+    let mut board = Board::default();
+    let mut moves = vec![];
+
+    let mut white_elapsed = time::Duration::default();
+    let mut black_elapsed = time::Duration::default();
+
+    while board.game_result().is_none() {
+        let start_time = time::Instant::now();
+        let (best_move, score) = mcts::play_move_time(board.clone(), max_time);
+
+        match board.side_to_move() {
+            Color::White => white_elapsed += start_time.elapsed(),
+            Color::Black => black_elapsed += start_time.elapsed(),
+        }
+
+        board.do_move(best_move.clone());
+        moves.push(best_move.clone());
+        println!(
+            "{:6}: {:.3}, {:.1}ms",
+            best_move,
+            score,
+            start_time.elapsed().as_secs_f32()
+        );
+        io::stdout().flush().unwrap();
+    }
+
+    println!(
+        "{:.1} used by white, {:.1} for black",
+        white_elapsed.as_secs_f32(),
+        black_elapsed.as_secs_f32()
+    );
+
+    print!("\n[");
+    for mv in moves.iter() {
+        print!("\"{:?}\", ", mv);
+    }
+    println!("]");
+
+    for (ply, mv) in moves.iter().enumerate() {
+        if ply % 2 == 0 {
+            print!("{}. {:?} ", ply / 2 + 1, mv);
+        } else {
+            println!("{:?}", mv);
+        }
+    }
+    println!();
+
+    println!("\n{:?}\nResult: {:?}", board, board.game_result());
 }
 
 fn mcts_vs_minmax(minmax_depth: u16, mcts_nodes: u64) {
@@ -353,7 +405,6 @@ fn play_human(mut board: Board) {
 }
 
 fn bench() {
-    use std::time;
     const NODES: u64 = 1_000_000;
     let start_time = time::Instant::now();
     {

@@ -5,7 +5,7 @@
 use crate::board::{Board, Move, TunableBoard};
 use board_game_traits::board::{Board as BoardTrait, Color, GameResult};
 use rand::Rng;
-use std::ops;
+use std::{ops, time};
 
 pub struct MctsSetting {
     value_params: Vec<f32>,
@@ -77,6 +77,53 @@ pub fn mcts(board: Board, nodes: u64) -> (Move, Score) {
     }
     let (mv, score) = tree.best_move();
     (mv, score)
+}
+
+/// Play a move, calculating for a maximum duration.
+/// It will usually spend much less time, especially if the move is obvious.
+/// On average, it will spend around 20% of `max_time`, and rarely more than 50%.
+pub fn play_move_time(board: Board, max_time: time::Duration) -> (Move, Score) {
+    let mut tree = Tree::new_root();
+    let settings = MctsSetting::default();
+    let mut simple_moves = vec![];
+    let mut moves = vec![];
+    let start_time = time::Instant::now();
+
+    for i in 1.. {
+        for _ in 0..i * 100 {
+            tree.select(&mut board.clone(), &settings, &mut simple_moves, &mut moves);
+        }
+
+        let (best_move, best_score) = tree.best_move();
+
+        if best_score > 0.999
+            || best_score < 0.001
+            || start_time.elapsed() > max_time - time::Duration::from_millis(50)
+            || tree.children.len() == 1
+        {
+            return tree.best_move();
+        }
+
+        let mut child_refs: Vec<&(Tree, Move)> = tree.children.iter().collect();
+        child_refs.sort_by_key(|(child, _)| child.visits);
+        child_refs.reverse();
+
+        let node_ratio = child_refs[1].0.visits as f32 / child_refs[0].0.visits as f32;
+        let time_ratio = start_time.elapsed().as_secs_f32() / max_time.as_secs_f32();
+
+        if time_ratio.powf(2.0) > node_ratio / 2.0 {
+            // Do not stop if any other child nodes have better action value
+            if tree
+                .children
+                .iter()
+                .any(|(child, mv)| *mv != best_move && 1.0 - child.mean_action_value > best_score)
+            {
+                continue;
+            }
+            return (best_move, best_score);
+        }
+    }
+    unreachable!()
 }
 
 /// Run mcts with specific static evaluation parameters, for optimization the parameter set.
