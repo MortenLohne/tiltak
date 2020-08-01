@@ -56,7 +56,7 @@ impl Board {
         const FLAT_STONE_PSQT: usize = MOVE_COUNT + 1;
         const STANDING_STONE_PSQT: usize = FLAT_STONE_PSQT + 6;
         const CAPSTONE_PSQT: usize = STANDING_STONE_PSQT + 6;
-        const ROAD_STONES_IN_RANK_FILE: usize = CAPSTONE_PSQT + 6;
+        const ROAD_STONES_IN_RANK_FILE: usize = CAPSTONE_PSQT + 1;
         const EXTEND_GROUP: usize = ROAD_STONES_IN_RANK_FILE + 15;
         const MERGE_TWO_GROUPS: usize = EXTEND_GROUP + 1;
         const BLOCK_MERGER: usize = MERGE_TWO_GROUPS + 1;
@@ -203,7 +203,7 @@ impl Board {
                 if *role == Standing {
                     coefficients[STANDING_STONE_PSQT + SQUARE_SYMMETRIES[square.0 as usize]] = 1.0;
                 } else if *role == Cap {
-                    coefficients[CAPSTONE_PSQT + SQUARE_SYMMETRIES[square.0 as usize]] = 1.0;
+                    coefficients[CAPSTONE_PSQT] = 1.0;
                 } else {
                     unreachable!(
                         "Tried to place {:?} with move {} on board\n{:?}",
