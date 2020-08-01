@@ -211,7 +211,12 @@ impl Tree {
                 }
             })
             .map(|(child, mv)| (mv.clone(), 1.0 - child.mean_action_value))
-            .unwrap()
+            .unwrap_or_else(|| {
+                panic!(
+                    "Couldn't find best move for node{:?}",
+                    self.shallow_clone(2)
+                )
+            })
     }
 
     pub fn best_move_temperature(&self, temperature: f64) -> (Move, Score) {
