@@ -13,7 +13,7 @@ pub fn play_game(
     white_settings: &MctsSetting,
     black_settings: &MctsSetting,
 ) -> (Game<Board>, Vec<Vec<(Move, Score)>>) {
-    const MCTS_NODES: u64 = 10_000;
+    const MCTS_NODES: u64 = 100_000;
     const TEMPERATURE: f64 = 1.0;
 
     let mut board = Board::start_board();

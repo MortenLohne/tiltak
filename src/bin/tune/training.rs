@@ -47,7 +47,7 @@ pub fn train_perpetually(
 ) -> Result<(), Box<dyn error::Error>> {
     const BATCH_SIZE: usize = 100;
     // Only train from the last n batches
-    const BATCHES_FOR_TRAINING: usize = 5;
+    const BATCHES_FOR_TRAINING: usize = 10;
 
     let mut all_games = vec![];
     let mut all_move_scores = vec![];
