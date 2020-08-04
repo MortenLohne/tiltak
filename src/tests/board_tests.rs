@@ -456,8 +456,8 @@ fn group_connection_test() {
 
     let a1_connection = group_connection.connect_square(Square::parse_square("a1"));
 
-    assert!(a1_connection.is_connected_south());
-    assert!(a1_connection.is_connected_east());
-    assert!(!a1_connection.is_connected_north());
-    assert!(!a1_connection.is_connected_west());
+    assert!(!a1_connection.is_connected_south());
+    assert!(!a1_connection.is_connected_east());
+    assert!(a1_connection.is_connected_north());
+    assert!(a1_connection.is_connected_west());
 }

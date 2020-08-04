@@ -134,7 +134,8 @@ impl Board {
                 }
 
                 for (_, group_id) in our_unique_neighbour_groups {
-                    coefficients[EXTEND_GROUP] += self.amount_in_group()[group_id as usize] as f32;
+                    coefficients[EXTEND_GROUP] +=
+                        self.amount_in_group()[group_id as usize].0 as f32;
                 }
 
                 // If square is next to a road stone laid on our last turn

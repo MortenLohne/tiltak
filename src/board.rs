@@ -600,8 +600,13 @@ impl GroupEdgeConnection {
         edge_connection
     }
 
+    pub fn is_winning(self) -> bool {
+        self.is_connected_north() && self.is_connected_south()
+            || self.is_connected_east() && self.is_connected_west()
+    }
+
     pub fn is_connected_north(self) -> bool {
-        self.data & 0b1000 == 0
+        self.data & 0b1000 != 0
     }
 
     pub fn connect_north(self) -> Self {
@@ -611,7 +616,7 @@ impl GroupEdgeConnection {
     }
 
     pub fn is_connected_west(self) -> bool {
-        self.data & 0b100 == 0
+        self.data & 0b100 != 0
     }
 
     pub fn connect_west(self) -> Self {
@@ -621,7 +626,7 @@ impl GroupEdgeConnection {
     }
 
     pub fn is_connected_east(self) -> bool {
-        self.data & 0b10 == 0
+        self.data & 0b10 != 0
     }
 
     pub fn connect_east(self) -> Self {
@@ -631,7 +636,7 @@ impl GroupEdgeConnection {
     }
 
     pub fn is_connected_south(self) -> bool {
-        self.data & 1 == 0
+        self.data & 1 != 0
     }
 
     pub fn connect_south(self) -> Self {
@@ -659,7 +664,7 @@ pub struct Board {
     moves_played: u16,
     moves: Vec<Move>,
     groups: AbstractBoard<u8>,
-    amount_in_group: [u8; BOARD_AREA + 1],
+    amount_in_group: [(u8, GroupEdgeConnection); BOARD_AREA + 1],
 }
 
 impl Index<Square> for Board {
@@ -694,9 +699,9 @@ impl Default for Board {
             moves_played: 0,
             moves: vec![],
             groups: Default::default(),
-            amount_in_group: [0; BOARD_AREA + 1],
+            amount_in_group: [(0, GroupEdgeConnection::default()); BOARD_AREA + 1],
         };
-        board.amount_in_group[0] = BOARD_AREA as u8;
+        board.amount_in_group[0] = (BOARD_AREA as u8, GroupEdgeConnection::default());
         board
     }
 }
@@ -780,7 +785,7 @@ impl Board {
         &self.groups
     }
 
-    pub(crate) fn amount_in_group(&self) -> &[u8; BOARD_AREA + 1] {
+    pub(crate) fn amount_in_group(&self) -> &[(u8, GroupEdgeConnection); BOARD_AREA + 1] {
         &self.amount_in_group
     }
 
@@ -939,10 +944,16 @@ impl Board {
             &mut highest_component_id,
         );
 
-        self.amount_in_group = [0; BOARD_AREA + 1];
+        self.amount_in_group = Default::default();
 
         for square in squares_iterator() {
-            self.amount_in_group[self.groups[square] as usize] += 1;
+            self.amount_in_group[self.groups[square] as usize].0 += 1;
+            if self[square].top_stone().map(Piece::is_road_piece) == Some(true) {
+                self.amount_in_group[self.groups[square] as usize].1 = self.amount_in_group
+                    [self.groups[square] as usize]
+                    .1
+                    .connect_square(square);
+            }
         }
     }
 
@@ -1434,23 +1445,33 @@ impl board::Board for Board {
     }
 
     fn game_result(&self) -> Option<GameResult> {
-        let highest_component_id = self
+        if self
             .amount_in_group
             .iter()
-            .enumerate()
-            .skip(1)
-            .find(|(_i, v)| **v == 0)
-            .map(|(i, _v)| i)
-            .unwrap_or(BOARD_AREA + 1) as u8;
+            .any(|(_, group_connection)| group_connection.is_winning())
+        {
+            let highest_component_id = self
+                .amount_in_group
+                .iter()
+                .enumerate()
+                .skip(1)
+                .find(|(_i, v)| (**v).0 == 0)
+                .map(|(i, _v)| i)
+                .unwrap_or(BOARD_AREA + 1) as u8;
 
-        if let Some(square) = self.is_win_by_road(&self.groups, highest_component_id) {
-            debug_assert!(self[square].top_stone().unwrap().is_road_piece());
-            return if self[square].top_stone().unwrap().color() == Color::White {
-                Some(GameResult::WhiteWin)
-            } else {
-                Some(GameResult::BlackWin)
+            if let Some(square) = self.is_win_by_road(&self.groups, highest_component_id) {
+                debug_assert!(self[square].top_stone().unwrap().is_road_piece());
+                return if self[square].top_stone().unwrap().color() == Color::White {
+                    Some(GameResult::WhiteWin)
+                } else {
+                    Some(GameResult::BlackWin)
+                };
             };
-        };
+            unreachable!(
+                "Board has winning connection, but isn't winning\n{:?}",
+                self
+            )
+        }
 
         if (self.white_stones_left == 0 && self.white_capstones_left == 0)
             || (self.black_stones_left == 0 && self.black_capstones_left == 0)
