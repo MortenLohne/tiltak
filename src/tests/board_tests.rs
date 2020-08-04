@@ -1,5 +1,8 @@
 use crate::board::Piece::{BlackCap, BlackFlat, WhiteFlat, WhiteStanding};
-use crate::board::{squares_iterator, Board, Direction::*, Move, Piece, Role, Square, BOARD_SIZE};
+use crate::board::{
+    squares_iterator, Board, Direction::*, GroupEdgeConnection, Move, Piece, Role, Square,
+    BOARD_SIZE,
+};
 use crate::tests::do_moves_and_check_validity;
 use crate::{board as board_mod, board};
 use board_game_traits::board::{Board as BoardTrait, EvalBoard};
@@ -445,4 +448,16 @@ fn square_rank_file_test() {
             board.reverse_move(reverse_move);
         }
     }
+}
+
+#[test]
+fn group_connection_test() {
+    let group_connection = GroupEdgeConnection::default();
+
+    let a1_connection = group_connection.connect_square(Square::parse_square("a1"));
+
+    assert!(a1_connection.is_connected_south());
+    assert!(a1_connection.is_connected_east());
+    assert!(!a1_connection.is_connected_north());
+    assert!(!a1_connection.is_connected_west());
 }

@@ -577,6 +577,70 @@ pub struct Movement {
     pub pieces_to_take: u8,
 }
 
+#[derive(Default, Clone, Copy, PartialEq, Eq, Debug)]
+pub struct GroupEdgeConnection {
+    data: u8,
+}
+
+impl GroupEdgeConnection {
+    pub fn connect_square(self, square: Square) -> Self {
+        let mut edge_connection = self;
+        if square.rank() == BOARD_SIZE as u8 - 1 {
+            edge_connection = edge_connection.connect_north();
+        }
+        if square.rank() == 0 {
+            edge_connection = edge_connection.connect_south();
+        }
+        if square.file() == 0 {
+            edge_connection = edge_connection.connect_west();
+        }
+        if square.file() == BOARD_SIZE as u8 - 1 {
+            edge_connection = edge_connection.connect_east();
+        }
+        edge_connection
+    }
+
+    pub fn is_connected_north(self) -> bool {
+        self.data & 0b1000 == 0
+    }
+
+    pub fn connect_north(self) -> Self {
+        GroupEdgeConnection {
+            data: self.data | 0b1000,
+        }
+    }
+
+    pub fn is_connected_west(self) -> bool {
+        self.data & 0b100 == 0
+    }
+
+    pub fn connect_west(self) -> Self {
+        GroupEdgeConnection {
+            data: self.data | 0b100,
+        }
+    }
+
+    pub fn is_connected_east(self) -> bool {
+        self.data & 0b10 == 0
+    }
+
+    pub fn connect_east(self) -> Self {
+        GroupEdgeConnection {
+            data: self.data | 0b10,
+        }
+    }
+
+    pub fn is_connected_south(self) -> bool {
+        self.data & 1 == 0
+    }
+
+    pub fn connect_south(self) -> Self {
+        GroupEdgeConnection {
+            data: self.data | 1,
+        }
+    }
+}
+
 /// Complete representation of a Tak position
 #[derive(Clone, PartialEq, Eq)]
 pub struct Board {
