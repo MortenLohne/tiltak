@@ -63,6 +63,19 @@ fn tactic_test1() {
     plays_correct_hard_move_property(&move_strings, &["d5"]);
 }
 
+#[test]
+fn simple_move_move_to_win() {
+    let move_strings = [
+        "a5", "e2", "Cc3", "a4", "b3", "a3", "a2", "b2", "e3", "b2<", "a1", "Cb2", "b1",
+    ];
+
+    let mut board = Board::start_board();
+
+    do_moves_and_check_validity(&mut board, &move_strings);
+
+    plays_correct_hard_move_property(&move_strings, &["b2<"]);
+}
+
 #[cfg(test)]
 fn plays_correct_hard_move_property(move_strings: &[&str], correct_moves: &[&str]) {
     let mut board = Board::default();
