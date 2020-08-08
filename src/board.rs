@@ -646,6 +646,16 @@ impl GroupEdgeConnection {
     }
 }
 
+impl ops::BitOr for GroupEdgeConnection {
+    type Output = Self;
+
+    fn bitor(self, rhs: Self) -> Self::Output {
+        GroupEdgeConnection {
+            data: self.data | rhs.data,
+        }
+    }
+}
+
 /// Complete representation of a Tak position
 #[derive(Clone, PartialEq, Eq)]
 pub struct Board {
@@ -1241,6 +1251,19 @@ impl Board {
             }
         }
         suicide_win_square
+    }
+
+    pub fn is_critical_square(&self, square: Square, color: Color) -> bool {
+        let sum_of_connections = square
+            .neighbours()
+            .filter(|neighbour| self[*neighbour].top_stone().map(Piece::color) == Some(color))
+            .map(|neighbour| self.amount_in_group[self.groups[neighbour] as usize].1)
+            .fold(
+                GroupEdgeConnection::default().connect_square(square),
+                |acc, connection| acc | connection,
+            );
+
+        sum_of_connections.is_winning()
     }
 }
 

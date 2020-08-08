@@ -5,7 +5,7 @@ use crate::board::{
 };
 use crate::tests::do_moves_and_check_validity;
 use crate::{board as board_mod, board};
-use board_game_traits::board::{Board as BoardTrait, EvalBoard};
+use board_game_traits::board::{Board as BoardTrait, EvalBoard, Color};
 use board_game_traits::board::{GameResult, GameResult::*};
 use pgn_traits::pgn::PgnBoard;
 use rand::seq::SliceRandom;
@@ -460,4 +460,23 @@ fn group_connection_test() {
     assert!(!a1_connection.is_connected_east());
     assert!(a1_connection.is_connected_north());
     assert!(a1_connection.is_connected_west());
+}
+
+#[test]
+fn critical_square_test() {
+    let move_strings = ["a1", "e5", "e4", "a2", "e3", "a3", "e2", "a4"];
+
+    let mut board = Board::default();
+
+    do_moves_and_check_validity(
+        &mut board,
+        &move_strings,
+    );
+
+    let e1 = Square::parse_square("e1");
+    let a5 = Square::parse_square("a5");
+    assert!(board.is_critical_square(e1, Color::White));
+    assert!(!board.is_critical_square(e1, Color::Black));
+    assert!(board.is_critical_square(a5, Color::Black));
+    assert!(!board.is_critical_square(a5, Color::White));
 }
