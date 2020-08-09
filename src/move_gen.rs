@@ -60,7 +60,8 @@ impl Board {
         const EXTEND_GROUP: usize = ROAD_STONES_IN_RANK_FILE + 15;
         const MERGE_TWO_GROUPS: usize = EXTEND_GROUP + 1;
         const BLOCK_MERGER: usize = MERGE_TWO_GROUPS + 1;
-        const NEXT_TO_OUR_LAST_STONE: usize = BLOCK_MERGER + 1;
+        const PLACE_CRITICAL_SQUARE: usize = BLOCK_MERGER + 1;
+        const NEXT_TO_OUR_LAST_STONE: usize = PLACE_CRITICAL_SQUARE + 4;
         const NEXT_TO_THEIR_LAST_STONE: usize = NEXT_TO_OUR_LAST_STONE + 1;
         const DIAGONAL_TO_OUR_LAST_STONE: usize = NEXT_TO_THEIR_LAST_STONE + 1;
         const DIAGONAL_TO_THEIR_LAST_STONE: usize = DIAGONAL_TO_OUR_LAST_STONE + 1;
@@ -138,6 +139,12 @@ impl Board {
                         self.amount_in_group()[group_id as usize].0 as f32;
                 }
 
+                if self.is_critical_square(*square, Us::color()) {
+                    coefficients[PLACE_CRITICAL_SQUARE] += 1.0;
+                } else if self.is_critical_square(*square, Them::color()) {
+                    coefficients[PLACE_CRITICAL_SQUARE + 1] += 1.0;
+                }
+
                 // If square is next to a road stone laid on our last turn
                 if let Some(Move::Place(last_role, last_square)) =
                     self.moves().get(self.moves().len() - 2)
@@ -203,8 +210,16 @@ impl Board {
                 // Apply PSQT:
                 if *role == Standing {
                     coefficients[STANDING_STONE_PSQT + SQUARE_SYMMETRIES[square.0 as usize]] = 1.0;
+                    if self.is_critical_square(*square, Them::color()) {
+                        coefficients[PLACE_CRITICAL_SQUARE + 2] += 1.0;
+                    }
                 } else if *role == Cap {
                     coefficients[CAPSTONE_PSQT + SQUARE_SYMMETRIES[square.0 as usize]] = 1.0;
+                    if self.is_critical_square(*square, Us::color()) {
+                        coefficients[PLACE_CRITICAL_SQUARE] += 1.0;
+                    } else if self.is_critical_square(*square, Them::color()) {
+                        coefficients[PLACE_CRITICAL_SQUARE + 3] += 1.0;
+                    }
                 } else {
                     unreachable!(
                         "Tried to place {:?} with move {} on board\n{:?}",
