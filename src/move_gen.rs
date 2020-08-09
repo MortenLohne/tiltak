@@ -76,7 +76,8 @@ impl Board {
         const STACK_MOVEMENT_THAT_GIVES_US_TOP_PIECES: usize =
             BLOCKING_STONE_BLOCKS_EXTENSIONS_OF_TWO_FLATS + 1;
         const STACK_CAPTURED_BY_MOVEMENT: usize = STACK_MOVEMENT_THAT_GIVES_US_TOP_PIECES + 9;
-        const _NEXT_CONST: usize = STACK_CAPTURED_BY_MOVEMENT + 1;
+        const MOVE_ONTO_CRITICAL_SQUARE: usize = STACK_CAPTURED_BY_MOVEMENT + 1;
+        const _NEXT_CONST: usize = MOVE_ONTO_CRITICAL_SQUARE + 2;
 
         assert_eq!(coefficients.len(), _NEXT_CONST);
 
@@ -259,6 +260,7 @@ impl Board {
                     } else {
                         *square
                     };
+                let mut gets_critical_square = false;
 
                 let mut our_pieces = 0;
                 let mut their_pieces = 0;
@@ -282,6 +284,9 @@ impl Board {
                             if Us::piece_is_ours(piece) {
                                 coefficients[STACK_CAPTURED_BY_MOVEMENT] +=
                                     destination_stack.len() as f32;
+                                if self.is_critical_square(destination_square, Us::color()) {
+                                    gets_critical_square = true;
+                                }
                             } else {
                                 coefficients[STACK_CAPTURED_BY_MOVEMENT] -=
                                     destination_stack.len() as f32;
@@ -309,6 +314,16 @@ impl Board {
                     coefficients[STACK_MOVEMENT_THAT_GIVES_US_TOP_PIECES + 7] = our_pieces as f32;
                     coefficients[STACK_MOVEMENT_THAT_GIVES_US_TOP_PIECES + 8] =
                         (our_pieces * our_pieces) as f32;
+                }
+
+                if gets_critical_square {
+                    if their_pieces == 0
+                        && stack_movement.movements[0].pieces_to_take == self[*square].len()
+                    {
+                        coefficients[MOVE_ONTO_CRITICAL_SQUARE] += 1.0;
+                    } else {
+                        coefficients[MOVE_ONTO_CRITICAL_SQUARE + 1] += 1.0;
+                    }
                 }
             }
         }
