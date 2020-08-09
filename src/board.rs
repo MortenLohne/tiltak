@@ -1265,6 +1265,10 @@ impl Board {
 
         sum_of_connections.is_winning()
     }
+
+    pub fn critical_squares<'a>(&'a self, color: Color) -> impl Iterator<Item = Square> + 'a {
+        squares_iterator().filter(move |square| self.is_critical_square(*square, color))
+    }
 }
 
 impl board::Board for Board {

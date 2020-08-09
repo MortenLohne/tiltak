@@ -5,7 +5,7 @@ use crate::board::{
 };
 use crate::tests::do_moves_and_check_validity;
 use crate::{board as board_mod, board};
-use board_game_traits::board::{Board as BoardTrait, EvalBoard, Color};
+use board_game_traits::board::{Board as BoardTrait, Color, EvalBoard};
 use board_game_traits::board::{GameResult, GameResult::*};
 use pgn_traits::pgn::PgnBoard;
 use rand::seq::SliceRandom;
@@ -468,10 +468,7 @@ fn critical_square_test() {
 
     let mut board = Board::default();
 
-    do_moves_and_check_validity(
-        &mut board,
-        &move_strings,
-    );
+    do_moves_and_check_validity(&mut board, &move_strings);
 
     let e1 = Square::parse_square("e1");
     let a5 = Square::parse_square("a5");
