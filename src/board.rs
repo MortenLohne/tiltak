@@ -1056,7 +1056,33 @@ impl Board {
         coefficients[FLATSTONE_LEAD + 2] = white_flatstone_lead as f32 * endgame_scale_factor;
         coefficients[NUMBER_OF_GROUPS + 2] = number_of_groups * endgame_scale_factor;
 
-        const PIECES_IN_OUR_STACK: usize = NUMBER_OF_GROUPS + 3;
+        const CRITICAL_SQUARES: usize = NUMBER_OF_GROUPS + 3;
+
+        for critical_square in self.critical_squares(Color::White) {
+            match self[critical_square].top_stone {
+                None => coefficients[CRITICAL_SQUARES] += 1.0,
+                Some(Piece::WhiteStanding) => coefficients[CRITICAL_SQUARES + 1] += 1.0,
+                Some(Piece::BlackFlat) => coefficients[CRITICAL_SQUARES + 2] += 1.0,
+                Some(Piece::BlackCap) | Some(Piece::BlackStanding) => {
+                    coefficients[CRITICAL_SQUARES + 3] += 1.0
+                }
+                _ => unreachable!(),
+            }
+        }
+
+        for critical_square in self.critical_squares(Color::Black) {
+            match self[critical_square].top_stone {
+                None => coefficients[CRITICAL_SQUARES] -= 1.0,
+                Some(Piece::BlackStanding) => coefficients[CRITICAL_SQUARES + 1] -= 1.0,
+                Some(Piece::WhiteFlat) => coefficients[CRITICAL_SQUARES + 2] -= 1.0,
+                Some(Piece::WhiteCap) | Some(Piece::WhiteStanding) => {
+                    coefficients[CRITICAL_SQUARES + 3] -= 1.0
+                }
+                _ => unreachable!(),
+            }
+        }
+
+        const PIECES_IN_OUR_STACK: usize = CRITICAL_SQUARES + 4;
         const PIECES_IN_THEIR_STACK: usize = PIECES_IN_OUR_STACK + 1;
         const CAPSTONE_OVER_OWN_PIECE: usize = PIECES_IN_THEIR_STACK + 1;
         const CAPSTONE_ON_STACK: usize = CAPSTONE_OVER_OWN_PIECE + 1;
@@ -1538,57 +1564,61 @@ pub(crate) const SQUARE_SYMMETRIES: [usize; 25] = [
 impl TunableBoard for Board {
     #[allow(clippy::unreadable_literal)]
     const VALUE_PARAMS: &'static [f32] = &[
-        -0.21487005,
-        -0.0406565,
-        -0.018901477,
-        0.030663004,
-        0.079226784,
-        0.11530221,
-        0.743739,
-        0.65239054,
-        0.6930186,
-        0.74156344,
-        0.8289646,
-        0.78372926,
-        0.08004124,
-        0.5119432,
-        0.6198412,
-        0.84567523,
-        0.96913385,
-        1.2360283,
-        1.0609382,
-        0.6352445,
-        0.91007096,
-        0.43367025,
-        -0.42892265,
-        -0.037731387,
-        -0.26795357,
-        -0.08676032,
-        -0.012233485,
-        1.0000367,
-        0.6400831,
-        0.23976964,
-        0.42723274,
-        0.38668478,
-        -0.027503295,
-        -0.13108984,
-        -0.13363458,
-        0.7972735,
-        -0.806871,
-        -0.57120854,
-        -0.3215248,
-        0.1548999,
-        0.75791836,
-        -1.4084904,
-        -1.0300877,
-        -0.20436336,
-        0.7446849,
-        1.8981309,
-        0.010878452,
-        0.10515187,
-        0.2837778,
-        0.018385313,
-        0.22821361,
+        -0.2255297,
+        -0.047007166,
+        -0.023654517,
+        0.018294845,
+        0.0682679,
+        0.10516572,
+        0.75402546,
+        0.6661302,
+        0.70757097,
+        0.7501032,
+        0.838739,
+        0.7905934,
+        0.078382626,
+        0.4997774,
+        0.6118615,
+        0.8315108,
+        0.95413196,
+        1.224424,
+        1.0686768,
+        0.68951875,
+        0.9472978,
+        0.41328722,
+        -0.45540243,
+        -0.04744424,
+        -0.24311167,
+        -0.0408128,
+        0.020252394,
+        0.21817672,
+        0.0061117546,
+        0.11904294,
+        0.0744189,
+        1.0015546,
+        0.63938814,
+        0.23970537,
+        0.42529368,
+        0.3811882,
+        -0.027405808,
+        -0.13341314,
+        -0.13424352,
+        0.80383444,
+        -0.8032112,
+        -0.5740348,
+        -0.31383643,
+        0.15803683,
+        0.7376483,
+        -1.3865784,
+        -1.0065124,
+        -0.1764541,
+        0.7718788,
+        1.8063365,
+        -0.0009923871,
+        0.11126704,
+        0.22816241,
+        0.019930827,
+        0.15768114,
     ];
     #[allow(clippy::unreadable_literal)]
     const POLICY_PARAMS: &'static [f32] = &[
