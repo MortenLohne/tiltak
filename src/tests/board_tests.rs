@@ -327,7 +327,7 @@ fn double_road_wins_test() {
 // Black is behind by one point, with one stone left to place
 // Check that placing it standing is suicide, but placing it flat is not
 #[test]
-fn cannot_suicide_into_points_loss_test() {
+fn suicide_into_points_loss_test() {
     let mut board = Board::start_board();
     let move_strings = [
         "a1", "e5", "e3", "Cc3", "e4", "e2", "d3", "c3>", "d4", "b2", "c3", "c2", "c4", "d2",
@@ -365,6 +365,28 @@ fn cannot_suicide_into_points_loss_test() {
     assert!(moves
         .iter()
         .any(|mv| matches!(mv, Move::Place(Role::Flat, _))));
+}
+
+#[test]
+fn suicide_into_road_loss_test() {
+    let move_strings = [
+        "a5", "a1", "Cc3", "Cd3", "c2", "c4", "b3", "c1", "b2", "d2", "b4", "e3", "b5", "a5>",
+        "b1", "c5", "a5", "2b5-", "a4", "Sa3", "b5", "a3+", "d4", "d1", "c3+", "3b4-", "e4", "d3+",
+        "c3", "4b3>", "b3", "5c3<", "c3", "c1<", "a1>", "d2<", "3b1+12", "d3", "5b3>113", "2d4-",
+        "b4", "2a4>", "2b2>11", "d3>", "2c4-", "c4", "d4", "4e3+13", "a3", "3b4-", "3c3+12",
+    ];
+
+    let mut board = Board::start_board();
+
+    do_moves_and_check_validity(&mut board, &move_strings);
+
+    let mut moves = vec![];
+    board.generate_moves(&mut moves);
+    let mv = board.move_from_lan("e4-").unwrap();
+
+    assert!(moves.contains(&mv));
+    board.do_move(mv);
+    assert_eq!(board.game_result(), Some(WhiteWin))
 }
 
 #[test]

@@ -65,6 +65,7 @@ fn tactic_test1() {
 
 #[test]
 fn simple_move_move_to_win() {
+    // a5 e2 Cc3 a4 b3 a3 a2 b2 e3 b2< a1 Cb2 b1 b2< Se1 a2-
     let move_strings = [
         "a5", "e2", "Cc3", "a4", "b3", "a3", "a2", "b2", "e3", "b2<", "a1", "Cb2", "b1",
     ];
