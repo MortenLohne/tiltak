@@ -469,6 +469,9 @@ pub fn positions_and_results_from_games(games: Vec<Game<Board>>) -> (Vec<Board>,
     for game in games.into_iter() {
         let mut board = game.start_board;
         for (mv, _) in game.moves {
+            if board.game_result().is_some() {
+                break;
+            }
             positions.push(board.clone());
             results.push(game.game_result.unwrap_or(GameResult::Draw));
             board.do_move(mv);
