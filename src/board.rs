@@ -22,6 +22,7 @@ use board_game_traits::board::{Color, GameResult};
 use pgn_traits::pgn;
 use std::cmp::Ordering;
 use std::fmt::Write;
+use std::hash::{Hash, Hasher};
 use std::iter::FromIterator;
 #[cfg(test)]
 use std::mem;
@@ -295,7 +296,7 @@ pub enum Role {
 }
 
 /// One of the 6 game pieces in Tak. Each piece has one variant for each color.
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Hash)]
 pub enum Piece {
     WhiteFlat,
     BlackFlat,
@@ -364,7 +365,7 @@ impl ops::Not for Piece {
 }
 
 /// The contents of a square on the board, consisting of zero or more pieces
-#[derive(Clone, PartialEq, Eq, Debug, Default)]
+#[derive(Clone, PartialEq, Eq, Debug, Default, Hash)]
 pub struct Stack {
     top_stone: Option<Piece>,
     bitboard: BitBoard,
@@ -657,7 +658,7 @@ impl ops::BitOr for GroupEdgeConnection {
 }
 
 /// Complete representation of a Tak position
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Clone)]
 pub struct Board {
     cells: AbstractBoard<Stack>,
     to_move: Color,
@@ -675,6 +676,32 @@ pub struct Board {
     moves: Vec<Move>,
     groups: AbstractBoard<u8>,
     amount_in_group: [(u8, GroupEdgeConnection); BOARD_AREA + 1],
+}
+
+impl PartialEq for Board {
+    fn eq(&self, other: &Self) -> bool {
+        self.cells == other.cells
+            && self.to_move == other.to_move
+            && self.white_stones_left == other.white_stones_left
+            && self.black_stones_left == other.black_stones_left
+            && self.white_capstones_left == other.white_capstones_left
+            && self.black_capstones_left == other.black_capstones_left
+            && self.moves_played == other.moves_played
+    }
+}
+
+impl Eq for Board {}
+
+impl Hash for Board {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.cells.hash(state);
+        self.to_move.hash(state);
+        self.white_stones_left.hash(state);
+        self.black_stones_left.hash(state);
+        self.white_capstones_left.hash(state);
+        self.black_capstones_left.hash(state);
+        self.moves_played.hash(state);
+    }
 }
 
 impl Index<Square> for Board {
@@ -1845,7 +1872,7 @@ impl pgn_traits::pgn::PgnBoard for Board {
     }
 }
 
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
 pub(crate) struct AbstractBoard<T> {
     raw: [[T; BOARD_SIZE]; BOARD_SIZE],
 }
