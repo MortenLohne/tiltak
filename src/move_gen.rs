@@ -144,10 +144,13 @@ impl Board {
                         group_data.amount_in_group[group_id as usize].0 as f32;
                 }
 
+                let their_open_critical_squares =
+                    Them::critical_squares(&*group_data) & (!self.all_pieces());
+
                 if Us::is_critical_square(&*group_data, *square) {
                     coefficients[PLACE_CRITICAL_SQUARE] += 1.0;
-                } else if !Them::critical_squares(&*group_data).is_empty() {
-                    if Them::critical_squares(&*group_data) == BitBoard::empty().set(square.0) {
+                } else if !their_open_critical_squares.is_empty() {
+                    if their_open_critical_squares == BitBoard::empty().set(square.0) {
                         coefficients[PLACE_CRITICAL_SQUARE + 1] += 1.0;
                     } else {
                         coefficients[IGNORE_CRITICAL_SQUARE] += 1.0;
@@ -217,12 +220,15 @@ impl Board {
             }
             Move::Place(role, square) => {
                 let group_data = self.group_data();
+                let their_open_critical_squares =
+                    Them::critical_squares(&*group_data) & (!self.all_pieces());
 
                 // Apply PSQT:
                 if *role == Standing {
                     coefficients[STANDING_STONE_PSQT + SQUARE_SYMMETRIES[square.0 as usize]] = 1.0;
-                    if !Them::critical_squares(&*group_data).is_empty() {
-                        if Them::critical_squares(&*group_data) == BitBoard::empty().set(square.0) {
+
+                    if !their_open_critical_squares.is_empty() {
+                        if their_open_critical_squares == BitBoard::empty().set(square.0) {
                             coefficients[PLACE_CRITICAL_SQUARE + 2] += 1.0;
                         } else {
                             coefficients[IGNORE_CRITICAL_SQUARE] += 1.0;
@@ -232,8 +238,8 @@ impl Board {
                     coefficients[CAPSTONE_PSQT + SQUARE_SYMMETRIES[square.0 as usize]] = 1.0;
                     if Us::is_critical_square(&*group_data, *square) {
                         coefficients[PLACE_CRITICAL_SQUARE] += 1.0;
-                    } else if !Them::critical_squares(&*group_data).is_empty() {
-                        if Them::critical_squares(&*group_data) == BitBoard::empty().set(square.0) {
+                    } else if !their_open_critical_squares.is_empty() {
+                        if their_open_critical_squares == BitBoard::empty().set(square.0) {
                             coefficients[PLACE_CRITICAL_SQUARE + 3] += 1.0;
                         } else {
                             coefficients[IGNORE_CRITICAL_SQUARE] += 1.0;
