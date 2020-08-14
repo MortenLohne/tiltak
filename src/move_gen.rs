@@ -77,7 +77,7 @@ impl Board {
 
         const STACK_MOVEMENT_THAT_GIVES_US_TOP_PIECES: usize =
             BLOCKING_STONE_BLOCKS_EXTENSIONS_OF_TWO_FLATS + 1;
-        const STACK_CAPTURED_BY_MOVEMENT: usize = STACK_MOVEMENT_THAT_GIVES_US_TOP_PIECES + 9;
+        const STACK_CAPTURED_BY_MOVEMENT: usize = STACK_MOVEMENT_THAT_GIVES_US_TOP_PIECES + 6;
         const MOVE_ONTO_CRITICAL_SQUARE: usize = STACK_CAPTURED_BY_MOVEMENT + 1;
         const _NEXT_CONST: usize = MOVE_ONTO_CRITICAL_SQUARE + 2;
 
@@ -330,18 +330,12 @@ impl Board {
                 if their_pieces == 0 {
                     coefficients[STACK_MOVEMENT_THAT_GIVES_US_TOP_PIECES] = 1.0;
                     coefficients[STACK_MOVEMENT_THAT_GIVES_US_TOP_PIECES + 1] = our_pieces as f32;
-                    coefficients[STACK_MOVEMENT_THAT_GIVES_US_TOP_PIECES + 2] =
-                        (our_pieces * our_pieces) as f32;
                 } else if their_pieces == 1 {
-                    coefficients[STACK_MOVEMENT_THAT_GIVES_US_TOP_PIECES + 3] = 1.0;
-                    coefficients[STACK_MOVEMENT_THAT_GIVES_US_TOP_PIECES + 4] = our_pieces as f32;
-                    coefficients[STACK_MOVEMENT_THAT_GIVES_US_TOP_PIECES + 5] =
-                        (our_pieces * our_pieces) as f32;
+                    coefficients[STACK_MOVEMENT_THAT_GIVES_US_TOP_PIECES + 2] = 1.0;
+                    coefficients[STACK_MOVEMENT_THAT_GIVES_US_TOP_PIECES + 3] = our_pieces as f32;
                 } else {
-                    coefficients[STACK_MOVEMENT_THAT_GIVES_US_TOP_PIECES + 6] = 1.0;
-                    coefficients[STACK_MOVEMENT_THAT_GIVES_US_TOP_PIECES + 7] = our_pieces as f32;
-                    coefficients[STACK_MOVEMENT_THAT_GIVES_US_TOP_PIECES + 8] =
-                        (our_pieces * our_pieces) as f32;
+                    coefficients[STACK_MOVEMENT_THAT_GIVES_US_TOP_PIECES + 4] = 1.0;
+                    coefficients[STACK_MOVEMENT_THAT_GIVES_US_TOP_PIECES + 5] = our_pieces as f32;
                 }
 
                 let their_open_critical_squares =
