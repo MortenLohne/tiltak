@@ -1,4 +1,4 @@
-use crate::board::BOARD_SIZE;
+use crate::board::{BOARD_SIZE, Square};
 use std::{fmt, ops};
 
 #[derive(PartialEq, Eq, Clone, Copy, Hash, Default)]
@@ -113,6 +113,42 @@ impl BitBoard {
     #[inline]
     pub fn count(self) -> u8 {
         self.board.count_ones() as u8
+    }
+}
+
+impl IntoIterator for BitBoard {
+    type Item = Square;
+    type IntoIter = BitBoardIter;
+
+    fn into_iter(self) -> Self::IntoIter {
+        BitBoardIter::new(self)
+    }
+}
+
+pub struct BitBoardIter {
+    board: BitBoard,
+}
+
+impl BitBoardIter {
+    fn new(board: BitBoard) -> Self {
+        BitBoardIter {
+            board
+        }
+    }
+}
+
+impl Iterator for BitBoardIter {
+    type Item = Square;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.board.is_empty() {
+            None
+        }
+        else {
+            let i = self.board.board.trailing_zeros() as u8;
+            self.board = self.board.clear(i);
+            Some(Square(i))
+        }
     }
 }
 

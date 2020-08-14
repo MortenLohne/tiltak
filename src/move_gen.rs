@@ -92,6 +92,8 @@ impl Board {
 
         match mv {
             Move::Place(role, square) if *role == Flat => {
+                let group_data = self.group_data();
+
                 // Apply PSQT
                 coefficients[FLAT_STONE_PSQT + SQUARE_SYMMETRIES[square.0 as usize]] = 1.0;
 
@@ -112,7 +114,7 @@ impl Board {
                 let mut their_unique_neighbour_groups: ArrayVec<[(Square, u8); 4]> =
                     ArrayVec::new();
                 for neighbour in square.neighbours().filter(|sq| !self[*sq].is_empty()) {
-                    let neighbour_group_id = self.groups()[neighbour];
+                    let neighbour_group_id = group_data.groups[neighbour];
                     if Us::piece_is_ours(self[neighbour].top_stone().unwrap()) {
                         if our_unique_neighbour_groups
                             .iter()
@@ -137,12 +139,12 @@ impl Board {
 
                 for (_, group_id) in our_unique_neighbour_groups {
                     coefficients[EXTEND_GROUP] +=
-                        self.amount_in_group()[group_id as usize].0 as f32;
+                        group_data.amount_in_group[group_id as usize].0 as f32;
                 }
 
-                if self.is_critical_square(*square, Us::color()) {
+                if Us::is_critical_square(&*group_data, *square) {
                     coefficients[PLACE_CRITICAL_SQUARE] += 1.0;
-                } else if self.is_critical_square(*square, Them::color()) {
+                } else if Them::is_critical_square(&*group_data, *square) {
                     coefficients[PLACE_CRITICAL_SQUARE + 1] += 1.0;
                 }
 
@@ -208,17 +210,19 @@ impl Board {
                 }
             }
             Move::Place(role, square) => {
+                let group_data = self.group_data();
+
                 // Apply PSQT:
                 if *role == Standing {
                     coefficients[STANDING_STONE_PSQT + SQUARE_SYMMETRIES[square.0 as usize]] = 1.0;
-                    if self.is_critical_square(*square, Them::color()) {
+                    if Them::is_critical_square(&*group_data, *square) {
                         coefficients[PLACE_CRITICAL_SQUARE + 2] += 1.0;
                     }
                 } else if *role == Cap {
                     coefficients[CAPSTONE_PSQT + SQUARE_SYMMETRIES[square.0 as usize]] = 1.0;
-                    if self.is_critical_square(*square, Us::color()) {
+                    if Us::is_critical_square(&*group_data, *square) {
                         coefficients[PLACE_CRITICAL_SQUARE] += 1.0;
-                    } else if self.is_critical_square(*square, Them::color()) {
+                    } else if Them::is_critical_square(&*group_data, *square) {
                         coefficients[PLACE_CRITICAL_SQUARE + 3] += 1.0;
                     }
                 } else {
@@ -254,6 +258,8 @@ impl Board {
                 }
             }
             Move::Move(square, direction, stack_movement) => {
+                let group_data = self.group_data();
+
                 let mut destination_square =
                     if stack_movement.movements[0].pieces_to_take == self[*square].len() {
                         square.go_direction(*direction).unwrap()
@@ -284,7 +290,7 @@ impl Board {
                             if Us::piece_is_ours(piece) {
                                 coefficients[STACK_CAPTURED_BY_MOVEMENT] +=
                                     destination_stack.len() as f32;
-                                if self.is_critical_square(destination_square, Us::color()) {
+                                if Us::is_critical_square(&*group_data, destination_square) {
                                     gets_critical_square = true;
                                 }
                             } else {
