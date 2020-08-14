@@ -1,3 +1,4 @@
+use crate::bitboard::BitBoard;
 use crate::board::Role::*;
 use crate::board::{
     Board, ColorTr, Direction, Move, Movement, Piece, Square, StackMovement, TunableBoard,
@@ -146,7 +147,7 @@ impl Board {
                 if Us::is_critical_square(&*group_data, *square) {
                     coefficients[PLACE_CRITICAL_SQUARE] += 1.0;
                 } else if !Them::critical_squares(&*group_data).is_empty() {
-                    if Them::is_critical_square(&*group_data, *square) {
+                    if Them::critical_squares(&*group_data) == BitBoard::empty().set(square.0) {
                         coefficients[PLACE_CRITICAL_SQUARE + 1] += 1.0;
                     } else {
                         coefficients[IGNORE_CRITICAL_SQUARE] += 1.0;
@@ -221,7 +222,7 @@ impl Board {
                 if *role == Standing {
                     coefficients[STANDING_STONE_PSQT + SQUARE_SYMMETRIES[square.0 as usize]] = 1.0;
                     if !Them::critical_squares(&*group_data).is_empty() {
-                        if Them::is_critical_square(&*group_data, *square) {
+                        if Them::critical_squares(&*group_data) == BitBoard::empty().set(square.0) {
                             coefficients[PLACE_CRITICAL_SQUARE + 2] += 1.0;
                         } else {
                             coefficients[IGNORE_CRITICAL_SQUARE] += 1.0;
@@ -232,7 +233,7 @@ impl Board {
                     if Us::is_critical_square(&*group_data, *square) {
                         coefficients[PLACE_CRITICAL_SQUARE] += 1.0;
                     } else if !Them::critical_squares(&*group_data).is_empty() {
-                        if Them::is_critical_square(&*group_data, *square) {
+                        if Them::critical_squares(&*group_data) == BitBoard::empty().set(square.0) {
                             coefficients[PLACE_CRITICAL_SQUARE + 3] += 1.0;
                         } else {
                             coefficients[IGNORE_CRITICAL_SQUARE] += 1.0;
