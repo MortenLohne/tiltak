@@ -308,7 +308,9 @@ pub fn tune_real_value_and_policy(
     let mut games_and_move_scoress: Vec<(&Game<Board>, &MoveScoresForGame)> =
         games.iter().zip(move_scoress).collect();
 
-    games_and_move_scoress.shuffle(&mut rand::thread_rng());
+    let mut rng = rand::rngs::StdRng::from_seed([0; 32]);
+
+    games_and_move_scoress.shuffle(&mut rng);
 
     let (games, move_scoress): (Vec<_>, Vec<_>) = games_and_move_scoress.into_iter().unzip();
 
@@ -410,8 +412,8 @@ pub fn games_and_move_scoress_from_file(
     let mut move_scoress = read_move_scores_from_file()?;
     let mut games = read_games_from_file()?;
 
-    move_scoress.truncate(4000);
-    games.truncate(4000);
+    move_scoress.truncate(3000);
+    games.truncate(3000);
 
     for (game, move_scores) in games.iter().zip(&move_scoress) {
         let mut board = game.start_board.clone();
