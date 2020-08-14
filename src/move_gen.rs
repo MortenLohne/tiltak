@@ -62,8 +62,8 @@ impl Board {
         const MERGE_TWO_GROUPS: usize = EXTEND_GROUP + 1;
         const BLOCK_MERGER: usize = MERGE_TWO_GROUPS + 1;
         const PLACE_CRITICAL_SQUARE: usize = BLOCK_MERGER + 1;
-        const IGNORE_CRITICAL_SQUARE: usize = PLACE_CRITICAL_SQUARE + 4;
-        const NEXT_TO_OUR_LAST_STONE: usize = IGNORE_CRITICAL_SQUARE + 1;
+        const IGNORE_CRITICAL_SQUARE: usize = PLACE_CRITICAL_SQUARE + 5;
+        const NEXT_TO_OUR_LAST_STONE: usize = IGNORE_CRITICAL_SQUARE + 2;
         const NEXT_TO_THEIR_LAST_STONE: usize = NEXT_TO_OUR_LAST_STONE + 1;
         const DIAGONAL_TO_OUR_LAST_STONE: usize = NEXT_TO_THEIR_LAST_STONE + 1;
         const DIAGONAL_TO_THEIR_LAST_STONE: usize = DIAGONAL_TO_OUR_LAST_STONE + 1;
@@ -290,6 +290,7 @@ impl Board {
 
                 let mut our_pieces = 0;
                 let mut their_pieces = 0;
+                let mut their_pieces_captured = 0;
 
                 // This iterator skips the first square if we move the whole stack
                 for piece in self
@@ -310,6 +311,7 @@ impl Board {
                             if Us::piece_is_ours(piece) {
                                 coefficients[STACK_CAPTURED_BY_MOVEMENT] +=
                                     destination_stack.len() as f32;
+                                their_pieces_captured += 1;
                                 if Us::is_critical_square(&*group_data, destination_square) {
                                     gets_critical_square = true;
                                 }
@@ -340,6 +342,19 @@ impl Board {
                     coefficients[STACK_MOVEMENT_THAT_GIVES_US_TOP_PIECES + 7] = our_pieces as f32;
                     coefficients[STACK_MOVEMENT_THAT_GIVES_US_TOP_PIECES + 8] =
                         (our_pieces * our_pieces) as f32;
+                }
+
+                let their_open_critical_squares =
+                    Them::critical_squares(&*group_data) & (!self.all_pieces());
+
+                if !their_open_critical_squares.is_empty() {
+                    if their_pieces_captured == 0 {
+                        // Move ignores their critical threat, but might win for us
+                        coefficients[IGNORE_CRITICAL_SQUARE + 1] += 1.0;
+                    } else {
+                        // Move captures at least one stack, which might save us
+                        coefficients[PLACE_CRITICAL_SQUARE + 4] += their_pieces_captured as f32;
+                    }
                 }
 
                 if gets_critical_square {
