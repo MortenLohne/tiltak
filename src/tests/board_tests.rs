@@ -500,6 +500,20 @@ fn critical_square_test() {
     assert!(board.group_data().is_critical_square(a5, Color::Black));
     assert!(!board.group_data().is_critical_square(a5, Color::White));
 
-    assert_eq!(board.group_data().critical_squares(Color::White).into_iter().collect::<Vec<_>>(), vec![e1]);
-    assert_eq!(board.group_data().critical_squares(Color::Black).into_iter().collect::<Vec<_>>(), vec![a5]);
+    assert_eq!(
+        board
+            .group_data()
+            .critical_squares(Color::White)
+            .into_iter()
+            .collect::<Vec<_>>(),
+        vec![e1]
+    );
+    assert_eq!(
+        board
+            .group_data()
+            .critical_squares(Color::Black)
+            .into_iter()
+            .collect::<Vec<_>>(),
+        vec![a5]
+    );
 }

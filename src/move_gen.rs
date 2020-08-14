@@ -61,7 +61,8 @@ impl Board {
         const MERGE_TWO_GROUPS: usize = EXTEND_GROUP + 1;
         const BLOCK_MERGER: usize = MERGE_TWO_GROUPS + 1;
         const PLACE_CRITICAL_SQUARE: usize = BLOCK_MERGER + 1;
-        const NEXT_TO_OUR_LAST_STONE: usize = PLACE_CRITICAL_SQUARE + 4;
+        const IGNORE_CRITICAL_SQUARE: usize = PLACE_CRITICAL_SQUARE + 4;
+        const NEXT_TO_OUR_LAST_STONE: usize = IGNORE_CRITICAL_SQUARE + 1;
         const NEXT_TO_THEIR_LAST_STONE: usize = NEXT_TO_OUR_LAST_STONE + 1;
         const DIAGONAL_TO_OUR_LAST_STONE: usize = NEXT_TO_THEIR_LAST_STONE + 1;
         const DIAGONAL_TO_THEIR_LAST_STONE: usize = DIAGONAL_TO_OUR_LAST_STONE + 1;
@@ -144,8 +145,12 @@ impl Board {
 
                 if Us::is_critical_square(&*group_data, *square) {
                     coefficients[PLACE_CRITICAL_SQUARE] += 1.0;
-                } else if Them::is_critical_square(&*group_data, *square) {
-                    coefficients[PLACE_CRITICAL_SQUARE + 1] += 1.0;
+                } else if !Them::critical_squares(&*group_data).is_empty() {
+                    if Them::is_critical_square(&*group_data, *square) {
+                        coefficients[PLACE_CRITICAL_SQUARE + 1] += 1.0;
+                    } else {
+                        coefficients[IGNORE_CRITICAL_SQUARE] += 1.0;
+                    }
                 }
 
                 // If square is next to a road stone laid on our last turn
@@ -215,15 +220,23 @@ impl Board {
                 // Apply PSQT:
                 if *role == Standing {
                     coefficients[STANDING_STONE_PSQT + SQUARE_SYMMETRIES[square.0 as usize]] = 1.0;
-                    if Them::is_critical_square(&*group_data, *square) {
-                        coefficients[PLACE_CRITICAL_SQUARE + 2] += 1.0;
+                    if !Them::critical_squares(&*group_data).is_empty() {
+                        if Them::is_critical_square(&*group_data, *square) {
+                            coefficients[PLACE_CRITICAL_SQUARE + 2] += 1.0;
+                        } else {
+                            coefficients[IGNORE_CRITICAL_SQUARE] += 1.0;
+                        }
                     }
                 } else if *role == Cap {
                     coefficients[CAPSTONE_PSQT + SQUARE_SYMMETRIES[square.0 as usize]] = 1.0;
                     if Us::is_critical_square(&*group_data, *square) {
                         coefficients[PLACE_CRITICAL_SQUARE] += 1.0;
-                    } else if Them::is_critical_square(&*group_data, *square) {
-                        coefficients[PLACE_CRITICAL_SQUARE + 3] += 1.0;
+                    } else if !Them::critical_squares(&*group_data).is_empty() {
+                        if Them::is_critical_square(&*group_data, *square) {
+                            coefficients[PLACE_CRITICAL_SQUARE + 3] += 1.0;
+                        } else {
+                            coefficients[IGNORE_CRITICAL_SQUARE] += 1.0;
+                        }
                     }
                 } else {
                     unreachable!(

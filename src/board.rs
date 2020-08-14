@@ -20,15 +20,15 @@ use board_game_traits::board::GameResult::{BlackWin, Draw, WhiteWin};
 use board_game_traits::board::{Board as BoardTrait, EvalBoard as EvalBoardTrait};
 use board_game_traits::board::{Color, GameResult};
 use pgn_traits::pgn;
+use std::cell::RefCell;
 use std::cmp::Ordering;
 use std::fmt::Write;
 use std::hash::{Hash, Hasher};
 use std::iter::FromIterator;
 #[cfg(test)]
 use std::mem;
-use std::ops::{Index, IndexMut, DerefMut, Deref};
+use std::ops::{Deref, DerefMut, Index, IndexMut};
 use std::{fmt, iter, ops};
-use std::cell::RefCell;
 
 /// Extra items for tuning evaluation constants.
 pub trait TunableBoard: BoardTrait {
@@ -78,6 +78,8 @@ pub(crate) trait ColorTr {
     fn piece_is_ours(piece: Piece) -> bool;
 
     fn is_critical_square(group_data: &GroupData, square: Square) -> bool;
+
+    fn critical_squares(group_data: &GroupData) -> BitBoard;
 }
 
 struct WhiteTr {}
@@ -126,6 +128,10 @@ impl ColorTr for WhiteTr {
     fn is_critical_square(group_data: &GroupData, square: Square) -> bool {
         group_data.white_critical_squares.get(square.0)
     }
+
+    fn critical_squares(group_data: &GroupData) -> BitBoard {
+        group_data.white_critical_squares
+    }
 }
 
 struct BlackTr {}
@@ -173,6 +179,10 @@ impl ColorTr for BlackTr {
 
     fn is_critical_square(group_data: &GroupData, square: Square) -> bool {
         group_data.black_critical_squares.get(square.0)
+    }
+
+    fn critical_squares(group_data: &GroupData) -> BitBoard {
+        group_data.black_critical_squares
     }
 }
 
@@ -771,7 +781,8 @@ impl Default for Board {
             moves: vec![],
             group_data: RefCell::new(GroupData::default()),
         };
-        board.group_data.borrow_mut().amount_in_group[0] = (BOARD_AREA as u8, GroupEdgeConnection::default());
+        board.group_data.borrow_mut().amount_in_group[0] =
+            (BOARD_AREA as u8, GroupEdgeConnection::default());
         board
     }
 }
@@ -811,7 +822,11 @@ impl fmt::Debug for Board {
         writeln!(f, "White road stones: {:b}", self.white_road_pieces().board)?;
         writeln!(f, "Black road stones: {:b}", self.black_road_pieces().board)?;
         writeln!(f, "Groups: {:?}", self.group_data.borrow().groups)?;
-        writeln!(f, "Amount in groups: {:?}", self.group_data.borrow().amount_in_group)?;
+        writeln!(
+            f,
+            "Amount in groups: {:?}",
+            self.group_data.borrow().amount_in_group
+        )?;
         Ok(())
     }
 }
@@ -858,7 +873,13 @@ impl Board {
         self.group_data.borrow()
     }
 
-    fn is_critical_square_from_scratch(&self, groups: &AbstractBoard<u8>, amount_in_group: &[(u8, GroupEdgeConnection); BOARD_AREA + 1], square: Square, color: Color) -> bool {
+    fn is_critical_square_from_scratch(
+        &self,
+        groups: &AbstractBoard<u8>,
+        amount_in_group: &[(u8, GroupEdgeConnection); BOARD_AREA + 1],
+        square: Square,
+        color: Color,
+    ) -> bool {
         let sum_of_connections = square
             .neighbours()
             .filter(|neighbour| self[*neighbour].top_stone().map(Piece::color) == Some(color))
@@ -1018,23 +1039,15 @@ impl Board {
             amount_in_group,
             white_critical_squares,
             black_critical_squares,
-            updated_groups}
-            = group_data.deref_mut();
+            updated_groups,
+        } = group_data.deref_mut();
 
         let mut highest_component_id = 1;
 
         *groups = Default::default();
 
-        connected_components_graph(
-            self.white_road_pieces(),
-            groups,
-            &mut highest_component_id,
-        );
-        connected_components_graph(
-            self.black_road_pieces(),
-            groups,
-            &mut highest_component_id,
-        );
+        connected_components_graph(self.white_road_pieces(), groups, &mut highest_component_id);
+        connected_components_graph(self.black_road_pieces(), groups, &mut highest_component_id);
 
         *amount_in_group = Default::default();
 
@@ -1052,10 +1065,12 @@ impl Board {
         *black_critical_squares = BitBoard::default();
 
         for square in squares_iterator() {
-            if self.is_critical_square_from_scratch(&groups, &amount_in_group, square, Color::White) {
+            if self.is_critical_square_from_scratch(&groups, &amount_in_group, square, Color::White)
+            {
                 *white_critical_squares = white_critical_squares.set(square.0);
             }
-            if self.is_critical_square_from_scratch(&groups, &amount_in_group, square, Color::Black) {
+            if self.is_critical_square_from_scratch(&groups, &amount_in_group, square, Color::Black)
+            {
                 *black_critical_squares = black_critical_squares.set(square.0);
             }
         }
@@ -1701,70 +1716,71 @@ impl TunableBoard for Board {
     ];
     #[allow(clippy::unreadable_literal)]
     const POLICY_PARAMS: &'static [f32] = &[
-        0.96094596,
-        -0.15939538,
-        0.25686845,
-        0.8212463,
-        1.0583013,
-        1.7171491,
-        1.2136556,
-        -1.9773598,
-        -2.2401807,
-        -1.7535338,
-        -1.477327,
-        -1.0852009,
-        -0.07930347,
-        -0.35592726,
-        -0.6879147,
-        -0.46915707,
-        -0.35211053,
-        2.0684993,
-        6.3962355,
-        -0.48296243,
-        -0.3118674,
-        0.21031867,
-        0.9988253,
-        0.17498846,
-        -0.33938742,
-        -0.095621414,
-        0.7046398,
-        0.5775717,
-        0.21998219,
-        0.72881174,
-        0.86623144,
-        1.1844255,
-        0.48533645,
-        0.021534385,
-        0.0063957055,
-        0.23017639,
-        0.1341849,
-        2.0631483,
-        0.2960934,
-        1.8877966,
-        -0.0077168113,
-        0.6057346,
-        0.5918942,
-        0.28738508,
-        0.33545318,
-        -0.078107156,
-        0.008841074,
-        0.00020403968,
-        -0.0067947116,
-        0.059752863,
-        -0.1284411,
-        1.0206575,
-        -0.57999957,
-        0.32261485,
-        0.04552765,
-        -0.7815671,
-        -0.63677865,
-        -0.364481,
-        -0.6716764,
-        -0.68976605,
-        -0.711315,
-        0.48651573,
-        0.8594798,
-        0.29682472,
+        0.9700831,
+        0.098732114,
+        0.5065662,
+        1.0276412,
+        1.2789383,
+        1.9431621,
+        1.4269104,
+        -1.8269703,
+        -2.1099308,
+        -1.6491256,
+        -1.3777751,
+        -0.9854765,
+        0.043712776,
+        -0.3771013,
+        -0.72028637,
+        -0.5048331,
+        -0.37462285,
+        2.1061454,
+        6.4596553,
+        -0.62213486,
+        -0.3559854,
+        0.30404028,
+        1.1664361,
+        0.24613576,
+        -0.27001798,
+        0.05410726,
+        0.8673376,
+        0.6859934,
+        0.3759456,
+        0.8895884,
+        0.9739413,
+        1.4039762,
+        0.5228745,
+        0.017265927,
+        0.01214531,
+        0.3084681,
+        -0.013693573,
+        1.6718209,
+        0.08246247,
+        1.6798905,
+        -0.0018028626,
+        -0.9283768,
+        0.5301039,
+        0.5950025,
+        0.25183877,
+        0.32964146,
+        -0.13204503,
+        -0.009491633,
+        -0.00033727093,
+        -0.006197629,
+        0.07775067,
+        -0.098837726,
+        1.0914276,
+        -0.5573415,
+        0.33950064,
+        0.042131413,
+        -0.83002645,
+        -0.63795865,
+        -0.2339633,
+        -0.6775176,
+        -0.686304,
+        -0.72926784,
+        0.4861133,
+        0.8600948,
+        0.32339454,
     ];
 
     fn static_eval_coefficients(&self, coefficients: &mut [f32]) {

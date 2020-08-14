@@ -1,4 +1,4 @@
-use crate::board::{BOARD_SIZE, Square};
+use crate::board::{Square, BOARD_SIZE};
 use std::{fmt, ops};
 
 #[derive(PartialEq, Eq, Clone, Copy, Hash, Default)]
@@ -131,9 +131,7 @@ pub struct BitBoardIter {
 
 impl BitBoardIter {
     fn new(board: BitBoard) -> Self {
-        BitBoardIter {
-            board
-        }
+        BitBoardIter { board }
     }
 }
 
@@ -143,8 +141,7 @@ impl Iterator for BitBoardIter {
     fn next(&mut self) -> Option<Self::Item> {
         if self.board.is_empty() {
             None
-        }
-        else {
+        } else {
             let i = self.board.board.trailing_zeros() as u8;
             self.board = self.board.clear(i);
             Some(Square(i))
