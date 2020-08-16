@@ -67,13 +67,9 @@ impl Board {
         const NEXT_TO_THEIR_LAST_STONE: usize = NEXT_TO_OUR_LAST_STONE + 1;
         const DIAGONAL_TO_OUR_LAST_STONE: usize = NEXT_TO_THEIR_LAST_STONE + 1;
         const DIAGONAL_TO_THEIR_LAST_STONE: usize = DIAGONAL_TO_OUR_LAST_STONE + 1;
-        const FLAT_PIECE_NEXT_TO_TWO_FLAT_PIECES: usize = DIAGONAL_TO_THEIR_LAST_STONE + 1;
-        const ATTACK_FLATSTONE: usize = FLAT_PIECE_NEXT_TO_TWO_FLAT_PIECES + 1;
-        const ATTACK_STRONG_FLATSTONE: usize = ATTACK_FLATSTONE + 3;
+        const ATTACK_STRONG_FLATSTONE: usize = DIAGONAL_TO_THEIR_LAST_STONE + 1;
 
-        const BLOCKING_STONE_NEXT_TO_TWO_OF_THEIR_FLATS: usize = ATTACK_STRONG_FLATSTONE + 1;
-        const BLOCKING_STONE_BLOCKS_EXTENSIONS_OF_TWO_FLATS: usize =
-            BLOCKING_STONE_NEXT_TO_TWO_OF_THEIR_FLATS + 1;
+        const BLOCKING_STONE_BLOCKS_EXTENSIONS_OF_TWO_FLATS: usize = ATTACK_STRONG_FLATSTONE + 1;
 
         const STACK_MOVEMENT_THAT_GIVES_US_TOP_PIECES: usize =
             BLOCKING_STONE_BLOCKS_EXTENSIONS_OF_TWO_FLATS + 1;
@@ -203,28 +199,6 @@ impl Board {
                         }
                     }
 
-                    // If square has two or more of your own pieces around it
-                    if square
-                        .neighbours()
-                        .filter_map(|neighbour| self[neighbour].top_stone())
-                        .filter(|neighbour_piece| Us::is_road_stone(*neighbour_piece))
-                        .count()
-                        >= 2
-                    {
-                        coefficients[FLAT_PIECE_NEXT_TO_TWO_FLAT_PIECES] = 1.0;
-                    }
-
-                    // Bonus for "attacking" an enemy flatstone
-                    let enemy_flatstone_neighbours = square
-                        .neighbours()
-                        .filter(|sq| self[*sq].top_stone() == Some(Them::flat_piece()))
-                        .count();
-
-                    if enemy_flatstone_neighbours > 0 {
-                        coefficients
-                            [ATTACK_FLATSTONE + usize::max(enemy_flatstone_neighbours, 3)] = 1.0;
-                    }
-
                     // Bonus for attacking a flatstone in a rank/file where we are strong
                     for neighbour in square.neighbours() {
                         if self[neighbour].top_stone() == Some(Them::flat_piece()) {
@@ -262,15 +236,6 @@ impl Board {
                 }
                 if *role == Standing || *role == Cap {
                     // If square has two or more opponent flatstones around it
-                    if square
-                        .neighbours()
-                        .filter_map(|neighbour| self[neighbour].top_stone())
-                        .filter(|neighbour_piece| *neighbour_piece == Them::flat_piece())
-                        .count()
-                        >= 2
-                    {
-                        coefficients[BLOCKING_STONE_NEXT_TO_TWO_OF_THEIR_FLATS] = 1.0;
-                    }
                     for direction in square.directions() {
                         let neighbour = square.go_direction(direction).unwrap();
                         if self[neighbour]
