@@ -59,9 +59,9 @@ impl Board {
         const CAPSTONE_PSQT: usize = STANDING_STONE_PSQT + 6;
         const ROAD_STONES_IN_RANK_FILE: usize = CAPSTONE_PSQT + 6;
         const EXTEND_GROUP: usize = ROAD_STONES_IN_RANK_FILE + 15;
-        const MERGE_TWO_GROUPS: usize = EXTEND_GROUP + 1;
-        const BLOCK_MERGER: usize = MERGE_TWO_GROUPS + 1;
-        const PLACE_CRITICAL_SQUARE: usize = BLOCK_MERGER + 1;
+        const MERGE_TWO_GROUPS: usize = EXTEND_GROUP + 2;
+        const BLOCK_MERGER: usize = MERGE_TWO_GROUPS + 2;
+        const PLACE_CRITICAL_SQUARE: usize = BLOCK_MERGER + 2;
         const IGNORE_CRITICAL_SQUARE: usize = PLACE_CRITICAL_SQUARE + 5;
         const NEXT_TO_OUR_LAST_STONE: usize = IGNORE_CRITICAL_SQUARE + 2;
         const NEXT_TO_THEIR_LAST_STONE: usize = NEXT_TO_OUR_LAST_STONE + 1;
@@ -122,7 +122,9 @@ impl Board {
                     let i = (11 * n_low - n_low * n_low) / 2 + n_high - n_low;
                     debug_assert!(i < 15);
                     coefficients[ROAD_STONES_IN_RANK_FILE + i as usize] += 1.0;
+                }
 
+                if matches!(*role, Flat | Cap) {
                     // If square is next to a group
                     let mut our_unique_neighbour_groups: ArrayVec<[(Square, u8); 4]> =
                         ArrayVec::new();
@@ -144,19 +146,39 @@ impl Board {
                             their_unique_neighbour_groups.push((neighbour, neighbour_group_id));
                         }
                     }
-                    if our_unique_neighbour_groups.len() > 1 {
-                        coefficients[MERGE_TWO_GROUPS] += 1.0;
-                    }
+                    match *role {
+                        Flat => {
+                            if our_unique_neighbour_groups.len() > 1 {
+                                coefficients[MERGE_TWO_GROUPS] += 1.0;
+                            }
 
-                    if their_unique_neighbour_groups.len() > 1 {
-                        coefficients[BLOCK_MERGER] += 1.0;
-                    }
+                            if their_unique_neighbour_groups.len() > 1 {
+                                coefficients[BLOCK_MERGER] += 1.0;
+                            }
 
-                    for (_, group_id) in our_unique_neighbour_groups {
-                        coefficients[EXTEND_GROUP] +=
-                            group_data.amount_in_group[group_id as usize].0 as f32;
-                    }
+                            for (_, group_id) in our_unique_neighbour_groups {
+                                coefficients[EXTEND_GROUP] +=
+                                    group_data.amount_in_group[group_id as usize].0 as f32;
+                            }
+                        }
+                        Cap => {
+                            if our_unique_neighbour_groups.len() > 1 {
+                                coefficients[MERGE_TWO_GROUPS + 1] += 1.0;
+                            }
 
+                            if their_unique_neighbour_groups.len() > 1 {
+                                coefficients[BLOCK_MERGER + 1] += 1.0;
+                            }
+
+                            for (_, group_id) in our_unique_neighbour_groups {
+                                coefficients[EXTEND_GROUP + 1] +=
+                                    group_data.amount_in_group[group_id as usize].0 as f32;
+                            }
+                        }
+                        _ => unreachable!(),
+                    }
+                }
+                if *role == Flat {
                     if Us::is_critical_square(&*group_data, *square) {
                         coefficients[PLACE_CRITICAL_SQUARE] += 1.0;
                     } else if !their_open_critical_squares.is_empty() {
