@@ -22,12 +22,14 @@ use board_game_traits::board::{Color, GameResult};
 use pgn_traits::pgn;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
+use std::cell::RefCell;
 use std::cmp::Ordering;
 use std::fmt::Write;
+use std::hash::{Hash, Hasher};
 use std::iter::FromIterator;
 #[cfg(test)]
 use std::mem;
-use std::ops::{Index, IndexMut};
+use std::ops::{Deref, DerefMut, Index, IndexMut};
 use std::{fmt, iter, ops};
 
 /// Extra items for tuning evaluation constants.
@@ -76,6 +78,10 @@ pub(crate) trait ColorTr {
     fn is_road_stone(piece: Piece) -> bool;
 
     fn piece_is_ours(piece: Piece) -> bool;
+
+    fn is_critical_square(group_data: &GroupData, square: Square) -> bool;
+
+    fn critical_squares(group_data: &GroupData) -> BitBoard;
 }
 
 struct WhiteTr {}
@@ -120,6 +126,14 @@ impl ColorTr for WhiteTr {
     fn piece_is_ours(piece: Piece) -> bool {
         piece == WhiteFlat || piece == WhiteStanding || piece == WhiteCap
     }
+
+    fn is_critical_square(group_data: &GroupData, square: Square) -> bool {
+        group_data.white_critical_squares.get(square.0)
+    }
+
+    fn critical_squares(group_data: &GroupData) -> BitBoard {
+        group_data.white_critical_squares
+    }
 }
 
 struct BlackTr {}
@@ -163,6 +177,14 @@ impl ColorTr for BlackTr {
 
     fn piece_is_ours(piece: Piece) -> bool {
         piece == BlackFlat || piece == BlackCap || piece == BlackStanding
+    }
+
+    fn is_critical_square(group_data: &GroupData, square: Square) -> bool {
+        group_data.black_critical_squares.get(square.0)
+    }
+
+    fn critical_squares(group_data: &GroupData) -> BitBoard {
+        group_data.black_critical_squares
     }
 }
 
@@ -299,7 +321,7 @@ pub enum Role {
 }
 
 /// One of the 6 game pieces in Tak. Each piece has one variant for each color.
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Hash)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum Piece {
     WhiteFlat,
@@ -369,7 +391,7 @@ impl ops::Not for Piece {
 }
 
 /// The contents of a square on the board, consisting of zero or more pieces
-#[derive(Clone, PartialEq, Eq, Debug, Default)]
+#[derive(Clone, PartialEq, Eq, Debug, Default, Hash)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Stack {
     top_stone: Option<Piece>,
@@ -594,8 +616,113 @@ pub enum ColorDef {
     Black,
 }
 
+#[derive(Default, Clone, Copy, PartialEq, Eq, Debug)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub struct GroupEdgeConnection {
+    data: u8,
+}
+
+impl GroupEdgeConnection {
+    pub fn connect_square(self, square: Square) -> Self {
+        let mut edge_connection = self;
+        if square.rank() == BOARD_SIZE as u8 - 1 {
+            edge_connection = edge_connection.connect_north();
+        }
+        if square.rank() == 0 {
+            edge_connection = edge_connection.connect_south();
+        }
+        if square.file() == 0 {
+            edge_connection = edge_connection.connect_west();
+        }
+        if square.file() == BOARD_SIZE as u8 - 1 {
+            edge_connection = edge_connection.connect_east();
+        }
+        edge_connection
+    }
+
+    pub fn is_winning(self) -> bool {
+        self.is_connected_north() && self.is_connected_south()
+            || self.is_connected_east() && self.is_connected_west()
+    }
+
+    pub fn is_connected_north(self) -> bool {
+        self.data & 0b1000 != 0
+    }
+
+    pub fn connect_north(self) -> Self {
+        GroupEdgeConnection {
+            data: self.data | 0b1000,
+        }
+    }
+
+    pub fn is_connected_west(self) -> bool {
+        self.data & 0b100 != 0
+    }
+
+    pub fn connect_west(self) -> Self {
+        GroupEdgeConnection {
+            data: self.data | 0b100,
+        }
+    }
+
+    pub fn is_connected_east(self) -> bool {
+        self.data & 0b10 != 0
+    }
+
+    pub fn connect_east(self) -> Self {
+        GroupEdgeConnection {
+            data: self.data | 0b10,
+        }
+    }
+
+    pub fn is_connected_south(self) -> bool {
+        self.data & 1 != 0
+    }
+
+    pub fn connect_south(self) -> Self {
+        GroupEdgeConnection {
+            data: self.data | 1,
+        }
+    }
+}
+
+impl ops::BitOr for GroupEdgeConnection {
+    type Output = Self;
+
+    fn bitor(self, rhs: Self) -> Self::Output {
+        GroupEdgeConnection {
+            data: self.data | rhs.data,
+        }
+    }
+}
+#[derive(Clone, PartialEq, Eq, Debug, Default)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub struct GroupData {
+    pub(crate) groups: AbstractBoard<u8>,
+    pub(crate) amount_in_group: [(u8, GroupEdgeConnection); BOARD_AREA + 1],
+    pub(crate) white_critical_squares: BitBoard,
+    pub(crate) black_critical_squares: BitBoard,
+    updated_groups: bool,
+}
+
+impl GroupData {
+    pub fn is_critical_square(&self, square: Square, color: Color) -> bool {
+        match color {
+            Color::White => WhiteTr::is_critical_square(self, square),
+            Color::Black => BlackTr::is_critical_square(self, square),
+        }
+    }
+
+    pub fn critical_squares<'a>(&'a self, color: Color) -> impl Iterator<Item = Square> + 'a {
+        match color {
+            Color::White => self.white_critical_squares.into_iter(),
+            Color::Black => self.black_critical_squares.into_iter(),
+        }
+    }
+}
+
 /// Complete representation of a Tak position
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Board {
     cells: AbstractBoard<Stack>,
@@ -613,8 +740,33 @@ pub struct Board {
     black_capstones_left: u8,
     moves_played: u16,
     moves: Vec<Move>,
-    groups: AbstractBoard<u8>,
-    amount_in_group: [u8; BOARD_AREA + 1],
+    group_data: RefCell<GroupData>,
+}
+
+impl PartialEq for Board {
+    fn eq(&self, other: &Self) -> bool {
+        self.cells == other.cells
+            && self.to_move == other.to_move
+            && self.white_stones_left == other.white_stones_left
+            && self.black_stones_left == other.black_stones_left
+            && self.white_capstones_left == other.white_capstones_left
+            && self.black_capstones_left == other.black_capstones_left
+            && self.moves_played == other.moves_played
+    }
+}
+
+impl Eq for Board {}
+
+impl Hash for Board {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.cells.hash(state);
+        self.to_move.hash(state);
+        self.white_stones_left.hash(state);
+        self.black_stones_left.hash(state);
+        self.white_capstones_left.hash(state);
+        self.black_capstones_left.hash(state);
+        self.moves_played.hash(state);
+    }
 }
 
 impl Index<Square> for Board {
@@ -633,7 +785,7 @@ impl IndexMut<Square> for Board {
 
 impl Default for Board {
     fn default() -> Self {
-        let mut board = Board {
+        let board = Board {
             cells: Default::default(),
             to_move: Color::White,
             white_flat_stones: Default::default(),
@@ -648,10 +800,10 @@ impl Default for Board {
             black_capstones_left: STARTING_CAPSTONES,
             moves_played: 0,
             moves: vec![],
-            groups: Default::default(),
-            amount_in_group: [0; BOARD_AREA + 1],
+            group_data: RefCell::new(GroupData::default()),
         };
-        board.amount_in_group[0] = BOARD_AREA as u8;
+        board.group_data.borrow_mut().amount_in_group[0] =
+            (BOARD_AREA as u8, GroupEdgeConnection::default());
         board
     }
 }
@@ -690,8 +842,12 @@ impl fmt::Debug for Board {
         writeln!(f, "{} to move.", self.side_to_move())?;
         writeln!(f, "White road stones: {:b}", self.white_road_pieces().board)?;
         writeln!(f, "Black road stones: {:b}", self.black_road_pieces().board)?;
-        writeln!(f, "Groups: {:?}", self.groups)?;
-        writeln!(f, "Amount in groups: {:?}", self.amount_in_group)?;
+        writeln!(f, "Groups: {:?}", self.group_data.borrow().groups)?;
+        writeln!(
+            f,
+            "Amount in groups: {:?}",
+            self.group_data.borrow().amount_in_group
+        )?;
         Ok(())
     }
 }
@@ -713,6 +869,13 @@ impl Board {
         self.black_standing_stones | self.black_capstones
     }
 
+    pub(crate) fn all_pieces(&self) -> BitBoard {
+        self.white_flat_stones
+            | self.white_blocking_pieces()
+            | self.black_flat_stones
+            | self.black_blocking_pieces()
+    }
+
     pub fn white_flat_tops_count(&self) -> u8 {
         self.white_road_pieces().count() - (STARTING_CAPSTONES - self.white_capstones_left)
     }
@@ -731,12 +894,30 @@ impl Board {
         &self.moves
     }
 
-    pub(crate) fn groups(&self) -> &AbstractBoard<u8> {
-        &self.groups
+    pub(crate) fn group_data<'a>(&'a self) -> impl Deref<Target = GroupData> + 'a {
+        if !self.group_data.borrow().updated_groups {
+            self.update_group_connectedness();
+        }
+        self.group_data.borrow()
     }
 
-    pub(crate) fn amount_in_group(&self) -> &[u8; BOARD_AREA + 1] {
-        &self.amount_in_group
+    fn is_critical_square_from_scratch(
+        &self,
+        groups: &AbstractBoard<u8>,
+        amount_in_group: &[(u8, GroupEdgeConnection); BOARD_AREA + 1],
+        square: Square,
+        color: Color,
+    ) -> bool {
+        let sum_of_connections = square
+            .neighbours()
+            .filter(|neighbour| self[*neighbour].top_stone().map(Piece::color) == Some(color))
+            .map(|neighbour| amount_in_group[groups[neighbour] as usize].1)
+            .fold(
+                GroupEdgeConnection::default().connect_square(square),
+                |acc, connection| acc | connection,
+            );
+
+        sum_of_connections.is_winning()
     }
 
     #[cfg(test)]
@@ -878,27 +1059,50 @@ impl Board {
         }
     }
 
-    pub fn update_group_connectedness(&mut self) {
+    pub fn update_group_connectedness(&self) {
+        let mut group_data = self.group_data.borrow_mut();
+
+        let GroupData {
+            groups,
+            amount_in_group,
+            white_critical_squares,
+            black_critical_squares,
+            updated_groups,
+        } = group_data.deref_mut();
+
         let mut highest_component_id = 1;
 
-        self.groups = Default::default();
+        *groups = Default::default();
 
-        connected_components_graph(
-            self.white_road_pieces(),
-            &mut self.groups,
-            &mut highest_component_id,
-        );
-        connected_components_graph(
-            self.black_road_pieces(),
-            &mut self.groups,
-            &mut highest_component_id,
-        );
+        connected_components_graph(self.white_road_pieces(), groups, &mut highest_component_id);
+        connected_components_graph(self.black_road_pieces(), groups, &mut highest_component_id);
 
-        self.amount_in_group = [0; BOARD_AREA + 1];
+        *amount_in_group = Default::default();
 
         for square in squares_iterator() {
-            self.amount_in_group[self.groups[square] as usize] += 1;
+            amount_in_group[groups[square] as usize].0 += 1;
+            if self[square].top_stone().map(Piece::is_road_piece) == Some(true) {
+                amount_in_group[groups[square] as usize].1 = amount_in_group
+                    [groups[square] as usize]
+                    .1
+                    .connect_square(square);
+            }
         }
+
+        *white_critical_squares = BitBoard::default();
+        *black_critical_squares = BitBoard::default();
+
+        for square in squares_iterator() {
+            if self.is_critical_square_from_scratch(&groups, &amount_in_group, square, Color::White)
+            {
+                *white_critical_squares = white_critical_squares.set(square.0);
+            }
+            if self.is_critical_square_from_scratch(&groups, &amount_in_group, square, Color::Black)
+            {
+                *black_critical_squares = black_critical_squares.set(square.0);
+            }
+        }
+        *updated_groups = true;
     }
 
     /// An iterator over the top stones left behind after a stack movement
@@ -951,9 +1155,11 @@ impl Board {
         // Bonus/malus depending on the number of groups each side has
         let mut seen_groups = [false; BOARD_AREA + 1];
         seen_groups[0] = true;
+        let group_data = self.group_data.borrow();
+
         let number_of_groups = squares_iterator()
             .map(|square| {
-                let group_id = self.groups[square] as usize;
+                let group_id = group_data.groups[square] as usize;
                 if !seen_groups[group_id] {
                     seen_groups[group_id] = true;
                     self[square].top_stone.unwrap().color().multiplier()
@@ -990,7 +1196,33 @@ impl Board {
         coefficients[FLATSTONE_LEAD + 2] = white_flatstone_lead as f32 * endgame_scale_factor;
         coefficients[NUMBER_OF_GROUPS + 2] = number_of_groups * endgame_scale_factor;
 
-        const PIECES_IN_OUR_STACK: usize = NUMBER_OF_GROUPS + 3;
+        const CRITICAL_SQUARES: usize = NUMBER_OF_GROUPS + 3;
+
+        for critical_square in group_data.critical_squares(Color::White) {
+            match self[critical_square].top_stone {
+                None => coefficients[CRITICAL_SQUARES] += 1.0,
+                Some(Piece::WhiteStanding) => coefficients[CRITICAL_SQUARES + 1] += 1.0,
+                Some(Piece::BlackFlat) => coefficients[CRITICAL_SQUARES + 2] += 1.0,
+                Some(Piece::BlackCap) | Some(Piece::BlackStanding) => {
+                    coefficients[CRITICAL_SQUARES + 3] += 1.0
+                }
+                _ => unreachable!(),
+            }
+        }
+
+        for critical_square in group_data.critical_squares(Color::Black) {
+            match self[critical_square].top_stone {
+                None => coefficients[CRITICAL_SQUARES] -= 1.0,
+                Some(Piece::BlackStanding) => coefficients[CRITICAL_SQUARES + 1] -= 1.0,
+                Some(Piece::WhiteFlat) => coefficients[CRITICAL_SQUARES + 2] -= 1.0,
+                Some(Piece::WhiteCap) | Some(Piece::WhiteStanding) => {
+                    coefficients[CRITICAL_SQUARES + 3] -= 1.0
+                }
+                _ => unreachable!(),
+            }
+        }
+
+        const PIECES_IN_OUR_STACK: usize = CRITICAL_SQUARES + 4;
         const PIECES_IN_THEIR_STACK: usize = PIECES_IN_OUR_STACK + 1;
         const CAPSTONE_OVER_OWN_PIECE: usize = PIECES_IN_THEIR_STACK + 1;
         const CAPSTONE_ON_STACK: usize = CAPSTONE_OVER_OWN_PIECE + 1;
@@ -1320,8 +1552,7 @@ impl board::Board for Board {
             self
         );
 
-        self.update_group_connectedness();
-
+        self.group_data.borrow_mut().updated_groups = false;
         self.moves.push(mv);
         self.to_move = !self.to_move;
         self.moves_played += 1;
@@ -1381,31 +1612,41 @@ impl board::Board for Board {
             }
         }
 
-        self.update_group_connectedness();
-
+        self.group_data.borrow_mut().updated_groups = false;
         self.moves.pop();
         self.moves_played -= 1;
         self.to_move = !self.to_move;
     }
 
     fn game_result(&self) -> Option<GameResult> {
-        let highest_component_id = self
+        let group_data = self.group_data();
+        if group_data
             .amount_in_group
             .iter()
-            .enumerate()
-            .skip(1)
-            .find(|(_i, v)| **v == 0)
-            .map(|(i, _v)| i)
-            .unwrap_or(BOARD_AREA + 1) as u8;
+            .any(|(_, group_connection)| group_connection.is_winning())
+        {
+            let highest_component_id = group_data
+                .amount_in_group
+                .iter()
+                .enumerate()
+                .skip(1)
+                .find(|(_i, v)| (**v).0 == 0)
+                .map(|(i, _v)| i)
+                .unwrap_or(BOARD_AREA + 1) as u8;
 
-        if let Some(square) = self.is_win_by_road(&self.groups, highest_component_id) {
-            debug_assert!(self[square].top_stone().unwrap().is_road_piece());
-            return if self[square].top_stone().unwrap().color() == Color::White {
-                Some(GameResult::WhiteWin)
-            } else {
-                Some(GameResult::BlackWin)
+            if let Some(square) = self.is_win_by_road(&group_data.groups, highest_component_id) {
+                debug_assert!(self[square].top_stone().unwrap().is_road_piece());
+                return if self[square].top_stone().unwrap().color() == Color::White {
+                    Some(GameResult::WhiteWin)
+                } else {
+                    Some(GameResult::BlackWin)
+                };
             };
-        };
+            unreachable!(
+                "Board has winning connection, but isn't winning\n{:?}",
+                self
+            )
+        }
 
         if (self.white_stones_left == 0 && self.white_capstones_left == 0)
             || (self.black_stones_left == 0 && self.black_capstones_left == 0)
@@ -1445,118 +1686,129 @@ pub(crate) const SQUARE_SYMMETRIES: [usize; 25] = [
 impl TunableBoard for Board {
     #[allow(clippy::unreadable_literal)]
     const VALUE_PARAMS: &'static [f32] = &[
-        -0.21487005,
-        -0.0406565,
-        -0.018901477,
-        0.030663004,
-        0.079226784,
-        0.11530221,
-        0.743739,
-        0.65239054,
-        0.6930186,
-        0.74156344,
-        0.8289646,
-        0.78372926,
-        0.08004124,
-        0.5119432,
-        0.6198412,
-        0.84567523,
-        0.96913385,
-        1.2360283,
-        1.0609382,
-        0.6352445,
-        0.91007096,
-        0.43367025,
-        -0.42892265,
-        -0.037731387,
-        -0.26795357,
-        -0.08676032,
-        -0.012233485,
-        1.0000367,
-        0.6400831,
-        0.23976964,
-        0.42723274,
-        0.38668478,
-        -0.027503295,
-        -0.13108984,
-        -0.13363458,
-        0.7972735,
-        -0.806871,
-        -0.57120854,
-        -0.3215248,
-        0.1548999,
-        0.75791836,
-        -1.4084904,
-        -1.0300877,
-        -0.20436336,
-        0.7446849,
-        1.8981309,
-        0.010878452,
-        0.10515187,
-        0.2837778,
-        0.018385313,
-        0.22821361,
+        -0.06957684,
+        0.09941823,
+        0.22993903,
+        0.27654657,
+        0.3576238,
+        0.27503046,
+        -0.13006444,
+        0.36942688,
+        0.110328175,
+        0.5693802,
+        0.6442959,
+        0.13126442,
+        -0.42256492,
+        -0.2047903,
+        -0.01716135,
+        0.33137748,
+        0.38537857,
+        0.98498,
+        0.80496544,
+        0.73231345,
+        1.0004733,
+        0.3392549,
+        0.15786444,
+        0.6615083,
+        -0.22721307,
+        -0.21164285,
+        -0.033452734,
+        0.29641888,
+        0.050247233,
+        0.17163476,
+        -0.12893447,
+        1.1369265,
+        0.7167756,
+        0.020071372,
+        0.47985473,
+        0.6211995,
+        -0.055475865,
+        -0.19257045,
+        -0.17199256,
+        0.57515764,
+        -0.6788107,
+        -0.31649214,
+        -0.06827733,
+        0.11140136,
+        0.3620042,
+        -0.79724455,
+        -0.5222425,
+        -0.07149559,
+        0.46780652,
+        0.9309407,
+        -0.0003883317,
+        0.08454401,
+        -0.15707234,
+        0.25327602,
+        0.009132297,
     ];
     #[allow(clippy::unreadable_literal)]
     const POLICY_PARAMS: &'static [f32] = &[
-        0.95176965,
-        0.16173114,
-        0.59772474,
-        1.1166116,
-        1.3162442,
-        1.9868575,
-        1.4941791,
-        -2.7922604,
-        -3.0687063,
-        -2.448749,
-        -2.4790342,
-        -1.6158262,
-        -0.44776046,
-        -0.7285182,
-        -1.1858665,
-        -1.0157739,
-        -0.6413192,
-        1.9780879,
-        6.884801,
-        -0.85744035,
-        -0.7118897,
-        -0.16571522,
-        0.6391703,
-        1.3325201,
-        -0.68129116,
-        -0.4353376,
-        0.40206176,
-        2.4287982,
-        -0.18257001,
-        0.38008448,
-        3.0049555,
-        0.96343607,
-        0.5669638,
-        0.017208176,
-        0.014718662,
-        0.21069713,
-        0.1450136,
-        0.63075835,
-        0.6348403,
-        0.30854577,
-        0.3511834,
-        -0.08849041,
-        -0.005027906,
-        0.009074186,
-        0.0013767083,
-        0.065020956,
-        -0.12625043,
-        1.8251697,
-        -0.53789485,
-        0.29997733,
-        0.03960361,
-        -1.1024146,
-        -0.7377459,
-        0.008673969,
-        -0.69387805,
-        -0.75885266,
-        -0.8611216,
-        0.48262483,
+        0.89577013,
+        -0.027521847,
+        0.2576402,
+        0.5089246,
+        0.78075093,
+        1.1284016,
+        0.42189822,
+        -2.3600466,
+        -2.639767,
+        -2.7550888,
+        -2.460807,
+        -2.3146715,
+        -2.3411353,
+        -1.9655714,
+        -1.440716,
+        -1.1410253,
+        -1.2069306,
+        -0.3164149,
+        5.509648,
+        -0.6967968,
+        -0.4379162,
+        0.27379686,
+        0.8567536,
+        1.308089,
+        -0.5267456,
+        -0.145497,
+        0.48774365,
+        0.7948223,
+        0.047049087,
+        0.53108364,
+        0.038285382,
+        0.5924418,
+        -0.05875795,
+        0.008744102,
+        0.04212139,
+        -0.0035095464,
+        -0.4605051,
+        0.6563388,
+        0.15589722,
+        0.3920133,
+        0.18595915,
+        1.1734537,
+        -0.6022039,
+        2.484877,
+        0.83857965,
+        2.5872924,
+        4.1869264,
+        0.8030188,
+        -3.9624834,
+        -2.3699753,
+        0.8408107,
+        1.050883,
+        0.3543681,
+        0.55475014,
+        0.0688861,
+        0.61418205,
+        -0.81568795,
+        0.26141876,
+        -2.8161912,
+        -2.1170151,
+        -2.2156065,
+        -2.2637486,
+        0.5628444,
+        0.8341487,
+        2.4380996,
     ];
 
     fn static_eval_coefficients(&self, coefficients: &mut [f32]) {
@@ -1716,7 +1968,7 @@ impl pgn_traits::pgn::PgnBoard for Board {
     }
 }
 
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub(crate) struct AbstractBoard<T> {
     raw: [[T; BOARD_SIZE]; BOARD_SIZE],

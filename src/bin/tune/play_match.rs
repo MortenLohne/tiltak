@@ -1,9 +1,10 @@
 use board_game_traits::board::{Board as BoardTrait, Color, GameResult};
+use rand::seq::SliceRandom;
 use rand::Rng;
 use rayon::prelude::*;
 use std::io;
 use std::sync::atomic::{AtomicU64, Ordering};
-use taik::board::{Board, Move};
+use taik::board::{Board, Move, Role};
 use taik::mcts::{MctsSetting, Score};
 use taik::pgn_writer::Game;
 use taik::{mcts, pgn_writer};
@@ -13,12 +14,13 @@ pub fn play_game(
     white_settings: &MctsSetting,
     black_settings: &MctsSetting,
 ) -> (Game<Board>, Vec<Vec<(Move, Score)>>) {
-    const MCTS_NODES: u64 = 10_000;
+    const MCTS_NODES: u64 = 100_000;
     const TEMPERATURE: f64 = 1.0;
 
     let mut board = Board::start_board();
     let mut game_moves = vec![];
     let mut move_scores = vec![];
+    let mut rng = rand::thread_rng();
 
     while board.game_result().is_none() {
         let num_plies = game_moves.len();
@@ -30,8 +32,20 @@ pub fn play_game(
             Color::White => mcts::mcts_training(board.clone(), MCTS_NODES, white_settings),
             Color::Black => mcts::mcts_training(board.clone(), MCTS_NODES, black_settings),
         };
+
+        // For the first regular move (White's move #2),
+        // choose a random flatstone move 50% of the time
+        // This reduces white's first move advantage, and prevents white from always playing 2.Cc3
+        let best_move = if board.half_moves_played() == 2 && rng.gen() {
+            let flat_moves = moves_scores
+                .iter()
+                .map(|(mv, _)| mv)
+                .filter(|mv| matches!(*mv, Move::Place(Role::Flat, _)))
+                .collect::<Vec<_>>();
+            (*flat_moves.choose(&mut rng).unwrap()).clone()
+        }
         // Turn off temperature in the middle-game, when all games are expected to be unique
-        let best_move = if board.half_moves_played() < 20 {
+        else if board.half_moves_played() < 20 {
             best_move(TEMPERATURE, &moves_scores[..])
         } else {
             best_move(0.1, &moves_scores[..])

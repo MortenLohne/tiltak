@@ -342,11 +342,12 @@ fn test_position() {
     let mut simple_moves = vec![];
     let mut moves = vec![];
     let settings = MctsSetting::default();
-    for i in 0.. {
+    for i in 1.. {
         tree.select(&mut board.clone(), &settings, &mut simple_moves, &mut moves);
         if i % 100_000 == 0 {
             println!("{} visits, val={}", tree.visits, tree.mean_action_value);
             tree.print_info(&settings);
+            println!("Best move: {:?}", tree.best_move())
         }
     }
 }

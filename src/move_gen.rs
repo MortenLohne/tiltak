@@ -1,3 +1,4 @@
+use crate::bitboard::BitBoard;
 use crate::board::Role::*;
 use crate::board::{
     Board, ColorTr, Direction, Move, Movement, Piece, Square, StackMovement, TunableBoard,
@@ -58,24 +59,23 @@ impl Board {
         const CAPSTONE_PSQT: usize = STANDING_STONE_PSQT + 6;
         const ROAD_STONES_IN_RANK_FILE: usize = CAPSTONE_PSQT + 6;
         const EXTEND_GROUP: usize = ROAD_STONES_IN_RANK_FILE + 15;
-        const MERGE_TWO_GROUPS: usize = EXTEND_GROUP + 1;
-        const BLOCK_MERGER: usize = MERGE_TWO_GROUPS + 1;
-        const NEXT_TO_OUR_LAST_STONE: usize = BLOCK_MERGER + 1;
+        const MERGE_TWO_GROUPS: usize = EXTEND_GROUP + 3;
+        const BLOCK_MERGER: usize = MERGE_TWO_GROUPS + 3;
+        const PLACE_CRITICAL_SQUARE: usize = BLOCK_MERGER + 3;
+        const IGNORE_CRITICAL_SQUARE: usize = PLACE_CRITICAL_SQUARE + 5;
+        const NEXT_TO_OUR_LAST_STONE: usize = IGNORE_CRITICAL_SQUARE + 2;
         const NEXT_TO_THEIR_LAST_STONE: usize = NEXT_TO_OUR_LAST_STONE + 1;
         const DIAGONAL_TO_OUR_LAST_STONE: usize = NEXT_TO_THEIR_LAST_STONE + 1;
         const DIAGONAL_TO_THEIR_LAST_STONE: usize = DIAGONAL_TO_OUR_LAST_STONE + 1;
-        const FLAT_PIECE_NEXT_TO_TWO_FLAT_PIECES: usize = DIAGONAL_TO_THEIR_LAST_STONE + 1;
-        const ATTACK_FLATSTONE: usize = FLAT_PIECE_NEXT_TO_TWO_FLAT_PIECES + 1;
-        const ATTACK_STRONG_FLATSTONE: usize = ATTACK_FLATSTONE + 3;
+        const ATTACK_STRONG_FLATSTONE: usize = DIAGONAL_TO_THEIR_LAST_STONE + 1;
 
-        const BLOCKING_STONE_NEXT_TO_TWO_OF_THEIR_FLATS: usize = ATTACK_STRONG_FLATSTONE + 1;
-        const BLOCKING_STONE_BLOCKS_EXTENSIONS_OF_TWO_FLATS: usize =
-            BLOCKING_STONE_NEXT_TO_TWO_OF_THEIR_FLATS + 1;
+        const BLOCKING_STONE_BLOCKS_EXTENSIONS_OF_TWO_FLATS: usize = ATTACK_STRONG_FLATSTONE + 1;
 
         const STACK_MOVEMENT_THAT_GIVES_US_TOP_PIECES: usize =
             BLOCKING_STONE_BLOCKS_EXTENSIONS_OF_TWO_FLATS + 1;
-        const STACK_CAPTURED_BY_MOVEMENT: usize = STACK_MOVEMENT_THAT_GIVES_US_TOP_PIECES + 9;
-        const _NEXT_CONST: usize = STACK_CAPTURED_BY_MOVEMENT + 1;
+        const STACK_CAPTURED_BY_MOVEMENT: usize = STACK_MOVEMENT_THAT_GIVES_US_TOP_PIECES + 6;
+        const MOVE_ONTO_CRITICAL_SQUARE: usize = STACK_CAPTURED_BY_MOVEMENT + 1;
+        const _NEXT_CONST: usize = MOVE_ONTO_CRITICAL_SQUARE + 2;
 
         assert_eq!(coefficients.len(), _NEXT_CONST);
 
@@ -89,28 +89,43 @@ impl Board {
         }
 
         match mv {
-            Move::Place(role, square) if *role == Flat => {
+            Move::Place(role, square) => {
+                let group_data = self.group_data();
+                let their_open_critical_squares =
+                    Them::critical_squares(&*group_data) & (!self.all_pieces());
+
                 // Apply PSQT
-                coefficients[FLAT_STONE_PSQT + SQUARE_SYMMETRIES[square.0 as usize]] = 1.0;
+                match role {
+                    Flat => {
+                        coefficients[FLAT_STONE_PSQT + SQUARE_SYMMETRIES[square.0 as usize]] = 1.0
+                    }
+                    Standing => {
+                        coefficients[STANDING_STONE_PSQT + SQUARE_SYMMETRIES[square.0 as usize]] =
+                            1.0
+                    }
+                    Cap => coefficients[CAPSTONE_PSQT + SQUARE_SYMMETRIES[square.0 as usize]] = 1.0,
+                }
 
-                // Bonus for laying stones in files/ranks where we already have road stones
-                // Implemented as a 2D table. Because of symmetries,
-                // only 15 squares are needed, not all 25
-                let road_stones_in_rank = Us::road_stones(&self).rank(square.rank()).count();
-                let road_stones_in_file = Us::road_stones(&self).file(square.file()).count();
+                if *role == Flat {
+                    // Bonus for laying stones in files/ranks where we already have road stones
+                    // Implemented as a 2D table. Because of symmetries,
+                    // only 15 squares are needed, not all 25
+                    let road_stones_in_rank = Us::road_stones(&self).rank(square.rank()).count();
+                    let road_stones_in_file = Us::road_stones(&self).file(square.file()).count();
 
-                let n_low = u8::min(road_stones_in_file, road_stones_in_rank);
-                let n_high = u8::max(road_stones_in_file, road_stones_in_rank);
-                let i = (11 * n_low - n_low * n_low) / 2 + n_high - n_low;
-                debug_assert!(i < 15);
-                coefficients[ROAD_STONES_IN_RANK_FILE + i as usize] += 1.0;
+                    let n_low = u8::min(road_stones_in_file, road_stones_in_rank);
+                    let n_high = u8::max(road_stones_in_file, road_stones_in_rank);
+                    let i = (11 * n_low - n_low * n_low) / 2 + n_high - n_low;
+                    debug_assert!(i < 15);
+                    coefficients[ROAD_STONES_IN_RANK_FILE + i as usize] += 1.0;
+                }
 
                 // If square is next to a group
                 let mut our_unique_neighbour_groups: ArrayVec<[(Square, u8); 4]> = ArrayVec::new();
                 let mut their_unique_neighbour_groups: ArrayVec<[(Square, u8); 4]> =
                     ArrayVec::new();
                 for neighbour in square.neighbours().filter(|sq| !self[*sq].is_empty()) {
-                    let neighbour_group_id = self.groups()[neighbour];
+                    let neighbour_group_id = group_data.groups[neighbour];
                     if Us::piece_is_ours(self[neighbour].top_stone().unwrap()) {
                         if our_unique_neighbour_groups
                             .iter()
@@ -125,127 +140,134 @@ impl Board {
                         their_unique_neighbour_groups.push((neighbour, neighbour_group_id));
                     }
                 }
+
+                let role_id = match *role {
+                    Flat => 0,
+                    Standing => 1,
+                    Cap => 2,
+                };
+
                 if our_unique_neighbour_groups.len() > 1 {
-                    coefficients[MERGE_TWO_GROUPS] += 1.0;
+                    coefficients[MERGE_TWO_GROUPS + role_id] += 1.0;
                 }
 
                 if their_unique_neighbour_groups.len() > 1 {
-                    coefficients[BLOCK_MERGER] += 1.0;
+                    coefficients[BLOCK_MERGER + role_id] += 1.0;
                 }
 
                 for (_, group_id) in our_unique_neighbour_groups {
-                    coefficients[EXTEND_GROUP] += self.amount_in_group()[group_id as usize] as f32;
+                    coefficients[EXTEND_GROUP + role_id] +=
+                        group_data.amount_in_group[group_id as usize].0 as f32;
                 }
 
-                // If square is next to a road stone laid on our last turn
-                if let Some(Move::Place(last_role, last_square)) =
-                    self.moves().get(self.moves().len() - 2)
-                {
-                    if *last_role == Flat || *last_role == Cap {
-                        if square.neighbours().any(|neigh| neigh == *last_square) {
-                            coefficients[NEXT_TO_OUR_LAST_STONE] = 1.0;
-                        } else if (square.rank() as i8 - last_square.rank() as i8).abs() == 1
-                            && (square.file() as i8 - last_square.file() as i8).abs() == 1
-                        {
-                            coefficients[DIAGONAL_TO_OUR_LAST_STONE] = 1.0;
+                if *role == Flat {
+                    if Us::is_critical_square(&*group_data, *square) {
+                        coefficients[PLACE_CRITICAL_SQUARE] += 1.0;
+                    } else if !their_open_critical_squares.is_empty() {
+                        if their_open_critical_squares == BitBoard::empty().set(square.0) {
+                            coefficients[PLACE_CRITICAL_SQUARE + 1] += 1.0;
+                        } else {
+                            coefficients[IGNORE_CRITICAL_SQUARE] += 1.0;
+                        }
+                    }
+
+                    // If square is next to a road stone laid on our last turn
+                    if let Some(Move::Place(last_role, last_square)) =
+                        self.moves().get(self.moves().len() - 2)
+                    {
+                        if *last_role == Flat || *last_role == Cap {
+                            if square.neighbours().any(|neigh| neigh == *last_square) {
+                                coefficients[NEXT_TO_OUR_LAST_STONE] = 1.0;
+                            } else if (square.rank() as i8 - last_square.rank() as i8).abs() == 1
+                                && (square.file() as i8 - last_square.file() as i8).abs() == 1
+                            {
+                                coefficients[DIAGONAL_TO_OUR_LAST_STONE] = 1.0;
+                            }
+                        }
+                    }
+
+                    // If square is next to a road stone laid on their last turn
+                    if let Some(Move::Place(last_role, last_square)) = self.moves().last() {
+                        if *last_role == Flat {
+                            if square.neighbours().any(|neigh| neigh == *last_square) {
+                                coefficients[NEXT_TO_THEIR_LAST_STONE] = 1.0;
+                            } else if (square.rank() as i8 - last_square.rank() as i8).abs() == 1
+                                && (square.file() as i8 - last_square.file() as i8).abs() == 1
+                            {
+                                coefficients[DIAGONAL_TO_THEIR_LAST_STONE] = 1.0;
+                            }
+                        }
+                    }
+
+                    // Bonus for attacking a flatstone in a rank/file where we are strong
+                    for neighbour in square.neighbours() {
+                        if self[neighbour].top_stone() == Some(Them::flat_piece()) {
+                            let our_road_stones =
+                                Us::road_stones(self).rank(neighbour.rank()).count()
+                                    + Us::road_stones(self).file(neighbour.file()).count();
+                            if our_road_stones >= 2 {
+                                coefficients[ATTACK_STRONG_FLATSTONE] +=
+                                    (our_road_stones - 1) as f32;
+                            }
                         }
                     }
                 }
 
-                // If square is next to a road stone laid on their last turn
-                if let Some(Move::Place(last_role, last_square)) = self.moves().last() {
-                    if *last_role == Flat {
-                        if square.neighbours().any(|neigh| neigh == *last_square) {
-                            coefficients[NEXT_TO_THEIR_LAST_STONE] = 1.0;
-                        } else if (square.rank() as i8 - last_square.rank() as i8).abs() == 1
-                            && (square.file() as i8 - last_square.file() as i8).abs() == 1
-                        {
-                            coefficients[DIAGONAL_TO_THEIR_LAST_STONE] = 1.0;
-                        }
-                    }
-                }
-
-                // If square has two or more of your own pieces around it
-                if square
-                    .neighbours()
-                    .filter_map(|neighbour| self[neighbour].top_stone())
-                    .filter(|neighbour_piece| Us::is_road_stone(*neighbour_piece))
-                    .count()
-                    >= 2
-                {
-                    coefficients[FLAT_PIECE_NEXT_TO_TWO_FLAT_PIECES] = 1.0;
-                }
-
-                // Bonus for "attacking" an enemy flatstone
-                let enemy_flatstone_neighbours = square
-                    .neighbours()
-                    .filter(|sq| self[*sq].top_stone() == Some(Them::flat_piece()))
-                    .count();
-
-                if enemy_flatstone_neighbours > 0 {
-                    coefficients[ATTACK_FLATSTONE + usize::max(enemy_flatstone_neighbours, 3)] =
-                        1.0;
-                }
-
-                // Bonus for attacking a flatstone in a rank/file where we are strong
-                for neighbour in square.neighbours() {
-                    if self[neighbour].top_stone() == Some(Them::flat_piece()) {
-                        let our_road_stones = Us::road_stones(self).rank(neighbour.rank()).count()
-                            + Us::road_stones(self).file(neighbour.file()).count();
-                        if our_road_stones >= 2 {
-                            coefficients[ATTACK_STRONG_FLATSTONE] += (our_road_stones - 1) as f32;
-                        }
-                    }
-                }
-            }
-            Move::Place(role, square) => {
-                // Apply PSQT:
                 if *role == Standing {
                     coefficients[STANDING_STONE_PSQT + SQUARE_SYMMETRIES[square.0 as usize]] = 1.0;
+
+                    if !their_open_critical_squares.is_empty() {
+                        if their_open_critical_squares == BitBoard::empty().set(square.0) {
+                            coefficients[PLACE_CRITICAL_SQUARE + 2] += 1.0;
+                        } else {
+                            coefficients[IGNORE_CRITICAL_SQUARE] += 1.0;
+                        }
+                    }
                 } else if *role == Cap {
-                    coefficients[CAPSTONE_PSQT + SQUARE_SYMMETRIES[square.0 as usize]] = 1.0;
-                } else {
-                    unreachable!(
-                        "Tried to place {:?} with move {} on board\n{:?}",
-                        role, mv, self
-                    );
-                };
-                // If square has two or more opponent flatstones around it
-                if square
-                    .neighbours()
-                    .filter_map(|neighbour| self[neighbour].top_stone())
-                    .filter(|neighbour_piece| *neighbour_piece == Them::flat_piece())
-                    .count()
-                    >= 2
-                {
-                    coefficients[BLOCKING_STONE_NEXT_TO_TWO_OF_THEIR_FLATS] = 1.0;
+                    if Us::is_critical_square(&*group_data, *square) {
+                        coefficients[PLACE_CRITICAL_SQUARE] += 1.0;
+                    } else if !their_open_critical_squares.is_empty() {
+                        if their_open_critical_squares == BitBoard::empty().set(square.0) {
+                            coefficients[PLACE_CRITICAL_SQUARE + 3] += 1.0;
+                        } else {
+                            coefficients[IGNORE_CRITICAL_SQUARE] += 1.0;
+                        }
+                    }
                 }
-                for direction in square.directions() {
-                    let neighbour = square.go_direction(direction).unwrap();
-                    if self[neighbour]
-                        .top_stone()
-                        .map(Them::is_road_stone)
-                        .unwrap_or_default()
-                        && neighbour
-                            .go_direction(direction)
-                            .and_then(|sq| self[sq].top_stone())
+                if *role == Standing || *role == Cap {
+                    // If square has two or more opponent flatstones around it
+                    for direction in square.directions() {
+                        let neighbour = square.go_direction(direction).unwrap();
+                        if self[neighbour]
+                            .top_stone()
                             .map(Them::is_road_stone)
                             .unwrap_or_default()
-                    {
-                        coefficients[BLOCKING_STONE_BLOCKS_EXTENSIONS_OF_TWO_FLATS] += 1.0;
+                            && neighbour
+                                .go_direction(direction)
+                                .and_then(|sq| self[sq].top_stone())
+                                .map(Them::is_road_stone)
+                                .unwrap_or_default()
+                        {
+                            coefficients[BLOCKING_STONE_BLOCKS_EXTENSIONS_OF_TWO_FLATS] += 1.0;
+                        }
                     }
                 }
             }
+
             Move::Move(square, direction, stack_movement) => {
+                let group_data = self.group_data();
+
                 let mut destination_square =
                     if stack_movement.movements[0].pieces_to_take == self[*square].len() {
                         square.go_direction(*direction).unwrap()
                     } else {
                         *square
                     };
+                let mut gets_critical_square = false;
 
                 let mut our_pieces = 0;
                 let mut their_pieces = 0;
+                let mut their_pieces_captured = 0;
 
                 // This iterator skips the first square if we move the whole stack
                 for piece in self
@@ -266,6 +288,10 @@ impl Board {
                             if Us::piece_is_ours(piece) {
                                 coefficients[STACK_CAPTURED_BY_MOVEMENT] +=
                                     destination_stack.len() as f32;
+                                their_pieces_captured += 1;
+                                if Us::is_critical_square(&*group_data, destination_square) {
+                                    gets_critical_square = true;
+                                }
                             } else {
                                 coefficients[STACK_CAPTURED_BY_MOVEMENT] -=
                                     destination_stack.len() as f32;
@@ -281,18 +307,35 @@ impl Board {
                 if their_pieces == 0 {
                     coefficients[STACK_MOVEMENT_THAT_GIVES_US_TOP_PIECES] = 1.0;
                     coefficients[STACK_MOVEMENT_THAT_GIVES_US_TOP_PIECES + 1] = our_pieces as f32;
-                    coefficients[STACK_MOVEMENT_THAT_GIVES_US_TOP_PIECES + 2] =
-                        (our_pieces * our_pieces) as f32;
                 } else if their_pieces == 1 {
-                    coefficients[STACK_MOVEMENT_THAT_GIVES_US_TOP_PIECES + 3] = 1.0;
-                    coefficients[STACK_MOVEMENT_THAT_GIVES_US_TOP_PIECES + 4] = our_pieces as f32;
-                    coefficients[STACK_MOVEMENT_THAT_GIVES_US_TOP_PIECES + 5] =
-                        (our_pieces * our_pieces) as f32;
+                    coefficients[STACK_MOVEMENT_THAT_GIVES_US_TOP_PIECES + 2] = 1.0;
+                    coefficients[STACK_MOVEMENT_THAT_GIVES_US_TOP_PIECES + 3] = our_pieces as f32;
                 } else {
-                    coefficients[STACK_MOVEMENT_THAT_GIVES_US_TOP_PIECES + 6] = 1.0;
-                    coefficients[STACK_MOVEMENT_THAT_GIVES_US_TOP_PIECES + 7] = our_pieces as f32;
-                    coefficients[STACK_MOVEMENT_THAT_GIVES_US_TOP_PIECES + 8] =
-                        (our_pieces * our_pieces) as f32;
+                    coefficients[STACK_MOVEMENT_THAT_GIVES_US_TOP_PIECES + 4] = 1.0;
+                    coefficients[STACK_MOVEMENT_THAT_GIVES_US_TOP_PIECES + 5] = our_pieces as f32;
+                }
+
+                let their_open_critical_squares =
+                    Them::critical_squares(&*group_data) & (!self.all_pieces());
+
+                if !their_open_critical_squares.is_empty() {
+                    if their_pieces_captured == 0 {
+                        // Move ignores their critical threat, but might win for us
+                        coefficients[IGNORE_CRITICAL_SQUARE + 1] += 1.0;
+                    } else {
+                        // Move captures at least one stack, which might save us
+                        coefficients[PLACE_CRITICAL_SQUARE + 4] += their_pieces_captured as f32;
+                    }
+                }
+
+                if gets_critical_square {
+                    if their_pieces == 0
+                        && stack_movement.movements[0].pieces_to_take == self[*square].len()
+                    {
+                        coefficients[MOVE_ONTO_CRITICAL_SQUARE] += 1.0;
+                    } else {
+                        coefficients[MOVE_ONTO_CRITICAL_SQUARE + 1] += 1.0;
+                    }
                 }
             }
         }

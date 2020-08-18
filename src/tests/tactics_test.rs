@@ -63,6 +63,35 @@ fn tactic_test1() {
     plays_correct_hard_move_property(&move_strings, &["d5"]);
 }
 
+#[test]
+fn simple_move_move_to_win() {
+    // a5 e2 Cc3 a4 b3 a3 a2 b2 e3 b2< a1 Cb2 b1 b2< Se1 a2-
+    let move_strings = [
+        "a5", "e2", "Cc3", "a4", "b3", "a3", "a2", "b2", "e3", "b2<", "a1", "Cb2", "b1",
+    ];
+
+    let mut board = Board::start_board();
+
+    do_moves_and_check_validity(&mut board, &move_strings);
+
+    plays_correct_hard_move_property(&move_strings, &["b2<"]);
+}
+
+#[test]
+fn flatten_our_stone_to_win() {
+    // c4 c5 Cc3 Cd3 c2 b4 d4 d3+ d3 b3 c1 b2 b1 b5 a1 e3 c3+ Sc3 d1 Se1 e2 Sd2 a2 a3 a4 2d4- a5 d3< d1< 2c3-11
+    let move_strings = [
+        "c4", "c5", "Cc3", "Cd3", "c2", "b4", "d4", "d3+", "d3", "b3", "c1", "b2", "b1", "b5",
+        "a1", "e3", "c3+", "Sc3", "d1", "Se1", "e2", "Sd2", "a2", "a3", "a4", "2d4-", "a5",
+    ];
+
+    let mut board = Board::start_board();
+
+    do_moves_and_check_validity(&mut board, &move_strings);
+
+    plays_correct_hard_move_property(&move_strings, &["d3<"]);
+}
+
 #[cfg(test)]
 fn plays_correct_hard_move_property(move_strings: &[&str], correct_moves: &[&str]) {
     let mut board = Board::default();
