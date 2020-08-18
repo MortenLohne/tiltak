@@ -17,7 +17,7 @@ constant-tuning = ["rayon", "nom", "pgn-writer"]
 aws-lambda = ["lambda_runtime", "serde", "arrayvec/serde"]
 
 [[bin]]
-name = "aws_lambda"
+name = "bootstrap"
 required-features = ["aws-lambda"]
 
 [dependencies]
