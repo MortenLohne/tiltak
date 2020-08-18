@@ -316,6 +316,10 @@ struct AwsEvent {
 }
 
 fn best_move_aws(aws_function_name: &str, payload: AwsEvent) -> Result<(Move, f32)> {
+    let mut aws_out_file_name = std::env::temp_dir();
+    aws_out_file_name.push("aws_response.json");
+    File::create(aws_out_file_name.clone())?;
+
     let command = Command::new("aws")
         .arg("lambda")
         .arg("invoke")
@@ -323,7 +327,9 @@ fn best_move_aws(aws_function_name: &str, payload: AwsEvent) -> Result<(Move, f3
         .arg(aws_function_name)
         .arg("--cli-binary-format")
         .arg("raw-in-base64-out")
-        .arg("--payload");
+        .arg("--payload")
+        .arg(aws_out_file_name.as_os_str())
+        .spawn()?;
 
     unimplemented!();
 }
@@ -335,6 +341,7 @@ use arrayvec::ArrayVec;
 use std::process::Command;
 use taik::board;
 use taik::board::{Direction, Move, Movement, Role, StackMovement};
+use std::fs::File;
 
 pub fn parse_move(input: &str) -> board::Move {
     let words: Vec<&str> = input.split_whitespace().collect();
