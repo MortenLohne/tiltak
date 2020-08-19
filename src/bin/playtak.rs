@@ -41,6 +41,14 @@ pub fn main() -> Result<()> {
                 .help("Name of debug logfile")
                 .takes_value(true),
         )
+        .arg(
+            Arg::with_name("aws-function-name")
+                .long("aws-function-name")
+                .value_name("taik")
+                .help(
+                    "Run the engine on AWS instead of locally. Requires aws cli installed locally.",
+                ),
+        )
         .get_matches();
 
     let log_dispatcher = fern::Dispatch::new().format(|out, message, record| {
@@ -71,7 +79,11 @@ pub fn main() -> Result<()> {
             .unwrap()
     }
 
-    let mut session = PlaytakSession::new()?;
+    let mut session = if let Some(aws_function_name) = matches.value_of("aws-function-name") {
+        PlaytakSession::with_aws(aws_function_name.to_string())
+    } else {
+        PlaytakSession::new()
+    }?;
 
     if let (Some(user), Some(pwd)) = (matches.value_of("username"), matches.value_of("password")) {
         session.login("Taik", &user, &pwd)?;
@@ -84,6 +96,7 @@ pub fn main() -> Result<()> {
 }
 
 struct PlaytakSession {
+    aws_function_name: Option<String>,
     connection: BufStream<TcpStream>,
     // The server requires regular pings, to not kick the user
     // This thread does nothing but provide those pings
@@ -101,9 +114,16 @@ impl PlaytakSession {
             ping_thread_connection.flush()?;
         });
         Ok(PlaytakSession {
+            aws_function_name: None,
             connection,
             _ping_thread: ping_thread,
         })
+    }
+
+    fn with_aws(aws_function_name: String) -> Result<Self> {
+        let mut session = Self::new()?;
+        session.aws_function_name = Some(aws_function_name);
+        Ok(session)
     }
 
     /// Login with the provided name, username and password
@@ -221,6 +241,7 @@ impl PlaytakSession {
                 write_move(best_move, &mut output_string);
                 self.send_line(&output_string)?;
             } else {
+                // Wait for the opponent's move. The server may send other messages in the meantime
                 loop {
                     let line = self.read_line()?;
                     let words: Vec<&str> = line.split_whitespace().collect();
@@ -288,12 +309,39 @@ fn dial() -> Result<BufStream<TcpStream>> {
     net::TcpStream::connect("playtak.com:10000").map(BufStream::new)
 }
 
+struct AwsEvent {
+    moves: Vec<Move>,
+    time_left: Duration,
+    increment: Duration,
+}
+
+fn best_move_aws(aws_function_name: &str, payload: AwsEvent) -> Result<(Move, f32)> {
+    let mut aws_out_file_name = std::env::temp_dir();
+    aws_out_file_name.push("aws_response.json");
+    File::create(aws_out_file_name.clone())?;
+
+    let command = Command::new("aws")
+        .arg("lambda")
+        .arg("invoke")
+        .arg("--function-name")
+        .arg(aws_function_name)
+        .arg("--cli-binary-format")
+        .arg("raw-in-base64-out")
+        .arg("--payload")
+        .arg(aws_out_file_name.as_os_str())
+        .spawn()?;
+
+    unimplemented!();
+}
+
 use std::cmp::Ordering;
 use std::iter;
 
 use arrayvec::ArrayVec;
+use std::process::Command;
 use taik::board;
 use taik::board::{Direction, Move, Movement, Role, StackMovement};
+use std::fs::File;
 
 pub fn parse_move(input: &str) -> board::Move {
     let words: Vec<&str> = input.split_whitespace().collect();

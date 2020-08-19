@@ -11,6 +11,10 @@ default-run = "main"
 [profile.release]
 debug = true
 
+[[bin]]
+name = "aws_client"
+path = "src/bin/aws_client.rs"
+
 [features]
 pgn-writer = []
 constant-tuning = ["rayon", "nom", "pgn-writer"]
