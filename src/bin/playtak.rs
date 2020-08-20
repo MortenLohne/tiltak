@@ -2,13 +2,17 @@ use board_game_traits::board::{Board as BoardTrait, Color};
 use bufstream::BufStream;
 use clap::{App, Arg};
 use std::fmt::Write as FmtWrite;
-use std::io::{BufRead, Result, Write};
+use std::io::{BufRead, Result, Write, BufReader};
 use std::net::TcpStream;
 use std::str::FromStr;
 use std::time::Duration;
-use std::{io, net, thread};
+use std::{io, net, thread, fs};
 use taik::board::Board;
 use taik::mcts;
+#[cfg(feature = "aws-lambda")]
+use taik::aws;
+#[cfg(feature = "aws-lambda")]
+use serde_json;
 
 use log::{debug, info, warn};
 
@@ -233,7 +237,20 @@ impl PlaytakSession {
                 break;
             }
             if board.side_to_move() == our_color {
-                let (best_move, score) = mcts::mcts(board.clone(), 1_000_000);
+                let (best_move, score) = if let Some(aws_function_name) = self.aws_function_name.as_ref() {
+                    let event = aws::Event {
+                        moves: moves.iter().map(|(mv, _): &(Move, _)| mv.clone()).collect(),
+                        time_left: Duration::from_secs(600),
+                        increment: Duration::from_secs(10),
+                    };
+                    let aws::Output {
+                        best_move, score
+                    } = best_move_aws(aws_function_name, &event)?;
+                    (best_move, score)
+                }
+                else {
+                     mcts::mcts(board.clone(), 1_000_000)
+                };
                 board.do_move(best_move.clone());
                 moves.push((best_move.clone(), score.to_string()));
 
@@ -309,29 +326,30 @@ fn dial() -> Result<BufStream<TcpStream>> {
     net::TcpStream::connect("playtak.com:10000").map(BufStream::new)
 }
 
-struct AwsEvent {
-    moves: Vec<Move>,
-    time_left: Duration,
-    increment: Duration,
-}
-
-fn best_move_aws(aws_function_name: &str, payload: AwsEvent) -> Result<(Move, f32)> {
+fn best_move_aws(aws_function_name: &str, payload: &aws::Event) -> Result<aws::Output> {
     let mut aws_out_file_name = std::env::temp_dir();
     aws_out_file_name.push("aws_response.json");
-    File::create(aws_out_file_name.clone())?;
+    {
+        File::create(aws_out_file_name.clone())?;
 
-    let command = Command::new("aws")
-        .arg("lambda")
-        .arg("invoke")
-        .arg("--function-name")
-        .arg(aws_function_name)
-        .arg("--cli-binary-format")
-        .arg("raw-in-base64-out")
-        .arg("--payload")
-        .arg(aws_out_file_name.as_os_str())
-        .spawn()?;
+        let mut child = Command::new("aws")
+            .arg("lambda")
+            .arg("invoke")
+            .arg("--function-name")
+            .arg(aws_function_name)
+            .arg("--cli-binary-format")
+            .arg("raw-in-base64-out")
+            .arg("--payload")
+            .arg(serde_json::to_string(payload).unwrap())
+            .arg(aws_out_file_name.as_os_str())
+            .spawn()?;
+        child.wait()?;
+    }
 
-    unimplemented!();
+    let aws_out_file = File::open(aws_out_file_name.clone())?;
+    let output = serde_json::from_reader(BufReader::new(aws_out_file)).unwrap();
+    fs::remove_file(aws_out_file_name)?;
+    Ok(output)
 }
 
 use std::cmp::Ordering;

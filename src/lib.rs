@@ -36,6 +36,8 @@ pub mod mcts;
 pub mod minmax;
 pub mod move_gen;
 mod tests;
+#[cfg(feature = "aws-lambda")]
+pub mod aws;
 
 pub use mcts::mcts;
 
