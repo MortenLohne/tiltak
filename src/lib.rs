@@ -30,14 +30,14 @@ extern crate board_game_traits;
 extern crate pgn_traits;
 extern crate rand;
 
+#[cfg(feature = "aws-lambda")]
+pub mod aws;
 mod bitboard;
 pub mod board;
 pub mod mcts;
 pub mod minmax;
 pub mod move_gen;
 mod tests;
-#[cfg(feature = "aws-lambda")]
-pub mod aws;
 
 pub use mcts::mcts;
 
