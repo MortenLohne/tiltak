@@ -187,7 +187,13 @@ impl PlaytakSession {
     /// Place a game seek (challenge) on playtak, and wait for somebody to accept
     /// Mutually recursive with `play_game` when the challenge is accepted
     pub fn seek_game(&mut self) -> io::Result<()> {
-        self.send_line("Seek 5 900 10")?;
+        let total_time = Duration::from_secs(900);
+        let increment = Duration::from_secs(10);
+        self.send_line(&format!(
+            "Seek 5 {} {}",
+            total_time.as_secs(),
+            increment.as_secs()
+        ))?;
 
         loop {
             let input = self.read_line()?;
@@ -204,7 +210,15 @@ impl PlaytakSession {
                         "black" => Color::Black,
                         color => panic!("Bad color \"{}\"", color),
                     };
-                    self.play_game(game_no, board_size, white_player, black_player, color)?;
+                    self.play_game(
+                        game_no,
+                        board_size,
+                        white_player,
+                        black_player,
+                        color,
+                        total_time,
+                        increment,
+                    )?;
                     return Ok(());
                 }
                 "NOK" => {
@@ -225,6 +239,8 @@ impl PlaytakSession {
         white_player: &str,
         black_player: &str,
         our_color: Color,
+        time_left: Duration,
+        increment: Duration,
     ) -> io::Result<()> {
         info!(
             "Starting game #{}, {} vs {} as {}",
@@ -232,6 +248,7 @@ impl PlaytakSession {
         );
         let mut board = Board::start_board();
         let mut moves = vec![];
+        let mut our_time_left = time_left;
         'gameloop: loop {
             if board.game_result().is_some() {
                 break;
@@ -242,8 +259,8 @@ impl PlaytakSession {
                     let aws_function_name = self.aws_function_name.as_ref().unwrap();
                     let event = aws::Event {
                         moves: moves.iter().map(|(mv, _): &(Move, _)| mv.clone()).collect(),
-                        time_left: Duration::from_secs(600),
-                        increment: Duration::from_secs(10),
+                        time_left: our_time_left,
+                        increment: increment,
                     };
                     let aws::Output { best_move, score } =
                         aws::best_move_aws(aws_function_name, &event)?;
@@ -251,7 +268,10 @@ impl PlaytakSession {
                 };
 
                 #[cfg(not(feature = "aws-lambda"))]
-                let (best_move, score) = mcts::mcts(board.clone(), 1_000_000);
+                let (best_move, score) = {
+                    let maximum_time = our_time_left / 5 + increment;
+                    mcts::play_move_time(board.clone(), maximum_time)
+                };
 
                 board.do_move(best_move.clone());
                 moves.push((best_move.clone(), score.to_string()));
@@ -273,7 +293,17 @@ impl PlaytakSession {
                                 moves.push((move_played, "0.0".to_string()));
                                 break;
                             }
-                            "Abandoned" | "Over" => break 'gameloop,
+                            "Time" => {
+                                let white_time_left =
+                                    Duration::from_secs(u64::from_str(&words[2]).unwrap());
+                                let black_time_left =
+                                    Duration::from_secs(u64::from_str(&words[3]).unwrap());
+                                our_time_left = match our_color {
+                                    Color::White => white_time_left,
+                                    Color::Black => black_time_left,
+                                };
+                            }
+                            "Abandoned" | "Abandoned." | "Over" => break 'gameloop,
                             _ => debug!("Ignoring server message \"{}\"", line),
                         }
                     } else if words[0] == "NOK" {
@@ -334,6 +364,8 @@ use std::iter;
 use arrayvec::ArrayVec;
 use taik::board;
 use taik::board::{Direction, Move, Movement, Role, StackMovement};
+#[cfg(not(feature = "aws-lambda"))]
+use taik::mcts;
 
 pub fn parse_move(input: &str) -> board::Move {
     let words: Vec<&str> = input.split_whitespace().collect();
