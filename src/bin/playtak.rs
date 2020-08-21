@@ -41,6 +41,13 @@ pub fn main() -> Result<()> {
                 .value_name("taik.log")
                 .help("Name of debug logfile")
                 .takes_value(true),
+        )
+        .arg(
+            Arg::with_name("playBot")
+                .long("play-bot")
+                .value_name("botname")
+                .help("Instead of seeking any game, accept any seek from the specified bot")
+                .takes_value(true),
         );
     if cfg!(feature = "aws-lambda") {
         app = app.arg(
@@ -50,7 +57,8 @@ pub fn main() -> Result<()> {
                 .required(true)
                 .help(
                     "Run the engine on AWS instead of locally. Requires aws cli installed locally.",
-                ),
+                )
+                .takes_value(true),
         );
     }
     let matches = app.get_matches();
@@ -95,8 +103,11 @@ pub fn main() -> Result<()> {
         warn!("No username/password provided, logging in as guest");
         session.login_guest()?;
     }
-
-    session.seek_game()
+    if let Some(name) = matches.value_of("playBot") {
+        session.seek_game(SeekMode::PlayOtherBot(name.to_string()))
+    } else {
+        session.seek_game(SeekMode::OpenSeek)
+    }
 }
 
 struct PlaytakSession {
@@ -105,6 +116,12 @@ struct PlaytakSession {
     // The server requires regular pings, to not kick the user
     // This thread does nothing but provide those pings
     _ping_thread: thread::JoinHandle<io::Result<()>>,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+enum SeekMode {
+    OpenSeek,
+    PlayOtherBot(String),
 }
 
 impl PlaytakSession {
@@ -186,14 +203,17 @@ impl PlaytakSession {
 
     /// Place a game seek (challenge) on playtak, and wait for somebody to accept
     /// Mutually recursive with `play_game` when the challenge is accepted
-    pub fn seek_game(&mut self) -> io::Result<()> {
-        let total_time = Duration::from_secs(900);
-        let increment = Duration::from_secs(10);
-        self.send_line(&format!(
-            "Seek 5 {} {}",
-            total_time.as_secs(),
-            increment.as_secs()
-        ))?;
+    pub fn seek_game(&mut self, seek_mode: SeekMode) -> io::Result<()> {
+        let mut time_for_game = Duration::from_secs(900);
+        let mut increment = Duration::from_secs(10);
+
+        if seek_mode == SeekMode::OpenSeek {
+            self.send_line(&format!(
+                "Seek 5 {} {}",
+                time_for_game.as_secs(),
+                increment.as_secs()
+            ))?;
+        }
 
         loop {
             let input = self.read_line()?;
@@ -211,15 +231,32 @@ impl PlaytakSession {
                         color => panic!("Bad color \"{}\"", color),
                     };
                     self.play_game(
+                        seek_mode,
                         game_no,
                         board_size,
                         white_player,
                         black_player,
                         color,
-                        total_time,
+                        time_for_game,
                         increment,
                     )?;
                     return Ok(());
+                }
+
+                "Seek" => {
+                    if let SeekMode::PlayOtherBot(ref bot_name) = seek_mode {
+                        if words[1] == "new" {
+                            let number = u64::from_str(words[2]).unwrap();
+                            let name = words[3];
+                            let time = Duration::from_secs(u64::from_str(words[5]).unwrap());
+                            let inc = Duration::from_secs(u64::from_str(words[6]).unwrap());
+                            if name.eq_ignore_ascii_case(bot_name) {
+                                self.send_line(&format!("Accept {}", number))?;
+                                time_for_game = time;
+                                increment = inc;
+                            }
+                        }
+                    }
                 }
                 "NOK" => {
                     self.send_line("quit")?;
@@ -234,6 +271,7 @@ impl PlaytakSession {
     /// Mutually recursive with `seek_game`, which places a new seek as soon as the game finishes.
     fn play_game(
         &mut self,
+        seek_mode: SeekMode,
         game_no: u64,
         _board_size: usize,
         white_player: &str,
@@ -243,8 +281,8 @@ impl PlaytakSession {
         increment: Duration,
     ) -> io::Result<()> {
         info!(
-            "Starting game #{}, {} vs {} as {}",
-            game_no, white_player, black_player, our_color
+            "Starting game #{}, {} vs {} as {}, {}+{:.1}",
+            game_no, white_player, black_player, our_color, time_left.as_secs(), increment.as_secs_f32()
         );
         let mut board = Board::start_board();
         let mut moves = vec![];
@@ -260,7 +298,7 @@ impl PlaytakSession {
                     let event = aws::Event {
                         moves: moves.iter().map(|(mv, _): &(Move, _)| mv.clone()).collect(),
                         time_left: our_time_left,
-                        increment: increment,
+                        increment,
                     };
                     let aws::Output { best_move, score } =
                         aws::best_move_aws(aws_function_name, &event)?;
@@ -307,8 +345,8 @@ impl PlaytakSession {
                             _ => debug!("Ignoring server message \"{}\"", line),
                         }
                     } else if words[0] == "NOK" {
-                        self.send_line("quit")?;
-                        return Ok(());
+                        // self.send_line("quit")?;
+                        // return Ok(());
                     }
                 }
             }
@@ -345,7 +383,7 @@ impl PlaytakSession {
 
         info!("Move list: {}", move_list.join(" "));
 
-        self.seek_game()
+        self.seek_game(seek_mode)
     }
 }
 
