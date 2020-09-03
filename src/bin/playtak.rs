@@ -282,7 +282,12 @@ impl PlaytakSession {
     ) -> io::Result<()> {
         info!(
             "Starting game #{}, {} vs {} as {}, {}+{:.1}",
-            game_no, white_player, black_player, our_color, time_left.as_secs(), increment.as_secs_f32()
+            game_no,
+            white_player,
+            black_player,
+            our_color,
+            time_left.as_secs(),
+            increment.as_secs_f32()
         );
         let mut board = Board::start_board();
         let mut moves = vec![];
