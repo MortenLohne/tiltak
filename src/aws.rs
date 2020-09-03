@@ -42,7 +42,15 @@ pub fn best_move_aws(aws_function_name: &str, payload: &Event) -> io::Result<Out
     let mut aws_out_file_name = std::env::temp_dir();
     aws_out_file_name.push("aws_response.json");
     {
-        fs::File::create(aws_out_file_name.clone())?;
+        fs::File::create(aws_out_file_name.clone()).map_err(|err| {
+            io::Error::new(
+                err.kind(),
+                format!(
+                    "Failed to create temporary aws output file \"{}\"",
+                    aws_out_file_name.to_string_lossy()
+                ),
+            )
+        })?;
 
         let mut child = Command::new("aws")
             .arg("lambda")
@@ -54,12 +62,29 @@ pub fn best_move_aws(aws_function_name: &str, payload: &Event) -> io::Result<Out
             .arg("--payload")
             .arg(serde_json::to_string(payload).unwrap())
             .arg(aws_out_file_name.as_os_str())
-            .spawn()?;
+            .spawn()
+            .map_err(|err| io::Error::new(err.kind(), "Failed to start aws cli"))?;
         child.wait()?;
     }
 
-    let aws_out_file = fs::File::open(aws_out_file_name.clone())?;
+    let aws_out_file = fs::File::open(aws_out_file_name.clone()).map_err(|err| {
+        io::Error::new(
+            err.kind(),
+            format!(
+                "Failed to read from temporary aws output file \"{}\"",
+                aws_out_file_name.to_string_lossy()
+            ),
+        )
+    })?;
     let output = serde_json::from_reader(BufReader::new(aws_out_file)).unwrap();
-    fs::remove_file(aws_out_file_name)?;
+    fs::remove_file(&aws_out_file_name).map_err(|err| {
+        io::Error::new(
+            err.kind(),
+            format!(
+                "Failed to delete temporary aws output file \"{}\"",
+                aws_out_file_name.to_string_lossy()
+            ),
+        )
+    })?;
     Ok(output)
 }
