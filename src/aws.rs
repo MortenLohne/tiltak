@@ -57,8 +57,6 @@ pub fn best_move_aws(aws_function_name: &str, payload: &Event) -> io::Result<Out
             .arg("invoke")
             .arg("--function-name")
             .arg(aws_function_name)
-            .arg("--cli-binary-format")
-            .arg("raw-in-base64-out")
             .arg("--payload")
             .arg(serde_json::to_string(payload).unwrap())
             .arg(aws_out_file_name.as_os_str())
