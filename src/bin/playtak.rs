@@ -1,6 +1,7 @@
 use board_game_traits::board::{Board as BoardTrait, Color};
 use bufstream::BufStream;
 use clap::{App, Arg};
+use log::error;
 use std::fmt::Write as FmtWrite;
 use std::io::{BufRead, Result, Write};
 use std::net::TcpStream;
@@ -103,11 +104,16 @@ pub fn main() -> Result<()> {
         warn!("No username/password provided, logging in as guest");
         session.login_guest()?;
     }
-    if let Some(name) = matches.value_of("playBot") {
+    let result = if let Some(name) = matches.value_of("playBot") {
         session.seek_game(SeekMode::PlayOtherBot(name.to_string()))
     } else {
         session.seek_game(SeekMode::OpenSeek)
+    };
+
+    if let Err(ref err) = result {
+        error!("Fatal error: {}", err);
     }
+    result
 }
 
 struct PlaytakSession {
