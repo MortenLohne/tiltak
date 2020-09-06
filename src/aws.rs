@@ -3,10 +3,12 @@ use crate::mcts;
 use board_game_traits::board::Board as EvalBoard;
 use lambda_runtime::error::HandlerError;
 use lambda_runtime::Context;
+use log::{debug, error, warn};
 use serde::Deserialize;
 use serde::Serialize;
-use std::io::BufReader;
-use std::process::Command;
+use serde_json::Value;
+use std::io::{BufReader, Read};
+use std::process::{Command, Stdio};
 use std::time::Duration;
 use std::{fs, io};
 
@@ -53,6 +55,8 @@ pub fn best_move_aws(aws_function_name: &str, payload: &Event) -> io::Result<Out
         })?;
 
         let mut child = Command::new("aws")
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
             .arg("lambda")
             .arg("invoke")
             .arg("--function-name")
@@ -62,7 +66,35 @@ pub fn best_move_aws(aws_function_name: &str, payload: &Event) -> io::Result<Out
             .arg(aws_out_file_name.as_os_str())
             .spawn()
             .map_err(|err| io::Error::new(err.kind(), "Failed to start aws cli"))?;
+
+        let mut aws_stdout = child.stdout.take().unwrap();
+        let mut aws_stderr = child.stderr.take().unwrap();
+
+        debug!("Sent AWS lambda invoke");
+
         child.wait()?;
+        let output: serde_json::Value = serde_json::from_reader(&mut aws_stdout).unwrap();
+
+        if let Value::Object(values) = &output {
+            if let Some(Value::Number(status_code_number)) = values.get("StatusCode") {
+                let status_code = status_code_number.as_u64().unwrap();
+                if status_code / 100 == 2 {
+                    debug!("Got HTTP response {} from aws", status_code);
+                } else {
+                    error!("Got HTTP response {} from aws", status_code);
+                }
+            } else {
+                warn!("AWS response contained no status code: {}", output);
+            }
+        } else {
+            warn!("Received bad AWS response: {}", output);
+        }
+
+        let mut aws_error_output = String::new();
+        aws_stderr.read_to_string(&mut aws_error_output)?;
+        if !aws_error_output.is_empty() {
+            error!("AWS-cli stderr: \"{}\"", aws_error_output);
+        }
     }
 
     let aws_out_file = fs::File::open(aws_out_file_name.clone()).map_err(|err| {
