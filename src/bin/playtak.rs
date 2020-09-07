@@ -363,7 +363,6 @@ impl PlaytakSession {
             }
         }
 
-        #[cfg(feature = "pgn-writer")]
         {
             info!("Game finished. Pgn: ");
 

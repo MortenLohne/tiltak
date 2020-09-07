@@ -12,8 +12,7 @@ default-run = "main"
 debug = true
 
 [features]
-pgn-writer = []
-constant-tuning = ["rayon", "nom", "pgn-writer"]
+constant-tuning = ["rayon", "nom"]
 aws-lambda = ["lambda_runtime", "serde", "serde_json", "arrayvec/serde"]
 
 [[bin]]
