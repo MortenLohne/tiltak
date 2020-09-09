@@ -265,8 +265,7 @@ impl PlaytakSession {
                     }
                 }
                 "NOK" => {
-                    self.send_line("quit")?;
-                    return Ok(());
+                    warn!("Received NOK from server, ignoring. This may happen if the game was aborted while we were thinking");
                 }
                 _ => debug!("Ignoring server message \"{}\"", input.trim()),
             }
@@ -356,8 +355,7 @@ impl PlaytakSession {
                             _ => debug!("Ignoring server message \"{}\"", line),
                         }
                     } else if words[0] == "NOK" {
-                        // self.send_line("quit")?;
-                        // return Ok(());
+                        warn!("Received NOK from server, ignoring.");
                     }
                 }
             }
