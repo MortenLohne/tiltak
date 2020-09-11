@@ -412,6 +412,10 @@ pub fn games_and_move_scoress_from_file(
     let mut move_scoress = read_move_scores_from_file()?;
     let mut games = read_games_from_file()?;
 
+    // Only keep the last n games, since all the training data doesn't fit in memory while training
+    move_scoress.reverse();
+    games.reverse();
+
     move_scoress.truncate(3000);
     games.truncate(3000);
 
