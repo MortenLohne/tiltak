@@ -216,7 +216,7 @@ fn mcts_selfplay(max_time: time::Duration) {
         board.do_move(best_move.clone());
         moves.push(best_move.clone());
         println!(
-            "{:6}: {:.3}, {:.1}ms",
+            "{:6}: {:.3}, {:.1}s",
             best_move,
             score,
             start_time.elapsed().as_secs_f32()
