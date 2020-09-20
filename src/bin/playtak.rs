@@ -224,7 +224,9 @@ impl PlaytakSession {
         loop {
             let input = self.read_line()?;
             let words: Vec<&str> = input.split_whitespace().collect();
-
+            if words.is_empty() {
+                continue;
+            }
             match words[0] {
                 "Game" => {
                     let game_no: u64 = u64::from_str(words[2]).unwrap();
@@ -332,6 +334,9 @@ impl PlaytakSession {
                 loop {
                     let line = self.read_line()?;
                     let words: Vec<&str> = line.split_whitespace().collect();
+                    if words.is_empty() {
+                        continue;
+                    }
                     if words[0] == format!("Game#{}", game_no) {
                         match words[1] {
                             "P" | "M" => {
