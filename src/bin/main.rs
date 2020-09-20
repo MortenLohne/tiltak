@@ -36,7 +36,8 @@ use taik::board::TunableBoard;
 use taik::mcts;
 use taik::mcts::MctsSetting;
 use taik::minmax;
-#[cfg(feature = "pgn-writer")]
+
+#[cfg(feature = "constant-tuning")]
 use taik::pgn_writer::Game;
 
 fn main() {

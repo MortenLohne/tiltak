@@ -1,19 +1,21 @@
 use board_game_traits::board::{Board as BoardTrait, Color};
 use bufstream::BufStream;
 use clap::{App, Arg};
+use log::error;
 use std::fmt::Write as FmtWrite;
 use std::io::{BufRead, Result, Write};
 use std::net::TcpStream;
 use std::str::FromStr;
 use std::time::Duration;
 use std::{io, net, thread};
+#[cfg(feature = "aws-lambda")]
+use taik::aws;
 use taik::board::Board;
-use taik::mcts;
 
 use log::{debug, info, warn};
 
 pub fn main() -> Result<()> {
-    let matches = App::new("Taik playtak client")
+    let mut app = App::new("Taik playtak client")
         .version("0.1")
         .author("Morten Lohne")
         .arg(
@@ -41,7 +43,26 @@ pub fn main() -> Result<()> {
                 .help("Name of debug logfile")
                 .takes_value(true),
         )
-        .get_matches();
+        .arg(
+            Arg::with_name("playBot")
+                .long("play-bot")
+                .value_name("botname")
+                .help("Instead of seeking any game, accept any seek from the specified bot")
+                .takes_value(true),
+        );
+    if cfg!(feature = "aws-lambda") {
+        app = app.arg(
+            Arg::with_name("aws-function-name")
+                .long("aws-function-name")
+                .value_name("taik")
+                .required(true)
+                .help(
+                    "Run the engine on AWS instead of locally. Requires aws cli installed locally.",
+                )
+                .takes_value(true),
+        );
+    }
+    let matches = app.get_matches();
 
     let log_dispatcher = fern::Dispatch::new().format(|out, message, record| {
         out.finish(format_args!(
@@ -71,7 +92,11 @@ pub fn main() -> Result<()> {
             .unwrap()
     }
 
-    let mut session = PlaytakSession::new()?;
+    let mut session = if let Some(aws_function_name) = matches.value_of("aws-function-name") {
+        PlaytakSession::with_aws(aws_function_name.to_string())
+    } else {
+        PlaytakSession::new()
+    }?;
 
     if let (Some(user), Some(pwd)) = (matches.value_of("username"), matches.value_of("password")) {
         session.login("Taik", &user, &pwd)?;
@@ -79,15 +104,30 @@ pub fn main() -> Result<()> {
         warn!("No username/password provided, logging in as guest");
         session.login_guest()?;
     }
+    let result = if let Some(name) = matches.value_of("playBot") {
+        session.seek_game(SeekMode::PlayOtherBot(name.to_string()))
+    } else {
+        session.seek_game(SeekMode::OpenSeek)
+    };
 
-    session.seek_game()
+    if let Err(ref err) = result {
+        error!("Fatal error: {}", err);
+    }
+    result
 }
 
 struct PlaytakSession {
+    aws_function_name: Option<String>,
     connection: BufStream<TcpStream>,
     // The server requires regular pings, to not kick the user
     // This thread does nothing but provide those pings
     _ping_thread: thread::JoinHandle<io::Result<()>>,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+enum SeekMode {
+    OpenSeek,
+    PlayOtherBot(String),
 }
 
 impl PlaytakSession {
@@ -101,9 +141,16 @@ impl PlaytakSession {
             ping_thread_connection.flush()?;
         });
         Ok(PlaytakSession {
+            aws_function_name: None,
             connection,
             _ping_thread: ping_thread,
         })
+    }
+
+    fn with_aws(aws_function_name: String) -> Result<Self> {
+        let mut session = Self::new()?;
+        session.aws_function_name = Some(aws_function_name);
+        Ok(session)
     }
 
     /// Login with the provided name, username and password
@@ -162,13 +209,24 @@ impl PlaytakSession {
 
     /// Place a game seek (challenge) on playtak, and wait for somebody to accept
     /// Mutually recursive with `play_game` when the challenge is accepted
-    pub fn seek_game(&mut self) -> io::Result<()> {
-        self.send_line("Seek 5 900 10")?;
+    pub fn seek_game(&mut self, seek_mode: SeekMode) -> io::Result<()> {
+        let mut time_for_game = Duration::from_secs(900);
+        let mut increment = Duration::from_secs(10);
+
+        if seek_mode == SeekMode::OpenSeek {
+            self.send_line(&format!(
+                "Seek 5 {} {}",
+                time_for_game.as_secs(),
+                increment.as_secs()
+            ))?;
+        }
 
         loop {
             let input = self.read_line()?;
             let words: Vec<&str> = input.split_whitespace().collect();
-
+            if words.is_empty() {
+                continue;
+            }
             match words[0] {
                 "Game" => {
                     let game_no: u64 = u64::from_str(words[2]).unwrap();
@@ -180,12 +238,36 @@ impl PlaytakSession {
                         "black" => Color::Black,
                         color => panic!("Bad color \"{}\"", color),
                     };
-                    self.play_game(game_no, board_size, white_player, black_player, color)?;
+                    self.play_game(
+                        seek_mode,
+                        game_no,
+                        board_size,
+                        white_player,
+                        black_player,
+                        color,
+                        time_for_game,
+                        increment,
+                    )?;
                     return Ok(());
                 }
+
+                "Seek" => {
+                    if let SeekMode::PlayOtherBot(ref bot_name) = seek_mode {
+                        if words[1] == "new" {
+                            let number = u64::from_str(words[2]).unwrap();
+                            let name = words[3];
+                            let time = Duration::from_secs(u64::from_str(words[5]).unwrap());
+                            let inc = Duration::from_secs(u64::from_str(words[6]).unwrap());
+                            if name.eq_ignore_ascii_case(bot_name) {
+                                self.send_line(&format!("Accept {}", number))?;
+                                time_for_game = time;
+                                increment = inc;
+                            }
+                        }
+                    }
+                }
                 "NOK" => {
-                    self.send_line("quit")?;
-                    return Ok(());
+                    warn!("Received NOK from server, ignoring. This may happen if the game was aborted while we were thinking");
                 }
                 _ => debug!("Ignoring server message \"{}\"", input.trim()),
             }
@@ -196,24 +278,51 @@ impl PlaytakSession {
     /// Mutually recursive with `seek_game`, which places a new seek as soon as the game finishes.
     fn play_game(
         &mut self,
+        seek_mode: SeekMode,
         game_no: u64,
         _board_size: usize,
         white_player: &str,
         black_player: &str,
         our_color: Color,
+        time_left: Duration,
+        increment: Duration,
     ) -> io::Result<()> {
         info!(
-            "Starting game #{}, {} vs {} as {}",
-            game_no, white_player, black_player, our_color
+            "Starting game #{}, {} vs {} as {}, {}+{:.1}",
+            game_no,
+            white_player,
+            black_player,
+            our_color,
+            time_left.as_secs(),
+            increment.as_secs_f32()
         );
         let mut board = Board::start_board();
         let mut moves = vec![];
+        let mut our_time_left = time_left;
         'gameloop: loop {
             if board.game_result().is_some() {
                 break;
             }
             if board.side_to_move() == our_color {
-                let (best_move, score) = mcts::mcts(board.clone(), 1_000_000);
+                #[cfg(feature = "aws-lambda")]
+                let (best_move, score) = {
+                    let aws_function_name = self.aws_function_name.as_ref().unwrap();
+                    let event = aws::Event {
+                        moves: moves.iter().map(|(mv, _): &(Move, _)| mv.clone()).collect(),
+                        time_left: our_time_left,
+                        increment,
+                    };
+                    let aws::Output { best_move, score } =
+                        aws::best_move_aws(aws_function_name, &event)?;
+                    (best_move, score)
+                };
+
+                #[cfg(not(feature = "aws-lambda"))]
+                let (best_move, score) = {
+                    let maximum_time = our_time_left / 5 + increment;
+                    mcts::play_move_time(board.clone(), maximum_time)
+                };
+
                 board.do_move(best_move.clone());
                 moves.push((best_move.clone(), score.to_string()));
 
@@ -221,9 +330,13 @@ impl PlaytakSession {
                 write_move(best_move, &mut output_string);
                 self.send_line(&output_string)?;
             } else {
+                // Wait for the opponent's move. The server may send other messages in the meantime
                 loop {
                     let line = self.read_line()?;
                     let words: Vec<&str> = line.split_whitespace().collect();
+                    if words.is_empty() {
+                        continue;
+                    }
                     if words[0] == format!("Game#{}", game_no) {
                         match words[1] {
                             "P" | "M" => {
@@ -233,18 +346,26 @@ impl PlaytakSession {
                                 moves.push((move_played, "0.0".to_string()));
                                 break;
                             }
-                            "Abandoned" | "Over" => break 'gameloop,
+                            "Time" => {
+                                let white_time_left =
+                                    Duration::from_secs(u64::from_str(&words[2]).unwrap());
+                                let black_time_left =
+                                    Duration::from_secs(u64::from_str(&words[3]).unwrap());
+                                our_time_left = match our_color {
+                                    Color::White => white_time_left,
+                                    Color::Black => black_time_left,
+                                };
+                            }
+                            "Abandoned" | "Abandoned." | "Over" => break 'gameloop,
                             _ => debug!("Ignoring server message \"{}\"", line),
                         }
                     } else if words[0] == "NOK" {
-                        self.send_line("quit")?;
-                        return Ok(());
+                        warn!("Received NOK from server, ignoring.");
                     }
                 }
             }
         }
 
-        #[cfg(feature = "pgn-writer")]
         {
             info!("Game finished. Pgn: ");
 
@@ -275,7 +396,7 @@ impl PlaytakSession {
 
         info!("Move list: {}", move_list.join(" "));
 
-        self.seek_game()
+        self.seek_game(seek_mode)
     }
 }
 
@@ -294,6 +415,8 @@ use std::iter;
 use arrayvec::ArrayVec;
 use taik::board;
 use taik::board::{Direction, Move, Movement, Role, StackMovement};
+#[cfg(not(feature = "aws-lambda"))]
+use taik::mcts;
 
 pub fn parse_move(input: &str) -> board::Move {
     let words: Vec<&str> = input.split_whitespace().collect();

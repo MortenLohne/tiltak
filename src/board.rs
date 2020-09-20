@@ -20,6 +20,8 @@ use board_game_traits::board::GameResult::{BlackWin, Draw, WhiteWin};
 use board_game_traits::board::{Board as BoardTrait, EvalBoard as EvalBoardTrait};
 use board_game_traits::board::{Color, GameResult};
 use pgn_traits::pgn;
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
 use std::cell::RefCell;
 use std::cmp::Ordering;
 use std::fmt::Write;
@@ -188,6 +190,7 @@ impl ColorTr for BlackTr {
 
 /// A location on the board. Can be used to index a `Board`.
 #[derive(Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Square(pub u8);
 
 impl Square {
@@ -310,6 +313,7 @@ pub fn squares_iterator() -> impl Iterator<Item = Square> {
 
 /// One of the 3 piece roles in Tak. The same as piece, but without different variants for each color.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum Role {
     Flat,
     Standing,
@@ -318,6 +322,7 @@ pub enum Role {
 
 /// One of the 6 game pieces in Tak. Each piece has one variant for each color.
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Hash)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum Piece {
     WhiteFlat,
     BlackFlat,
@@ -387,6 +392,7 @@ impl ops::Not for Piece {
 
 /// The contents of a square on the board, consisting of zero or more pieces
 #[derive(Clone, PartialEq, Eq, Debug, Default, Hash)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Stack {
     top_stone: Option<Piece>,
     bitboard: BitBoard,
@@ -504,6 +510,7 @@ impl IntoIterator for Stack {
 
 /// A legal move for a position.
 #[derive(Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum Move {
     Place(Role, Square),
     Move(Square, Direction, StackMovement), // Number of stones to take
@@ -559,6 +566,7 @@ pub enum ReverseMove {
 
 /// One of the four cardinal directions on the board
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum Direction {
     North,
     West,
@@ -589,17 +597,27 @@ impl Direction {
 
 /// One or more `Movement`s, storing how many pieces are dropped off at each step
 #[derive(Clone, PartialEq, Eq, Debug)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct StackMovement {
     pub movements: ArrayVec<[Movement; BOARD_SIZE - 1]>,
 }
 
 /// Moving a stack of pieces consists of one or more `Movement`s
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Movement {
     pub pieces_to_take: u8,
 }
 
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", serde(remote = "Color"))]
+pub enum ColorDef {
+    White,
+    Black,
+}
+
 #[derive(Default, Clone, Copy, PartialEq, Eq, Debug)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct GroupEdgeConnection {
     data: u8,
 }
@@ -678,6 +696,7 @@ impl ops::BitOr for GroupEdgeConnection {
     }
 }
 #[derive(Clone, PartialEq, Eq, Debug, Default)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct GroupData {
     pub(crate) groups: AbstractBoard<u8>,
     pub(crate) amount_in_group: [(u8, GroupEdgeConnection); BOARD_AREA + 1],
@@ -704,8 +723,10 @@ impl GroupData {
 
 /// Complete representation of a Tak position
 #[derive(Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Board {
     cells: AbstractBoard<Stack>,
+    #[cfg_attr(feature = "serde", serde(with = "ColorDef"))]
     to_move: Color,
     white_flat_stones: BitBoard,
     black_flat_stones: BitBoard,
@@ -1948,6 +1969,7 @@ impl pgn_traits::pgn::PgnBoard for Board {
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub(crate) struct AbstractBoard<T> {
     raw: [[T; BOARD_SIZE]; BOARD_SIZE],
 }
