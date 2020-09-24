@@ -92,6 +92,18 @@ fn flatten_our_stone_to_win() {
     plays_correct_hard_move_property(&move_strings, &["d3<"]);
 }
 
+#[test]
+fn winning_movement_test() {
+    // e1 e5 Cc3 d1 c1 Cc2 d2 b1 c1> a1 c1 d3 b2 e1< c1> b3 d4 e2 b4 d3- 4d1<22 c2- Sd1 c2 d1+ 2c1< c4
+    let move_strings = ["e1", "e5", "Cc3", "d1", "c1", "Cc2", "d2", "b1", "c1>", "a1", "c1", "d3", "b2", "e1<", "c1>", "b3", "d4", "e2", "b4", "d3-", "4d1<22", "c2-", "Sd1", "c2", "d1+", "2c1<", "c4"];
+
+    let mut board = Board::start_board();
+
+    do_moves_and_check_validity(&mut board, &move_strings);
+
+    plays_correct_hard_move_property(&move_strings, &["4b1>13"]);
+}
+
 #[cfg(test)]
 fn plays_correct_hard_move_property(move_strings: &[&str], correct_moves: &[&str]) {
     let mut board = Board::default();
