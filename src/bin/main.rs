@@ -1,3 +1,5 @@
+#![feature(min_const_generics)]
+
 #[cfg(feature = "constant-tuning")]
 #[macro_use]
 extern crate nom;
@@ -95,7 +97,7 @@ fn main() {
             for i in 0.. {
                 let file_name = format!("games{}_batch0.ptn", i);
                 if !Path::new(&file_name).exists() {
-                    training::train_perpetually(i, Board::VALUE_PARAMS, Board::POLICY_PARAMS)
+                    training::train_perpetually(i, &Board::VALUE_PARAMS, &Board::POLICY_PARAMS)
                         .unwrap();
                     break;
                 } else {
@@ -192,7 +194,12 @@ fn main() {
             ];
             let value_params2 = Board::VALUE_PARAMS;
             let policy_params2 = Board::POLICY_PARAMS;
-            play_match_between_params(value_params1, value_params2, policy_params1, policy_params2);
+            play_match_between_params(
+                value_params1,
+                &value_params2,
+                policy_params1,
+                &policy_params2,
+            );
         }
         s => println!("Unknown option \"{}\"", s),
     }

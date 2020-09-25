@@ -95,7 +95,10 @@ fn flatten_our_stone_to_win() {
 #[test]
 fn winning_movement_test() {
     // e1 e5 Cc3 d1 c1 Cc2 d2 b1 c1> a1 c1 d3 b2 e1< c1> b3 d4 e2 b4 d3- 4d1<22 c2- Sd1 c2 d1+ 2c1< c4
-    let move_strings = ["e1", "e5", "Cc3", "d1", "c1", "Cc2", "d2", "b1", "c1>", "a1", "c1", "d3", "b2", "e1<", "c1>", "b3", "d4", "e2", "b4", "d3-", "4d1<22", "c2-", "Sd1", "c2", "d1+", "2c1<", "c4"];
+    let move_strings = [
+        "e1", "e5", "Cc3", "d1", "c1", "Cc2", "d2", "b1", "c1>", "a1", "c1", "d3", "b2", "e1<",
+        "c1>", "b3", "d4", "e2", "b4", "d3-", "4d1<22", "c2-", "Sd1", "c2", "d1+", "2c1<", "c4",
+    ];
 
     let mut board = Board::start_board();
 

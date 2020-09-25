@@ -1,3 +1,5 @@
+#![feature(min_const_generics)]
+
 //! A library implementing the rules for Tak, including a fairly strong AI.
 //!
 //! # Examples

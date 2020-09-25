@@ -33,9 +33,9 @@ use std::ops::{Deref, DerefMut, Index, IndexMut};
 use std::{fmt, iter, ops};
 
 /// Extra items for tuning evaluation constants.
-pub trait TunableBoard: BoardTrait {
-    const VALUE_PARAMS: &'static [f32];
-    const POLICY_PARAMS: &'static [f32];
+pub trait TunableBoard<const N: usize, const M: usize>: BoardTrait {
+    const VALUE_PARAMS: [f32; N];
+    const POLICY_PARAMS: [f32; M];
 
     fn static_eval_coefficients(&self, coefficients: &mut [f32]);
 
@@ -1023,7 +1023,7 @@ impl Board {
         simple_moves: &mut Vec<Move>,
         moves: &mut Vec<(Move, mcts::Score)>,
     ) {
-        self.generate_moves_with_params(Board::POLICY_PARAMS, simple_moves, moves)
+        self.generate_moves_with_params(&Board::POLICY_PARAMS, simple_moves, moves)
     }
 
     fn count_all_pieces(&self) -> u8 {
@@ -1675,7 +1675,7 @@ impl board::Board for Board {
 
 impl EvalBoardTrait for Board {
     fn static_eval(&self) -> f32 {
-        self.static_eval_with_params(Self::VALUE_PARAMS)
+        self.static_eval_with_params(&Self::VALUE_PARAMS)
     }
 }
 
@@ -1683,9 +1683,9 @@ pub(crate) const SQUARE_SYMMETRIES: [usize; 25] = [
     0, 1, 2, 1, 0, 1, 3, 4, 3, 1, 2, 4, 5, 4, 2, 1, 3, 4, 3, 1, 0, 1, 2, 1, 0,
 ];
 
-impl TunableBoard for Board {
+impl TunableBoard<55, 65> for Board {
     #[allow(clippy::unreadable_literal)]
-    const VALUE_PARAMS: &'static [f32] = &[
+    const VALUE_PARAMS: [f32; 55] = [
         0.02410072,
         0.18671544,
         0.26740885,
@@ -1743,7 +1743,7 @@ impl TunableBoard for Board {
         0.20223762,
     ];
     #[allow(clippy::unreadable_literal)]
-    const POLICY_PARAMS: &'static [f32] = &[
+    const POLICY_PARAMS: [f32; 65] = [
         0.9477754,
         0.10378754,
         0.3924614,
