@@ -53,7 +53,7 @@ pub fn gradient_descent<const N: usize>(
             trace!("Slopes: {:?}", slopes);
             gradients
                 .iter_mut()
-                .zip(slopes)
+                .zip(slopes.iter())
                 .for_each(|(gradient, slope)| *gradient = beta * *gradient + (1.0 - beta) * slope);
             trace!("Gradients: {:?}", gradients);
 
@@ -107,7 +107,7 @@ fn calc_slope<const N: usize>(
     coefficient_sets: &[[f64; N]],
     results: &[f64],
     params: &[f64; N],
-) -> Vec<f64> {
+) -> [f64; N] {
     let mut slopes = coefficient_sets
         .par_iter()
         .zip(results)
@@ -123,20 +123,18 @@ fn calc_slope<const N: usize>(
             gradients_for_this_training_sample.collect::<Vec<f64>>()
         })
         .fold(
-            || vec![0.0; params.len()],
+            || [0.0; N],
             |mut a, b| {
-                assert_eq!(a.len(), b.len());
-                for (c, d) in a.iter_mut().zip(b) {
+                for (c, d) in a.iter_mut().zip(b.iter()) {
                     *c += d;
                 }
                 a
             },
         )
         .reduce(
-            || vec![0.0; params.len()],
+            || [0.0; N],
             |mut a, b| {
-                assert_eq!(a.len(), b.len());
-                for (c, d) in a.iter_mut().zip(b) {
+                for (c, d) in a.iter_mut().zip(b.iter()) {
                     *c += d;
                 }
                 a
