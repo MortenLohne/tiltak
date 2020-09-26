@@ -1,14 +1,14 @@
 use rayon::prelude::*;
 use std::time::Instant;
 
-pub fn gradient_descent(
-    coefficient_sets: &[Vec<f64>],
+pub fn gradient_descent<const N: usize>(
+    coefficient_sets: &[[f64; N]],
     results: &[f64],
-    test_coefficient_sets: &[Vec<f64>],
+    test_coefficient_sets: &[[f64; N]],
     test_results: &[f64],
-    params: &[f64],
+    params: &[f64; N],
     initial_learning_rate: f64,
-) -> Vec<f64> {
+) -> [f64; N] {
     assert_eq!(coefficient_sets.len(), results.len());
     assert_eq!(test_coefficient_sets.len(), test_results.len());
 
@@ -32,7 +32,7 @@ pub fn gradient_descent(
     );
 
     let mut lowest_error = initial_error;
-    let mut best_parameter_set = params.to_vec();
+    let mut best_parameter_set = params.clone();
 
     for eta in [
         initial_learning_rate,
@@ -44,25 +44,23 @@ pub fn gradient_descent(
     {
         trace!("\nTuning with eta = {}\n", eta);
         let mut parameter_set = best_parameter_set.clone();
-        let mut gradients = vec![0.0; params.len()];
+        let mut gradients = [0.0; N];
 
         let mut iterations_since_improvement = 0;
         let mut iterations_since_large_improvement = 0;
         loop {
             let slopes = calc_slope(coefficient_sets, results, &parameter_set);
             trace!("Slopes: {:?}", slopes);
-            gradients = gradients
-                .iter()
+            gradients
+                .iter_mut()
                 .zip(slopes)
-                .map(|(gradient, slope)| beta * gradient + (1.0 - beta) * slope)
-                .collect();
+                .for_each(|(gradient, slope)| *gradient = beta * *gradient + (1.0 - beta) * slope);
             trace!("Gradients: {:?}", gradients);
 
-            parameter_set = parameter_set
-                .iter()
+            parameter_set
+                .iter_mut()
                 .zip(gradients.iter())
-                .map(|(param, gradient)| param - gradient * eta)
-                .collect();
+                .for_each(|(param, gradient)| *param -= gradient * eta);
             trace!("New parameters: {:?}", parameter_set);
 
             let error = average_error(test_coefficient_sets, test_results, &parameter_set);
@@ -105,7 +103,11 @@ pub fn gradient_descent(
 }
 
 /// For each parameter, calculate the slope for that dimension
-fn calc_slope(coefficient_sets: &[Vec<f64>], results: &[f64], params: &[f64]) -> Vec<f64> {
+fn calc_slope<const N: usize>(
+    coefficient_sets: &[[f64; N]],
+    results: &[f64],
+    params: &[f64; N],
+) -> Vec<f64> {
     let mut slopes = coefficient_sets
         .par_iter()
         .zip(results)
@@ -148,7 +150,11 @@ fn calc_slope(coefficient_sets: &[Vec<f64>], results: &[f64], params: &[f64]) ->
 }
 
 /// Mean squared error of the parameter set, measured against given results and positions
-fn average_error(coefficient_sets: &[Vec<f64>], results: &[f64], params: &[f64]) -> f64 {
+fn average_error<const N: usize>(
+    coefficient_sets: &[[f64; N]],
+    results: &[f64],
+    params: &[f64; N],
+) -> f64 {
     assert_eq!(coefficient_sets.len(), results.len());
     coefficient_sets
         .into_par_iter()

@@ -10,7 +10,7 @@ use std::io::Read;
 use std::io::Write;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time;
-use std::{error, fs, io, iter};
+use std::{error, fs, io};
 use taik::board::TunableBoard;
 use taik::board::{Board, Move};
 use taik::mcts::MctsSetting;
@@ -25,14 +25,21 @@ type MoveScoresForGame = Vec<Vec<MoveScore>>;
 pub fn train_from_scratch(training_id: usize) -> Result<(), Box<dyn error::Error>> {
     let mut rng = rand::thread_rng();
 
-    let initial_value_params: Vec<f32> = iter::from_fn(|| Some(rng.gen_range(-0.01, 0.01)))
-        .take(Board::VALUE_PARAMS.len())
-        .collect();
+    let initial_value_params: [f32; Board::VALUE_PARAMS.len()] =
+        array_from_fn(|| rng.gen_range(-0.01, 0.01));
 
-    let mut initial_policy_params: Vec<f32> = iter::from_fn(|| Some(rng.gen_range(-0.01, 0.01)))
-        .take(Board::POLICY_PARAMS.len())
-        .collect();
+    let mut initial_policy_params: [f32; Board::POLICY_PARAMS.len()] =
+        array_from_fn(|| rng.gen_range(-0.01, 0.01));
 
+    /*
+        let initial_value_params: Vec<f32> = iter::from_fn(|| Some(rng.gen_range(-0.01, 0.01)))
+            .take(Board::VALUE_PARAMS.len())
+            .collect();
+
+        let mut initial_policy_params: Vec<f32> = iter::from_fn(|| Some(rng.gen_range(-0.01, 0.01)))
+            .take(Board::POLICY_PARAMS.len())
+            .collect();
+    */
     // The move number parameter should always be around 1.0, so start it here
     // If we don't, variation of this parameter completely dominates the other parameters
     initial_policy_params[0] = 1.0;
@@ -42,8 +49,8 @@ pub fn train_from_scratch(training_id: usize) -> Result<(), Box<dyn error::Error
 
 pub fn train_perpetually(
     training_id: usize,
-    initial_value_params: &[f32],
-    initial_policy_params: &[f32],
+    initial_value_params: &[f32; Board::VALUE_PARAMS.len()],
+    initial_policy_params: &[f32; Board::POLICY_PARAMS.len()],
 ) -> Result<(), Box<dyn error::Error>> {
     const BATCH_SIZE: usize = 100;
     // Only train from the last n batches
@@ -52,11 +59,11 @@ pub fn train_perpetually(
     let mut all_games = vec![];
     let mut all_move_scores = vec![];
 
-    let mut last_value_params = initial_value_params.to_vec();
-    let mut last_policy_params = initial_policy_params.to_vec();
+    let mut last_value_params = initial_value_params.clone();
+    let mut last_policy_params = initial_policy_params.clone();
 
-    let mut value_params = initial_value_params.to_vec();
-    let mut policy_params = initial_policy_params.to_vec();
+    let mut value_params = initial_value_params.clone();
+    let mut policy_params = initial_policy_params.clone();
 
     let mut batch_id = 0;
     let start_time = time::Instant::now();
@@ -146,27 +153,19 @@ pub fn train_perpetually(
 
         let value_tuning_start_time = time::Instant::now();
 
-        let (new_value_params, new_policy_params) = tune_real_value_and_policy(
-            &games_in_training_batch,
-            &move_scores_in_training_batch,
-            &value_params.iter().map(|p| *p as f64).collect::<Vec<f64>>(),
-            &policy_params
-                .iter()
-                .map(|p| *p as f64)
-                .collect::<Vec<f64>>(),
-        )?;
+        let (new_value_params, new_policy_params): ([f64; 55], [f64; 65]) =
+            tune_real_value_and_policy(
+                &games_in_training_batch,
+                &move_scores_in_training_batch,
+                &map_array(&value_params, |a| *a as f64),
+                &map_array(&policy_params, |a| *a as f64),
+            )?;
 
         last_value_params = value_params;
         last_policy_params = policy_params;
 
-        value_params = new_value_params
-            .iter()
-            .map(|p| *p as f32)
-            .collect::<Vec<f32>>();
-        policy_params = new_policy_params
-            .iter()
-            .map(|p| *p as f32)
-            .collect::<Vec<f32>>();
+        value_params = map_array(&new_value_params, |p| *p as f32);
+        policy_params = map_array(&new_policy_params, |p| *p as f32);
 
         tuning_time += value_tuning_start_time.elapsed();
 
@@ -249,7 +248,7 @@ pub fn read_games_from_file() -> Result<Vec<Game<Board>>, Box<dyn error::Error>>
     pgn_parser::parse_pgn(&input)
 }
 
-pub fn tune_real_from_file() -> Result<Vec<f64>, Box<dyn error::Error>> {
+pub fn tune_real_from_file<const N: usize>() -> Result<[f64; N], Box<dyn error::Error>> {
     let games = read_games_from_file()?;
 
     let (positions, results) = positions_and_results_from_games(games);
@@ -257,11 +256,17 @@ pub fn tune_real_from_file() -> Result<Vec<f64>, Box<dyn error::Error>> {
     let coefficient_sets = positions
         .iter()
         .map(|position| {
-            let mut coefficients = vec![0.0; Board::VALUE_PARAMS.len()];
+            let mut coefficients = [0.0; N];
             position.static_eval_coefficients(&mut coefficients);
-            coefficients.iter().map(|a| *a as f64).collect()
+            let mut f64_coefficients = [0.0; N];
+            for (f64_coefficient, f32_coefficient) in
+                f64_coefficients.iter_mut().zip(coefficients.iter())
+            {
+                *f64_coefficient = *f32_coefficient as f64;
+            }
+            f64_coefficients
         })
-        .collect::<Vec<Vec<f64>>>();
+        .collect::<Vec<[f64; N]>>();
 
     let f64_results = results
         .iter()
@@ -275,10 +280,11 @@ pub fn tune_real_from_file() -> Result<Vec<f64>, Box<dyn error::Error>> {
     let middle_index = positions.len() / 2;
 
     let mut rng = rand::thread_rng();
-    let initial_params: Vec<f64> = iter::from_fn(|| Some(rng.gen_range(-0.01, 0.01)))
-        .take(Board::VALUE_PARAMS.len())
-        .collect();
+    let mut initial_params = [0.00; N];
 
+    for param in initial_params.iter_mut() {
+        *param = rng.gen_range(-0.01, 0.01)
+    }
     let tuned_parameters = real_gradient_descent::gradient_descent(
         &coefficient_sets[0..middle_index],
         &f64_results[0..middle_index],
@@ -299,12 +305,12 @@ pub fn tune_real_from_file() -> Result<Vec<f64>, Box<dyn error::Error>> {
     Ok(tuned_parameters)
 }
 
-pub fn tune_real_value_and_policy(
+pub fn tune_real_value_and_policy<const N: usize, const M: usize>(
     games: &[Game<Board>],
     move_scoress: &[MoveScoresForGame],
-    initial_value_params: &[f64],
-    initial_policy_params: &[f64],
-) -> Result<(Vec<f64>, Vec<f64>), Box<dyn error::Error>> {
+    initial_value_params: &[f64; N],
+    initial_policy_params: &[f64; M],
+) -> Result<([f64; N], [f64; M]), Box<dyn error::Error>> {
     let mut games_and_move_scoress: Vec<(&Game<Board>, &MoveScoresForGame)> =
         games.iter().zip(move_scoress).collect();
 
@@ -320,11 +326,17 @@ pub fn tune_real_value_and_policy(
     let value_coefficient_sets = positions
         .iter()
         .map(|position| {
-            let mut coefficients = vec![0.0; Board::VALUE_PARAMS.len()];
+            let mut coefficients = [0.0; N];
             position.static_eval_coefficients(&mut coefficients);
-            coefficients.iter().map(|a| *a as f64).collect()
+            let mut f64_coefficients = [0.0; N];
+            for (f64_coefficient, f32_coefficient) in
+                f64_coefficients.iter_mut().zip(coefficients.iter())
+            {
+                *f64_coefficient = *f32_coefficient as f64;
+            }
+            f64_coefficients
         })
-        .collect::<Vec<Vec<f64>>>();
+        .collect::<Vec<[f64; N]>>();
 
     let value_results = results
         .iter()
@@ -335,7 +347,7 @@ pub fn tune_real_value_and_policy(
         })
         .collect::<Vec<f64>>();
 
-    let mut policy_coefficients_sets: Vec<Vec<f64>> = vec![];
+    let mut policy_coefficients_sets: Vec<[f64; M]> = vec![];
     let mut policy_results: Vec<f64> = vec![];
 
     for (game, move_scores) in games.iter().zip(move_scoress) {
@@ -343,10 +355,18 @@ pub fn tune_real_value_and_policy(
 
         for (mv, move_scores) in game.moves.iter().map(|(mv, _)| mv).zip(move_scores) {
             for (possible_move, score) in move_scores {
-                let mut coefficients = vec![0.0; Board::POLICY_PARAMS.len()];
+                let mut coefficients = [0.0; M];
                 board.coefficients_for_move(&mut coefficients, possible_move, move_scores.len());
 
-                policy_coefficients_sets.push(coefficients.into_iter().map(|c| c as f64).collect());
+                let mut f64_coefficients = [0.0; M];
+
+                for (f64_coefficient, f32_coefficient) in
+                    f64_coefficients.iter_mut().zip(coefficients.iter())
+                {
+                    *f64_coefficient = *f32_coefficient as f64;
+                }
+
+                policy_coefficients_sets.push(f64_coefficients);
                 policy_results.push(*score as f64);
             }
             board.do_move(mv.clone());
@@ -382,19 +402,22 @@ pub fn tune_real_value_and_policy(
     Ok((tuned_value_parameters, tuned_policy_parameters))
 }
 
-pub fn tune_real_value_and_policy_from_file() -> Result<(Vec<f64>, Vec<f64>), Box<dyn error::Error>>
-{
+pub fn tune_real_value_and_policy_from_file() -> Result<
+    (
+        [f64; Board::VALUE_PARAMS.len()],
+        [f64; Board::POLICY_PARAMS.len()],
+    ),
+    Box<dyn error::Error>,
+> {
     let (games, move_scoress) = games_and_move_scoress_from_file()?;
 
     let mut rng = rand::thread_rng();
 
-    let initial_value_params: Vec<f64> = iter::from_fn(|| Some(rng.gen_range(-0.01, 0.01)))
-        .take(Board::VALUE_PARAMS.len())
-        .collect();
+    let initial_value_params: [f64; Board::VALUE_PARAMS.len()] =
+        array_from_fn(|| rng.gen_range(-0.01, 0.01));
 
-    let mut initial_policy_params: Vec<f64> = iter::from_fn(|| Some(rng.gen_range(-0.01, 0.01)))
-        .take(Board::POLICY_PARAMS.len())
-        .collect();
+    let mut initial_policy_params: [f64; Board::POLICY_PARAMS.len()] =
+        array_from_fn(|| rng.gen_range(-0.01, 0.01));
 
     // The move number parameter should always be around 1.0, so start it here
     // If we don't, variation of this parameter completely dominates the other parameters
@@ -485,4 +508,28 @@ pub fn positions_and_results_from_games(games: Vec<Game<Board>>) -> (Vec<Board>,
         }
     }
     (positions, results)
+}
+
+fn map_array<F, T, U, const N: usize>(a: &[T; N], f: F) -> [U; N]
+where
+    F: Fn(&T) -> U,
+    U: Default + Copy,
+{
+    let mut output = [U::default(); N];
+    for (output, e) in output.iter_mut().zip(a) {
+        *output = f(e);
+    }
+    output
+}
+
+fn array_from_fn<F, T, const N: usize>(mut f: F) -> [T; N]
+where
+    F: FnMut() -> T,
+    T: Default + Copy,
+{
+    let mut output = [T::default(); N];
+    for e in output.iter_mut() {
+        *e = f();
+    }
+    output
 }

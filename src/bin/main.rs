@@ -107,7 +107,8 @@ fn main() {
         }
         #[cfg(feature = "constant-tuning")]
         "real" => {
-            let value_params = tune::training::tune_real_from_file().unwrap();
+            let value_params: [f64; Board::VALUE_PARAMS.len()] =
+                tune::training::tune_real_from_file().unwrap();
             println!("{:?}", value_params);
         }
         #[cfg(feature = "constant-tuning")]
