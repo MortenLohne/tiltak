@@ -144,19 +144,19 @@ pub fn train_perpetually(
 
         let value_tuning_start_time = time::Instant::now();
 
-        let (new_value_params, new_policy_params): ([f64; 55], [f64; 65]) =
+        let (new_value_params, new_policy_params): ([f32; 55], [f32; 65]) =
             tune_real_value_and_policy(
                 &games_in_training_batch,
                 &move_scores_in_training_batch,
-                &map_array(&value_params, |a| *a as f64),
-                &map_array(&policy_params, |a| *a as f64),
+                &value_params,
+                &policy_params,
             )?;
 
         last_value_params = value_params;
         last_policy_params = policy_params;
 
-        value_params = map_array(&new_value_params, |p| *p as f32);
-        policy_params = map_array(&new_policy_params, |p| *p as f32);
+        value_params = new_value_params;
+        policy_params = new_policy_params;
 
         tuning_time += value_tuning_start_time.elapsed();
 
@@ -239,7 +239,7 @@ pub fn read_games_from_file() -> Result<Vec<Game<Board>>, Box<dyn error::Error>>
     pgn_parser::parse_pgn(&input)
 }
 
-pub fn tune_real_from_file<const N: usize>() -> Result<[f64; N], Box<dyn error::Error>> {
+pub fn tune_real_from_file<const N: usize>() -> Result<[f32; N], Box<dyn error::Error>> {
     let games = read_games_from_file()?;
 
     let (positions, results) = positions_and_results_from_games(games);
@@ -249,18 +249,18 @@ pub fn tune_real_from_file<const N: usize>() -> Result<[f64; N], Box<dyn error::
         .map(|position| {
             let mut coefficients = [0.0; N];
             position.static_eval_coefficients(&mut coefficients);
-            map_array(&coefficients, |f| *f as f64)
+            coefficients
         })
-        .collect::<Vec<[f64; N]>>();
+        .collect::<Vec<[f32; N]>>();
 
-    let f64_results = results
+    let f32_results = results
         .iter()
         .map(|res| match res {
             GameResult::WhiteWin => 1.0,
             GameResult::Draw => 0.5,
             GameResult::BlackWin => 0.0,
         })
-        .collect::<Vec<f64>>();
+        .collect::<Vec<f32>>();
 
     let middle_index = positions.len() / 2;
 
@@ -272,20 +272,14 @@ pub fn tune_real_from_file<const N: usize>() -> Result<[f64; N], Box<dyn error::
     }
     let tuned_parameters = real_gradient_descent::gradient_descent(
         &coefficient_sets[0..middle_index],
-        &f64_results[0..middle_index],
+        &f32_results[0..middle_index],
         &coefficient_sets[middle_index..],
-        &f64_results[middle_index..],
+        &f32_results[middle_index..],
         &initial_params,
         50.0,
     );
 
-    println!(
-        "Final parameters: {:?}",
-        tuned_parameters
-            .iter()
-            .map(|f| *f as f32)
-            .collect::<Vec<f32>>()
-    );
+    println!("Final parameters: {:?}", tuned_parameters);
 
     Ok(tuned_parameters)
 }
@@ -293,9 +287,9 @@ pub fn tune_real_from_file<const N: usize>() -> Result<[f64; N], Box<dyn error::
 pub fn tune_real_value_and_policy<const N: usize, const M: usize>(
     games: &[Game<Board>],
     move_scoress: &[MoveScoresForGame],
-    initial_value_params: &[f64; N],
-    initial_policy_params: &[f64; M],
-) -> Result<([f64; N], [f64; M]), Box<dyn error::Error>> {
+    initial_value_params: &[f32; N],
+    initial_policy_params: &[f32; M],
+) -> Result<([f32; N], [f32; M]), Box<dyn error::Error>> {
     let mut games_and_move_scoress: Vec<(&Game<Board>, &MoveScoresForGame)> =
         games.iter().zip(move_scoress).collect();
 
@@ -313,9 +307,9 @@ pub fn tune_real_value_and_policy<const N: usize, const M: usize>(
         .map(|position| {
             let mut coefficients = [0.0; N];
             position.static_eval_coefficients(&mut coefficients);
-            map_array(&coefficients, |f| *f as f64)
+            coefficients
         })
-        .collect::<Vec<[f64; N]>>();
+        .collect::<Vec<[f32; N]>>();
 
     let value_results = results
         .iter()
@@ -324,13 +318,13 @@ pub fn tune_real_value_and_policy<const N: usize, const M: usize>(
             GameResult::Draw => 0.5,
             GameResult::BlackWin => 0.0,
         })
-        .collect::<Vec<f64>>();
+        .collect::<Vec<f32>>();
 
     let number_of_coefficient_sets = move_scoress.iter().flat_map(|a| *a).flatten().count();
 
-    let mut policy_coefficients_sets: Vec<[f64; M]> =
+    let mut policy_coefficients_sets: Vec<[f32; M]> =
         Vec::with_capacity(number_of_coefficient_sets);
-    let mut policy_results: Vec<f64> = Vec::with_capacity(number_of_coefficient_sets);
+    let mut policy_results: Vec<f32> = Vec::with_capacity(number_of_coefficient_sets);
 
     for (game, move_scores) in games.iter().zip(move_scoress) {
         let mut board = game.start_board.clone();
@@ -340,8 +334,8 @@ pub fn tune_real_value_and_policy<const N: usize, const M: usize>(
                 let mut coefficients = [0.0; M];
                 board.coefficients_for_move(&mut coefficients, possible_move, move_scores.len());
 
-                policy_coefficients_sets.push(map_array(&coefficients, |f| *f as f64));
-                policy_results.push(*score as f64);
+                policy_coefficients_sets.push(coefficients);
+                policy_results.push(*score);
             }
             board.do_move(mv.clone());
         }
@@ -378,8 +372,8 @@ pub fn tune_real_value_and_policy<const N: usize, const M: usize>(
 
 pub fn tune_real_value_and_policy_from_file() -> Result<
     (
-        [f64; Board::VALUE_PARAMS.len()],
-        [f64; Board::POLICY_PARAMS.len()],
+        [f32; Board::VALUE_PARAMS.len()],
+        [f32; Board::POLICY_PARAMS.len()],
     ),
     Box<dyn error::Error>,
 > {
@@ -387,10 +381,10 @@ pub fn tune_real_value_and_policy_from_file() -> Result<
 
     let mut rng = rand::thread_rng();
 
-    let initial_value_params: [f64; Board::VALUE_PARAMS.len()] =
+    let initial_value_params: [f32; Board::VALUE_PARAMS.len()] =
         array_from_fn(|| rng.gen_range(-0.01, 0.01));
 
-    let mut initial_policy_params: [f64; Board::POLICY_PARAMS.len()] =
+    let mut initial_policy_params: [f32; Board::POLICY_PARAMS.len()] =
         array_from_fn(|| rng.gen_range(-0.01, 0.01));
 
     // The move number parameter should always be around 1.0, so start it here
@@ -482,18 +476,6 @@ pub fn positions_and_results_from_games(games: Vec<Game<Board>>) -> (Vec<Board>,
         }
     }
     (positions, results)
-}
-
-fn map_array<F, T, U, const N: usize>(a: &[T; N], f: F) -> [U; N]
-where
-    F: Fn(&T) -> U,
-    U: Default + Copy,
-{
-    let mut output = [U::default(); N];
-    for (output, e) in output.iter_mut().zip(a) {
-        *output = f(e);
-    }
-    output
 }
 
 fn array_from_fn<F, T, const N: usize>(mut f: F) -> [T; N]
