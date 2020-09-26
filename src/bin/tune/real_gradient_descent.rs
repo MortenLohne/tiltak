@@ -166,8 +166,7 @@ fn average_error<const N: usize>(
         / (coefficient_sets.len() as f64)
 }
 
-pub fn eval_from_params(coefficients: &[f64], params: &[f64]) -> f64 {
-    assert_eq!(coefficients.len(), params.len());
+pub fn eval_from_params<const N: usize>(coefficients: &[f64; N], params: &[f64; N]) -> f64 {
     coefficients.iter().zip(params).map(|(c, p)| c * p).sum()
 }
 
