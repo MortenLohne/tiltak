@@ -9,8 +9,8 @@ use pgn_traits::pgn::PgnBoard;
 use std::io::Read;
 use std::io::Write;
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::time;
 use std::{error, fs, io};
+use std::{mem, time};
 use taik::board::TunableBoard;
 use taik::board::{Board, Move};
 use taik::mcts::MctsSetting;
@@ -347,8 +347,11 @@ pub fn tune_real_value_and_policy<const N: usize, const M: usize>(
         })
         .collect::<Vec<f64>>();
 
-    let mut policy_coefficients_sets: Vec<[f64; M]> = vec![];
-    let mut policy_results: Vec<f64> = vec![];
+    let number_of_coefficient_sets = move_scoress.iter().flat_map(|a| *a).flatten().count();
+
+    let mut policy_coefficients_sets: Vec<[f64; M]> =
+        Vec::with_capacity(number_of_coefficient_sets);
+    let mut policy_results: Vec<f64> = Vec::with_capacity(number_of_coefficient_sets);
 
     for (game, move_scores) in games.iter().zip(move_scoress) {
         let mut board = game.start_board.clone();
