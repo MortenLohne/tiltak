@@ -9,8 +9,8 @@ use pgn_traits::pgn::PgnBoard;
 use std::io::Read;
 use std::io::Write;
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::time;
 use std::{error, fs, io};
-use std::{mem, time};
 use taik::board::TunableBoard;
 use taik::board::{Board, Move};
 use taik::mcts::MctsSetting;
@@ -31,15 +31,6 @@ pub fn train_from_scratch(training_id: usize) -> Result<(), Box<dyn error::Error
     let mut initial_policy_params: [f32; Board::POLICY_PARAMS.len()] =
         array_from_fn(|| rng.gen_range(-0.01, 0.01));
 
-    /*
-        let initial_value_params: Vec<f32> = iter::from_fn(|| Some(rng.gen_range(-0.01, 0.01)))
-            .take(Board::VALUE_PARAMS.len())
-            .collect();
-
-        let mut initial_policy_params: Vec<f32> = iter::from_fn(|| Some(rng.gen_range(-0.01, 0.01)))
-            .take(Board::POLICY_PARAMS.len())
-            .collect();
-    */
     // The move number parameter should always be around 1.0, so start it here
     // If we don't, variation of this parameter completely dominates the other parameters
     initial_policy_params[0] = 1.0;
@@ -258,13 +249,7 @@ pub fn tune_real_from_file<const N: usize>() -> Result<[f64; N], Box<dyn error::
         .map(|position| {
             let mut coefficients = [0.0; N];
             position.static_eval_coefficients(&mut coefficients);
-            let mut f64_coefficients = [0.0; N];
-            for (f64_coefficient, f32_coefficient) in
-                f64_coefficients.iter_mut().zip(coefficients.iter())
-            {
-                *f64_coefficient = *f32_coefficient as f64;
-            }
-            f64_coefficients
+            map_array(&coefficients, |f| *f as f64)
         })
         .collect::<Vec<[f64; N]>>();
 
@@ -328,13 +313,7 @@ pub fn tune_real_value_and_policy<const N: usize, const M: usize>(
         .map(|position| {
             let mut coefficients = [0.0; N];
             position.static_eval_coefficients(&mut coefficients);
-            let mut f64_coefficients = [0.0; N];
-            for (f64_coefficient, f32_coefficient) in
-                f64_coefficients.iter_mut().zip(coefficients.iter())
-            {
-                *f64_coefficient = *f32_coefficient as f64;
-            }
-            f64_coefficients
+            map_array(&coefficients, |f| *f as f64)
         })
         .collect::<Vec<[f64; N]>>();
 
@@ -361,15 +340,7 @@ pub fn tune_real_value_and_policy<const N: usize, const M: usize>(
                 let mut coefficients = [0.0; M];
                 board.coefficients_for_move(&mut coefficients, possible_move, move_scores.len());
 
-                let mut f64_coefficients = [0.0; M];
-
-                for (f64_coefficient, f32_coefficient) in
-                    f64_coefficients.iter_mut().zip(coefficients.iter())
-                {
-                    *f64_coefficient = *f32_coefficient as f64;
-                }
-
-                policy_coefficients_sets.push(f64_coefficients);
+                policy_coefficients_sets.push(map_array(&coefficients, |f| *f as f64));
                 policy_results.push(*score as f64);
             }
             board.do_move(mv.clone());
