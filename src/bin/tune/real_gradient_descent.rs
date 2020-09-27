@@ -116,11 +116,14 @@ fn calc_slope<const N: usize>(
             let estimated_sigmoid = sigmoid(estimated_result);
             let derived_sigmoid_result = sigmoid_derived(estimated_result);
 
-            let gradients_for_this_training_sample = coefficients.iter().map(|coefficient| {
-                (estimated_sigmoid - result) * derived_sigmoid_result * *coefficient
-            });
-
-            gradients_for_this_training_sample.collect::<Vec<f32>>()
+            let mut gradients_for_this_training_sample = [0.0; N];
+            gradients_for_this_training_sample
+                .iter_mut()
+                .zip(coefficients)
+                .for_each(|(gradient, coefficient)| {
+                    *gradient = (estimated_sigmoid - result) * derived_sigmoid_result * *coefficient
+                });
+            gradients_for_this_training_sample
         })
         .fold(
             || [0.0; N],
