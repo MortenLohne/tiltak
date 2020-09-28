@@ -92,28 +92,40 @@ pub fn main() -> Result<()> {
             .unwrap()
     }
 
-    let mut session = if let Some(aws_function_name) = matches.value_of("aws-function-name") {
-        PlaytakSession::with_aws(aws_function_name.to_string())
-    } else {
-        PlaytakSession::new()
-    }?;
+    loop {
+        let mut session = if let Some(aws_function_name) = matches.value_of("aws-function-name") {
+            PlaytakSession::with_aws(aws_function_name.to_string())
+        } else {
+            PlaytakSession::new()
+        }?;
 
-    if let (Some(user), Some(pwd)) = (matches.value_of("username"), matches.value_of("password")) {
-        session.login("Taik", &user, &pwd)?;
-    } else {
-        warn!("No username/password provided, logging in as guest");
-        session.login_guest()?;
-    }
-    let result = if let Some(name) = matches.value_of("playBot") {
-        session.seek_game(SeekMode::PlayOtherBot(name.to_string()))
-    } else {
-        session.seek_game(SeekMode::OpenSeek)
-    };
+        if let (Some(user), Some(pwd)) =
+            (matches.value_of("username"), matches.value_of("password"))
+        {
+            session.login("Taik", &user, &pwd)?;
+        } else {
+            warn!("No username/password provided, logging in as guest");
+            session.login_guest()?;
+        }
+        let result = if let Some(name) = matches.value_of("playBot") {
+            session.seek_game(SeekMode::PlayOtherBot(name.to_string()))
+        } else {
+            session.seek_game(SeekMode::OpenSeek)
+        };
 
-    if let Err(ref err) = result {
-        error!("Fatal error: {}", err);
+        match result {
+            Err(err) => match err.kind() {
+                io::ErrorKind::ConnectionAborted => {
+                    warn!("Server connection aborted, attempting to reconnect")
+                }
+                _ => {
+                    error!("Fatal error: {}", err);
+                    return Err(err);
+                }
+            },
+            Ok(_) => unreachable!(),
+        }
     }
-    result
 }
 
 struct PlaytakSession {
@@ -121,7 +133,7 @@ struct PlaytakSession {
     connection: BufStream<TcpStream>,
     // The server requires regular pings, to not kick the user
     // This thread does nothing but provide those pings
-    _ping_thread: thread::JoinHandle<io::Result<()>>,
+    ping_thread: Option<thread::JoinHandle<io::Result<()>>>,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -135,15 +147,15 @@ impl PlaytakSession {
     fn new() -> Result<Self> {
         let connection = connect()?;
         let mut ping_thread_connection = connection.get_ref().try_clone()?;
-        let ping_thread = thread::spawn(move || loop {
+        let ping_thread = Some(thread::spawn(move || loop {
             thread::sleep(Duration::from_secs(30));
             writeln!(ping_thread_connection, "PING")?;
             ping_thread_connection.flush()?;
-        });
+        }));
         Ok(PlaytakSession {
             aws_function_name: None,
             connection,
-            _ping_thread: ping_thread,
+            ping_thread,
         })
     }
 
@@ -195,7 +207,21 @@ impl PlaytakSession {
 
     fn read_line(&mut self) -> Result<String> {
         let mut input = String::new();
-        self.connection.read_line(&mut input)?;
+        let bytes_read = self.connection.read_line(&mut input)?;
+        if bytes_read == 0 {
+            info!("Got EOF from server. Shutting down connection.");
+            self.connection.get_mut().shutdown(net::Shutdown::Both)?;
+            info!("Waiting for ping thread to exit");
+            match self.ping_thread.take().unwrap().join() {
+                Ok(Ok(())) => unreachable!(),
+                Ok(Err(err)) => info!("Ping thread exited successfully with {}", err),
+                Err(err) => error!("Failed to join ping thread {:?}", err),
+            }
+            return Err(io::Error::new(
+                io::ErrorKind::ConnectionAborted,
+                "Received EOF from server",
+            ));
+        }
         info!("> {}", input.trim());
         Ok(input)
     }
@@ -209,7 +235,7 @@ impl PlaytakSession {
 
     /// Place a game seek (challenge) on playtak, and wait for somebody to accept
     /// Mutually recursive with `play_game` when the challenge is accepted
-    pub fn seek_game(&mut self, seek_mode: SeekMode) -> io::Result<()> {
+    pub fn seek_game(&mut self, seek_mode: SeekMode) -> io::Result<std::convert::Infallible> {
         let mut time_for_game = Duration::from_secs(900);
         let mut increment = Duration::from_secs(10);
 
@@ -248,7 +274,7 @@ impl PlaytakSession {
                         time_for_game,
                         increment,
                     )?;
-                    return Ok(());
+                    unreachable!()
                 }
 
                 "Seek" => {
@@ -286,7 +312,7 @@ impl PlaytakSession {
         our_color: Color,
         time_left: Duration,
         increment: Duration,
-    ) -> io::Result<()> {
+    ) -> io::Result<Infallible> {
         info!(
             "Starting game #{}, {} vs {} as {}, {}+{:.1}",
             game_no,
@@ -413,6 +439,7 @@ use std::cmp::Ordering;
 use std::iter;
 
 use arrayvec::ArrayVec;
+use std::convert::Infallible;
 use taik::board;
 use taik::board::{Direction, Move, Movement, Role, StackMovement};
 #[cfg(not(feature = "aws-lambda"))]
