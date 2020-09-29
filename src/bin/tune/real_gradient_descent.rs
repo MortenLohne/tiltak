@@ -121,7 +121,9 @@ fn calc_slope<const N: usize>(
                 .iter_mut()
                 .zip(coefficients)
                 .for_each(|(gradient, coefficient)| {
-                    *gradient = (estimated_sigmoid - result) * derived_sigmoid_result * *coefficient
+                    *gradient = ((estimated_sigmoid - result)
+                        * derived_sigmoid_result
+                        * *coefficient) as f64
                 });
             gradients_for_this_training_sample
         })
@@ -129,7 +131,7 @@ fn calc_slope<const N: usize>(
             || [0.0; N],
             |mut a, b| {
                 for (c, d) in a.iter_mut().zip(b.iter()) {
-                    *c += d;
+                    *c += *d as f64;
                 }
                 a
             },
@@ -138,16 +140,20 @@ fn calc_slope<const N: usize>(
             || [0.0; N],
             |mut a, b| {
                 for (c, d) in a.iter_mut().zip(b.iter()) {
-                    *c += d;
+                    *c += *d as f64;
                 }
                 a
             },
         );
 
     for slope in slopes.iter_mut() {
-        *slope /= coefficient_sets.len() as f32;
+        *slope /= coefficient_sets.len() as f64;
     }
-    slopes
+    let mut f32_slopes = [0.0; N];
+    for (f64_slope, slope) in f32_slopes.iter_mut().zip(&slopes) {
+        *f64_slope = *slope as f32;
+    }
+    f32_slopes
 }
 
 /// Mean squared error of the parameter set, measured against given results and positions
