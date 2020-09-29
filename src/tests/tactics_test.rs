@@ -95,13 +95,30 @@ fn flatten_our_stone_to_win() {
 #[test]
 fn winning_movement_test() {
     // e1 e5 Cc3 d1 c1 Cc2 d2 b1 c1> a1 c1 d3 b2 e1< c1> b3 d4 e2 b4 d3- 4d1<22 c2- Sd1 c2 d1+ 2c1< c4
-    let move_strings = ["e1", "e5", "Cc3", "d1", "c1", "Cc2", "d2", "b1", "c1>", "a1", "c1", "d3", "b2", "e1<", "c1>", "b3", "d4", "e2", "b4", "d3-", "4d1<22", "c2-", "Sd1", "c2", "d1+", "2c1<", "c4"];
+    let move_strings = [
+        "e1", "e5", "Cc3", "d1", "c1", "Cc2", "d2", "b1", "c1>", "a1", "c1", "d3", "b2", "e1<",
+        "c1>", "b3", "d4", "e2", "b4", "d3-", "4d1<22", "c2-", "Sd1", "c2", "d1+", "2c1<", "c4",
+    ];
 
     let mut board = Board::start_board();
 
     do_moves_and_check_validity(&mut board, &move_strings);
 
     plays_correct_hard_move_property(&move_strings, &["4b1>13"]);
+}
+
+#[test]
+fn winning_movement_test2() {
+    let move_strings = [
+        "a1", "a5", "b5", "Cc3", "c5", "d5", "Cd4", "c4", "e5", "c4+", "c4", "b4", "c4+", "d5<",
+        "d5", "c4", "d4<", "4c5<22", "c5", "b3", "2c4+", "3b5-", "2c5<", "a4",
+    ];
+
+    let mut board = Board::start_board();
+
+    do_moves_and_check_validity(&mut board, &move_strings);
+
+    plays_correct_hard_move_property(&move_strings, &["b5<"]);
 }
 
 #[cfg(test)]
