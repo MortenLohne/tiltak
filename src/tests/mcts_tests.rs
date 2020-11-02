@@ -4,6 +4,7 @@ use crate::mcts::MctsSetting;
 use crate::tests::do_moves_and_check_validity;
 use board_game_traits::board::Board as BoardTrait;
 use pgn_traits::pgn::PgnBoard;
+use std::time;
 
 #[test]
 fn win_in_two_moves_test() {
@@ -115,6 +116,24 @@ fn do_not_play_suicide_move_as_black_test2() {
     board.generate_moves(&mut moves);
     assert!(moves.contains(&board.move_from_san("2c5>11").unwrap()));
     assert!(mcts::mcts(board.clone(), 10_000).0 != board.move_from_san("2c5>11").unwrap());
+}
+
+#[test]
+fn do_not_instamove_into_loss() {
+    let mut board = Board::start_board();
+    let move_strings = [
+        "e1", "a5", "Cc3", "d1", "c1", "b1", "c2", "1b1>1", "b1", "2c1<2", "c1", "Ca1", "c4",
+        "3b1>3", "1c2-1", "1d1<1", "Sd1", "1a1>1", "b3", "a1", "1d1<1", "1b1>1", "d3", "2c1>2",
+        "Sb1", "1d1<1", "d2", "1e1<1", "c2", "e1", "1d2-1", "1e1<1",
+    ];
+
+    do_moves_and_check_validity(&mut board, &move_strings);
+
+    let (best_move, _) = mcts::play_move_time(board.clone(), time::Duration::from_secs(1));
+
+    for move_string in ["b2", "c5", "b4", "d4"].iter() {
+        assert_ne!(best_move, board.move_from_san(move_string).unwrap());
+    }
 }
 
 #[test]

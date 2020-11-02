@@ -96,9 +96,7 @@ pub fn play_move_time(board: Board, max_time: time::Duration) -> (Move, Score) {
 
         let (best_move, best_score) = tree.best_move();
 
-        if best_score > 0.999
-            || best_score < 0.001
-            || start_time.elapsed() > max_time - time::Duration::from_millis(50)
+        if start_time.elapsed() > max_time - time::Duration::from_millis(50)
             || tree.children.len() == 1
         {
             return tree.best_move();
@@ -186,7 +184,7 @@ impl Tree {
                 (1.0 + self.visits as Score + settings.c_puct_base()) / settings.c_puct_base(),
             );
 
-        best_children.iter().take(8).for_each(|(child, mv)| {
+        best_children.iter().take(20).for_each(|(child, mv)| {
             println!(
                 "Move {}: {} visits, {:.3} mean action value, {:.3} static score, {:.3} exploration value, pv {}",
                 mv, child.visits, child.mean_action_value, child.heuristic_score,
