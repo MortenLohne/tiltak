@@ -26,7 +26,7 @@ use crate::tune::spsa;
 #[cfg(feature = "constant-tuning")]
 use crate::tune::training;
 
-use board_game_traits::board::Board as BoardTrait;
+use board_game_traits::board::{Board as BoardTrait, EvalBoard};
 use board_game_traits::board::{Color, GameResult};
 use pgn_traits::pgn::PgnBoard;
 
@@ -346,7 +346,13 @@ fn test_position() {
     for i in 1.. {
         tree.select(&mut board.clone(), &settings, &mut simple_moves, &mut moves);
         if i % 100_000 == 0 {
-            println!("{} visits, val={}", tree.visits, tree.mean_action_value);
+            println!(
+                "{} visits, val={:.4}, static eval={:.4}, static winning probability={:.4}",
+                tree.visits,
+                tree.mean_action_value,
+                board.static_eval(),
+                mcts::cp_to_win_percentage(board.static_eval())
+            );
             tree.print_info(&settings);
             println!("Best move: {:?}", tree.best_move())
         }
