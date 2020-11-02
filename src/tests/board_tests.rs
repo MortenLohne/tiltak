@@ -3,6 +3,7 @@ use crate::board::{
     squares_iterator, Board, Direction::*, GroupEdgeConnection, Move, Piece, Role, Square,
     BOARD_SIZE,
 };
+use crate::minmax::minmax;
 use crate::tests::do_moves_and_check_validity;
 use crate::{board as board_mod, board};
 use board_game_traits::board::{Board as BoardTrait, Color, EvalBoard};
@@ -516,4 +517,11 @@ fn critical_square_test() {
             .collect::<Vec<_>>(),
         vec![a5]
     );
+}
+
+#[test]
+fn static_eval_after_move_test() {
+    let mut board = Board::start_board();
+    minmax(&mut board, 1);
+    board.static_eval();
 }

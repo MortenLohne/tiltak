@@ -848,6 +848,11 @@ impl fmt::Debug for Board {
             "Amount in groups: {:?}",
             self.group_data.borrow().amount_in_group
         )?;
+        writeln!(
+            f,
+            "Groups up to date: {}",
+            self.group_data.borrow().updated_groups
+        )?;
         Ok(())
     }
 }
@@ -1155,7 +1160,7 @@ impl Board {
         // Bonus/malus depending on the number of groups each side has
         let mut seen_groups = [false; BOARD_AREA + 1];
         seen_groups[0] = true;
-        let group_data = self.group_data.borrow();
+        let group_data = self.group_data();
 
         let number_of_groups = squares_iterator()
             .map(|square| {
