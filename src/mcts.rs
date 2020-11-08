@@ -55,12 +55,36 @@ pub type Score = f32;
 /// A Monte Carlo Search Tree, containing every node that has been seen in search.
 #[derive(Clone, PartialEq, Debug)]
 pub struct Tree {
-    pub children: Vec<(Tree, Move)>,
-    pub visits: u64,
+    pub children: Vec<TreeEdge>,
     pub total_action_value: f64,
-    pub mean_action_value: Score,
-    pub heuristic_score: Score,
     pub is_terminal: bool,
+}
+
+#[derive(Clone, PartialEq, Debug)]
+pub struct TreeEdge {
+    child: Option<Box<Tree>>,
+    mv: Move,
+    mean_action_value: Score,
+    visits: u64,
+    heuristic_score: Score,
+}
+
+impl TreeEdge {
+    fn new(mv: Move, heuristic_score: Score) -> Self {
+        TreeEdge {
+            child: None,
+            mv,
+            mean_action_value: 0.1,
+            visits: 0,
+            heuristic_score
+        }
+    }
+    #[inline]
+    fn exploration_value(&self, parent_visits_sqrt: Score, cpuct: Score) -> Score {
+        (1.0 - self.mean_action_value)
+            + cpuct * self.heuristic_score * parent_visits_sqrt / (1 + self.visits) as Score
+
+    }
 }
 
 // TODO: Winning percentage should be always be interpreted from the side to move's perspective
@@ -102,11 +126,11 @@ pub fn play_move_time(board: Board, max_time: time::Duration) -> (Move, Score) {
             return tree.best_move();
         }
 
-        let mut child_refs: Vec<&(Tree, Move)> = tree.children.iter().collect();
-        child_refs.sort_by_key(|(child, _)| child.visits);
+        let mut child_refs: Vec<&TreeEdge> = tree.children.iter().collect();
+        child_refs.sort_by_key(|edge| edge.visits);
         child_refs.reverse();
 
-        let node_ratio = child_refs[1].0.visits as f32 / child_refs[0].0.visits as f32;
+        let node_ratio = child_refs[1].visits as f32 / child_refs[0].visits as f32;
         let time_ratio = start_time.elapsed().as_secs_f32() / max_time.as_secs_f32();
 
         if time_ratio.powf(2.0) > node_ratio / 2.0 {
@@ -114,7 +138,7 @@ pub fn play_move_time(board: Board, max_time: time::Duration) -> (Move, Score) {
             if tree
                 .children
                 .iter()
-                .any(|(child, mv)| *mv != best_move && 1.0 - child.mean_action_value > best_score)
+                .any(|edge| edge.mv != best_move && 1.0 - edge.mean_action_value > best_score)
             {
                 continue;
             }
@@ -133,10 +157,10 @@ pub fn mcts_training(board: Board, nodes: u64, settings: &MctsSetting) -> Vec<(M
     for _ in 0..nodes {
         tree.select(&mut board.clone(), &settings, &mut simple_moves, &mut moves);
     }
-    let child_visits: u64 = tree.children.iter().map(|(child, _)| child.visits).sum();
+    let child_visits: u64 = tree.children.iter().map(|edge| edge.visits).sum();
     tree.children
         .iter()
-        .map(|(child, mv)| (mv.clone(), child.visits as f32 / child_visits as f32))
+        .map(|edge| (edge.mv.clone(), edge.visits as f32 / child_visits as f32))
         .collect()
 }
 
@@ -144,10 +168,7 @@ impl Tree {
     pub fn new_root() -> Self {
         Tree {
             children: vec![],
-            visits: 0,
             total_action_value: 0.0,
-            mean_action_value: 0.5,
-            heuristic_score: 0.0,
             is_terminal: false,
         }
     }
@@ -160,36 +181,38 @@ impl Tree {
             } else {
                 self.children
                     .iter()
-                    .map(|(child, mv)| (child.shallow_clone(depth - 1), mv.clone()))
+                    .map(|edge| TreeEdge {
+                        child: edge.child.as_ref().map(|child| Box::new(child.shallow_clone(depth - 1))),
+                        mv: edge.mv.clone(),
+                        mean_action_value: edge.mean_action_value,
+                        visits: edge.visits,
+                        heuristic_score: edge.heuristic_score,
+                    })
                     .collect()
             },
-            visits: self.visits,
             total_action_value: self.total_action_value,
-            mean_action_value: self.mean_action_value,
-            heuristic_score: self.heuristic_score,
             is_terminal: self.is_terminal,
         }
     }
 
     /// Print human-readable information of the search's progress.
-    pub fn print_info(&self, settings: &MctsSetting) {
-        let mut best_children: Vec<&(Tree, Move)> =
-            self.children.iter().map(|child| child).collect();
+    pub fn print_info(&self, visits: u64, settings: &MctsSetting) {
+        let mut best_children: Vec<&TreeEdge> =
+            self.children.iter().map(|edge| edge).collect();
 
-        best_children.sort_by_key(|(child, _)| child.visits);
+        best_children.sort_by_key(|edge| edge.visits);
         best_children.reverse();
-        let parent_visits = self.visits;
         let dynamic_cpuct = settings.c_puct_init()
             + Score::ln(
-                (1.0 + self.visits as Score + settings.c_puct_base()) / settings.c_puct_base(),
+                (1.0 + visits as Score + settings.c_puct_base()) / settings.c_puct_base(),
             );
 
-        best_children.iter().take(20).for_each(|(child, mv)| {
+        best_children.iter().take(20).for_each(|edge| {
             println!(
                 "Move {}: {} visits, {:.3} mean action value, {:.3} static score, {:.3} exploration value, pv {}",
-                mv, child.visits, child.mean_action_value, child.heuristic_score,
-                child.exploration_value((parent_visits as Score).sqrt(), dynamic_cpuct),
-                child.pv().map(|mv| mv.to_string() + " ").collect::<String>()
+                edge.mv, edge.visits, edge.mean_action_value, edge.heuristic_score,
+                edge.exploration_value((visits as Score).sqrt(), dynamic_cpuct),
+                edge.child.as_ref().unwrap().pv().map(|mv| mv.to_string() + " ").collect::<String>()
             )
         });
     }
@@ -201,8 +224,8 @@ impl Tree {
     pub fn best_move(&self) -> (Move, Score) {
         self.children
             .iter()
-            .max_by_key(|(child, _)| child.visits)
-            .map(|(child, mv)| (mv.clone(), 1.0 - child.mean_action_value))
+            .max_by_key(|edge| edge.visits)
+            .map(|edge| (edge.mv.clone(), 1.0 - edge.mean_action_value))
             .unwrap_or_else(|| {
                 panic!(
                     "Couldn't find best move for node{:?}",
@@ -211,14 +234,14 @@ impl Tree {
             })
     }
 
-    pub fn best_move_temperature(&self, temperature: f64) -> (Move, Score) {
+    pub fn best_move_temperature(&self, visits: u64, temperature: f64) -> (Move, Score) {
         let mut rng = rand::thread_rng();
         let mut move_probabilities = vec![];
         let mut cumulative_prob = 0.0;
 
-        for (child, mv) in self.children.iter() {
-            cumulative_prob += (child.visits as f64).powf(1.0 / temperature) / self.visits as f64;
-            move_probabilities.push((mv, child.mean_action_value, cumulative_prob));
+        for edge in self.children.iter() {
+            cumulative_prob += (edge.visits as f64).powf(1.0 / temperature) / visits as f64;
+            move_probabilities.push((edge.mv.clone(), edge.mean_action_value, cumulative_prob));
         }
 
         let p = rng.gen_range(0.0, cumulative_prob);
@@ -233,10 +256,7 @@ impl Tree {
     fn new_node(heuristic_score: Score) -> Self {
         Tree {
             children: vec![],
-            visits: 0,
             total_action_value: 0.0,
-            mean_action_value: 0.1,
-            heuristic_score,
             is_terminal: false,
         }
     }
@@ -262,7 +282,7 @@ impl Tree {
                 self.visits,
                 self.children
                     .iter()
-                    .map(|(child, _)| child.visits)
+                    .map(|edge| edge.visits)
                     .sum::<u64>()
                     + 1,
                 "{} visits, {} total action value, {} mean action value",
@@ -291,18 +311,18 @@ impl Tree {
             let mut best_exploration_value = 0.0;
             let mut best_child_node_index = 0;
 
-            for (i, (child, _)) in self.children.iter().enumerate() {
-                let child_exploration_value = child.exploration_value(visits_sqrt, dynamic_cpuct);
+            for (i, edge) in self.children.iter().enumerate() {
+                let child_exploration_value = edge.exploration_value(visits_sqrt, dynamic_cpuct);
                 if child_exploration_value >= best_exploration_value {
                     best_child_node_index = i;
                     best_exploration_value = child_exploration_value;
                 }
             }
 
-            let (child, mv) = self.children.get_mut(best_child_node_index).unwrap();
+            let edge = self.children.get_mut(best_child_node_index).unwrap();
 
-            board.do_move(mv.clone());
-            let result = 1.0 - child.select(board, settings, simple_moves, moves);
+            board.do_move(edge.mv.clone());
+            let result = 1.0 - edge.child.as_mut().unwrap().select(board, settings, simple_moves, moves);
             self.visits += 1;
 
             self.total_action_value += result as f64;
@@ -359,7 +379,7 @@ impl Tree {
         self.children.reserve_exact(moves.len());
         for (mv, heuristic_score) in moves.drain(..) {
             self.children
-                .push((Tree::new_node(heuristic_score), mv.clone()));
+                .push(TreeEdge::new(mv.clone(), heuristic_score));
         }
     }
 
@@ -417,10 +437,12 @@ impl<'a> Iterator for PV<'a> {
         self.tree
             .children
             .iter()
-            .max_by_key(|(child, _)| child.visits)
-            .map(|(child, mv)| {
-                self.tree = child;
-                mv.clone()
+            .max_by_key(|edge| edge.visits)
+            .and_then(|edge| {
+                edge.child.as_ref().map(|child| {
+                    self.tree = child;
+                    edge.mv.clone()
+                })
             })
     }
 }
