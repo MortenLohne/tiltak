@@ -1,4 +1,4 @@
-use board_game_traits::board::{Board as BoardTrait, Color};
+use board_game_traits::board::{Board as BoardTrait, Color, GameResult};
 use bufstream::BufStream;
 use clap::{App, Arg};
 use log::error;
@@ -355,6 +355,27 @@ impl PlaytakSession {
                 let mut output_string = format!("Game#{} ", game_no);
                 write_move(best_move, &mut output_string);
                 self.send_line(&output_string)?;
+
+                // Say "Tak" whenever there is a threat to win
+                // Only do this vs Shigewara
+                if white_player == "shigewara" || black_player == "shigewara" {
+                    let mut board_clone = board.clone();
+                    board_clone.null_move();
+                    let mut moves = vec![];
+                    board_clone.generate_moves(&mut moves);
+                    for mv in moves {
+                        let reverse_move = board_clone.do_move(mv);
+                        match (board_clone.side_to_move(), board_clone.game_result()) {
+                            (Color::White, Some(GameResult::BlackWin))
+                            | (Color::Black, Some(GameResult::WhiteWin)) => {
+                                self.send_line("Tell shigewara Tak!")?;
+                                break;
+                            }
+                            _ => (),
+                        }
+                        board_clone.reverse_move(reverse_move);
+                    }
+                }
             } else {
                 // Wait for the opponent's move. The server may send other messages in the meantime
                 loop {
