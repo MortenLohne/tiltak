@@ -1,10 +1,14 @@
+use crate::pgn_writer::Game;
 use board_game_traits::board::GameResult;
+use nom::{
+    alt, char, complete, dbg, do_parse, many0, many1, many_till, named, opt, return_error, tag,
+    take_until, take_until_and_consume,
+};
 use pgn_traits::pgn::PgnBoard;
 use std::error;
 use std::fmt::Debug;
 use std::io;
 use std::io::Write;
-use taik::pgn_writer::Game;
 
 pub fn parse_pgn<B: PgnBoard + Debug + Clone>(
     mut input: &str,

@@ -41,4 +41,5 @@ mod tests;
 
 pub use mcts::mcts;
 
+pub mod pgn_parser;
 pub mod pgn_writer;

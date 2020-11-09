@@ -1,8 +1,5 @@
 #[cfg(feature = "constant-tuning")]
 #[macro_use]
-extern crate nom;
-#[cfg(feature = "constant-tuning")]
-#[macro_use]
 extern crate log;
 
 #[cfg(feature = "constant-tuning")]
@@ -14,7 +11,7 @@ mod tests;
 pub mod playtak;
 pub mod uti;
 
-use std::io::Write;
+use std::io::{Read, Write};
 #[cfg(feature = "constant-tuning")]
 use std::path::Path;
 use std::{io, time};
@@ -36,8 +33,6 @@ use taik::board::TunableBoard;
 use taik::mcts;
 use taik::mcts::MctsSetting;
 use taik::minmax;
-
-#[cfg(feature = "constant-tuning")]
 use taik::pgn_writer::Game;
 
 fn main() {
@@ -59,6 +54,14 @@ fn main() {
             }
         }
         "analyze" => test_position(),
+        "game" => {
+            let mut input = String::new();
+            io::stdin().read_to_string(&mut input).unwrap();
+
+            let game = taik::pgn_parser::parse_pgn(&mut input).unwrap();
+
+            analyze_game(game[0].clone());
+        }
         "mem_usage" => mem_usage(),
         "bench" => bench(),
         "selfplay" => mcts_selfplay(time::Duration::from_secs(10)),
@@ -359,6 +362,33 @@ fn test_position() {
     }
 }
 
+fn analyze_game(game: Game<Board>) {
+    let mut board = game.start_board.clone();
+    let mut ply_number = 2;
+    for (mv, _) in game.moves {
+        board.do_move(mv.clone());
+        let (best_move, score) = mcts::mcts(board.clone(), 1_000_000);
+        if ply_number % 2 == 0 {
+            print!(
+                "{}. {}: {{{:.2}%, best reply {}}} ",
+                ply_number / 2,
+                board.move_to_san(&mv),
+                (1.0 - score) * 100.0,
+                best_move
+            );
+        } else {
+            println!(
+                "{}... {}: {{{:.2}%, best reply {}}}",
+                ply_number / 2,
+                board.move_to_san(&mv),
+                (1.0 - score) * 100.0,
+                best_move
+            );
+        }
+        ply_number += 1;
+    }
+}
+
 /// Play a game against the engine through stdin
 fn play_human(mut board: Board) {
     match board.game_result() {
@@ -461,7 +491,7 @@ fn pgn_to_move_list() {
     let mut file = fs::File::open("game.ptn").unwrap();
     let mut input = String::new();
     file.read_to_string(&mut input).unwrap();
-    let games: Vec<Game<Board>> = tune::pgn_parser::parse_pgn(&input).unwrap();
+    let games: Vec<Game<Board>> = taik::pgn_parser::parse_pgn(&input).unwrap();
     println!("Parsed {} games", games.len());
     print!("[");
     for (mv, _) in games[0].moves.iter() {
