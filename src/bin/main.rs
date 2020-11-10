@@ -58,9 +58,12 @@ fn main() {
             let mut input = String::new();
             io::stdin().read_to_string(&mut input).unwrap();
 
-            let game = taik::pgn_parser::parse_pgn(&mut input).unwrap();
+            let games = taik::pgn_parser::parse_pgn(&mut input).unwrap();
+            if games.is_empty() {
+                panic!("Couldn't parse any games")
+            }
 
-            analyze_game(game[0].clone());
+            analyze_game(games[0].clone());
         }
         "mem_usage" => mem_usage(),
         "bench" => bench(),
@@ -367,6 +370,9 @@ fn analyze_game(game: Game<Board>) {
     let mut ply_number = 2;
     for (mv, _) in game.moves {
         board.do_move(mv.clone());
+        if board.game_result().is_some() {
+            break;
+        }
         let (best_move, score) = mcts::mcts(board.clone(), 1_000_000);
         if ply_number % 2 == 0 {
             print!(
