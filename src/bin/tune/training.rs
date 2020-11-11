@@ -1,5 +1,5 @@
 use crate::tune::play_match::play_game;
-use crate::tune::{pgn_parser, play_match, real_gradient_descent};
+use crate::tune::{play_match, real_gradient_descent};
 use board_game_traits::board::Board as BoardTrait;
 use board_game_traits::board::GameResult;
 use rand::prelude::*;
