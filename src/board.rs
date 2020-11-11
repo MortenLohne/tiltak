@@ -906,6 +906,10 @@ impl Board {
         self.group_data.borrow()
     }
 
+    pub fn null_move(&mut self) {
+        self.to_move = !self.to_move;
+    }
+
     fn is_critical_square_from_scratch(
         &self,
         groups: &AbstractBoard<u8>,

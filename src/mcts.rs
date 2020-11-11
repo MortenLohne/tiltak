@@ -136,7 +136,7 @@ impl RootNode {
                     / self.settings.c_puct_base(),
             );
 
-        best_children.iter().take(20).for_each(|edge| {
+        best_children.iter().take(8).for_each(|edge| {
             println!(
                 "Move {}: {} visits, {:.3} mean action value, {:.3} static score, {:.3} exploration value, pv {}",
                 edge.mv, edge.visits, edge.mean_action_value, edge.heuristic_score,

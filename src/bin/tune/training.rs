@@ -14,6 +14,7 @@ use std::{error, fs, io, iter};
 use taik::board::TunableBoard;
 use taik::board::{Board, Move};
 use taik::mcts::MctsSetting;
+use taik::pgn_parser;
 use taik::pgn_writer::Game;
 
 // The score, or probability of being played, for a given move

@@ -12,7 +12,7 @@ default-run = "main"
 debug = true
 
 [features]
-constant-tuning = ["rayon", "nom"]
+constant-tuning = ["rayon"]
 aws-lambda = ["lambda_runtime", "serde", "serde_json", "arrayvec/serde"]
 
 [[bin]]
@@ -37,4 +37,3 @@ clap = "2.33"
 [dependencies.nom]
 version = "4.2"
 features = ["verbose-errors"]
-optional = true
