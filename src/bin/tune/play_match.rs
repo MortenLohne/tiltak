@@ -29,8 +29,8 @@ pub fn play_game(
         }
 
         let moves_scores = match board.side_to_move() {
-            Color::White => mcts::mcts_training(board.clone(), MCTS_NODES, white_settings),
-            Color::Black => mcts::mcts_training(board.clone(), MCTS_NODES, black_settings),
+            Color::White => mcts::mcts_training(board.clone(), MCTS_NODES, white_settings.clone()),
+            Color::Black => mcts::mcts_training(board.clone(), MCTS_NODES, black_settings.clone()),
         };
 
         // For the first regular move (White's move #2),
@@ -116,8 +116,8 @@ pub fn play_match_between_params(
             }
 
             let moves_scores = match board.side_to_move() {
-                Color::White => mcts::mcts_training(board.clone(), NODES, &player1_settings),
-                Color::Black => mcts::mcts_training(board.clone(), NODES, &player2_settings),
+                Color::White => mcts::mcts_training(board.clone(), NODES, player1_settings.clone()),
+                Color::Black => mcts::mcts_training(board.clone(), NODES, player2_settings.clone()),
             };
             let best_move = best_move(TEMPERATURE, &moves_scores[..]);
             board.do_move(best_move);
@@ -137,8 +137,8 @@ pub fn play_match_between_params(
                 break;
             }
             let moves_scores = match board.side_to_move() {
-                Color::White => mcts::mcts_training(board.clone(), NODES, &player2_settings),
-                Color::Black => mcts::mcts_training(board.clone(), NODES, &player1_settings),
+                Color::White => mcts::mcts_training(board.clone(), NODES, player2_settings.clone()),
+                Color::Black => mcts::mcts_training(board.clone(), NODES, player1_settings.clone()),
             };
             let best_move = best_move(TEMPERATURE, &moves_scores[..]);
             board.do_move(best_move.clone());
