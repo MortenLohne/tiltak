@@ -488,7 +488,6 @@ fn bench() {
 #[cfg(feature = "constant-tuning")]
 fn pgn_to_move_list() {
     use std::fs;
-    use std::io::Read;
 
     let mut file = fs::File::open("game.ptn").unwrap();
     let mut input = String::new();
