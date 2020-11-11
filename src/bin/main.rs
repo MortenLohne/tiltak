@@ -509,6 +509,7 @@ fn mem_usage() {
     println!("Tak move: {} bytes", mem::size_of::<board::Move>());
 
     println!("MCTS node: {} bytes.", mem::size_of::<mcts::Tree>());
+    println!("MCTS edge: {} bytes", mem::size_of::<mcts::TreeEdge>());
     let board = board::Board::default();
     let mut tree = mcts::RootNode::new(board);
     for _ in 0..2 {
@@ -516,7 +517,7 @@ fn mem_usage() {
     }
     println!(
         "MCTS node's children: {} bytes.",
-        tree.children().len() * mem::size_of::<(mcts::Tree, board::Move)>()
+        tree.children().len() * mem::size_of::<mcts::Tree>()
     );
 }
 
