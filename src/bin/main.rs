@@ -34,7 +34,6 @@ use taik::board;
 use taik::board::Board;
 use taik::board::TunableBoard;
 use taik::mcts;
-use taik::mcts::MctsSetting;
 use taik::minmax;
 
 #[cfg(feature = "constant-tuning")]
@@ -339,21 +338,18 @@ fn test_position() {
         );
     }
 
-    let mut tree = mcts::Tree::new_root();
-    let mut simple_moves = vec![];
-    let mut moves = vec![];
-    let settings = MctsSetting::default();
+    let mut tree = mcts::RootNode::new(board.clone());
     for i in 1.. {
-        tree.select(&mut board.clone(), &settings, &mut simple_moves, &mut moves);
+        tree.select();
         if i % 100_000 == 0 {
             println!(
                 "{} visits, val={:.4}, static eval={:.4}, static winning probability={:.4}",
-                tree.visits,
-                tree.mean_action_value,
+                tree.visits(),
+                tree.mean_action_value(),
                 board.static_eval(),
                 mcts::cp_to_win_percentage(board.static_eval())
             );
-            tree.print_info(&settings);
+            tree.print_info();
             println!("Best move: {:?}", tree.best_move())
         }
     }
@@ -478,19 +474,14 @@ fn mem_usage() {
     println!("Tak move: {} bytes", mem::size_of::<board::Move>());
 
     println!("MCTS node: {} bytes.", mem::size_of::<mcts::Tree>());
-    let mut board = board::Board::default();
-    let mut tree = mcts::Tree::new_root();
+    let board = board::Board::default();
+    let mut tree = mcts::RootNode::new(board);
     for _ in 0..2 {
-        tree.select(
-            &mut board,
-            &MctsSetting::default(),
-            &mut vec![],
-            &mut vec![],
-        );
+        tree.select();
     }
     println!(
         "MCTS node's children: {} bytes.",
-        tree.children.len() * mem::size_of::<(mcts::Tree, board::Move)>()
+        tree.children().len() * mem::size_of::<(mcts::Tree, board::Move)>()
     );
 }
 
