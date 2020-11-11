@@ -32,7 +32,7 @@ pub fn handle_aws_event(e: Event, _c: Context) -> Result<Output, HandlerError> {
         board.do_move(mv);
     }
 
-    let max_time = Duration::min(e.time_left / 40 + e.increment, Duration::from_secs(20));
+    let max_time = Duration::min(e.time_left / 40 + e.increment, Duration::from_secs(30));
 
     let (best_move, score) = mcts::play_move_time(board, max_time);
 
