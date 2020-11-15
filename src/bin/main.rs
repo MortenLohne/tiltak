@@ -54,8 +54,6 @@ fn main() {
         "bench" => bench(),
         "selfplay" => mcts_selfplay(time::Duration::from_secs(10)),
         #[cfg(feature = "constant-tuning")]
-        "pgn_to_move_list" => pgn_to_move_list(),
-        #[cfg(feature = "constant-tuning")]
         "play_params" => {
             #[allow(clippy::unreadable_literal)]
             let value_params1: &'static [f32] = &[
@@ -415,22 +413,6 @@ fn bench() {
         time_taken.as_millis(),
         NODES as f64 * 3.0 / (1000.0 * time_taken.as_secs_f64())
     );
-}
-
-#[cfg(feature = "constant-tuning")]
-fn pgn_to_move_list() {
-    use std::fs;
-
-    let mut file = fs::File::open("game.ptn").unwrap();
-    let mut input = String::new();
-    file.read_to_string(&mut input).unwrap();
-    let games: Vec<Game<Board>> = taik::pgn_parser::parse_pgn(&input).unwrap();
-    println!("Parsed {} games", games.len());
-    print!("[");
-    for (mv, _) in games[0].moves.iter() {
-        print!("\"{}\", ", mv);
-    }
-    println!("]")
 }
 
 /// Print memory usage of various data types in the project, for debugging purposes
