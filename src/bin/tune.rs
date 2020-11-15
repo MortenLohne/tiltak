@@ -18,10 +18,14 @@ fn main() {
                     .required(true)
                     .value_name("games.ptn")))
         .subcommand(
-            SubCommand::with_name("policy-from-file")
-                .about("Tune policy constants from randomly initialized values, using the given text file")
-                .arg(Arg::with_name("file-name")
+            SubCommand::with_name("both-from-file")
+                .about("Tune value and policy constants from randomly initialized values, using the given text file")
+                .arg(Arg::with_name("value-file-name")
                     .index(1)
+                    .required(true)
+                    .value_name("games.ptn"))
+                .arg(Arg::with_name("policy-file-name")
+                    .index(2)
                     .required(true)
                     .value_name("move_scores.txt"))
         )
@@ -55,13 +59,15 @@ fn main() {
         }
         ("value-from-file", Some(arg)) => {
             let file_name = arg.value_of("file-name").unwrap();
-            let value_params = training::tune_real_from_file().unwrap();
+            let value_params = training::tune_real_from_file(file_name).unwrap();
             println!("{:?}", value_params);
         }
-        ("policy-from-file", Some(arg)) => {
-            let file_name = arg.value_of("file-name").unwrap();
+        ("both-from-file", Some(arg)) => {
+            let value_file_name = arg.value_of("value-file-name").unwrap();
+            let policy_file_name = arg.value_of("policy-file-name").unwrap();
             let (value_params, policy_params) =
-                training::tune_real_value_and_policy_from_file().unwrap();
+                training::tune_real_value_and_policy_from_file(value_file_name, policy_file_name)
+                    .unwrap();
             println!("Value: {:?}", value_params);
             println!("Policy: {:?}", policy_params);
         }

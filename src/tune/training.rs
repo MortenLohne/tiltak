@@ -243,15 +243,15 @@ impl GameStats {
     }
 }
 
-pub fn read_games_from_file() -> Result<Vec<Game<Board>>, Box<dyn error::Error>> {
-    let mut file = fs::File::open("games1_all.ptn")?;
+pub fn read_games_from_file(file_name: &str) -> Result<Vec<Game<Board>>, Box<dyn error::Error>> {
+    let mut file = fs::File::open(file_name)?;
     let mut input = String::new();
     file.read_to_string(&mut input)?;
     pgn_parser::parse_pgn(&input)
 }
 
-pub fn tune_real_from_file() -> Result<Vec<f64>, Box<dyn error::Error>> {
-    let games = read_games_from_file()?;
+pub fn tune_real_from_file(file_name: &str) -> Result<Vec<f64>, Box<dyn error::Error>> {
+    let games = read_games_from_file(file_name)?;
 
     let (positions, results) = positions_and_results_from_games(games);
 
@@ -383,9 +383,12 @@ pub fn tune_real_value_and_policy(
     Ok((tuned_value_parameters, tuned_policy_parameters))
 }
 
-pub fn tune_real_value_and_policy_from_file() -> Result<(Vec<f64>, Vec<f64>), Box<dyn error::Error>>
-{
-    let (games, move_scoress) = games_and_move_scoress_from_file()?;
+pub fn tune_real_value_and_policy_from_file(
+    value_file_name: &str,
+    policy_file_name: &str,
+) -> Result<(Vec<f64>, Vec<f64>), Box<dyn error::Error>> {
+    let (games, move_scoress) =
+        games_and_move_scoress_from_file(value_file_name, policy_file_name)?;
 
     let mut rng = rand::thread_rng();
 
@@ -409,9 +412,11 @@ pub fn tune_real_value_and_policy_from_file() -> Result<(Vec<f64>, Vec<f64>), Bo
 }
 
 pub fn games_and_move_scoress_from_file(
+    value_file_name: &str,
+    policy_file_name: &str,
 ) -> Result<(Vec<Game<Board>>, Vec<MoveScoresForGame>), Box<dyn error::Error>> {
-    let mut move_scoress = read_move_scores_from_file()?;
-    let mut games = read_games_from_file()?;
+    let mut move_scoress = read_move_scores_from_file(policy_file_name)?;
+    let mut games = read_games_from_file(value_file_name)?;
 
     // Only keep the last n games, since all the training data doesn't fit in memory while training
     move_scoress.reverse();
@@ -438,8 +443,10 @@ pub fn games_and_move_scoress_from_file(
     Ok((games, move_scoress))
 }
 
-pub fn read_move_scores_from_file() -> Result<Vec<MoveScoresForGame>, Box<dyn error::Error>> {
-    let mut file = fs::File::open("move_scores1_all.txt")?;
+pub fn read_move_scores_from_file(
+    file_name: &str,
+) -> Result<Vec<MoveScoresForGame>, Box<dyn error::Error>> {
+    let mut file = fs::File::open(file_name)?;
     let mut input = String::new();
     file.read_to_string(&mut input)?;
 
