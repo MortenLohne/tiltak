@@ -4,14 +4,15 @@ Taik is a simple AI for the board game [Tak](https://en.wikipedia.org/wiki/Tak_(
 
 # Overview
 
-The project consists of 4 different programs, that use the core engine in various ways:
+The project consists of 5 different binaries, that use the core engine in various ways:
  
+ * **main** Various commands, mostly for debugging and experimentation.
  * **playtak** Connect to the `playtak.com` server, and seek games as a bot.
  * **uti** Run the engine through a [uci-like](https://en.wikipedia.org/wiki/Universal_Chess_Interface) text interface.
- * **main** Various other commands, mostly for debugging and experimentation.
  * **tune** Automatically tune the engine's parameters. 
+ * **bootstrap** Engine worker for running on AWS Lambda.
  
- All 4 binaries will be built by default, see the `build` section. 
+ The first 3 binaries will be built by default, while `tune` and `bootstrap` require specific commands, see their sections. 
 
 # Usage
 
@@ -44,6 +45,11 @@ go movetime 1000
 ````
 
 ## tune
+To build and run this binary:
+```
+cargo build --release --features "constant-tuning" --bin tune
+cargo run --release --features "constant-tuning" --bin tune
+```
 
 Automatically tune the engine's parameters through several subcommands. 
 
@@ -51,13 +57,21 @@ The engine's static evaluation (value parameters) and move evaluation (policy pa
 
 This is otherwise not well documented, try `tune --help` for more. 
 
+## bootstrap 
+To build this binary:
+```
+cargo build --release --target x86_64-unknown-linux-musl --bin bootstrap --features aws-lambda
+```
+This is otherwise undocumented.
+
 # Build
 
 Building the project from source requires the Rust compiler and Cargo (Rust's package manager) installed, both included in the [Rust downloads.](https://www.rust-lang.org/tools/install)
 
-To build:
+To build and run:
 ```
 cargo build --release
+cargo run --release
 ```
 
 
