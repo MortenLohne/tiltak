@@ -19,6 +19,10 @@ aws-lambda = ["lambda_runtime", "serde", "serde_json", "arrayvec/serde"]
 name = "bootstrap"
 required-features = ["aws-lambda"]
 
+[[bin]]
+name = "tune"
+required-features = ["constant-tuning"]
+
 [dependencies]
 board-game-traits = "0.1"
 pgn-traits = "0.1"

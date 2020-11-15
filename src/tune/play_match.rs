@@ -1,13 +1,13 @@
+use crate::board::{Board, Move, Role};
+use crate::mcts::{MctsSetting, Score};
+use crate::pgn_writer::Game;
+use crate::{mcts, pgn_writer};
 use board_game_traits::board::{Board as BoardTrait, Color, GameResult};
 use rand::seq::SliceRandom;
 use rand::Rng;
 use rayon::prelude::*;
 use std::io;
 use std::sync::atomic::{AtomicU64, Ordering};
-use taik::board::{Board, Move, Role};
-use taik::mcts::{MctsSetting, Score};
-use taik::pgn_writer::Game;
-use taik::{mcts, pgn_writer};
 
 /// Play a single training game between two parameter sets
 pub fn play_game(

@@ -5,17 +5,17 @@ use board_game_traits::board::GameResult;
 use rand::prelude::*;
 use rayon::prelude::*;
 
+use crate::board::TunableBoard;
+use crate::board::{Board, Move};
+use crate::mcts::MctsSetting;
+use crate::pgn_parser;
+use crate::pgn_writer::Game;
 use pgn_traits::pgn::PgnBoard;
 use std::io::Read;
 use std::io::Write;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time;
 use std::{error, fs, io, iter};
-use taik::board::TunableBoard;
-use taik::board::{Board, Move};
-use taik::mcts::MctsSetting;
-use taik::pgn_parser;
-use taik::pgn_writer::Game;
 
 // The score, or probability of being played, for a given move
 type MoveScore = (Move, f32);

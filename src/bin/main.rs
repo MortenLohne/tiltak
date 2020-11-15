@@ -1,10 +1,3 @@
-#[cfg(feature = "constant-tuning")]
-#[macro_use]
-extern crate log;
-
-#[cfg(feature = "constant-tuning")]
-mod tune;
-
 #[cfg(test)]
 mod tests;
 
@@ -12,16 +5,7 @@ pub mod playtak;
 pub mod uti;
 
 use std::io::{Read, Write};
-#[cfg(feature = "constant-tuning")]
-use std::path::Path;
 use std::{io, time};
-
-#[cfg(feature = "constant-tuning")]
-use crate::tune::play_match::play_match_between_params;
-#[cfg(feature = "constant-tuning")]
-use crate::tune::spsa;
-#[cfg(feature = "constant-tuning")]
-use crate::tune::training;
 
 use board_game_traits::board::{Board as BoardTrait, EvalBoard};
 use board_game_traits::board::{Color, GameResult};
@@ -33,6 +17,7 @@ use taik::board::TunableBoard;
 use taik::mcts;
 use taik::minmax;
 use taik::pgn_writer::Game;
+use taik::tune::play_match::play_match_between_params;
 
 fn main() {
     println!("play: Play against the mcts AI");
@@ -67,60 +52,6 @@ fn main() {
         "mem_usage" => mem_usage(),
         "bench" => bench(),
         "selfplay" => mcts_selfplay(time::Duration::from_secs(10)),
-        #[cfg(feature = "constant-tuning")]
-        "spsa" => {
-            let mut variables = vec![
-                spsa::Variable {
-                    value: 0.72,
-                    delta: 0.1,
-                    apply_factor: 0.001,
-                },
-                spsa::Variable {
-                    value: 10000.0,
-                    delta: 2000.0,
-                    apply_factor: 0.002,
-                },
-            ];
-            spsa::tune(&mut variables);
-        }
-        #[cfg(feature = "constant-tuning")]
-        "train_from_scratch" => {
-            for i in 0.. {
-                let file_name = format!("games{}_batch0.ptn", i);
-                if !Path::new(&file_name).exists() {
-                    training::train_from_scratch(i).unwrap();
-                    break;
-                } else {
-                    println!("File {} already exists, trying next.", file_name);
-                }
-            }
-        }
-        #[cfg(feature = "constant-tuning")]
-        "train" => {
-            for i in 0.. {
-                let file_name = format!("games{}_batch0.ptn", i);
-                if !Path::new(&file_name).exists() {
-                    training::train_perpetually(i, Board::VALUE_PARAMS, Board::POLICY_PARAMS)
-                        .unwrap();
-                    break;
-                } else {
-                    println!("File {} already exists, trying next.", file_name);
-                }
-            }
-        }
-        #[cfg(feature = "constant-tuning")]
-        "real" => {
-            let value_params = tune::training::tune_real_from_file().unwrap();
-            println!("{:?}", value_params);
-        }
-        #[cfg(feature = "constant-tuning")]
-        "real2" => {
-            let (value_params, policy_params) =
-                tune::training::tune_real_value_and_policy_from_file().unwrap();
-            println!("Value: {:?}", value_params);
-            println!("Policy: {:?}", policy_params);
-        }
-
         #[cfg(feature = "constant-tuning")]
         "pgn_to_move_list" => pgn_to_move_list(),
         #[cfg(feature = "constant-tuning")]

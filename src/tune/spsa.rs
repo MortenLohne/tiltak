@@ -1,3 +1,4 @@
+use crate::mcts::MctsSetting;
 /// Tune search variable using a version of SPSA (Simultaneous perturbation stochastic approximation),
 /// similar to [Stockfish's tuning method](https://www.chessprogramming.org/Stockfish%27s_Tuning_Method)
 use crate::tune::play_match::play_game;
@@ -5,7 +6,6 @@ use board_game_traits::board::GameResult;
 use rand::SeedableRng;
 use rayon::prelude::*;
 use std::sync::Mutex;
-use taik::mcts::MctsSetting;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Variable {

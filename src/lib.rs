@@ -38,6 +38,8 @@ pub mod mcts;
 pub mod minmax;
 pub mod move_gen;
 mod tests;
+#[cfg(feature = "constant-tuning")]
+pub mod tune;
 
 pub use mcts::mcts;
 
