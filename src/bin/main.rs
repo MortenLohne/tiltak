@@ -43,7 +43,7 @@ fn main() {
             let mut input = String::new();
             io::stdin().read_to_string(&mut input).unwrap();
 
-            let games = taik::pgn_parser::parse_pgn(&mut input).unwrap();
+            let games = taik::pgn_parser::parse_pgn(&input).unwrap();
             if games.is_empty() {
                 panic!("Couldn't parse any games")
             }
