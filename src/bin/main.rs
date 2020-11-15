@@ -21,9 +21,9 @@ use taik::pgn_writer::Game;
 use taik::tune::play_match::play_match_between_params;
 
 fn main() {
-    println!("play: Play against the mcts AI");
-    println!("aimatch: Watch the minmax and mcts AIs play");
-    println!("analyze: Mcts analysis of a position, provided from a simple move list");
+    println!("play: Play against the engine through the command line");
+    println!("aimatch: Watch the engine play against a very simple minmax implementation");
+    println!("analyze: Analyze a given position, provided from a simple move list");
 
     let mut input = String::new();
     io::stdin().read_line(&mut input).unwrap();

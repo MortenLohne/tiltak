@@ -20,9 +20,9 @@ The project consists of 5 different binaries, that use the core engine in variou
 
 Three experimental commands entered through stdin:
 
-* play: Play against the minmax-based AI.
-* aimatch: Watch the minmax and mcts AIs play.
-* analyze: Mcts analysis of a position, provided from a simple move list.
+* play: Play against the engine through the command line.
+* aimatch: Watch the engine play against a very simple minmax implementation.
+* analyze: Analyze a given position, provided from a simple move list.
 
 ## playtak
 
