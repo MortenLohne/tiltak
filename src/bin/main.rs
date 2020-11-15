@@ -17,7 +17,7 @@ use taik::board::TunableBoard;
 use taik::mcts;
 use taik::minmax;
 use taik::pgn_writer::Game;
-#[cfg(feature = "tune")]
+#[cfg(feature = "constant-tuning")]
 use taik::tune::play_match::play_match_between_params;
 
 fn main() {
