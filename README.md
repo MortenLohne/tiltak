@@ -4,13 +4,14 @@ Taik is a simple AI for the board game [Tak](https://en.wikipedia.org/wiki/Tak_(
 
 # Overview
 
-The project consists of 3 different programs, that use the core engine in various ways:
+The project consists of 4 different programs, that use the core engine in various ways:
  
  * **playtak** Connect to the `playtak.com` server, and seek games as a bot.
  * **uti** Run the engine through a [uci-like](https://en.wikipedia.org/wiki/Universal_Chess_Interface) text interface.
  * **main** Various other commands, mostly for debugging and experimentation.
+ * **tune** Automatically tune the engine's parameters. 
  
- All 3 binaries will be built by default, see the `build` section. 
+ All 4 binaries will be built by default, see the `build` section. 
 
 # Usage
 
@@ -23,7 +24,6 @@ Three experimental commands entered through stdin:
 * analyze: Mcts analysis of a position, provided from a simple move list.
 
 ## playtak
-
 
 Connect to the playtak.com server, and seek games as a bot. If no username/password is provided, the bot will login as guest. 
 
@@ -42,6 +42,14 @@ Only a small subset of uci works. To analyze a position for 1 second, run the ut
 position startpos moves e1 a1
 go movetime 1000
 ````
+
+## tune
+
+Automatically tune the engine's parameters through several subcommands. 
+
+The engine's static evaluation (value parameters) and move evaluation (policy parameters) are tuned from a `.ptn` file, using gradient descent. The search exploration parameters are tuned using [SPSA.](https://en.wikipedia.org/wiki/Simultaneous_perturbation_stochastic_approximation) 
+
+This is otherwise not well documented, try `tune --help` for more. 
 
 # Build
 
