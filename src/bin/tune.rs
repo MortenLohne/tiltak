@@ -87,7 +87,7 @@ fn main() {
             spsa::tune(&mut variables);
         }
         ("", None) => {
-            println!("Error: No subcommand selected.");
+            println!("Error: No subcommand selected. Try the 'help' subcommand for a list.");
             println!("{}", matches.usage());
         }
         _ => unreachable!(),
