@@ -2,6 +2,10 @@
 
 Taik is a simple AI for the board game [Tak](https://en.wikipedia.org/wiki/Tak_(game)). The project can be used as an analysis tool, or connect as a bot to the playtak.com server. 
 
+The core engine is built using [Monte Carlo Tree Search](https://en.wikipedia.org/wiki/Monte_Carlo_tree_search), but without full simulation rollouts. This is similar to the implementation in AlphaZero or Leela Zero. 
+
+It prunes the search tree very aggressively while searching, and will quickly reach depths of 10+ moves in the longest lines. On the other hand, it may also miss 2-move winning sequences, even with significant thinking time. 
+
 # Overview
 
 The project consists of 5 different binaries, that use the core engine in various ways:
@@ -78,12 +82,6 @@ cargo run --release
 This command will automatically fetch and build dependencies. The resulting binaries are written to `taik/target/release`.
 
 To build and run a specific command, run `cargo run --release --bin playtak` or similar.
-
-# Implementation details 
-
-The engine uses a modified version of Monte Carlo Tree Search, with a heuristic evaluation function in the simulation step, instead of full rollouts. The engine also uses a *policy* heuristic function to decide which child moves to prioritize in the tree.
-
-These heuristic functions include around 100 tune-able parameters, which have been optimized using gradient descent on a training set of 10000 self-play games.
 
 # Tests
 
