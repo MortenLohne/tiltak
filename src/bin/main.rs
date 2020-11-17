@@ -11,9 +11,15 @@ use board_game_traits::board::{Board as BoardTrait, EvalBoard};
 use board_game_traits::board::{Color, GameResult};
 use pgn_traits::pgn::PgnBoard;
 
+#[cfg(feature = "constant-tuning")]
+use rayon::prelude::*;
+#[cfg(feature = "constant-tuning")]
+use std::collections::HashSet;
 use taik::board;
 use taik::board::Board;
 use taik::board::TunableBoard;
+#[cfg(feature = "constant-tuning")]
+use taik::board::{Move, Role};
 use taik::mcts;
 use taik::minmax;
 use taik::pgn_writer::Game;
@@ -39,6 +45,30 @@ fn main() {
             }
         }
         "analyze" => test_position(),
+        #[cfg(feature = "constant-tuning")]
+        "openings" => {
+            let depth = 4;
+            let mut positions = HashSet::new();
+            let openings = generate_openings(Board::start_board(), &mut positions, depth);
+
+            let mut evaled_openings: Vec<_> = openings
+                .into_par_iter()
+                .filter(|position| position.len() == depth as usize)
+                .map(|position| {
+                    let mut board = Board::start_board();
+                    for mv in position.iter() {
+                        board.do_move(mv.clone());
+                    }
+                    (position, mcts::mcts(board, 100_000))
+                })
+                .collect();
+
+            evaled_openings
+                .sort_by(|(_, (_, score1)), (_, (_, score2))| score1.partial_cmp(score2).unwrap());
+            for (p, s) in evaled_openings {
+                println!("{:?}: {:?}", p, s);
+            }
+        }
         "game" => {
             let mut input = String::new();
             io::stdin().read_to_string(&mut input).unwrap();
@@ -131,6 +161,45 @@ fn main() {
         }
         s => println!("Unknown option \"{}\"", s),
     }
+}
+
+#[cfg(feature = "constant-tuning")]
+fn generate_openings(
+    mut board: Board,
+    positions: &mut HashSet<Board>,
+    depth: u8,
+) -> Vec<Vec<Move>> {
+    let mut moves = vec![];
+    board.generate_moves(&mut moves);
+    moves = moves
+        .into_iter()
+        .filter(|mv| matches!(mv, Move::Place(Role::Flat, _)))
+        .collect();
+    moves
+        .into_iter()
+        .flat_map(|mv| {
+            let reverse_move = board.do_move(mv.clone());
+            let mut child_lines = if depth > 1 {
+                if board
+                    .symmetries()
+                    .iter()
+                    .all(|board_symmetry| !positions.contains(board_symmetry))
+                {
+                    positions.insert(board.clone());
+                    generate_openings(board.clone(), positions, depth - 1)
+                } else {
+                    vec![vec![]]
+                }
+            } else {
+                vec![vec![]]
+            };
+            board.reverse_move(reverse_move);
+            for child_line in child_lines.iter_mut() {
+                child_line.insert(0, mv.clone());
+            }
+            child_lines
+        })
+        .collect()
 }
 
 fn mcts_selfplay(max_time: time::Duration) {
