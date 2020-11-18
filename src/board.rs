@@ -482,7 +482,7 @@ impl Stack {
     }
 }
 
-/// An iterator over the pieces in a stack.
+/// An iterator over the pieces in a stack, from the bottom up
 pub struct StackIterator {
     stack: Stack,
 }
@@ -1138,8 +1138,11 @@ impl Board {
         const FLAT_PSQT: usize = 0;
         const STAND_PSQT: usize = FLAT_PSQT + 6;
         const CAP_PSQT: usize = STAND_PSQT + 6;
+        const OUR_STACK_PSQT: usize = CAP_PSQT + 6;
+        const THEIR_STACK_PSQT: usize = OUR_STACK_PSQT + 6;
 
         for square in squares_iterator() {
+            let stack = &self[square];
             if let Some(piece) = self[square].top_stone() {
                 let i = square.0 as usize;
                 match piece {
@@ -1150,10 +1153,21 @@ impl Board {
                     WhiteCap => coefficients[CAP_PSQT + SQUARE_SYMMETRIES[i]] += 1.0,
                     BlackCap => coefficients[CAP_PSQT + SQUARE_SYMMETRIES[i]] -= 1.0,
                 }
+                if stack.height > 1 {
+                    let controlling_player = piece.color();
+                    let color_factor = piece.color().multiplier() as f32;
+                    for piece in stack.clone().into_iter().take(stack.height as usize - 1) {
+                        if piece.color() == controlling_player {
+                            coefficients[OUR_STACK_PSQT + SQUARE_SYMMETRIES[i]] += color_factor;
+                        } else {
+                            coefficients[THEIR_STACK_PSQT + SQUARE_SYMMETRIES[i]] -= color_factor;
+                        }
+                    }
+                }
             }
         }
 
-        const SIDE_TO_MOVE: usize = CAP_PSQT + 6;
+        const SIDE_TO_MOVE: usize = THEIR_STACK_PSQT + 6;
         const FLATSTONE_LEAD: usize = SIDE_TO_MOVE + 3;
         const NUMBER_OF_GROUPS: usize = FLATSTONE_LEAD + 3;
 
@@ -1231,9 +1245,7 @@ impl Board {
             }
         }
 
-        const PIECES_IN_OUR_STACK: usize = CRITICAL_SQUARES + 4;
-        const PIECES_IN_THEIR_STACK: usize = PIECES_IN_OUR_STACK + 1;
-        const CAPSTONE_OVER_OWN_PIECE: usize = PIECES_IN_THEIR_STACK + 1;
+        const CAPSTONE_OVER_OWN_PIECE: usize = CRITICAL_SQUARES + 4;
         const CAPSTONE_ON_STACK: usize = CAPSTONE_OVER_OWN_PIECE + 1;
         const STANDING_STONE_ON_STACK: usize = CAPSTONE_ON_STACK + 1;
         const FLAT_STONE_NEXT_TO_OUR_STACK: usize = STANDING_STONE_ON_STACK + 1;
@@ -1247,17 +1259,6 @@ impl Board {
                 let top_stone = stack.top_stone().unwrap();
                 let controlling_player = top_stone.color();
                 let color_factor = top_stone.color().multiplier() as f32;
-                stack
-                    .clone()
-                    .into_iter()
-                    .take(stack.len() as usize - 1)
-                    .for_each(|piece| {
-                        if piece.color() == controlling_player {
-                            coefficients[PIECES_IN_OUR_STACK] += color_factor
-                        } else {
-                            coefficients[PIECES_IN_THEIR_STACK] -= color_factor
-                        }
-                    });
 
                 // Extra bonus for having your capstone over your own piece
                 if top_stone.role() == Cap
@@ -1695,61 +1696,71 @@ pub(crate) const SQUARE_SYMMETRIES: [usize; 25] = [
 impl TunableBoard for Board {
     #[allow(clippy::unreadable_literal)]
     const VALUE_PARAMS: &'static [f32] = &[
-        0.02410072,
-        0.18671544,
-        0.26740885,
-        0.2908829,
-        0.318866,
-        0.26012158,
-        0.286522,
-        0.60670507,
-        0.3965485,
-        0.9069464,
-        0.8984828,
-        0.2710555,
-        -0.49013802,
-        -0.07806004,
-        -0.07385007,
-        0.3303005,
-        0.5447981,
-        1.0391511,
-        0.89429027,
-        0.94668573,
-        1.1238872,
-        0.39352033,
-        0.30208322,
-        0.6673585,
-        -0.34026077,
-        -0.14737698,
-        -0.14405948,
-        0.30268943,
-        -0.04500769,
-        0.14808108,
-        -0.06126654,
-        1.2800529,
-        0.84339494,
-        0.06345847,
-        0.6141379,
-        0.3910885,
-        -0.038572367,
-        -0.16753507,
-        -0.15440479,
-        0.60737604,
-        -0.7032435,
-        -0.36058593,
-        -0.07766759,
-        0.11693997,
-        0.43863094,
-        -0.9403858,
-        -0.6100272,
-        -0.103776984,
-        0.49591404,
-        1.1538436,
-        0.006547498,
-        -0.012822034,
-        -0.16325843,
-        0.2083021,
-        0.20223762,
+        -0.017803056,
+        0.1672491,
+        0.24027698,
+        0.29026398,
+        0.30987087,
+        0.25440925,
+        0.3279331,
+        0.55030465,
+        0.38420805,
+        0.8379914,
+        0.8394636,
+        0.48953676,
+        -0.5217102,
+        -0.081934914,
+        -0.14438076,
+        0.39587653,
+        0.5912089,
+        1.0287594,
+        1.1037564,
+        1.1698755,
+        1.2135509,
+        1.2129999,
+        1.250939,
+        1.3241924,
+        0.6959272,
+        0.7948777,
+        0.7712612,
+        0.84684813,
+        0.83600974,
+        0.8969007,
+        0.8632002,
+        0.82572,
+        1.0398452,
+        0.4008889,
+        0.24436173,
+        0.6002604,
+        -0.29366457,
+        -0.123944536,
+        -0.12388217,
+        0.309884,
+        -0.11210343,
+        0.16015732,
+        -0.042085163,
+        0.14198026,
+        0.6339217,
+        0.35588518,
+        -0.032943208,
+        -0.1569271,
+        -0.13379912,
+        0.6197931,
+        -0.6965155,
+        -0.36215284,
+        -0.09709675,
+        0.1260839,
+        0.43719134,
+        -0.87860185,
+        -0.5900968,
+        -0.102803975,
+        0.483264,
+        1.0928143,
+        0.005678368,
+        -0.0027855209,
+        0.0031052358,
+        0.19877331,
+        0.079868756,
     ];
     #[allow(clippy::unreadable_literal)]
     const POLICY_PARAMS: &'static [f32] = &[
