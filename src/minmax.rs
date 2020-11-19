@@ -1,4 +1,5 @@
 //! A very simple implementation of the minmax search algorithm.
+//! This is not used in the core engine at all, it is just here for fun/testing.
 
 use board_game_traits::board::EvalBoard;
 use board_game_traits::board::{Color, GameResult};
@@ -22,7 +23,7 @@ pub fn minmax<B: EvalBoard>(board: &mut B, depth: u16) -> (Option<B::Move>, f32)
             let (_, eval) = minmax(board, depth - 1);
             board.reverse_move(reverse_move);
             (Some(mv), eval)
-        }); //.collect::<Vec<(Option<B::Move>, f32)>>();
+        });
         match side_to_move {
             Color::White => child_evaluations
                 .max_by(|(_, a), (_, b)| a.partial_cmp(&b).unwrap())
