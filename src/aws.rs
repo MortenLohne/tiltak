@@ -1,5 +1,5 @@
 use crate::board::{Board, Move};
-use crate::mcts;
+use crate::search;
 use board_game_traits::board::Board as EvalBoard;
 use lambda_runtime::error::HandlerError;
 use lambda_runtime::Context;
@@ -34,7 +34,7 @@ pub fn handle_aws_event(e: Event, _c: Context) -> Result<Output, HandlerError> {
 
     let max_time = Duration::min(e.time_left / 40 + e.increment, Duration::from_secs(30));
 
-    let (best_move, score) = mcts::play_move_time(board, max_time);
+    let (best_move, score) = search::play_move_time(board, max_time);
 
     Ok(Output { best_move, score })
 }

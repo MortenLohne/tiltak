@@ -96,7 +96,7 @@ fn do_not_play_suicide_move_as_black_test() {
     let mut moves = vec![];
     board.generate_moves(&mut moves);
     assert!(moves.contains(&board.move_from_san("2a3-11").unwrap()));
-    assert!(mcts::mcts(board.clone(), 10_000).0 != board.move_from_san("2a3-11").unwrap());
+    assert!(search::mcts(board.clone(), 10_000).0 != board.move_from_san("2a3-11").unwrap());
 }
 
 #[test]
@@ -114,7 +114,7 @@ fn do_not_play_suicide_move_as_black_test2() {
     let mut moves = vec![];
     board.generate_moves(&mut moves);
     assert!(moves.contains(&board.move_from_san("2c5>11").unwrap()));
-    assert!(mcts::mcts(board.clone(), 10_000).0 != board.move_from_san("2c5>11").unwrap());
+    assert!(search::mcts(board.clone(), 10_000).0 != board.move_from_san("2c5>11").unwrap());
 }
 
 #[test]
@@ -128,7 +128,7 @@ fn do_not_instamove_into_loss() {
 
     do_moves_and_check_validity(&mut board, &move_strings);
 
-    let (best_move, _) = mcts::play_move_time(board.clone(), time::Duration::from_secs(1));
+    let (best_move, _) = search::play_move_time(board.clone(), time::Duration::from_secs(1));
 
     for move_string in ["b2", "c5", "b4", "d4"].iter() {
         assert_ne!(best_move, board.move_from_san(move_string).unwrap());
@@ -149,7 +149,7 @@ fn do_not_play_suicide_move_as_black_test3() {
     let mut moves = vec![];
     board.generate_moves(&mut moves);
     assert!(moves.contains(&board.move_from_san("2b5>11").unwrap()));
-    assert!(mcts::mcts(board.clone(), 10_000).0 != board.move_from_san("2b5>11").unwrap());
+    assert!(search::mcts(board.clone(), 10_000).0 != board.move_from_san("2b5>11").unwrap());
 }
 
 fn plays_correct_move_property(move_strings: &[&str], correct_moves: &[&str]) {
@@ -159,7 +159,7 @@ fn plays_correct_move_property(move_strings: &[&str], correct_moves: &[&str]) {
     do_moves_and_check_validity(&mut board, move_strings);
 
     board.generate_moves(&mut moves);
-    let mut mcts = mcts::RootNode::new(board.clone());
+    let mut mcts = search::RootNode::new(board.clone());
 
     for move_string in correct_moves {
         assert_eq!(

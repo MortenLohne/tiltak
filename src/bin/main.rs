@@ -15,16 +15,15 @@ use pgn_traits::pgn::PgnBoard;
 use rayon::prelude::*;
 #[cfg(feature = "constant-tuning")]
 use std::collections::HashSet;
-use taik::board;
 use taik::board::Board;
 use taik::board::TunableBoard;
 #[cfg(feature = "constant-tuning")]
 use taik::board::{Move, Role};
-use taik::mcts;
 use taik::minmax;
 use taik::pgn_writer::Game;
 #[cfg(feature = "constant-tuning")]
 use taik::tune::play_match::play_match_between_params;
+use taik::{board, search};
 
 fn main() {
     println!("play: Play against the engine through the command line");
@@ -59,7 +58,7 @@ fn main() {
                     for mv in position.iter() {
                         board.do_move(mv.clone());
                     }
-                    (position, mcts::mcts(board, 100_000))
+                    (position, search::mcts(board, 100_000))
                 })
                 .collect();
 
@@ -211,7 +210,7 @@ fn mcts_selfplay(max_time: time::Duration) {
 
     while board.game_result().is_none() {
         let start_time = time::Instant::now();
-        let (best_move, score) = mcts::play_move_time(board.clone(), max_time);
+        let (best_move, score) = search::play_move_time(board.clone(), max_time);
 
         match board.side_to_move() {
             Color::White => white_elapsed += start_time.elapsed(),
@@ -264,7 +263,7 @@ fn mcts_vs_minmax(minmax_depth: u16, mcts_nodes: u64) {
         }
         match board.side_to_move() {
             Color::Black => {
-                let (best_move, score) = mcts::mcts(board.clone(), mcts_nodes);
+                let (best_move, score) = search::mcts(board.clone(), mcts_nodes);
                 board.do_move(best_move.clone());
                 moves.push(best_move.clone());
                 println!("{:6}: {:.3}", best_move, score);
@@ -343,7 +342,7 @@ fn test_position() {
         );
     }
 
-    let mut tree = mcts::RootNode::new(board.clone());
+    let mut tree = search::MonteCarloTree::new(board.clone());
     for i in 1.. {
         tree.select();
         if i % 100_000 == 0 {
@@ -352,7 +351,7 @@ fn test_position() {
                 tree.visits(),
                 tree.mean_action_value(),
                 board.static_eval(),
-                mcts::cp_to_win_percentage(board.static_eval())
+                search::cp_to_win_percentage(board.static_eval())
             );
             tree.print_info();
             println!("Best move: {:?}", tree.best_move())
@@ -368,7 +367,7 @@ fn analyze_game(game: Game<Board>) {
         if board.game_result().is_some() {
             break;
         }
-        let (best_move, score) = mcts::mcts(board.clone(), 1_000_000);
+        let (best_move, score) = search::mcts(board.clone(), 1_000_000);
         if ply_number % 2 == 0 {
             print!(
                 "{}. {}: {{{:.2}%, best reply {}}} ",
@@ -429,7 +428,7 @@ fn play_human(mut board: Board) {
                 board.do_move(c_move);
                 play_human(board);
             } else {
-                let (best_move, score) = mcts::mcts(board.clone(), 1_000_000);
+                let (best_move, score) = search::mcts(board.clone(), 1_000_000);
 
                 println!("Computer played {:?} with score {}", best_move, score);
                 board.do_move(best_move);
@@ -449,7 +448,7 @@ fn bench() {
     {
         let board = Board::default();
 
-        let (_move, score) = mcts::mcts(board, NODES);
+        let (_move, score) = search::mcts(board, NODES);
         print!("{:.3}, ", score);
     }
 
@@ -458,7 +457,7 @@ fn bench() {
 
         do_moves_and_check_validity(&mut board, &["d3", "c3", "c4", "1d3<", "1c4+", "Sc4"]);
 
-        let (_move, score) = mcts::mcts(board, NODES);
+        let (_move, score) = search::mcts(board, NODES);
         print!("{:.3}, ", score);
     }
     {
@@ -472,7 +471,7 @@ fn bench() {
             ],
         );
 
-        let (_move, score) = mcts::mcts(board, NODES);
+        let (_move, score) = search::mcts(board, NODES);
         println!("{:.3}", score);
     }
     let time_taken = start_time.elapsed();
@@ -490,18 +489,6 @@ fn mem_usage() {
     println!("Tak board: {} bytes", mem::size_of::<board::Board>());
     println!("Tak board cell: {} bytes", mem::size_of::<board::Stack>());
     println!("Tak move: {} bytes", mem::size_of::<board::Move>());
-
-    println!("MCTS node: {} bytes.", mem::size_of::<mcts::Tree>());
-    println!("MCTS edge: {} bytes", mem::size_of::<mcts::TreeEdge>());
-    let board = board::Board::default();
-    let mut tree = mcts::RootNode::new(board);
-    for _ in 0..2 {
-        tree.select();
-    }
-    println!(
-        "MCTS node's children: {} bytes.",
-        tree.children().len() * mem::size_of::<mcts::Tree>()
-    );
 }
 
 fn do_moves_and_check_validity(board: &mut Board, move_strings: &[&str]) {

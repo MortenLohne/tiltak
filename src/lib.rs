@@ -34,14 +34,14 @@ extern crate rand;
 pub mod aws;
 mod bitboard;
 pub mod board;
-pub mod mcts;
 pub mod minmax;
 pub mod move_gen;
+pub mod search;
 mod tests;
 #[cfg(feature = "constant-tuning")]
 pub mod tune;
 
-pub use mcts::mcts;
+pub use search::mcts;
 
 pub mod pgn_parser;
 pub mod pgn_writer;

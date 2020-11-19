@@ -4,7 +4,7 @@ use crate::board::{
     Board, ColorTr, Direction, Move, Movement, Piece, Square, StackMovement, TunableBoard,
     BOARD_SIZE,
 };
-use crate::{board, mcts};
+use crate::{board, search};
 use arrayvec::ArrayVec;
 
 pub fn sigmoid(x: f32) -> f32 {
@@ -21,7 +21,7 @@ impl Board {
         &self,
         params: &[f32],
         simple_moves: &mut Vec<Move>,
-        moves: &mut Vec<(Move, mcts::Score)>,
+        moves: &mut Vec<(Move, search::Score)>,
     ) {
         let num_moves = simple_moves.len();
         moves.extend(simple_moves.drain(..).map(|mv| {

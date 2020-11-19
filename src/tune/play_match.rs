@@ -1,7 +1,7 @@
 use crate::board::{Board, Move, Role};
-use crate::mcts::{MctsSetting, Score};
 use crate::pgn_writer::Game;
-use crate::{mcts, pgn_writer};
+use crate::search::{MctsSetting, Score};
+use crate::{pgn_writer, search};
 use board_game_traits::board::{Board as BoardTrait, Color, GameResult};
 use rand::seq::SliceRandom;
 use rand::Rng;
@@ -29,8 +29,12 @@ pub fn play_game(
         }
 
         let moves_scores = match board.side_to_move() {
-            Color::White => mcts::mcts_training(board.clone(), MCTS_NODES, white_settings.clone()),
-            Color::Black => mcts::mcts_training(board.clone(), MCTS_NODES, black_settings.clone()),
+            Color::White => {
+                search::mcts_training(board.clone(), MCTS_NODES, white_settings.clone())
+            }
+            Color::Black => {
+                search::mcts_training(board.clone(), MCTS_NODES, black_settings.clone())
+            }
         };
 
         // For the first regular move (White's move #2),
@@ -116,8 +120,12 @@ pub fn play_match_between_params(
             }
 
             let moves_scores = match board.side_to_move() {
-                Color::White => mcts::mcts_training(board.clone(), NODES, player1_settings.clone()),
-                Color::Black => mcts::mcts_training(board.clone(), NODES, player2_settings.clone()),
+                Color::White => {
+                    search::mcts_training(board.clone(), NODES, player1_settings.clone())
+                }
+                Color::Black => {
+                    search::mcts_training(board.clone(), NODES, player2_settings.clone())
+                }
             };
             let best_move = best_move(TEMPERATURE, &moves_scores[..]);
             board.do_move(best_move);
@@ -137,8 +145,12 @@ pub fn play_match_between_params(
                 break;
             }
             let moves_scores = match board.side_to_move() {
-                Color::White => mcts::mcts_training(board.clone(), NODES, player2_settings.clone()),
-                Color::Black => mcts::mcts_training(board.clone(), NODES, player1_settings.clone()),
+                Color::White => {
+                    search::mcts_training(board.clone(), NODES, player2_settings.clone())
+                }
+                Color::Black => {
+                    search::mcts_training(board.clone(), NODES, player1_settings.clone())
+                }
             };
             let best_move = best_move(TEMPERATURE, &moves_scores[..]);
             board.do_move(best_move.clone());

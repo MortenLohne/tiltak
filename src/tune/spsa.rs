@@ -1,4 +1,4 @@
-use crate::mcts::MctsSetting;
+use crate::search::MctsSetting;
 /// Tune search variable using a version of SPSA (Simultaneous perturbation stochastic approximation),
 /// similar to [Stockfish's tuning method](https://www.chessprogramming.org/Stockfish%27s_Tuning_Method)
 use crate::tune::play_match::play_game;

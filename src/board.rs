@@ -12,8 +12,8 @@ use crate::board::Direction::*;
 use crate::board::Piece::*;
 use crate::board::Role::Flat;
 use crate::board::Role::*;
-use crate::mcts;
 use crate::move_gen::sigmoid;
+use crate::search;
 use arrayvec::ArrayVec;
 use board_game_traits::board;
 use board_game_traits::board::GameResult::{BlackWin, Draw, WhiteWin};
@@ -49,7 +49,7 @@ pub trait TunableBoard: BoardTrait {
         &self,
         params: &[f32],
         simple_moves: &mut Vec<<Self as BoardTrait>::Move>,
-        moves: &mut Vec<(<Self as BoardTrait>::Move, mcts::Score)>,
+        moves: &mut Vec<(<Self as BoardTrait>::Move, search::Score)>,
     );
 
     fn probability_for_move(&self, params: &[f32], mv: &Self::Move, num_moves: usize) -> f32;
@@ -1033,7 +1033,7 @@ impl Board {
     pub fn generate_moves_with_probabilities(
         &self,
         simple_moves: &mut Vec<Move>,
-        moves: &mut Vec<(Move, mcts::Score)>,
+        moves: &mut Vec<(Move, search::Score)>,
     ) {
         self.generate_moves_with_params(Board::POLICY_PARAMS, simple_moves, moves)
     }
