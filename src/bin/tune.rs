@@ -59,14 +59,14 @@ fn main() {
         }
         ("value-from-file", Some(arg)) => {
             let file_name = arg.value_of("file-name").unwrap();
-            let value_params = training::tune_real_from_file(file_name).unwrap();
+            let value_params = training::tune_value_from_file(file_name).unwrap();
             println!("{:?}", value_params);
         }
         ("both-from-file", Some(arg)) => {
             let value_file_name = arg.value_of("value-file-name").unwrap();
             let policy_file_name = arg.value_of("policy-file-name").unwrap();
             let (value_params, policy_params) =
-                training::tune_real_value_and_policy_from_file(value_file_name, policy_file_name)
+                training::tune_value_and_policy_from_file(value_file_name, policy_file_name)
                     .unwrap();
             println!("Value: {:?}", value_params);
             println!("Policy: {:?}", policy_params);

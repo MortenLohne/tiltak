@@ -1,5 +1,5 @@
 use crate::tune::play_match::play_game;
-use crate::tune::{play_match, real_gradient_descent};
+use crate::tune::{gradient_descent, play_match};
 use board_game_traits::board::Board as BoardTrait;
 use board_game_traits::board::GameResult;
 use rand::prelude::*;
@@ -147,7 +147,7 @@ pub fn train_perpetually(
 
         let value_tuning_start_time = time::Instant::now();
 
-        let (new_value_params, new_policy_params) = tune_real_value_and_policy(
+        let (new_value_params, new_policy_params) = tune_value_and_policy(
             &games_in_training_batch,
             &move_scores_in_training_batch,
             &value_params.iter().map(|p| *p as f64).collect::<Vec<f64>>(),
@@ -250,7 +250,7 @@ pub fn read_games_from_file(file_name: &str) -> Result<Vec<Game<Board>>, Box<dyn
     pgn_parser::parse_pgn(&input)
 }
 
-pub fn tune_real_from_file(file_name: &str) -> Result<Vec<f64>, Box<dyn error::Error>> {
+pub fn tune_value_from_file(file_name: &str) -> Result<Vec<f64>, Box<dyn error::Error>> {
     let games = read_games_from_file(file_name)?;
 
     let (positions, results) = positions_and_results_from_games(games);
@@ -280,7 +280,7 @@ pub fn tune_real_from_file(file_name: &str) -> Result<Vec<f64>, Box<dyn error::E
         .take(Board::VALUE_PARAMS.len())
         .collect();
 
-    let tuned_parameters = real_gradient_descent::gradient_descent(
+    let tuned_parameters = gradient_descent::gradient_descent(
         &coefficient_sets[0..middle_index],
         &f64_results[0..middle_index],
         &coefficient_sets[middle_index..],
@@ -300,7 +300,7 @@ pub fn tune_real_from_file(file_name: &str) -> Result<Vec<f64>, Box<dyn error::E
     Ok(tuned_parameters)
 }
 
-pub fn tune_real_value_and_policy(
+pub fn tune_value_and_policy(
     games: &[Game<Board>],
     move_scoress: &[MoveScoresForGame],
     initial_value_params: &[f64],
@@ -356,7 +356,7 @@ pub fn tune_real_value_and_policy(
 
     let middle_index = value_coefficient_sets.len() / 2;
 
-    let tuned_value_parameters = real_gradient_descent::gradient_descent(
+    let tuned_value_parameters = gradient_descent::gradient_descent(
         &value_coefficient_sets[0..middle_index],
         &value_results[0..middle_index],
         &value_coefficient_sets[middle_index..],
@@ -369,7 +369,7 @@ pub fn tune_real_value_and_policy(
 
     let middle_index = policy_coefficients_sets.len() / 2;
 
-    let tuned_policy_parameters = real_gradient_descent::gradient_descent(
+    let tuned_policy_parameters = gradient_descent::gradient_descent(
         &policy_coefficients_sets[0..middle_index],
         &policy_results[0..middle_index],
         &policy_coefficients_sets[middle_index..],
@@ -383,7 +383,7 @@ pub fn tune_real_value_and_policy(
     Ok((tuned_value_parameters, tuned_policy_parameters))
 }
 
-pub fn tune_real_value_and_policy_from_file(
+pub fn tune_value_and_policy_from_file(
     value_file_name: &str,
     policy_file_name: &str,
 ) -> Result<(Vec<f64>, Vec<f64>), Box<dyn error::Error>> {
@@ -403,7 +403,7 @@ pub fn tune_real_value_and_policy_from_file(
     // The move number parameter should always be around 1.0, so start it here
     // If we don't, variation of this parameter completely dominates the other parameters
     initial_policy_params[0] = 1.0;
-    tune_real_value_and_policy(
+    tune_value_and_policy(
         &games,
         &move_scoress,
         &initial_value_params,
