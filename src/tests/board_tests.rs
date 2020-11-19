@@ -187,7 +187,7 @@ fn play_random_games_test() {
             assert!((board.white_road_pieces() & board.white_blocking_pieces()).count() <= 1);
 
             let eval = board.static_eval();
-            for rotation in board.rotations_and_symmetries() {
+            for rotation in board.symmetries_with_swapped_colors() {
                 if board.side_to_move() == rotation.side_to_move() {
                     assert!(rotation.static_eval() - eval < 0.0001,
                     "Static eval changed with rotation from {} to {} on board\n{:?}Rotated board:\n{:?}", eval, rotation.static_eval(), board, rotation);
@@ -206,7 +206,7 @@ fn play_random_games_test() {
             board.do_move(mv);
 
             let result = board.game_result();
-            for rotation in board.rotations_and_symmetries() {
+            for rotation in board.symmetries_with_swapped_colors() {
                 if board.side_to_move() == rotation.side_to_move() {
                     assert_eq!(rotation.game_result(), result);
                 } else {
@@ -216,7 +216,7 @@ fn play_random_games_test() {
 
             if result.is_none() {
                 let static_eval = board.static_eval();
-                for rotation in board.rotations_and_symmetries() {
+                for rotation in board.symmetries_with_swapped_colors() {
                     assert!(
                         rotation.static_eval().abs() - static_eval.abs() < 0.0001,
                         "Original static eval {}, rotated static eval {}.Board:\n{:?}\nRotated board:\n{:?}",

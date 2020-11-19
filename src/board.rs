@@ -27,7 +27,6 @@ use std::cmp::Ordering;
 use std::fmt::Write;
 use std::hash::{Hash, Hasher};
 use std::iter::FromIterator;
-#[cfg(test)]
 use std::mem;
 use std::ops::{Deref, DerefMut, Index, IndexMut};
 use std::{fmt, iter, ops};
@@ -929,7 +928,6 @@ impl Board {
         sum_of_connections.is_winning()
     }
 
-    #[cfg(test)]
     pub fn flip_board_y(&self) -> Board {
         let mut new_board = self.clone();
         for x in 0..BOARD_SIZE as u8 {
@@ -943,7 +941,6 @@ impl Board {
         new_board
     }
 
-    #[cfg(test)]
     pub fn flip_board_x(&self) -> Board {
         let mut new_board = self.clone();
         for x in 0..BOARD_SIZE as u8 {
@@ -957,7 +954,6 @@ impl Board {
         new_board
     }
 
-    #[cfg(test)]
     pub fn rotate_board(&self) -> Board {
         let mut new_board = self.clone();
         for x in 0..BOARD_SIZE as u8 {
@@ -973,7 +969,6 @@ impl Board {
         new_board
     }
 
-    #[cfg(test)]
     pub fn flip_colors(&self) -> Board {
         let mut new_board = self.clone();
         for square in squares_iterator() {
@@ -1007,9 +1002,10 @@ impl Board {
         new_board
     }
 
-    #[cfg(test)]
-    pub fn rotations_and_symmetries(&self) -> Vec<Board> {
+    /// Returns all 8 symmetries of the board
+    pub fn symmetries(&self) -> Vec<Board> {
         vec![
+            self.clone(),
             self.flip_board_x(),
             self.flip_board_y(),
             self.rotate_board(),
@@ -1017,8 +1013,15 @@ impl Board {
             self.rotate_board().rotate_board().rotate_board(),
             self.rotate_board().flip_board_x(),
             self.rotate_board().flip_board_y(),
-            self.flip_colors(),
         ]
+    }
+
+    /// Returns all 16 symmetries of the board, where swapping the colors is also a symmetry
+    pub fn symmetries_with_swapped_colors(&self) -> Vec<Board> {
+        self.symmetries()
+            .into_iter()
+            .flat_map(|board| vec![board.clone(), board.flip_colors()])
+            .collect()
     }
 
     /// Move generation that includes a heuristic probability of each move being played.
