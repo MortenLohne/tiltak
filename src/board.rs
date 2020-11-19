@@ -910,6 +910,10 @@ impl Board {
         self.to_move = !self.to_move;
     }
 
+    fn rank_file_of_square(&self, square: Square) -> [BitBoard; 2] {
+        [BitBoard::full().rank(square.rank()), BitBoard::full().file(square.file())]
+    }
+
     fn is_critical_square_from_scratch(
         &self,
         groups: &AbstractBoard<u8>,
@@ -1140,6 +1144,8 @@ impl Board {
         const CAP_PSQT: usize = STAND_PSQT + 6;
         const OUR_STACK_PSQT: usize = CAP_PSQT + 6;
         const THEIR_STACK_PSQT: usize = OUR_STACK_PSQT + 6;
+        const OUR_STACK_STRONG_FILE: usize = THEIR_STACK_PSQT + 6;
+        const THEIR_STACK_STRONG_FILE: usize = OUR_STACK_STRONG_FILE + 3;
 
         for square in squares_iterator() {
             let stack = &self[square];
@@ -1155,19 +1161,39 @@ impl Board {
                 }
                 if stack.height > 1 {
                     let controlling_player = piece.color();
-                    let color_factor = piece.color().multiplier() as f32;
+                    let color_factor = controlling_player.multiplier() as f32;
                     for piece in stack.clone().into_iter().take(stack.height as usize - 1) {
                         if piece.color() == controlling_player {
                             coefficients[OUR_STACK_PSQT + SQUARE_SYMMETRIES[i]] += color_factor;
+                            for &rank in self.rank_file_of_square(square).iter() {
+                                let num_pieces = match controlling_player {
+                                    Color::White => (self.white_road_pieces() & rank).count(),
+                                    Color::Black => (self.black_road_pieces() & rank).count(),
+                                };
+                                if num_pieces > 2 {
+                                    // println!("{}: {} pieces in {}'s rank, factor {}\n{:?}", square, num_pieces, controlling_player, color_factor, self);
+                                    coefficients[OUR_STACK_STRONG_FILE + num_pieces as usize - 3] += piece.color().multiplier() as f32;
+                                }
+                            }
                         } else {
                             coefficients[THEIR_STACK_PSQT + SQUARE_SYMMETRIES[i]] -= color_factor;
+                            for &rank in self.rank_file_of_square(square).iter() {
+                                let num_pieces = match controlling_player {
+                                    Color::White => (self.white_road_pieces() & rank).count(),
+                                    Color::Black => (self.black_road_pieces() & rank).count(),
+                                };
+                                if num_pieces > 2 {
+                                    // println!("{}: {} pieces in {}'s rank, factor {}\n{:?}", square, num_pieces, controlling_player, color_factor, self);
+                                    coefficients[THEIR_STACK_STRONG_FILE + num_pieces as usize - 3] -= piece.color().multiplier() as f32;
+                                }
+                            }
                         }
                     }
                 }
             }
         }
 
-        const SIDE_TO_MOVE: usize = THEIR_STACK_PSQT + 6;
+        const SIDE_TO_MOVE: usize = THEIR_STACK_STRONG_FILE + 3;
         const FLATSTONE_LEAD: usize = SIDE_TO_MOVE + 3;
         const NUMBER_OF_GROUPS: usize = FLATSTONE_LEAD + 3;
 
@@ -1761,6 +1787,12 @@ impl TunableBoard for Board {
         0.0031052358,
         0.19877331,
         0.079868756,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
     ];
     #[allow(clippy::unreadable_literal)]
     const POLICY_PARAMS: &'static [f32] = &[
