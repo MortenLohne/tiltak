@@ -347,11 +347,11 @@ fn test_position() {
         tree.select();
         if i % 100_000 == 0 {
             println!(
-                "{} visits, val={:.4}, static eval={:.4}, static winning probability={:.4}",
+                "{} visits, val={:.2}%, static eval={:.4}, static winning probability={:.2}%",
                 tree.visits(),
-                tree.mean_action_value(),
+                tree.mean_action_value() * 100.0,
                 board.static_eval(),
-                search::cp_to_win_percentage(board.static_eval())
+                search::cp_to_win_percentage(board.static_eval()) * 100.0
             );
             tree.print_info();
             println!("Best move: {:?}", tree.best_move())

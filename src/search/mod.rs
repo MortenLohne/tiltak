@@ -146,8 +146,8 @@ impl MonteCarloTree {
 
         best_children.iter().take(8).for_each(|edge| {
             println!(
-                "Move {}: {} visits, {:.3} mean action value, {:.3} static score, {:.3} exploration value, pv {}",
-                edge.mv, edge.visits, edge.mean_action_value, edge.heuristic_score,
+                "Move {}: {} visits, {:.2}% mean action value, {:.2}% static score, {:.3} exploration value, pv {}",
+                edge.mv, edge.visits, edge.mean_action_value * 100.0, edge.heuristic_score * 100.0,
                 edge.exploration_value((self.visits() as Score).sqrt(), dynamic_cpuct),
                 PV::new(edge.child.as_ref().unwrap()).map(|mv| mv.to_string() + " ").collect::<String>()
             )
