@@ -1,5 +1,5 @@
 use crate::board::Board;
-use crate::mcts;
+use crate::search;
 use crate::tests::do_moves_and_check_validity;
 use board_game_traits::board::Board as BoardTrait;
 use pgn_traits::pgn::PgnBoard;
@@ -159,7 +159,7 @@ fn plays_correct_move_property(move_strings: &[&str], correct_moves: &[&str]) {
     do_moves_and_check_validity(&mut board, move_strings);
 
     board.generate_moves(&mut moves);
-    let mut mcts = search::RootNode::new(board.clone());
+    let mut mcts = search::MonteCarloTree::new(board.clone());
 
     for move_string in correct_moves {
         assert_eq!(

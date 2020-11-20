@@ -1,5 +1,5 @@
 use crate::board::Board;
-use crate::mcts;
+use crate::search;
 use crate::tests::do_moves_and_check_validity;
 use board_game_traits::board::Board as BoardTrait;
 use pgn_traits::pgn::PgnBoard;
