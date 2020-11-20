@@ -79,6 +79,20 @@ fn find_win_in_two3() {
 }
 
 #[test]
+fn find_win_in_three() {
+    let move_strings = [
+        "e1", "e5", "Cc3", "c1", "d1", "d2", "a3", "b1", "b3", "d2-", "a1", "a2", "a1>", "Cb2",
+        "Sc2", "a1", "2b1>", "b2+", "b5", "b1", "c4", "d2", "c5",
+    ];
+
+    let mut board = Board::start_board();
+
+    do_moves_and_check_validity(&mut board, &move_strings);
+
+    plays_correct_hard_move_property(&move_strings, &["2b3-11"]);
+}
+
+#[test]
 fn tactic_test1() {
     let move_strings = [
         "b4", "e1", "Cc3", "Cc4", "d4", "b3", "b2", "d3", "c2", "a3", "c3>", "e4", "c3",
