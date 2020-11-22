@@ -183,8 +183,12 @@ fn play_random_games_test() {
         for i in 0.. {
             assert_eq!(board, board.flip_colors().flip_colors());
 
-            assert!((board.white_road_pieces() & board.black_road_pieces()).is_empty());
-            assert!((board.white_road_pieces() & board.white_blocking_pieces()).count() <= 1);
+            let group_data = board.group_data();
+
+            assert!((group_data.white_road_pieces() & group_data.black_road_pieces()).is_empty());
+            assert!(
+                (group_data.white_road_pieces() & group_data.white_blocking_pieces()).count() <= 1
+            );
 
             let eval = board.static_eval();
             for rotation in board.symmetries_with_swapped_colors() {
@@ -439,7 +443,9 @@ fn bitboard_full_board_file_rank_test() {
     );
     assert_eq!(board.game_result(), Some(WhiteWin));
 
-    let road_pieces = board.white_road_pieces() | board.black_road_pieces();
+    let group_data = board.group_data();
+
+    let road_pieces = group_data.white_road_pieces() | group_data.black_road_pieces();
 
     assert_eq!(road_pieces.count(), 25);
 
@@ -466,8 +472,11 @@ fn square_rank_file_test() {
 
             let mv = Move::Place(Role::Flat, square);
             let reverse_move = board.do_move(mv);
-            assert_eq!(board.black_road_pieces().rank(rank_id).count(), 1);
-            assert_eq!(board.black_road_pieces().file(file_id).count(), 1);
+
+            let group_data = board.group_data();
+
+            assert_eq!(group_data.black_road_pieces().rank(rank_id).count(), 1);
+            assert_eq!(group_data.black_road_pieces().file(file_id).count(), 1);
             board.reverse_move(reverse_move);
         }
     }

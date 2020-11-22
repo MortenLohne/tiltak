@@ -77,9 +77,9 @@ pub(crate) trait ColorTr {
 
     fn capstones_left(board: &Board) -> u8;
 
-    fn road_stones(board: &Board) -> BitBoard;
+    fn road_stones(group_data: &GroupData) -> BitBoard;
 
-    fn blocking_stones(board: &Board) -> BitBoard;
+    fn blocking_stones(group_data: &GroupData) -> BitBoard;
 
     fn flat_piece() -> Piece;
 
@@ -111,12 +111,12 @@ impl ColorTr for WhiteTr {
         board.white_capstones_left
     }
 
-    fn road_stones(board: &Board) -> BitBoard {
-        board.white_road_pieces()
+    fn road_stones(group_data: &GroupData) -> BitBoard {
+        group_data.white_road_pieces()
     }
 
-    fn blocking_stones(board: &Board) -> BitBoard {
-        board.white_blocking_pieces()
+    fn blocking_stones(group_data: &GroupData) -> BitBoard {
+        group_data.white_blocking_pieces()
     }
 
     fn flat_piece() -> Piece {
@@ -163,12 +163,12 @@ impl ColorTr for BlackTr {
         board.black_capstones_left
     }
 
-    fn road_stones(board: &Board) -> BitBoard {
-        board.black_road_pieces()
+    fn road_stones(group_data: &GroupData) -> BitBoard {
+        group_data.black_road_pieces()
     }
 
-    fn blocking_stones(board: &Board) -> BitBoard {
-        board.black_blocking_pieces()
+    fn blocking_stones(group_data: &GroupData) -> BitBoard {
+        group_data.black_blocking_pieces()
     }
 
     fn flat_piece() -> Piece {
@@ -714,9 +714,38 @@ pub struct GroupData {
     pub(crate) amount_in_group: [(u8, GroupEdgeConnection); BOARD_AREA + 1],
     pub(crate) white_critical_squares: BitBoard,
     pub(crate) black_critical_squares: BitBoard,
+    white_flat_stones: BitBoard,
+    black_flat_stones: BitBoard,
+    white_capstones: BitBoard,
+    black_capstones: BitBoard,
+    white_standing_stones: BitBoard,
+    black_standing_stones: BitBoard,
 }
 
 impl GroupData {
+    pub(crate) fn white_road_pieces(&self) -> BitBoard {
+        self.white_flat_stones | self.white_capstones
+    }
+
+    pub(crate) fn black_road_pieces(&self) -> BitBoard {
+        self.black_flat_stones | self.black_capstones
+    }
+
+    pub(crate) fn white_blocking_pieces(&self) -> BitBoard {
+        self.white_standing_stones | self.white_capstones
+    }
+
+    pub(crate) fn black_blocking_pieces(&self) -> BitBoard {
+        self.black_standing_stones | self.black_capstones
+    }
+
+    pub(crate) fn all_pieces(&self) -> BitBoard {
+        self.white_flat_stones
+            | self.white_blocking_pieces()
+            | self.black_flat_stones
+            | self.black_blocking_pieces()
+    }
+
     pub fn is_critical_square(&self, square: Square, color: Color) -> bool {
         match color {
             Color::White => WhiteTr::is_critical_square(self, square),
@@ -739,12 +768,6 @@ pub struct Board {
     cells: AbstractBoard<Stack>,
     #[cfg_attr(feature = "serde", serde(with = "ColorDef"))]
     to_move: Color,
-    white_flat_stones: BitBoard,
-    black_flat_stones: BitBoard,
-    white_capstones: BitBoard,
-    black_capstones: BitBoard,
-    white_standing_stones: BitBoard,
-    black_standing_stones: BitBoard,
     white_stones_left: u8,
     black_stones_left: u8,
     white_capstones_left: u8,
@@ -798,12 +821,6 @@ impl Default for Board {
         Board {
             cells: Default::default(),
             to_move: Color::White,
-            white_flat_stones: Default::default(),
-            black_flat_stones: Default::default(),
-            white_capstones: Default::default(),
-            black_capstones: Default::default(),
-            white_standing_stones: Default::default(),
-            black_standing_stones: Default::default(),
             white_stones_left: 21,
             black_stones_left: 21,
             white_capstones_left: STARTING_CAPSTONES,
@@ -846,44 +863,11 @@ impl fmt::Debug for Board {
             self.white_capstones_left, self.black_capstones_left
         )?;
         writeln!(f, "{} to move.", self.side_to_move())?;
-        writeln!(f, "White road stones: {:b}", self.white_road_pieces().board)?;
-        writeln!(f, "Black road stones: {:b}", self.black_road_pieces().board)?;
         Ok(())
     }
 }
 
 impl Board {
-    pub(crate) fn white_road_pieces(&self) -> BitBoard {
-        self.white_flat_stones | self.white_capstones
-    }
-
-    pub(crate) fn black_road_pieces(&self) -> BitBoard {
-        self.black_flat_stones | self.black_capstones
-    }
-
-    pub(crate) fn white_blocking_pieces(&self) -> BitBoard {
-        self.white_standing_stones | self.white_capstones
-    }
-
-    pub(crate) fn black_blocking_pieces(&self) -> BitBoard {
-        self.black_standing_stones | self.black_capstones
-    }
-
-    pub(crate) fn all_pieces(&self) -> BitBoard {
-        self.white_flat_stones
-            | self.white_blocking_pieces()
-            | self.black_flat_stones
-            | self.black_blocking_pieces()
-    }
-
-    pub fn white_flat_tops_count(&self) -> u8 {
-        self.white_road_pieces().count() - (STARTING_CAPSTONES - self.white_capstones_left)
-    }
-
-    pub fn black_flat_tops_count(&self) -> u8 {
-        self.black_road_pieces().count() - (STARTING_CAPSTONES - self.black_capstones_left)
-    }
-
     /// Number of moves/plies played in the game
     pub fn half_moves_played(&self) -> u16 {
         self.moves_played
@@ -925,7 +909,6 @@ impl Board {
                     self[Square((BOARD_SIZE as u8 - y - 1) * BOARD_SIZE as u8 + x)].clone();
             }
         }
-        new_board.bitboards_from_scratch();
         new_board
     }
 
@@ -937,7 +920,6 @@ impl Board {
                     self[Square(y * BOARD_SIZE as u8 + (BOARD_SIZE as u8 - x - 1))].clone();
             }
         }
-        new_board.bitboards_from_scratch();
         new_board
     }
 
@@ -951,7 +933,6 @@ impl Board {
                     self[Square(new_y * BOARD_SIZE as u8 + new_x)].clone();
             }
         }
-        new_board.bitboards_from_scratch();
         new_board
     }
 
@@ -970,18 +951,6 @@ impl Board {
         mem::swap(
             &mut new_board.white_capstones_left,
             &mut new_board.black_capstones_left,
-        );
-        mem::swap(
-            &mut new_board.white_flat_stones,
-            &mut new_board.black_flat_stones,
-        );
-        mem::swap(
-            &mut new_board.white_standing_stones,
-            &mut new_board.black_standing_stones,
-        );
-        mem::swap(
-            &mut new_board.white_capstones,
-            &mut new_board.black_capstones,
         );
         new_board.to_move = !new_board.to_move;
         new_board
@@ -1033,43 +1002,52 @@ impl Board {
             .sum()
     }
 
-    fn bitboards_from_scratch(&mut self) {
-        self.white_flat_stones = BitBoard::empty();
-        self.black_flat_stones = BitBoard::empty();
-        self.white_standing_stones = BitBoard::empty();
-        self.black_standing_stones = BitBoard::empty();
-        self.white_capstones = BitBoard::empty();
-        self.black_capstones = BitBoard::empty();
-        for square in squares_iterator() {
-            match self[square].top_stone() {
-                Some(WhiteFlat) => self.white_flat_stones = self.white_flat_stones.set(square.0),
-                Some(BlackFlat) => self.black_flat_stones = self.black_flat_stones.set(square.0),
-                Some(WhiteStanding) => {
-                    self.white_standing_stones = self.white_standing_stones.set(square.0)
-                }
-                Some(BlackStanding) => {
-                    self.black_standing_stones = self.black_standing_stones.set(square.0)
-                }
-                Some(WhiteCap) => self.white_capstones = self.white_capstones.set(square.0),
-                Some(BlackCap) => self.black_capstones = self.black_capstones.set(square.0),
-                None => (),
-            }
-        }
-    }
-
     #[inline(never)]
     pub fn group_data(&self) -> GroupData {
         let mut group_data = GroupData::default();
 
+        group_data.white_flat_stones = BitBoard::empty();
+        group_data.black_flat_stones = BitBoard::empty();
+        group_data.white_standing_stones = BitBoard::empty();
+        group_data.black_standing_stones = BitBoard::empty();
+        group_data.white_capstones = BitBoard::empty();
+        group_data.black_capstones = BitBoard::empty();
+
+        for square in squares_iterator() {
+            match self[square].top_stone() {
+                Some(WhiteFlat) => {
+                    group_data.white_flat_stones = group_data.white_flat_stones.set(square.0)
+                }
+                Some(BlackFlat) => {
+                    group_data.black_flat_stones = group_data.black_flat_stones.set(square.0)
+                }
+                Some(WhiteStanding) => {
+                    group_data.white_standing_stones =
+                        group_data.white_standing_stones.set(square.0)
+                }
+                Some(BlackStanding) => {
+                    group_data.black_standing_stones =
+                        group_data.black_standing_stones.set(square.0)
+                }
+                Some(WhiteCap) => {
+                    group_data.white_capstones = group_data.white_capstones.set(square.0)
+                }
+                Some(BlackCap) => {
+                    group_data.black_capstones = group_data.black_capstones.set(square.0)
+                }
+                None => (),
+            }
+        }
+
         let mut highest_component_id = 1;
 
         connected_components_graph(
-            self.white_road_pieces(),
+            group_data.white_road_pieces(),
             &mut group_data.groups,
             &mut highest_component_id,
         );
         connected_components_graph(
-            self.black_road_pieces(),
+            group_data.black_road_pieces(),
             &mut group_data.groups,
             &mut highest_component_id,
         );
@@ -1185,13 +1163,22 @@ impl Board {
         const OUR_STACK_PSQT: usize = CAP_PSQT + 6;
         const THEIR_STACK_PSQT: usize = OUR_STACK_PSQT + 6;
 
+        let mut white_flat_count = 0;
+        let mut black_flat_count = 0;
+
         for square in squares_iterator() {
             let stack = &self[square];
             if let Some(piece) = self[square].top_stone() {
                 let i = square.0 as usize;
                 match piece {
-                    WhiteFlat => coefficients[FLAT_PSQT + SQUARE_SYMMETRIES[i]] += 1.0,
-                    BlackFlat => coefficients[FLAT_PSQT + SQUARE_SYMMETRIES[i]] -= 1.0,
+                    WhiteFlat => {
+                        coefficients[FLAT_PSQT + SQUARE_SYMMETRIES[i]] += 1.0;
+                        white_flat_count += 1;
+                    }
+                    BlackFlat => {
+                        coefficients[FLAT_PSQT + SQUARE_SYMMETRIES[i]] -= 1.0;
+                        black_flat_count += 1;
+                    }
                     WhiteStanding => coefficients[STAND_PSQT + SQUARE_SYMMETRIES[i]] += 1.0,
                     BlackStanding => coefficients[STAND_PSQT + SQUARE_SYMMETRIES[i]] -= 1.0,
                     WhiteCap => coefficients[CAP_PSQT + SQUARE_SYMMETRIES[i]] += 1.0,
@@ -1216,8 +1203,7 @@ impl Board {
         const NUMBER_OF_GROUPS: usize = FLATSTONE_LEAD + 3;
 
         // Give the side to move a bonus/malus depending on flatstone lead
-        let white_flatstone_lead =
-            self.white_flat_tops_count() as i8 - self.black_flat_tops_count() as i8;
+        let white_flatstone_lead = white_flat_count - black_flat_count;
 
         // Bonus/malus depending on the number of groups each side has
         let mut seen_groups = [false; BOARD_AREA + 1];
@@ -1352,17 +1338,33 @@ impl Board {
         let mut num_files_occupied_black = 0;
 
         for i in 0..BOARD_SIZE as u8 {
-            num_ranks_occupied_white +=
-                self.rank_score::<WhiteTr, BlackTr>(i, coefficients, RANK_FILE_CONTROL);
-            num_ranks_occupied_black +=
-                self.rank_score::<BlackTr, WhiteTr>(i, coefficients, RANK_FILE_CONTROL);
+            num_ranks_occupied_white += self.rank_score::<WhiteTr, BlackTr>(
+                &group_data,
+                i,
+                coefficients,
+                RANK_FILE_CONTROL,
+            );
+            num_ranks_occupied_black += self.rank_score::<BlackTr, WhiteTr>(
+                &group_data,
+                i,
+                coefficients,
+                RANK_FILE_CONTROL,
+            );
         }
 
         for i in 0..BOARD_SIZE as u8 {
-            num_files_occupied_white +=
-                self.file_score::<WhiteTr, BlackTr>(i, coefficients, RANK_FILE_CONTROL);
-            num_files_occupied_black +=
-                self.file_score::<BlackTr, WhiteTr>(i, coefficients, RANK_FILE_CONTROL);
+            num_files_occupied_white += self.file_score::<WhiteTr, BlackTr>(
+                &group_data,
+                i,
+                coefficients,
+                RANK_FILE_CONTROL,
+            );
+            num_files_occupied_black += self.file_score::<BlackTr, WhiteTr>(
+                &group_data,
+                i,
+                coefficients,
+                RANK_FILE_CONTROL,
+            );
         }
 
         coefficients[NUM_RANKS_FILES_OCCUPIED + num_ranks_occupied_white] += 1.0;
@@ -1377,11 +1379,12 @@ impl Board {
 
     fn rank_score<Us: ColorTr, Them: ColorTr>(
         &self,
+        group_data: &GroupData,
         rank_id: u8,
         coefficients: &mut [f32],
         rank_file_control: usize,
     ) -> usize {
-        let rank = Us::road_stones(self).rank(rank_id);
+        let rank = Us::road_stones(group_data).rank(rank_id);
         let num_ranks_occupied = if rank.is_empty() { 0 } else { 1 };
         let road_pieces_in_rank = rank.count();
         coefficients[rank_file_control + road_pieces_in_rank as usize] +=
@@ -1410,11 +1413,12 @@ impl Board {
 
     fn file_score<Us: ColorTr, Them: ColorTr>(
         &self,
+        group_data: &GroupData,
         file_id: u8,
         coefficients: &mut [f32],
         rank_file_control: usize,
     ) -> usize {
-        let rank = Us::road_stones(self).file(file_id);
+        let rank = Us::road_stones(group_data).file(file_id);
         let num_ranks_occupied = if rank.is_empty() { 0 } else { 1 };
         let road_pieces_in_rank = rank.count();
         coefficients[rank_file_control + road_pieces_in_rank as usize] +=
@@ -1539,22 +1543,6 @@ impl board::Board for Board {
                     !self.side_to_move()
                 };
                 self[to].push(Piece::from_role_color(role, color_to_place));
-                match (role, color_to_place) {
-                    (Flat, Color::White) => {
-                        self.white_flat_stones = self.white_flat_stones.set(to.0)
-                    }
-                    (Flat, Color::Black) => {
-                        self.black_flat_stones = self.black_flat_stones.set(to.0)
-                    }
-                    (Standing, Color::White) => {
-                        self.white_standing_stones = self.white_standing_stones.set(to.0)
-                    }
-                    (Standing, Color::Black) => {
-                        self.black_standing_stones = self.black_standing_stones.set(to.0)
-                    }
-                    (Cap, Color::White) => self.white_capstones = self.white_capstones.set(to.0),
-                    (Cap, Color::Black) => self.black_capstones = self.black_capstones.set(to.0),
-                }
 
                 match (color_to_place, role) {
                     (Color::White, Flat) => self.white_stones_left -= 1,
@@ -1588,8 +1576,6 @@ impl board::Board for Board {
 
                     from = to;
                 }
-
-                self.bitboards_from_scratch();
 
                 pieces_left_behind.reverse();
                 ReverseMove::Move(
@@ -1629,24 +1615,10 @@ impl board::Board for Board {
                 debug_assert!(piece.color() != self.side_to_move() || self.moves_played < 3);
 
                 match piece {
-                    WhiteFlat | WhiteStanding => {
-                        self.white_flat_stones = self.white_flat_stones.clear(square.0);
-                        self.white_standing_stones = self.white_standing_stones.clear(square.0);
-                        self.white_stones_left += 1
-                    }
-                    WhiteCap => {
-                        self.white_capstones = self.white_capstones.clear(square.0);
-                        self.white_capstones_left += 1
-                    }
-                    BlackFlat | BlackStanding => {
-                        self.black_flat_stones = self.black_flat_stones.clear(square.0);
-                        self.black_standing_stones = self.black_standing_stones.clear(square.0);
-                        self.black_stones_left += 1
-                    }
-                    BlackCap => {
-                        self.black_capstones = self.black_capstones.clear(square.0);
-                        self.black_capstones_left += 1
-                    }
+                    WhiteFlat | WhiteStanding => self.white_stones_left += 1,
+                    WhiteCap => self.white_capstones_left += 1,
+                    BlackFlat | BlackStanding => self.black_stones_left += 1,
+                    BlackCap => self.black_capstones_left += 1,
                 };
             }
 
@@ -1671,7 +1643,6 @@ impl board::Board for Board {
                         Color::Black => self[from].replace_top(BlackStanding),
                     };
                 };
-                self.bitboards_from_scratch();
             }
         }
 

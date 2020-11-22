@@ -99,7 +99,7 @@ impl Board {
         match mv {
             Move::Place(role, square) => {
                 let their_open_critical_squares =
-                    Them::critical_squares(&*group_data) & (!self.all_pieces());
+                    Them::critical_squares(&*group_data) & (!group_data.all_pieces());
 
                 // Apply PSQT
                 match role {
@@ -117,8 +117,10 @@ impl Board {
                     // Bonus for laying stones in files/ranks where we already have road stones
                     // Implemented as a 2D table. Because of symmetries,
                     // only 15 squares are needed, not all 25
-                    let road_stones_in_rank = Us::road_stones(&self).rank(square.rank()).count();
-                    let road_stones_in_file = Us::road_stones(&self).file(square.file()).count();
+                    let road_stones_in_rank =
+                        Us::road_stones(&group_data).rank(square.rank()).count();
+                    let road_stones_in_file =
+                        Us::road_stones(&group_data).file(square.file()).count();
 
                     let n_low = u8::min(road_stones_in_file, road_stones_in_rank);
                     let n_high = u8::max(road_stones_in_file, road_stones_in_rank);
@@ -210,8 +212,8 @@ impl Board {
                     for neighbour in square.neighbours() {
                         if self[neighbour].top_stone() == Some(Them::flat_piece()) {
                             let our_road_stones =
-                                Us::road_stones(self).rank(neighbour.rank()).count()
-                                    + Us::road_stones(self).file(neighbour.file()).count();
+                                Us::road_stones(group_data).rank(neighbour.rank()).count()
+                                    + Us::road_stones(group_data).file(neighbour.file()).count();
                             if our_road_stones >= 2 {
                                 coefficients[ATTACK_STRONG_FLATSTONE] +=
                                     (our_road_stones - 1) as f32;
@@ -321,7 +323,7 @@ impl Board {
                 }
 
                 let their_open_critical_squares =
-                    Them::critical_squares(&*group_data) & (!self.all_pieces());
+                    Them::critical_squares(&*group_data) & (!group_data.all_pieces());
 
                 if !their_open_critical_squares.is_empty() {
                     if their_pieces_captured == 0 {
