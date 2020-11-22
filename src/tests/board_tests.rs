@@ -495,23 +495,22 @@ fn critical_square_test() {
 
     let e1 = Square::parse_square("e1");
     let a5 = Square::parse_square("a5");
-    assert!(board.group_data().is_critical_square(e1, Color::White));
-    assert!(!board.group_data().is_critical_square(e1, Color::Black));
+    let group_data = board.group_data();
+    assert!(group_data.is_critical_square(e1, Color::White));
+    assert!(!group_data.is_critical_square(e1, Color::Black));
 
-    assert!(board.group_data().is_critical_square(a5, Color::Black));
-    assert!(!board.group_data().is_critical_square(a5, Color::White));
+    assert!(group_data.is_critical_square(a5, Color::Black));
+    assert!(!group_data.is_critical_square(a5, Color::White));
 
     assert_eq!(
-        board
-            .group_data()
+        group_data
             .critical_squares(Color::White)
             .into_iter()
             .collect::<Vec<_>>(),
         vec![e1]
     );
     assert_eq!(
-        board
-            .group_data()
+        group_data
             .critical_squares(Color::Black)
             .into_iter()
             .collect::<Vec<_>>(),

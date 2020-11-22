@@ -343,9 +343,15 @@ pub fn tune_value_and_policy(
         let mut board = game.start_board.clone();
 
         for (mv, move_scores) in game.moves.iter().map(|(mv, _)| mv).zip(move_scores) {
+            let group_data = board.group_data();
             for (possible_move, score) in move_scores {
                 let mut coefficients = vec![0.0; Board::POLICY_PARAMS.len()];
-                board.coefficients_for_move(&mut coefficients, possible_move, move_scores.len());
+                board.coefficients_for_move(
+                    &mut coefficients,
+                    possible_move,
+                    &group_data,
+                    move_scores.len(),
+                );
 
                 policy_coefficients_sets.push(coefficients.into_iter().map(|c| c as f64).collect());
                 policy_results.push(*score as f64);

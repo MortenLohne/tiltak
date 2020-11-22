@@ -1,5 +1,5 @@
 /// This module contains the core of the MCTS search algorithm
-use crate::board::{Board, Move, TunableBoard};
+use crate::board::{Board, GroupData, Move, TunableBoard};
 use crate::search::{cp_to_win_percentage, MctsSetting, Score};
 use board_game_traits::board::{Board as BoardTrait, Color, GameResult};
 use std::ops;
@@ -60,7 +60,14 @@ impl TreeEdge {
             );
             // Only generate child moves on the 2nd visit
             if self.visits == 1 {
-                node.init_children(&board, simple_moves, &settings.policy_params, moves);
+                let group_data = board.group_data();
+                node.init_children(
+                    &board,
+                    &group_data,
+                    simple_moves,
+                    &settings.policy_params,
+                    moves,
+                );
             }
 
             let visits_sqrt = (self.visits as Score).sqrt();
@@ -102,12 +109,14 @@ impl TreeEdge {
 
     // Never inline, for profiling purposes
     #[inline(never)]
-    fn expand(&mut self, board: &mut Board, params: &[f32]) -> Score {
+    fn expand(&mut self, board: &Board, params: &[f32]) -> Score {
         debug_assert!(self.child.is_none());
         self.child = Some(Box::new(Tree::new_node()));
         let child = self.child.as_mut().unwrap();
 
-        if let Some(game_result) = board.game_result() {
+        let group_data = board.group_data();
+
+        if let Some(game_result) = board.game_result_with_group_data(&group_data) {
             let game_result_for_us = match (game_result, board.side_to_move()) {
                 (GameResult::Draw, _) => GameResultForUs::Draw,
                 (GameResult::WhiteWin, Color::Black) => GameResultForUs::Loss, // The side to move has lost
@@ -125,7 +134,8 @@ impl TreeEdge {
             return score;
         }
 
-        let mut static_eval = cp_to_win_percentage(board.static_eval_with_params(params));
+        let mut static_eval =
+            cp_to_win_percentage(board.static_eval_with_params_and_data(&group_data, params));
         if board.side_to_move() == Color::Black {
             static_eval = 1.0 - static_eval;
         }
@@ -149,11 +159,12 @@ impl Tree {
     fn init_children(
         &mut self,
         board: &Board,
+        group_data: &GroupData,
         simple_moves: &mut Vec<Move>,
         policy_params: &[f32],
         moves: &mut Vec<(Move, Score)>,
     ) {
-        board.generate_moves_with_params(policy_params, simple_moves, moves);
+        board.generate_moves_with_params(policy_params, group_data, simple_moves, moves);
         self.children.reserve_exact(moves.len());
         for (mv, heuristic_score) in moves.drain(..) {
             self.children

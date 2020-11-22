@@ -1,8 +1,8 @@
 use crate::bitboard::BitBoard;
 use crate::board::Role::*;
 use crate::board::{
-    Board, ColorTr, Direction, Move, Movement, Piece, Square, StackMovement, TunableBoard,
-    BOARD_SIZE,
+    Board, ColorTr, Direction, GroupData, Move, Movement, Piece, Square, StackMovement,
+    TunableBoard, BOARD_SIZE,
 };
 use crate::{board, search};
 use arrayvec::ArrayVec;
@@ -20,6 +20,7 @@ impl Board {
     pub(crate) fn generate_moves_with_probabilities_colortr<Us: ColorTr, Them: ColorTr>(
         &self,
         params: &[f32],
+        group_data: &GroupData,
         simple_moves: &mut Vec<Move>,
         moves: &mut Vec<(Move, search::Score)>,
     ) {
@@ -27,7 +28,7 @@ impl Board {
         moves.extend(simple_moves.drain(..).map(|mv| {
             (
                 mv.clone(),
-                self.probability_for_move_colortr::<Us, Them>(params, &mv, num_moves),
+                self.probability_for_move_colortr::<Us, Them>(params, &mv, group_data, num_moves),
             )
         }));
     }
@@ -36,10 +37,16 @@ impl Board {
         &self,
         params: &[f32],
         mv: &Move,
+        group_data: &GroupData,
         num_moves: usize,
     ) -> f32 {
         let mut coefficients = vec![0.0; Self::POLICY_PARAMS.len()];
-        self.coefficients_for_move_colortr::<Us, Them>(&mut coefficients, mv, num_moves);
+        self.coefficients_for_move_colortr::<Us, Them>(
+            &mut coefficients,
+            mv,
+            group_data,
+            num_moves,
+        );
         let total_value: f32 = coefficients.iter().zip(params).map(|(c, p)| c * p).sum();
 
         sigmoid(total_value)
@@ -49,6 +56,7 @@ impl Board {
         &self,
         coefficients: &mut [f32],
         mv: &Move,
+        group_data: &GroupData,
         num_legal_moves: usize,
     ) {
         use crate::board::SQUARE_SYMMETRIES;
@@ -90,7 +98,6 @@ impl Board {
 
         match mv {
             Move::Place(role, square) => {
-                let group_data = self.group_data();
                 let their_open_critical_squares =
                     Them::critical_squares(&*group_data) & (!self.all_pieces());
 
@@ -255,8 +262,6 @@ impl Board {
             }
 
             Move::Move(square, direction, stack_movement) => {
-                let group_data = self.group_data();
-
                 let mut destination_square =
                     if stack_movement.movements[0].pieces_to_take == self[*square].len() {
                         square.go_direction(*direction).unwrap()

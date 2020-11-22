@@ -319,14 +319,23 @@ fn test_position() {
     let mut simple_moves = vec![];
     let mut moves = vec![];
 
-    board.generate_moves_with_probabilities(&mut simple_moves, &mut moves);
+    board.generate_moves_with_probabilities(
+        &board.group_data(),
+        &mut simple_moves,
+        &mut moves,
+    );
     moves.sort_by_key(|(_mv, score)| -(score * 1000.0) as i64);
 
     println!("Top 10 heuristic moves:");
     for (mv, score) in moves.iter().take(10) {
         println!("{}: {:.3}", mv, score);
         let mut coefficients = vec![0.0; Board::POLICY_PARAMS.len()];
-        board.coefficients_for_move(&mut coefficients, mv, moves.len());
+        board.coefficients_for_move(
+            &mut coefficients,
+            mv,
+            &board.group_data(),
+            moves.len(),
+        );
         for coefficient in coefficients {
             print!("{:.1}, ", coefficient);
         }

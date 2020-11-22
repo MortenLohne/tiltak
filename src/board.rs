@@ -22,17 +22,17 @@ use board_game_traits::board::{Color, GameResult};
 use pgn_traits::pgn;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
-use std::cell::RefCell;
 use std::cmp::Ordering;
 use std::fmt::Write;
 use std::hash::{Hash, Hasher};
 use std::iter::FromIterator;
 use std::mem;
-use std::ops::{Deref, DerefMut, Index, IndexMut};
+use std::ops::{Index, IndexMut};
 use std::{fmt, iter, ops};
 
 /// Extra items for tuning evaluation constants.
 pub trait TunableBoard: BoardTrait {
+    type ExtraData;
     const VALUE_PARAMS: &'static [f32];
     const POLICY_PARAMS: &'static [f32];
 
@@ -48,13 +48,26 @@ pub trait TunableBoard: BoardTrait {
     fn generate_moves_with_params(
         &self,
         params: &[f32],
+        data: &Self::ExtraData,
         simple_moves: &mut Vec<<Self as BoardTrait>::Move>,
         moves: &mut Vec<(<Self as BoardTrait>::Move, search::Score)>,
     );
 
-    fn probability_for_move(&self, params: &[f32], mv: &Self::Move, num_moves: usize) -> f32;
+    fn probability_for_move(
+        &self,
+        params: &[f32],
+        mv: &Self::Move,
+        data: &Self::ExtraData,
+        num_moves: usize,
+    ) -> f32;
 
-    fn coefficients_for_move(&self, coefficients: &mut [f32], mv: &Move, num_legal_moves: usize);
+    fn coefficients_for_move(
+        &self,
+        coefficients: &mut [f32],
+        mv: &Move,
+        data: &Self::ExtraData,
+        num_legal_moves: usize,
+    );
 }
 
 pub(crate) trait ColorTr {
@@ -701,7 +714,6 @@ pub struct GroupData {
     pub(crate) amount_in_group: [(u8, GroupEdgeConnection); BOARD_AREA + 1],
     pub(crate) white_critical_squares: BitBoard,
     pub(crate) black_critical_squares: BitBoard,
-    updated_groups: bool,
 }
 
 impl GroupData {
@@ -739,7 +751,6 @@ pub struct Board {
     black_capstones_left: u8,
     moves_played: u16,
     moves: Vec<Move>,
-    group_data: RefCell<GroupData>,
 }
 
 impl PartialEq for Board {
@@ -784,7 +795,7 @@ impl IndexMut<Square> for Board {
 
 impl Default for Board {
     fn default() -> Self {
-        let board = Board {
+        Board {
             cells: Default::default(),
             to_move: Color::White,
             white_flat_stones: Default::default(),
@@ -799,11 +810,7 @@ impl Default for Board {
             black_capstones_left: STARTING_CAPSTONES,
             moves_played: 0,
             moves: vec![],
-            group_data: RefCell::new(GroupData::default()),
-        };
-        board.group_data.borrow_mut().amount_in_group[0] =
-            (BOARD_AREA as u8, GroupEdgeConnection::default());
-        board
+        }
     }
 }
 
@@ -841,17 +848,6 @@ impl fmt::Debug for Board {
         writeln!(f, "{} to move.", self.side_to_move())?;
         writeln!(f, "White road stones: {:b}", self.white_road_pieces().board)?;
         writeln!(f, "Black road stones: {:b}", self.black_road_pieces().board)?;
-        writeln!(f, "Groups: {:?}", self.group_data.borrow().groups)?;
-        writeln!(
-            f,
-            "Amount in groups: {:?}",
-            self.group_data.borrow().amount_in_group
-        )?;
-        writeln!(
-            f,
-            "Groups up to date: {}",
-            self.group_data.borrow().updated_groups
-        )?;
         Ok(())
     }
 }
@@ -898,13 +894,6 @@ impl Board {
         &self.moves
     }
 
-    pub(crate) fn group_data<'a>(&'a self) -> impl Deref<Target = GroupData> + 'a {
-        if !self.group_data.borrow().updated_groups {
-            self.update_group_connectedness();
-        }
-        self.group_data.borrow()
-    }
-
     pub fn null_move(&mut self) {
         self.to_move = !self.to_move;
     }
@@ -937,7 +926,6 @@ impl Board {
             }
         }
         new_board.bitboards_from_scratch();
-        new_board.update_group_connectedness();
         new_board
     }
 
@@ -950,7 +938,6 @@ impl Board {
             }
         }
         new_board.bitboards_from_scratch();
-        new_board.update_group_connectedness();
         new_board
     }
 
@@ -965,7 +952,6 @@ impl Board {
             }
         }
         new_board.bitboards_from_scratch();
-        new_board.update_group_connectedness();
         new_board
     }
 
@@ -998,7 +984,6 @@ impl Board {
             &mut new_board.black_capstones,
         );
         new_board.to_move = !new_board.to_move;
-        new_board.update_group_connectedness();
         new_board
     }
 
@@ -1032,10 +1017,11 @@ impl Board {
     /// * `moves` A vector to place the moves and associated probabilities.
     pub fn generate_moves_with_probabilities(
         &self,
+        group_data: &GroupData,
         simple_moves: &mut Vec<Move>,
         moves: &mut Vec<(Move, search::Score)>,
     ) {
-        self.generate_moves_with_params(Board::POLICY_PARAMS, simple_moves, moves)
+        self.generate_moves_with_params(Board::POLICY_PARAMS, group_data, simple_moves, moves)
     }
 
     fn count_all_pieces(&self) -> u8 {
@@ -1071,50 +1057,52 @@ impl Board {
         }
     }
 
-    pub fn update_group_connectedness(&self) {
-        let mut group_data = self.group_data.borrow_mut();
-
-        let GroupData {
-            groups,
-            amount_in_group,
-            white_critical_squares,
-            black_critical_squares,
-            updated_groups,
-        } = group_data.deref_mut();
+    #[inline(never)]
+    pub fn group_data(&self) -> GroupData {
+        let mut group_data = GroupData::default();
 
         let mut highest_component_id = 1;
 
-        *groups = Default::default();
-
-        connected_components_graph(self.white_road_pieces(), groups, &mut highest_component_id);
-        connected_components_graph(self.black_road_pieces(), groups, &mut highest_component_id);
-
-        *amount_in_group = Default::default();
+        connected_components_graph(
+            self.white_road_pieces(),
+            &mut group_data.groups,
+            &mut highest_component_id,
+        );
+        connected_components_graph(
+            self.black_road_pieces(),
+            &mut group_data.groups,
+            &mut highest_component_id,
+        );
 
         for square in squares_iterator() {
-            amount_in_group[groups[square] as usize].0 += 1;
+            group_data.amount_in_group[group_data.groups[square] as usize].0 += 1;
             if self[square].top_stone().map(Piece::is_road_piece) == Some(true) {
-                amount_in_group[groups[square] as usize].1 = amount_in_group
-                    [groups[square] as usize]
+                group_data.amount_in_group[group_data.groups[square] as usize].1 = group_data
+                    .amount_in_group[group_data.groups[square] as usize]
                     .1
                     .connect_square(square);
             }
         }
 
-        *white_critical_squares = BitBoard::default();
-        *black_critical_squares = BitBoard::default();
-
         for square in squares_iterator() {
-            if self.is_critical_square_from_scratch(&groups, &amount_in_group, square, Color::White)
-            {
-                *white_critical_squares = white_critical_squares.set(square.0);
+            if self.is_critical_square_from_scratch(
+                &group_data.groups,
+                &group_data.amount_in_group,
+                square,
+                Color::White,
+            ) {
+                group_data.white_critical_squares = group_data.white_critical_squares.set(square.0);
             }
-            if self.is_critical_square_from_scratch(&groups, &amount_in_group, square, Color::Black)
-            {
-                *black_critical_squares = black_critical_squares.set(square.0);
+            if self.is_critical_square_from_scratch(
+                &group_data.groups,
+                &group_data.amount_in_group,
+                square,
+                Color::Black,
+            ) {
+                group_data.black_critical_squares = group_data.black_critical_squares.set(square.0);
             }
         }
-        *updated_groups = true;
+        group_data
     }
 
     /// An iterator over the top stones left behind after a stack movement
@@ -1137,7 +1125,60 @@ impl Board {
             .chain(std::iter::once(self[square].top_stone()))
     }
 
-    fn static_eval_game_phase(&self, coefficients: &mut [f32]) {
+    pub(crate) fn game_result_with_group_data(&self, group_data: &GroupData) -> Option<GameResult> {
+        if group_data
+            .amount_in_group
+            .iter()
+            .any(|(_, group_connection)| group_connection.is_winning())
+        {
+            let highest_component_id = group_data
+                .amount_in_group
+                .iter()
+                .enumerate()
+                .skip(1)
+                .find(|(_i, v)| (**v).0 == 0)
+                .map(|(i, _v)| i)
+                .unwrap_or(BOARD_AREA + 1) as u8;
+
+            if let Some(square) = self.is_win_by_road(&group_data.groups, highest_component_id) {
+                debug_assert!(self[square].top_stone().unwrap().is_road_piece());
+                return if self[square].top_stone().unwrap().color() == Color::White {
+                    Some(GameResult::WhiteWin)
+                } else {
+                    Some(GameResult::BlackWin)
+                };
+            };
+            unreachable!(
+                "Board has winning connection, but isn't winning\n{:?}",
+                self
+            )
+        }
+
+        if (self.white_stones_left == 0 && self.white_capstones_left == 0)
+            || (self.black_stones_left == 0 && self.black_capstones_left == 0)
+            || squares_iterator().all(|square| !self[square].is_empty())
+        {
+            // Count points
+            let mut white_points = 0;
+            let mut black_points = 0;
+            for square in squares_iterator() {
+                match self[square].top_stone() {
+                    Some(WhiteFlat) => white_points += 1,
+                    Some(BlackFlat) => black_points += 1,
+                    _ => (),
+                }
+            }
+            match white_points.cmp(&black_points) {
+                Ordering::Greater => Some(WhiteWin),
+                Ordering::Less => Some(BlackWin),
+                Ordering::Equal => Some(Draw),
+            }
+        } else {
+            None
+        }
+    }
+
+    fn static_eval_game_phase(&self, group_data: &GroupData, coefficients: &mut [f32]) {
         const FLAT_PSQT: usize = 0;
         const STAND_PSQT: usize = FLAT_PSQT + 6;
         const CAP_PSQT: usize = STAND_PSQT + 6;
@@ -1181,7 +1222,6 @@ impl Board {
         // Bonus/malus depending on the number of groups each side has
         let mut seen_groups = [false; BOARD_AREA + 1];
         seen_groups[0] = true;
-        let group_data = self.group_data();
 
         let number_of_groups = squares_iterator()
             .map(|square| {
@@ -1431,6 +1471,17 @@ impl Board {
         }
         suicide_win_square
     }
+
+    pub(crate) fn static_eval_with_params_and_data(
+        &self,
+        group_data: &GroupData,
+        params: &[f32],
+    ) -> f32 {
+        // TODO: Using a vector here is inefficient, we would like to use an array
+        let mut coefficients: Vec<f32> = vec![0.0; params.len()];
+        self.static_eval_game_phase(group_data, &mut coefficients);
+        coefficients.iter().zip(params).map(|(a, b)| a * b).sum()
+    }
 }
 
 impl board::Board for Board {
@@ -1565,7 +1616,6 @@ impl board::Board for Board {
             self
         );
 
-        self.group_data.borrow_mut().updated_groups = false;
         self.moves.push(mv);
         self.to_move = !self.to_move;
         self.moves_played += 1;
@@ -1625,64 +1675,13 @@ impl board::Board for Board {
             }
         }
 
-        self.group_data.borrow_mut().updated_groups = false;
         self.moves.pop();
         self.moves_played -= 1;
         self.to_move = !self.to_move;
     }
 
     fn game_result(&self) -> Option<GameResult> {
-        let group_data = self.group_data();
-        if group_data
-            .amount_in_group
-            .iter()
-            .any(|(_, group_connection)| group_connection.is_winning())
-        {
-            let highest_component_id = group_data
-                .amount_in_group
-                .iter()
-                .enumerate()
-                .skip(1)
-                .find(|(_i, v)| (**v).0 == 0)
-                .map(|(i, _v)| i)
-                .unwrap_or(BOARD_AREA + 1) as u8;
-
-            if let Some(square) = self.is_win_by_road(&group_data.groups, highest_component_id) {
-                debug_assert!(self[square].top_stone().unwrap().is_road_piece());
-                return if self[square].top_stone().unwrap().color() == Color::White {
-                    Some(GameResult::WhiteWin)
-                } else {
-                    Some(GameResult::BlackWin)
-                };
-            };
-            unreachable!(
-                "Board has winning connection, but isn't winning\n{:?}",
-                self
-            )
-        }
-
-        if (self.white_stones_left == 0 && self.white_capstones_left == 0)
-            || (self.black_stones_left == 0 && self.black_capstones_left == 0)
-            || squares_iterator().all(|square| !self[square].is_empty())
-        {
-            // Count points
-            let mut white_points = 0;
-            let mut black_points = 0;
-            for square in squares_iterator() {
-                match self[square].top_stone() {
-                    Some(WhiteFlat) => white_points += 1,
-                    Some(BlackFlat) => black_points += 1,
-                    _ => (),
-                }
-            }
-            match white_points.cmp(&black_points) {
-                Ordering::Greater => Some(WhiteWin),
-                Ordering::Less => Some(BlackWin),
-                Ordering::Equal => Some(Draw),
-            }
-        } else {
-            None
-        }
+        self.game_result_with_group_data(&self.group_data())
     }
 }
 
@@ -1697,6 +1696,7 @@ pub(crate) const SQUARE_SYMMETRIES: [usize; 25] = [
 ];
 
 impl TunableBoard for Board {
+    type ExtraData = GroupData;
     #[allow(clippy::unreadable_literal)]
     const VALUE_PARAMS: &'static [f32] = &[
         -0.017803056,
@@ -1837,12 +1837,14 @@ impl TunableBoard for Board {
     fn static_eval_coefficients(&self, coefficients: &mut [f32]) {
         debug_assert!(self.game_result().is_none());
 
-        self.static_eval_game_phase(coefficients)
+        let group_data = self.group_data();
+        self.static_eval_game_phase(&group_data, coefficients)
     }
 
     fn generate_moves_with_params(
         &self,
         params: &[f32],
+        group_data: &GroupData,
         simple_moves: &mut Vec<Self::Move>,
         moves: &mut Vec<(Self::Move, f32)>,
     ) {
@@ -1851,35 +1853,51 @@ impl TunableBoard for Board {
         match self.side_to_move() {
             Color::White => self.generate_moves_with_probabilities_colortr::<WhiteTr, BlackTr>(
                 params,
+                group_data,
                 simple_moves,
                 moves,
             ),
             Color::Black => self.generate_moves_with_probabilities_colortr::<BlackTr, WhiteTr>(
                 params,
+                group_data,
                 simple_moves,
                 moves,
             ),
         }
     }
 
-    fn probability_for_move(&self, params: &[f32], mv: &Move, num_moves: usize) -> f32 {
+    fn probability_for_move(
+        &self,
+        params: &[f32],
+        mv: &Move,
+        group_data: &GroupData,
+        num_moves: usize,
+    ) -> f32 {
         let mut coefficients = vec![0.0; Self::POLICY_PARAMS.len()];
-        self.coefficients_for_move(&mut coefficients, mv, num_moves);
+        self.coefficients_for_move(&mut coefficients, mv, group_data, num_moves);
         let total_value: f32 = coefficients.iter().zip(params).map(|(c, p)| c * p).sum();
 
         sigmoid(total_value)
     }
 
-    fn coefficients_for_move(&self, coefficients: &mut [f32], mv: &Move, num_legal_moves: usize) {
+    fn coefficients_for_move(
+        &self,
+        coefficients: &mut [f32],
+        mv: &Move,
+        group_data: &GroupData,
+        num_legal_moves: usize,
+    ) {
         match self.side_to_move() {
             Color::White => self.coefficients_for_move_colortr::<WhiteTr, BlackTr>(
                 coefficients,
                 mv,
+                group_data,
                 num_legal_moves,
             ),
             Color::Black => self.coefficients_for_move_colortr::<BlackTr, WhiteTr>(
                 coefficients,
                 mv,
+                group_data,
                 num_legal_moves,
             ),
         }
