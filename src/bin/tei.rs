@@ -12,26 +12,33 @@ pub fn main() {
     loop {
         let mut input = String::new();
         io::stdin().read_line(&mut input).unwrap();
-        if input.trim() == "uti" {
+        if input.trim() == "tei" {
             break;
         }
     }
 
     println!("id name taik");
     println!("id author Morten Lohne");
-    println!("utiok");
+    println!("teiok");
 
     let mut position = Board::default();
 
     for line in BufReader::new(io::stdin()).lines().map(Result::unwrap) {
-        match line.split_whitespace().next().unwrap() {
+        let mut words = line.split_whitespace();
+        match words.next().unwrap() {
             "quit" => break,
             "isready" => println!("readyok"),
             "setoption" => {
                 eprintln!("Unknown option \"{}\"", line);
                 break;
             }
-            "utinewgame" => (),
+            "teinewgame" => {
+                let size = words.next();
+                if size.is_some() && size != Some("5") {
+                    eprintln!("Error: Unsupported size {}, exiting...", size.unwrap());
+                    break;
+                }
+            }
             "position" => {
                 let mut words_iter = line.split_whitespace();
                 assert_eq!(words_iter.next(), Some("position"));

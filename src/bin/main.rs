@@ -2,7 +2,7 @@
 mod tests;
 
 pub mod playtak;
-pub mod uti;
+pub mod tei;
 
 use std::io::{Read, Write};
 use std::{io, time};

@@ -12,7 +12,7 @@ The project consists of 5 different binaries, that use the core engine in variou
  
  * **main** Various commands, mostly for debugging and experimentation.
  * **playtak** Connect to the `playtak.com` server, and seek games as a bot.
- * **uti** Run the engine through a [uci-like](https://en.wikipedia.org/wiki/Universal_Chess_Interface) text interface.
+ * **tei** Run the engine through Tak Engine Interface, a [uci-like](https://en.wikipedia.org/wiki/Universal_Chess_Interface) text interface.
  * **tune** Automatically tune the engine's parameters. 
  * **bootstrap** Engine worker for running on AWS Lambda.
  
@@ -37,11 +37,11 @@ Example usage:
 playtak -u <username> -p <password>
 ````
 
-## uti 
+## tei 
 
-Run the engine through a [uci-like](https://en.wikipedia.org/wiki/Universal_Chess_Interface) text interface.
+Run the engine through Tak Engine Interface, a [uci-like](https://en.wikipedia.org/wiki/Universal_Chess_Interface) text interface.
 
-Only a small subset of uci works. To analyze a position for 1 second, run the uti binary and enter:
+Only a small subset of uci works. To analyze a position for 1 second, run the tei binary and enter:
 
 ````
 position startpos moves e1 a1
