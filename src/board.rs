@@ -81,6 +81,10 @@ pub(crate) trait ColorTr {
 
     fn blocking_stones(group_data: &GroupData) -> BitBoard;
 
+    fn standing_stones(group_data: &GroupData) -> BitBoard;
+
+    fn cap_stones(group_data: &GroupData) -> BitBoard;
+
     fn flat_piece() -> Piece;
 
     fn standing_piece() -> Piece;
@@ -117,6 +121,14 @@ impl ColorTr for WhiteTr {
 
     fn blocking_stones(group_data: &GroupData) -> BitBoard {
         group_data.white_blocking_pieces()
+    }
+
+    fn standing_stones(group_data: &GroupData) -> BitBoard {
+        group_data.white_standing_stones
+    }
+
+    fn cap_stones(group_data: &GroupData) -> BitBoard {
+        group_data.white_capstones
     }
 
     fn flat_piece() -> Piece {
@@ -169,6 +181,14 @@ impl ColorTr for BlackTr {
 
     fn blocking_stones(group_data: &GroupData) -> BitBoard {
         group_data.black_blocking_pieces()
+    }
+
+    fn standing_stones(group_data: &GroupData) -> BitBoard {
+        group_data.black_standing_stones
+    }
+
+    fn cap_stones(group_data: &GroupData) -> BitBoard {
+        group_data.black_capstones
     }
 
     fn flat_piece() -> Piece {
@@ -1337,34 +1357,37 @@ impl Board {
         let mut num_ranks_occupied_black = 0;
         let mut num_files_occupied_black = 0;
 
-        for i in 0..BOARD_SIZE as u8 {
-            num_ranks_occupied_white += self.rank_score::<WhiteTr, BlackTr>(
+        for line in BitBoard::all_lines().iter() {
+            self.line_score::<WhiteTr, BlackTr>(
                 &group_data,
-                i,
+                *line,
                 coefficients,
                 RANK_FILE_CONTROL,
             );
-            num_ranks_occupied_black += self.rank_score::<BlackTr, WhiteTr>(
+            self.line_score::<BlackTr, WhiteTr>(
                 &group_data,
-                i,
+                *line,
                 coefficients,
                 RANK_FILE_CONTROL,
             );
         }
 
         for i in 0..BOARD_SIZE as u8 {
-            num_files_occupied_white += self.file_score::<WhiteTr, BlackTr>(
-                &group_data,
-                i,
-                coefficients,
-                RANK_FILE_CONTROL,
-            );
-            num_files_occupied_black += self.file_score::<BlackTr, WhiteTr>(
-                &group_data,
-                i,
-                coefficients,
-                RANK_FILE_CONTROL,
-            );
+            if !WhiteTr::road_stones(&group_data).rank(i).is_empty() {
+                num_ranks_occupied_white += 1;
+            }
+            if !BlackTr::road_stones(&group_data).rank(i).is_empty() {
+                num_ranks_occupied_black += 1;
+            }
+        }
+
+        for i in 0..BOARD_SIZE as u8 {
+            if !WhiteTr::road_stones(&group_data).file(i).is_empty() {
+                num_files_occupied_white += 1;
+            }
+            if !BlackTr::road_stones(&group_data).file(i).is_empty() {
+                num_files_occupied_black += 1;
+            }
         }
 
         coefficients[NUM_RANKS_FILES_OCCUPIED + num_ranks_occupied_white] += 1.0;
@@ -1377,72 +1400,29 @@ impl Board {
         assert_eq!(_NEXT_CONST, coefficients.len());
     }
 
-    fn rank_score<Us: ColorTr, Them: ColorTr>(
+    fn line_score<Us: ColorTr, Them: ColorTr>(
         &self,
         group_data: &GroupData,
-        rank_id: u8,
+        line: BitBoard,
         coefficients: &mut [f32],
-        rank_file_control: usize,
-    ) -> usize {
-        let rank = Us::road_stones(group_data).rank(rank_id);
-        let num_ranks_occupied = if rank.is_empty() { 0 } else { 1 };
-        let road_pieces_in_rank = rank.count();
-        coefficients[rank_file_control + road_pieces_in_rank as usize] +=
+        line_control: usize,
+    ) {
+        let road_pieces_in_line = (Us::road_stones(group_data) & line).count();
+
+        coefficients[line_control + road_pieces_in_line as usize] +=
             Us::color().multiplier() as f32;
 
-        let block_rank_file_with_capstone = rank_file_control + 6;
-        let block_rank_file_with_standing_stone = block_rank_file_with_capstone + 2;
+        let block_line_with_capstone = line_control + 6;
+        let block_line_with_standing_stone = block_line_with_capstone + 2;
 
-        // Give them a bonus for capstones/standing stones in our strong ranks
-        if road_pieces_in_rank >= 3 {
-            for file_id in 0..BOARD_SIZE as u8 {
-                let square = Square::from_rank_file(rank_id, file_id);
-                if self[square].top_stone() == Some(Them::cap_piece()) {
-                    coefficients
-                        [block_rank_file_with_capstone + road_pieces_in_rank as usize - 3] +=
-                        Them::color().multiplier() as f32
-                } else if self[square].top_stone() == Some(Them::standing_piece()) {
-                    coefficients
-                        [block_rank_file_with_standing_stone + road_pieces_in_rank as usize - 3] +=
-                        Them::color().multiplier() as f32
-                }
-            }
+        if road_pieces_in_line >= 3 {
+            coefficients[block_line_with_capstone + road_pieces_in_line as usize - 3] +=
+                ((Them::cap_stones(group_data) & line).count() as isize
+                    * Them::color().multiplier()) as f32;
+            coefficients[block_line_with_standing_stone + road_pieces_in_line as usize - 3] +=
+                ((Them::standing_stones(group_data) & line).count() as isize
+                    * Them::color().multiplier()) as f32;
         }
-        num_ranks_occupied
-    }
-
-    fn file_score<Us: ColorTr, Them: ColorTr>(
-        &self,
-        group_data: &GroupData,
-        file_id: u8,
-        coefficients: &mut [f32],
-        rank_file_control: usize,
-    ) -> usize {
-        let rank = Us::road_stones(group_data).file(file_id);
-        let num_ranks_occupied = if rank.is_empty() { 0 } else { 1 };
-        let road_pieces_in_rank = rank.count();
-        coefficients[rank_file_control + road_pieces_in_rank as usize] +=
-            Us::color().multiplier() as f32;
-
-        let block_rank_file_with_capstone = rank_file_control + 6;
-        let block_rank_file_with_standing_stone = block_rank_file_with_capstone + 2;
-
-        // Give them a bonus for capstones/standing stones in our strong files
-        if road_pieces_in_rank >= 3 {
-            for rank_id in 0..BOARD_SIZE as u8 {
-                let square = Square::from_rank_file(rank_id, file_id);
-                if self[square].top_stone() == Some(Them::cap_piece()) {
-                    coefficients
-                        [block_rank_file_with_capstone + road_pieces_in_rank as usize - 3] +=
-                        Them::color().multiplier() as f32
-                } else if self[square].top_stone() == Some(Them::standing_piece()) {
-                    coefficients
-                        [block_rank_file_with_standing_stone + road_pieces_in_rank as usize - 3] +=
-                        Them::color().multiplier() as f32
-                }
-            }
-        }
-        num_ranks_occupied
     }
 
     /// Check if either side has completed a road

@@ -59,6 +59,16 @@ impl BitBoard {
         }
     }
 
+    pub fn all_lines() -> [Self; BOARD_SIZE * 2] {
+        let mut result = [BitBoard::empty(); BOARD_SIZE * 2];
+        let full = BitBoard::full();
+        for i in 0..BOARD_SIZE {
+            result[i * 2] = full.rank(i as u8);
+            result[i * 2 + 1] = full.file(i as u8);
+        }
+        result
+    }
+
     #[inline]
     pub fn lower_n_bits(n: u8) -> Self {
         if n >= 64 {
