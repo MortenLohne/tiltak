@@ -81,6 +81,8 @@ pub(crate) trait ColorTr {
 
     fn blocking_stones(group_data: &GroupData) -> BitBoard;
 
+    fn flat_stones(group_data: &GroupData) -> BitBoard;
+
     fn standing_stones(group_data: &GroupData) -> BitBoard;
 
     fn cap_stones(group_data: &GroupData) -> BitBoard;
@@ -121,6 +123,10 @@ impl ColorTr for WhiteTr {
 
     fn blocking_stones(group_data: &GroupData) -> BitBoard {
         group_data.white_blocking_pieces()
+    }
+
+    fn flat_stones(group_data: &GroupData) -> BitBoard {
+        group_data.white_flat_stones
     }
 
     fn standing_stones(group_data: &GroupData) -> BitBoard {
@@ -181,6 +187,10 @@ impl ColorTr for BlackTr {
 
     fn blocking_stones(group_data: &GroupData) -> BitBoard {
         group_data.black_blocking_pieces()
+    }
+
+    fn flat_stones(group_data: &GroupData) -> BitBoard {
+        group_data.black_flat_stones
     }
 
     fn standing_stones(group_data: &GroupData) -> BitBoard {
@@ -1347,10 +1357,10 @@ impl Board {
                 }
             });
 
-        // Number of pieces in each rank/file
-        const NUM_RANKS_FILES_OCCUPIED: usize = CAPSTONE_NEXT_TO_OUR_STACK + 1;
-        // Number of ranks/files with at least one road stone
-        const RANK_FILE_CONTROL: usize = NUM_RANKS_FILES_OCCUPIED + 6;
+        // Number of pieces in each line
+        const NUM_LINES_OCCUPIED: usize = CAPSTONE_NEXT_TO_OUR_STACK + 1;
+        // Number of lines with at least one road stone
+        const LINE_CONTROL: usize = NUM_LINES_OCCUPIED + 6;
 
         let mut num_ranks_occupied_white = 0;
         let mut num_files_occupied_white = 0;
@@ -1358,18 +1368,8 @@ impl Board {
         let mut num_files_occupied_black = 0;
 
         for line in BitBoard::all_lines().iter() {
-            self.line_score::<WhiteTr, BlackTr>(
-                &group_data,
-                *line,
-                coefficients,
-                RANK_FILE_CONTROL,
-            );
-            self.line_score::<BlackTr, WhiteTr>(
-                &group_data,
-                *line,
-                coefficients,
-                RANK_FILE_CONTROL,
-            );
+            self.line_score::<WhiteTr, BlackTr>(&group_data, *line, coefficients, LINE_CONTROL);
+            self.line_score::<BlackTr, WhiteTr>(&group_data, *line, coefficients, LINE_CONTROL);
         }
 
         for i in 0..BOARD_SIZE as u8 {
@@ -1390,12 +1390,12 @@ impl Board {
             }
         }
 
-        coefficients[NUM_RANKS_FILES_OCCUPIED + num_ranks_occupied_white] += 1.0;
-        coefficients[NUM_RANKS_FILES_OCCUPIED + num_files_occupied_white] += 1.0;
-        coefficients[NUM_RANKS_FILES_OCCUPIED + num_ranks_occupied_black] -= 1.0;
-        coefficients[NUM_RANKS_FILES_OCCUPIED + num_files_occupied_black] -= 1.0;
+        coefficients[NUM_LINES_OCCUPIED + num_ranks_occupied_white] += 1.0;
+        coefficients[NUM_LINES_OCCUPIED + num_files_occupied_white] += 1.0;
+        coefficients[NUM_LINES_OCCUPIED + num_ranks_occupied_black] -= 1.0;
+        coefficients[NUM_LINES_OCCUPIED + num_files_occupied_black] -= 1.0;
 
-        const _NEXT_CONST: usize = RANK_FILE_CONTROL + 10;
+        const _NEXT_CONST: usize = LINE_CONTROL + 12;
 
         assert_eq!(_NEXT_CONST, coefficients.len());
     }
@@ -1412,15 +1412,18 @@ impl Board {
         coefficients[line_control + road_pieces_in_line as usize] +=
             Us::color().multiplier() as f32;
 
-        let block_line_with_capstone = line_control + 6;
-        let block_line_with_standing_stone = block_line_with_capstone + 2;
+        let block_their_line = line_control + 6;
 
+        // Bonus for blocking their lines
         if road_pieces_in_line >= 3 {
-            coefficients[block_line_with_capstone + road_pieces_in_line as usize - 3] +=
-                ((Them::cap_stones(group_data) & line).count() as isize
+            coefficients[block_their_line + road_pieces_in_line as usize - 3] +=
+                ((Them::flat_stones(group_data) & line).count() as isize
                     * Them::color().multiplier()) as f32;
-            coefficients[block_line_with_standing_stone + road_pieces_in_line as usize - 3] +=
+            coefficients[block_their_line + 2 + road_pieces_in_line as usize - 3] +=
                 ((Them::standing_stones(group_data) & line).count() as isize
+                    * Them::color().multiplier()) as f32;
+            coefficients[block_their_line + 4 + road_pieces_in_line as usize - 3] +=
+                ((Them::cap_stones(group_data) & line).count() as isize
                     * Them::color().multiplier()) as f32;
         }
     }
@@ -1650,71 +1653,73 @@ impl TunableBoard for Board {
     type ExtraData = GroupData;
     #[allow(clippy::unreadable_literal)]
     const VALUE_PARAMS: &'static [f32] = &[
-        -0.017803056,
-        0.1672491,
-        0.24027698,
-        0.29026398,
-        0.30987087,
-        0.25440925,
-        0.3279331,
-        0.55030465,
-        0.38420805,
-        0.8379914,
-        0.8394636,
-        0.48953676,
-        -0.5217102,
-        -0.081934914,
-        -0.14438076,
-        0.39587653,
-        0.5912089,
-        1.0287594,
-        1.1037564,
-        1.1698755,
-        1.2135509,
-        1.2129999,
-        1.250939,
-        1.3241924,
-        0.6959272,
-        0.7948777,
-        0.7712612,
-        0.84684813,
-        0.83600974,
-        0.8969007,
-        0.8632002,
-        0.82572,
-        1.0398452,
-        0.4008889,
-        0.24436173,
-        0.6002604,
-        -0.29366457,
-        -0.123944536,
-        -0.12388217,
-        0.309884,
-        -0.11210343,
-        0.16015732,
-        -0.042085163,
-        0.14198026,
-        0.6339217,
-        0.35588518,
-        -0.032943208,
-        -0.1569271,
-        -0.13379912,
-        0.6197931,
-        -0.6965155,
-        -0.36215284,
-        -0.09709675,
-        0.1260839,
-        0.43719134,
-        -0.87860185,
-        -0.5900968,
-        -0.102803975,
-        0.483264,
-        1.0928143,
-        0.005678368,
-        -0.0027855209,
-        0.0031052358,
-        0.19877331,
-        0.079868756,
+        -0.01572274,
+        0.16989301,
+        0.2417796,
+        0.28785828,
+        0.3157635,
+        0.25864968,
+        0.32866487,
+        0.55107635,
+        0.38675007,
+        0.8330562,
+        0.8367283,
+        0.48731363,
+        -0.52715933,
+        -0.08120161,
+        -0.14052086,
+        0.39548284,
+        0.5895505,
+        1.0269336,
+        1.0998785,
+        1.1704978,
+        1.213595,
+        1.2149378,
+        1.2535033,
+        1.3285655,
+        0.6963116,
+        0.7939199,
+        0.7703047,
+        0.8438783,
+        0.83577204,
+        0.9015863,
+        0.8654821,
+        0.82584864,
+        1.0415622,
+        0.39983407,
+        0.24256918,
+        0.6006121,
+        -0.28725535,
+        -0.116547115,
+        -0.1184358,
+        0.3019237,
+        -0.09845494,
+        0.17535304,
+        -0.060460363,
+        0.13354847,
+        0.64006203,
+        0.3585744,
+        -0.032501772,
+        -0.15769596,
+        -0.13514362,
+        0.6187018,
+        -0.6975018,
+        -0.3588804,
+        -0.10500548,
+        0.12374321,
+        0.42448536,
+        -0.88554716,
+        -0.5993386,
+        -0.11686669,
+        0.51069707,
+        1.0929133,
+        -0.003431532,
+        0.032665256,
+        0.038076416,
+        0.2150055,
+        0.052156355,
+        0.018968567,
+        -0.01817389,
     ];
     #[allow(clippy::unreadable_literal)]
     const POLICY_PARAMS: &'static [f32] = &[
