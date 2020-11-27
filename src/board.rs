@@ -1281,30 +1281,22 @@ impl Board {
         const CRITICAL_SQUARES: usize = NUMBER_OF_GROUPS + 3;
 
         for critical_square in group_data.critical_squares(Color::White) {
-            match self[critical_square].top_stone {
-                None => coefficients[CRITICAL_SQUARES] += 1.0,
-                Some(Piece::WhiteStanding) => coefficients[CRITICAL_SQUARES + 1] += 1.0,
-                Some(Piece::BlackFlat) => coefficients[CRITICAL_SQUARES + 2] += 1.0,
-                Some(Piece::BlackCap) | Some(Piece::BlackStanding) => {
-                    coefficients[CRITICAL_SQUARES + 3] += 1.0
-                }
-                _ => unreachable!(),
-            }
+            self.critical_squares_eval::<WhiteTr, BlackTr>(
+                critical_square,
+                coefficients,
+                CRITICAL_SQUARES,
+            );
         }
 
         for critical_square in group_data.critical_squares(Color::Black) {
-            match self[critical_square].top_stone {
-                None => coefficients[CRITICAL_SQUARES] -= 1.0,
-                Some(Piece::BlackStanding) => coefficients[CRITICAL_SQUARES + 1] -= 1.0,
-                Some(Piece::WhiteFlat) => coefficients[CRITICAL_SQUARES + 2] -= 1.0,
-                Some(Piece::WhiteCap) | Some(Piece::WhiteStanding) => {
-                    coefficients[CRITICAL_SQUARES + 3] -= 1.0
-                }
-                _ => unreachable!(),
-            }
+            self.critical_squares_eval::<BlackTr, WhiteTr>(
+                critical_square,
+                coefficients,
+                CRITICAL_SQUARES,
+            );
         }
 
-        const CAPSTONE_OVER_OWN_PIECE: usize = CRITICAL_SQUARES + 4;
+        const CAPSTONE_OVER_OWN_PIECE: usize = CRITICAL_SQUARES + 6;
         const CAPSTONE_ON_STACK: usize = CAPSTONE_OVER_OWN_PIECE + 1;
         const STANDING_STONE_ON_STACK: usize = CAPSTONE_ON_STACK + 1;
         const FLAT_STONE_NEXT_TO_OUR_STACK: usize = STANDING_STONE_ON_STACK + 1;
@@ -1398,6 +1390,40 @@ impl Board {
         const _NEXT_CONST: usize = LINE_CONTROL + 12;
 
         assert_eq!(_NEXT_CONST, coefficients.len());
+    }
+
+    /// Give bonus for our critical squares
+    fn critical_squares_eval<Us: ColorTr, Them: ColorTr>(
+        &self,
+        critical_square: Square,
+        coefficients: &mut [f32],
+        critical_squares: usize,
+    ) {
+        let top_stone = self[critical_square].top_stone;
+        if top_stone.is_none() {
+            coefficients[critical_squares] += Us::color().multiplier() as f32;
+        } else if top_stone == Some(Us::standing_piece()) {
+            coefficients[critical_squares + 1] += Us::color().multiplier() as f32;
+        } else if top_stone == Some(Them::flat_piece()) {
+            coefficients[critical_squares + 2] += Us::color().multiplier() as f32;
+        }
+        // Their capstone or standing stone
+        else {
+            coefficients[critical_squares + 3] += Us::color().multiplier() as f32
+        }
+
+        // Bonus for having our cap next to our critical square
+        for neighbour in critical_square.neighbours() {
+            if self[neighbour].top_stone == Some(Us::cap_piece()) {
+                coefficients[critical_squares + 4] += Us::color().multiplier() as f32;
+                // Further bonus for a capped stack next to our critical square
+                for piece in self[neighbour].clone().into_iter() {
+                    if piece == Us::flat_piece() {
+                        coefficients[critical_squares + 5] += Us::color().multiplier() as f32;
+                    }
+                }
+            }
+        }
     }
 
     fn line_score<Us: ColorTr, Them: ColorTr>(
@@ -1653,73 +1679,75 @@ impl TunableBoard for Board {
     type ExtraData = GroupData;
     #[allow(clippy::unreadable_literal)]
     const VALUE_PARAMS: &'static [f32] = &[
-        -0.01572274,
-        0.16989301,
-        0.2417796,
-        0.28785828,
-        0.3157635,
-        0.25864968,
-        0.32866487,
-        0.55107635,
-        0.38675007,
-        0.8330562,
-        0.8367283,
-        0.48731363,
-        -0.52715933,
-        -0.08120161,
-        -0.14052086,
-        0.39548284,
-        0.5895505,
-        1.0269336,
-        1.0998785,
-        1.1704978,
-        1.213595,
-        1.2149378,
-        1.2535033,
-        1.3285655,
-        0.6963116,
-        0.7939199,
-        0.7703047,
-        0.8438783,
-        0.83577204,
-        0.9015863,
-        0.8654821,
-        0.82584864,
-        1.0415622,
-        0.39983407,
-        0.24256918,
-        0.6006121,
-        -0.28725535,
-        -0.116547115,
-        -0.1184358,
-        0.3019237,
-        -0.09845494,
-        0.17535304,
-        -0.060460363,
-        0.13354847,
-        0.64006203,
-        0.3585744,
-        -0.032501772,
-        -0.15769596,
-        -0.13514362,
-        0.6187018,
-        -0.6975018,
-        -0.3588804,
-        -0.10500548,
-        0.12374321,
-        0.42448536,
-        -0.88554716,
-        -0.5993386,
-        -0.11686669,
-        0.51069707,
-        1.0929133,
-        -0.003431532,
-        0.032665256,
-        0.038076416,
-        0.2150055,
-        0.052156355,
-        0.018968567,
-        -0.01817389,
+        -0.016845044,
+        0.17022224,
+        0.24124837,
+        0.28603324,
+        0.31441984,
+        0.26619905,
+        0.3240439,
+        0.5464134,
+        0.38624322,
+        0.836523,
+        0.8441856,
+        0.50281864,
+        -0.5319615,
+        -0.08690647,
+        -0.14608166,
+        0.38866445,
+        0.58775675,
+        1.0267034,
+        1.0977447,
+        1.1716292,
+        1.2097449,
+        1.2128466,
+        1.2514062,
+        1.3240525,
+        0.6959771,
+        0.79473215,
+        0.77087706,
+        0.844586,
+        0.83693826,
+        0.90717065,
+        0.86492157,
+        0.8287618,
+        1.0482398,
+        0.40296316,
+        0.25697726,
+        0.60585046,
+        -0.28701374,
+        -0.12125129,
+        -0.1178239,
+        0.28548676,
+        -0.11196409,
+        0.15350688,
+        -0.09609637,
+        0.043966047,
+        0.09228689,
+        0.13676666,
+        0.6389944,
+        0.35806286,
+        -0.03181746,
+        -0.15553103,
+        -0.13250662,
+        0.60890996,
+        -0.7032362,
+        -0.36233038,
+        -0.10586373,
+        0.12679414,
+        0.4258857,
+        -0.8821736,
+        -0.6005885,
+        -0.119399525,
+        0.50513303,
+        1.0882376,
+        0.009241403,
+        0.031525154,
+        0.037940275,
+        0.21526852,
+        0.05217122,
+        0.024593933,
+        -0.011519423,
     ];
     #[allow(clippy::unreadable_literal)]
     const POLICY_PARAMS: &'static [f32] = &[
