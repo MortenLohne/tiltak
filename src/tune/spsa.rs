@@ -77,10 +77,10 @@ fn tuning_iteration<R: rand::Rng>(variables: &[Variable], rng: &mut R) -> Vec<SP
         .map(|(a, b)| if rng.gen() { (a, b) } else { (b, a) })
         .unzip();
 
-    let player1_settings =
-        MctsSetting::with_search_params(player1_variables.iter().map(|(_, a)| *a).collect());
-    let player2_settings =
-        MctsSetting::with_search_params(player2_variables.iter().map(|(_, a)| *a).collect());
+    let player1_settings = MctsSetting::default()
+        .add_search_params(player1_variables.iter().map(|(_, a)| *a).collect());
+    let player2_settings = MctsSetting::default()
+        .add_search_params(player2_variables.iter().map(|(_, a)| *a).collect());
 
     let (game, _) = play_game(&player1_settings, &player2_settings);
     match game.game_result {

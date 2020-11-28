@@ -15,6 +15,7 @@ pub struct MctsSetting {
     value_params: Vec<f32>,
     policy_params: Vec<f32>,
     search_params: Vec<Score>,
+    dirichlet: Option<f32>,
 }
 
 impl Default for MctsSetting {
@@ -23,25 +24,30 @@ impl Default for MctsSetting {
             value_params: Vec::from(Board::VALUE_PARAMS),
             policy_params: Vec::from(Board::POLICY_PARAMS),
             search_params: vec![0.57, 10000.0],
+            dirichlet: None,
         }
     }
 }
 
 impl MctsSetting {
-    pub fn with_eval_params(value_params: Vec<f32>, policy_params: Vec<f32>) -> Self {
-        MctsSetting {
-            value_params,
-            policy_params,
-            search_params: vec![0.57, 10000.0],
-        }
+    pub fn add_value_params(mut self, value_params: Vec<f32>) -> Self {
+        self.value_params = value_params;
+        self
     }
 
-    pub fn with_search_params(search_params: Vec<Score>) -> Self {
-        MctsSetting {
-            value_params: Vec::from(Board::VALUE_PARAMS),
-            policy_params: Vec::from(Board::POLICY_PARAMS),
-            search_params,
-        }
+    pub fn add_policy_params(mut self, policy_params: Vec<f32>) -> Self {
+        self.policy_params = policy_params;
+        self
+    }
+
+    pub fn add_search_params(mut self, search_params: Vec<f32>) -> Self {
+        self.search_params = search_params;
+        self
+    }
+
+    pub fn add_dirichlet(mut self, alpha: f32) -> Self {
+        self.dirichlet = Some(alpha);
+        self
     }
 
     pub fn c_puct_init(&self) -> Score {
