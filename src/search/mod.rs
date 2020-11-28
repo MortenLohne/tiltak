@@ -161,6 +161,19 @@ impl MonteCarloTree {
     pub fn mean_action_value(&self) -> Score {
         self.edge.mean_action_value
     }
+
+    #[cfg(feature = "constant-tuning")]
+    /// Apply Dirichlet noise to the root nodes, see the method in `Tree` for more.
+    pub fn apply_dirichlet_noise(&mut self) {
+        if let Some(child_node) = self.edge.child.as_mut() {
+            if child_node.children.is_empty() {
+                panic!("MCTS tree must be selected twice before applying Dirichlet noise")
+            }
+            child_node.apply_dirichlet(0.25, 0.5);
+        } else {
+            panic!("MCTS tree must be selected twice before applying Dirichlet noise");
+        }
+    }
 }
 
 /// The simplest way to use the mcts module. Run Monte Carlo Tree Search for `nodes` nodes, returning the best move, and its estimated winning probability for the side to move.
@@ -217,6 +230,7 @@ pub fn play_move_time(board: Board, max_time: time::Duration) -> (Move, Score) {
 }
 
 /// Run mcts with specific static evaluation parameters, for optimization the parameter set.
+/// Also applies Dirichlet noise to the root node
 pub fn mcts_training(board: Board, nodes: u64, settings: MctsSetting) -> Vec<(Move, Score)> {
     let mut tree = MonteCarloTree::with_settings(board, settings);
 

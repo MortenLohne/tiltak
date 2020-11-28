@@ -2,6 +2,8 @@
 use crate::board::{Board, GroupData, Move, TunableBoard};
 use crate::search::{cp_to_win_percentage, MctsSetting, Score};
 use board_game_traits::board::{Board as BoardTrait, Color, GameResult};
+#[cfg(feature = "constant-tuning")]
+use rand::distributions::Distribution;
 use std::ops;
 
 /// A Monte Carlo Search Tree, containing every node that has been seen in search.
@@ -177,6 +179,25 @@ impl Tree {
             children: vec![],
             total_action_value: 0.0,
             is_terminal: false,
+        }
+    }
+
+    #[cfg(feature = "constant-tuning")]
+    /// Apply Dirichlet noise to the heuristic scores of the child node
+    /// The noise is given `epsilon` weight.
+    /// `alpha` is used to generate the noise, lower values generate more varied noise.
+    /// Values above 1 are less noisy, and tend towards uniform outputs
+    pub fn apply_dirichlet(&mut self, epsilon: f32, alpha: f32) {
+        let mut rng = rand::thread_rng();
+        let dirichlet = rand_distr::Dirichlet::new_with_size(alpha, self.children.len()).unwrap();
+        let noise_vec = dirichlet.sample(&mut rng);
+        for (child_prior, eta) in self
+            .children
+            .iter_mut()
+            .map(|child| &mut child.heuristic_score)
+            .zip(noise_vec)
+        {
+            *child_prior = *child_prior * (1.0 - epsilon) + epsilon * eta;
         }
     }
 }
