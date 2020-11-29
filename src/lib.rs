@@ -28,7 +28,6 @@
 extern crate arrayvec;
 extern crate board_game_traits;
 extern crate pgn_traits;
-extern crate rand;
 
 #[cfg(feature = "aws-lambda")]
 pub mod aws;
