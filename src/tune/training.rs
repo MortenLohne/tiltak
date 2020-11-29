@@ -192,10 +192,12 @@ fn play_game_pair(
 ) -> (Game<Board>, Vec<Vec<(Move, f32)>>) {
     let settings = MctsSetting::default()
         .add_value_params(value_params.to_vec())
-        .add_policy_params(policy_params.to_vec());
+        .add_policy_params(policy_params.to_vec())
+        .add_dirichlet(0.2);
     let last_settings = MctsSetting::default()
         .add_value_params(last_value_params.to_vec())
-        .add_policy_params(last_policy_params.to_vec());
+        .add_policy_params(last_policy_params.to_vec())
+        .add_dirichlet(0.2);
     if i % 2 == 0 {
         let game = play_game(&settings, &last_settings);
         match game.0.game_result {

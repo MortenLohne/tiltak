@@ -341,7 +341,6 @@ fn test_position() {
             d, best_move, score
         );
     }
-
     let mut tree = search::MonteCarloTree::new(board.clone());
     for i in 1.. {
         tree.select();

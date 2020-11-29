@@ -15,6 +15,7 @@ pub struct MctsSetting {
     value_params: Vec<f32>,
     policy_params: Vec<f32>,
     search_params: Vec<Score>,
+    #[cfg(feature = "constant-tuning")]
     dirichlet: Option<f32>,
 }
 
@@ -24,6 +25,7 @@ impl Default for MctsSetting {
             value_params: Vec::from(Board::VALUE_PARAMS),
             policy_params: Vec::from(Board::POLICY_PARAMS),
             search_params: vec![0.57, 10000.0],
+            #[cfg(feature = "constant-tuning")]
             dirichlet: None,
         }
     }
@@ -45,6 +47,7 @@ impl MctsSetting {
         self
     }
 
+    #[cfg(feature = "constant-tuning")]
     pub fn add_dirichlet(mut self, alpha: f32) -> Self {
         self.dirichlet = Some(alpha);
         self
@@ -91,7 +94,8 @@ impl MonteCarloTree {
     }
 
     pub fn with_settings(board: Board, settings: MctsSetting) -> Self {
-        MonteCarloTree {
+        #[allow(unused_mut)]
+        let mut tree = MonteCarloTree {
             edge: TreeEdge {
                 child: None,
                 mv: Move::Place(Role::Flat, Square(0)),
@@ -103,7 +107,15 @@ impl MonteCarloTree {
             settings,
             simple_moves: vec![],
             moves: vec![],
+        };
+
+        #[cfg(feature = "constant-tuning")]
+        if let Some(alpha) = tree.settings.dirichlet {
+            tree.select();
+            tree.select();
+            (*tree.edge.child.as_mut().unwrap()).apply_dirichlet(0.25, alpha);
         }
+        tree
     }
 
     /// Run one iteration of MCTS
@@ -166,19 +178,6 @@ impl MonteCarloTree {
 
     pub fn mean_action_value(&self) -> Score {
         self.edge.mean_action_value
-    }
-
-    #[cfg(feature = "constant-tuning")]
-    /// Apply Dirichlet noise to the root nodes, see the method in `Tree` for more.
-    pub fn apply_dirichlet_noise(&mut self) {
-        if let Some(child_node) = self.edge.child.as_mut() {
-            if child_node.children.is_empty() {
-                panic!("MCTS tree must be selected twice before applying Dirichlet noise")
-            }
-            child_node.apply_dirichlet(0.25, 0.5);
-        } else {
-            panic!("MCTS tree must be selected twice before applying Dirichlet noise");
-        }
     }
 }
 
