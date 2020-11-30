@@ -1,7 +1,8 @@
 use crate::bitboard::BitBoard;
 use crate::board::Role::{Cap, Flat, Wall};
 use crate::board::{
-    Board, ColorTr, GroupData, Move, Square, TunableBoard, BOARD_SIZE, SQUARE_SYMMETRIES,
+    Board, ColorTr, Direction::*, GroupData, Move, Square, TunableBoard, BOARD_SIZE,
+    SQUARE_SYMMETRIES,
 };
 use crate::search;
 use arrayvec::ArrayVec;
@@ -37,7 +38,8 @@ const BLOCKING_STONE_BLOCKS_EXTENSIONS_OF_TWO_FLATS: usize = ATTACK_STRONG_FLATS
 const STACK_MOVEMENT_THAT_GIVES_US_TOP_PIECES: usize =
     BLOCKING_STONE_BLOCKS_EXTENSIONS_OF_TWO_FLATS + 1;
 const STACK_CAPTURED_BY_MOVEMENT: usize = STACK_MOVEMENT_THAT_GIVES_US_TOP_PIECES + 6;
-const MOVE_ONTO_CRITICAL_SQUARE: usize = STACK_CAPTURED_BY_MOVEMENT + 1;
+const MOVE_CAP_ONTO_STRONG_LINE: usize = STACK_CAPTURED_BY_MOVEMENT + 1;
+const MOVE_ONTO_CRITICAL_SQUARE: usize = MOVE_CAP_ONTO_STRONG_LINE + 4;
 const _NEXT_CONST: usize = MOVE_ONTO_CRITICAL_SQUARE + 2;
 
 impl Board {
@@ -272,6 +274,27 @@ pub(crate) fn coefficients_for_move_colortr<Us: ColorTr, Them: ColorTr>(
                     our_pieces += 1;
                 } else {
                     their_pieces += 1;
+                }
+
+                // Bonus for moving our cap to a strong line
+                // Extra bonus if it lands next to our critical square
+                if piece == Us::cap_piece() {
+                    let destination_line = match direction {
+                        North => Us::road_stones(group_data).rank(destination_square.rank()),
+                        West => Us::road_stones(group_data).file(destination_square.file()),
+                        East => Us::road_stones(group_data).file(destination_square.file()),
+                        South => Us::road_stones(group_data).rank(destination_square.rank()),
+                    };
+                    let road_count = destination_line.count() as usize;
+                    if road_count > 2 {
+                        coefficients[MOVE_CAP_ONTO_STRONG_LINE + road_count - 3] += 1.0;
+                        if destination_square
+                            .neighbours()
+                            .any(|n| Us::is_critical_square(group_data, n))
+                        {
+                            coefficients[MOVE_CAP_ONTO_STRONG_LINE + road_count - 1] += 1.0;
+                        }
+                    }
                 }
 
                 let destination_stack = &board[destination_square];
