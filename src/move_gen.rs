@@ -15,9 +15,9 @@ impl Board {
                 None => {
                     if Us::stones_left(&self) > 0 {
                         moves.push(Move::Place(Flat, square));
-                        moves.push(Move::Place(Standing, square));
+                        moves.push(Move::Place(Wall, square));
                     }
-                    if Us::capstones_left(&self) > 0 {
+                    if Us::caps_left(&self) > 0 {
                         moves.push(Move::Place(Cap, square));
                     }
                 }
@@ -74,7 +74,7 @@ impl Board {
             if neighbour_piece.map(Piece::role) == Some(Cap) {
                 return;
             }
-            if neighbour_piece.map(Piece::role) == Some(Standing) && max_pieces_to_take > 0 {
+            if neighbour_piece.map(Piece::role) == Some(Wall) && max_pieces_to_take > 0 {
                 let mut new_movement = partial_movement.clone();
                 new_movement.push(Movement { pieces_to_take: 1 });
                 movements.push(new_movement);

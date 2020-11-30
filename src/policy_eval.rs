@@ -1,5 +1,5 @@
 use crate::bitboard::BitBoard;
-use crate::board::Role::{Cap, Flat, Standing};
+use crate::board::Role::{Cap, Flat, Wall};
 use crate::board::{Board, ColorTr, GroupData, Move, Square, TunableBoard, SQUARE_SYMMETRIES};
 use crate::search;
 use arrayvec::ArrayVec;
@@ -14,11 +14,11 @@ pub fn inverse_sigmoid(x: f32) -> f32 {
 }
 
 const MOVE_COUNT: usize = 0;
-const FLAT_STONE_PSQT: usize = MOVE_COUNT + 1;
-const STANDING_STONE_PSQT: usize = FLAT_STONE_PSQT + 6;
-const CAPSTONE_PSQT: usize = STANDING_STONE_PSQT + 6;
-const ROAD_STONES_IN_RANK_FILE: usize = CAPSTONE_PSQT + 6;
-const EXTEND_GROUP: usize = ROAD_STONES_IN_RANK_FILE + 15;
+const FLAT_PSQT: usize = MOVE_COUNT + 1;
+const WALL_PSQT: usize = FLAT_PSQT + 6;
+const CAP_PSQT: usize = WALL_PSQT + 6;
+const ROAD_STONES_IN_LINE: usize = CAP_PSQT + 6;
+const EXTEND_GROUP: usize = ROAD_STONES_IN_LINE + 15;
 const MERGE_TWO_GROUPS: usize = EXTEND_GROUP + 3;
 const BLOCK_MERGER: usize = MERGE_TWO_GROUPS + 3;
 const PLACE_CRITICAL_SQUARE: usize = BLOCK_MERGER + 3;
@@ -27,9 +27,9 @@ const NEXT_TO_OUR_LAST_STONE: usize = IGNORE_CRITICAL_SQUARE + 2;
 const NEXT_TO_THEIR_LAST_STONE: usize = NEXT_TO_OUR_LAST_STONE + 1;
 const DIAGONAL_TO_OUR_LAST_STONE: usize = NEXT_TO_THEIR_LAST_STONE + 1;
 const DIAGONAL_TO_THEIR_LAST_STONE: usize = DIAGONAL_TO_OUR_LAST_STONE + 1;
-const ATTACK_STRONG_FLATSTONE: usize = DIAGONAL_TO_THEIR_LAST_STONE + 1;
+const ATTACK_STRONG_FLATS: usize = DIAGONAL_TO_THEIR_LAST_STONE + 1;
 
-const BLOCKING_STONE_BLOCKS_EXTENSIONS_OF_TWO_FLATS: usize = ATTACK_STRONG_FLATSTONE + 1;
+const BLOCKING_STONE_BLOCKS_EXTENSIONS_OF_TWO_FLATS: usize = ATTACK_STRONG_FLATS + 1;
 
 const STACK_MOVEMENT_THAT_GIVES_US_TOP_PIECES: usize =
     BLOCKING_STONE_BLOCKS_EXTENSIONS_OF_TWO_FLATS + 1;
@@ -99,11 +99,9 @@ pub(crate) fn coefficients_for_move_colortr<Us: ColorTr, Them: ColorTr>(
 
             // Apply PSQT
             match role {
-                Flat => coefficients[FLAT_STONE_PSQT + SQUARE_SYMMETRIES[square.0 as usize]] = 1.0,
-                Standing => {
-                    coefficients[STANDING_STONE_PSQT + SQUARE_SYMMETRIES[square.0 as usize]] = 1.0
-                }
-                Cap => coefficients[CAPSTONE_PSQT + SQUARE_SYMMETRIES[square.0 as usize]] = 1.0,
+                Flat => coefficients[FLAT_PSQT + SQUARE_SYMMETRIES[square.0 as usize]] = 1.0,
+                Wall => coefficients[WALL_PSQT + SQUARE_SYMMETRIES[square.0 as usize]] = 1.0,
+                Cap => coefficients[CAP_PSQT + SQUARE_SYMMETRIES[square.0 as usize]] = 1.0,
             }
 
             if *role == Flat {
@@ -117,7 +115,7 @@ pub(crate) fn coefficients_for_move_colortr<Us: ColorTr, Them: ColorTr>(
                 let n_high = u8::max(road_stones_in_file, road_stones_in_rank);
                 let i = (11 * n_low - n_low * n_low) / 2 + n_high - n_low;
                 debug_assert!(i < 15);
-                coefficients[ROAD_STONES_IN_RANK_FILE + i as usize] += 1.0;
+                coefficients[ROAD_STONES_IN_LINE + i as usize] += 1.0;
             }
 
             // If square is next to a group
@@ -142,7 +140,7 @@ pub(crate) fn coefficients_for_move_colortr<Us: ColorTr, Them: ColorTr>(
 
             let role_id = match *role {
                 Flat => 0,
-                Standing => 1,
+                Wall => 1,
                 Cap => 2,
             };
 
@@ -205,14 +203,14 @@ pub(crate) fn coefficients_for_move_colortr<Us: ColorTr, Them: ColorTr>(
                             Us::road_stones(group_data).rank(neighbour.rank()).count()
                                 + Us::road_stones(group_data).file(neighbour.file()).count();
                         if our_road_stones >= 2 {
-                            coefficients[ATTACK_STRONG_FLATSTONE] += (our_road_stones - 1) as f32;
+                            coefficients[ATTACK_STRONG_FLATS] += (our_road_stones - 1) as f32;
                         }
                     }
                 }
             }
 
-            if *role == Standing {
-                coefficients[STANDING_STONE_PSQT + SQUARE_SYMMETRIES[square.0 as usize]] = 1.0;
+            if *role == Wall {
+                coefficients[WALL_PSQT + SQUARE_SYMMETRIES[square.0 as usize]] = 1.0;
 
                 if !their_open_critical_squares.is_empty() {
                     if their_open_critical_squares == BitBoard::empty().set(square.0) {
@@ -232,7 +230,7 @@ pub(crate) fn coefficients_for_move_colortr<Us: ColorTr, Them: ColorTr>(
                     }
                 }
             }
-            if *role == Standing || *role == Cap {
+            if *role == Wall || *role == Cap {
                 // If square has two or more opponent flatstones around it
                 for direction in square.directions() {
                     let neighbour = square.go_direction(direction).unwrap();

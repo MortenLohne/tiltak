@@ -472,7 +472,7 @@ pub fn parse_move(input: &str) -> board::Move {
         let square = board::Square::parse_square(&words[1].to_lowercase());
         let role = match words.get(2) {
             Some(&"C") => Role::Cap,
-            Some(&"W") => Role::Standing,
+            Some(&"W") => Role::Wall,
             None => Role::Flat,
             Some(s) => panic!("Unknown role {} for move {}", s, input),
         };
@@ -532,7 +532,7 @@ pub fn write_move(mv: board::Move, w: &mut String) {
         board::Move::Place(role, square) => {
             let role_string = match role {
                 Role::Flat => "",
-                Role::Standing => " W",
+                Role::Wall => " W",
                 Role::Cap => " C",
             };
             let square_string = square.to_string().to_uppercase();

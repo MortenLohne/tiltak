@@ -1,4 +1,4 @@
-use crate::board::Piece::{BlackCap, BlackFlat, WhiteFlat, WhiteStanding};
+use crate::board::Piece::{BlackCap, BlackFlat, WhiteFlat, WhiteWall};
 use crate::board::{
     squares_iterator, Board, Direction::*, GroupEdgeConnection, Move, Piece, Role, Square,
     BOARD_SIZE,
@@ -36,13 +36,13 @@ fn go_in_directions_test() {
 
 #[test]
 fn get_set_test() {
-    let pieces = vec![WhiteFlat, BlackFlat, BlackFlat, WhiteStanding];
+    let pieces = vec![WhiteFlat, BlackFlat, BlackFlat, WhiteWall];
     let mut board = Board::default();
     for &piece in pieces.iter() {
         board[Square(12)].push(piece);
     }
     assert_eq!(board[Square(12)].len(), 4);
-    assert_eq!(board[Square(12)].top_stone(), Some(WhiteStanding));
+    assert_eq!(board[Square(12)].top_stone(), Some(WhiteWall));
 
     for (i, &piece) in pieces.iter().enumerate() {
         assert_eq!(
@@ -76,7 +76,7 @@ fn get_set_test() {
 #[test]
 fn flatten_stack_test() {
     let mut stack = board::Stack::default();
-    stack.push(WhiteStanding);
+    stack.push(WhiteWall);
     stack.push(BlackCap);
     assert_eq!(stack.get(0), Some(WhiteFlat));
     assert_eq!(stack.pop(), Some(BlackCap));
@@ -330,7 +330,7 @@ fn double_road_wins_test() {
 }
 
 // Black is behind by one point, with one stone left to place
-// Check that placing it standing is suicide, but placing it flat is not
+// Check that placing it as a wall is suicide, but placing it flat is not
 #[test]
 fn suicide_into_points_loss_test() {
     let mut board = Board::start_board();
@@ -349,10 +349,10 @@ fn suicide_into_points_loss_test() {
     for mv in moves.iter() {
         let reverse_move = board.do_move(mv.clone());
         match mv {
-            Move::Place(Role::Standing, _) => assert_eq!(
+            Move::Place(Role::Wall, _) => assert_eq!(
                 board.game_result(),
                 Some(GameResult::WhiteWin),
-                "Placing a standing stone is suicide"
+                "Placing a wall is suicide"
             ),
             Move::Place(Role::Flat, _) => assert_eq!(
                 board.game_result(),
@@ -366,7 +366,7 @@ fn suicide_into_points_loss_test() {
 
     assert!(moves
         .iter()
-        .any(|mv| matches!(mv, Move::Place(Role::Standing, _))));
+        .any(|mv| matches!(mv, Move::Place(Role::Wall, _))));
     assert!(moves
         .iter()
         .any(|mv| matches!(mv, Move::Place(Role::Flat, _))));
