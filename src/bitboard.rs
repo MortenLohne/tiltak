@@ -69,6 +69,13 @@ impl BitBoard {
         result
     }
 
+    pub fn lines_for_square(square: Square) -> [Self; 2] {
+        [
+            Self::full().rank(square.rank()),
+            Self::full().file(square.file()),
+        ]
+    }
+
     #[inline]
     pub fn lower_n_bits(n: u8) -> Self {
         if n >= 64 {

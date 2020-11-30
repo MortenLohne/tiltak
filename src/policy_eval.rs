@@ -1,6 +1,8 @@
 use crate::bitboard::BitBoard;
 use crate::board::Role::{Cap, Flat, Wall};
-use crate::board::{Board, ColorTr, GroupData, Move, Square, TunableBoard, SQUARE_SYMMETRIES};
+use crate::board::{
+    Board, ColorTr, GroupData, Move, Square, TunableBoard, BOARD_SIZE, SQUARE_SYMMETRIES,
+};
 use crate::search;
 use arrayvec::ArrayVec;
 
@@ -17,8 +19,9 @@ const MOVE_COUNT: usize = 0;
 const FLAT_PSQT: usize = MOVE_COUNT + 1;
 const WALL_PSQT: usize = FLAT_PSQT + 6;
 const CAP_PSQT: usize = WALL_PSQT + 6;
-const ROAD_STONES_IN_LINE: usize = CAP_PSQT + 6;
-const EXTEND_GROUP: usize = ROAD_STONES_IN_LINE + 15;
+const OUR_ROAD_STONES_IN_LINE: usize = CAP_PSQT + 6;
+const THEIR_ROAD_STONES_IN_LINE: usize = OUR_ROAD_STONES_IN_LINE + 15;
+const EXTEND_GROUP: usize = THEIR_ROAD_STONES_IN_LINE + 15;
 const MERGE_TWO_GROUPS: usize = EXTEND_GROUP + 3;
 const BLOCK_MERGER: usize = MERGE_TWO_GROUPS + 3;
 const PLACE_CRITICAL_SQUARE: usize = BLOCK_MERGER + 3;
@@ -104,18 +107,21 @@ pub(crate) fn coefficients_for_move_colortr<Us: ColorTr, Them: ColorTr>(
                 Cap => coefficients[CAP_PSQT + SQUARE_SYMMETRIES[square.0 as usize]] = 1.0,
             }
 
-            if *role == Flat {
-                // Bonus for laying stones in files/ranks where we already have road stones
-                // Implemented as a 2D table. Because of symmetries,
-                // only 15 squares are needed, not all 25
-                let road_stones_in_rank = Us::road_stones(&group_data).rank(square.rank()).count();
-                let road_stones_in_file = Us::road_stones(&group_data).file(square.file()).count();
+            let role_id = match *role {
+                Flat => 0,
+                Wall => 1,
+                Cap => 2,
+            };
 
-                let n_low = u8::min(road_stones_in_file, road_stones_in_rank);
-                let n_high = u8::max(road_stones_in_file, road_stones_in_rank);
-                let i = (11 * n_low - n_low * n_low) / 2 + n_high - n_low;
-                debug_assert!(i < 15);
-                coefficients[ROAD_STONES_IN_LINE + i as usize] += 1.0;
+            for &line in BitBoard::lines_for_square(*square).iter() {
+                let our_line_score = (Us::road_stones(&group_data) & line).count();
+                let their_line_score = (Them::road_stones(&group_data) & line).count();
+                coefficients
+                    [OUR_ROAD_STONES_IN_LINE + BOARD_SIZE * role_id + our_line_score as usize] +=
+                    1.0;
+                coefficients[THEIR_ROAD_STONES_IN_LINE
+                    + BOARD_SIZE * role_id
+                    + their_line_score as usize] += 1.0;
             }
 
             // If square is next to a group
@@ -137,12 +143,6 @@ pub(crate) fn coefficients_for_move_colortr<Us: ColorTr, Them: ColorTr>(
                     their_unique_neighbour_groups.push((neighbour, neighbour_group_id));
                 }
             }
-
-            let role_id = match *role {
-                Flat => 0,
-                Wall => 1,
-                Cap => 2,
-            };
 
             if our_unique_neighbour_groups.len() > 1 {
                 coefficients[MERGE_TWO_GROUPS + role_id] += 1.0;
