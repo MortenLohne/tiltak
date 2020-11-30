@@ -12,7 +12,8 @@ use crate::board::Direction::*;
 use crate::board::Piece::*;
 use crate::board::Role::Flat;
 use crate::board::Role::*;
-use crate::search;
+use crate::policy_eval::sigmoid;
+use crate::{policy_eval, search};
 use arrayvec::ArrayVec;
 use board_game_traits::board;
 use board_game_traits::board::GameResult::{BlackWin, Draw, WhiteWin};
@@ -28,7 +29,6 @@ use std::iter::FromIterator;
 use std::mem;
 use std::ops::{Index, IndexMut};
 use std::{fmt, iter, ops};
-use crate::policy_eval::sigmoid;
 
 /// Extra items for tuning evaluation constants.
 pub trait TunableBoard: BoardTrait {
@@ -1872,13 +1872,15 @@ impl TunableBoard for Board {
         num_legal_moves: usize,
     ) {
         match self.side_to_move() {
-            Color::White => self.coefficients_for_move_colortr::<WhiteTr, BlackTr>(
+            Color::White => policy_eval::coefficients_for_move_colortr::<WhiteTr, BlackTr>(
+                &self,
                 coefficients,
                 mv,
                 group_data,
                 num_legal_moves,
             ),
-            Color::Black => self.coefficients_for_move_colortr::<BlackTr, WhiteTr>(
+            Color::Black => policy_eval::coefficients_for_move_colortr::<BlackTr, WhiteTr>(
+                &self,
                 coefficients,
                 mv,
                 group_data,

@@ -1,8 +1,8 @@
+use crate::board;
 use crate::board::Role::*;
 use crate::board::{
     Board, ColorTr, Direction, Move, Movement, Piece, Square, StackMovement, BOARD_SIZE,
 };
-use crate::{board};
 use arrayvec::ArrayVec;
 
 impl Board {
