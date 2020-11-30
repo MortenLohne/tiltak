@@ -157,7 +157,7 @@ pub(crate) fn coefficients_for_move_colortr<Us: ColorTr, Them: ColorTr>(
                     group_data.amount_in_group[group_id as usize].0 as f32;
             }
 
-            if *role == Flat {
+            if *role == Flat || *role == Cap {
                 if Us::is_critical_square(&*group_data, *square) {
                     coefficients[PLACE_CRITICAL_SQUARE] += 1.0;
                 } else if !their_open_critical_squares.is_empty() {
