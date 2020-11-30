@@ -52,6 +52,7 @@ fn find_win_in_two() {
 
 #[test]
 fn find_win_in_two2() {
+    // a1 a5 b5 Cc3 c5 d5 Cd4 c4 e5 1c4+1 1d4+1 c4 1d5<1 1d5>1 d5 e4 2c5>11 1d5<1 2e5<11 2d5>2
     let move_strings = [
         "a1", "a5", "b5", "Cc3", "c5", "d5", "Cd4", "c4", "e5", "1c4+1", "1d4+1", "c4", "1d5<1",
         "1d5>1", "d5", "e4", "2c5>11", "1d5<1", "2e5<11", "2d5>2",
@@ -80,6 +81,7 @@ fn find_win_in_two3() {
 
 #[test]
 fn find_win_in_three() {
+    // e1 e5 Cc3 c1 d1 d2 a3 b1 b3 d2- a1 a2 a1> Cb2 Sc2 a1 2b1> b2+ b5 b1 c4 d2 c5
     let move_strings = [
         "e1", "e5", "Cc3", "c1", "d1", "d2", "a3", "b1", "b3", "d2-", "a1", "a2", "a1>", "Cb2",
         "Sc2", "a1", "2b1>", "b2+", "b5", "b1", "c4", "d2", "c5",
