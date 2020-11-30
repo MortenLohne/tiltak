@@ -12,7 +12,6 @@ use crate::board::Direction::*;
 use crate::board::Piece::*;
 use crate::board::Role::Flat;
 use crate::board::Role::*;
-use crate::move_gen::sigmoid;
 use crate::search;
 use arrayvec::ArrayVec;
 use board_game_traits::board;
@@ -29,6 +28,7 @@ use std::iter::FromIterator;
 use std::mem;
 use std::ops::{Index, IndexMut};
 use std::{fmt, iter, ops};
+use crate::policy_eval::sigmoid;
 
 /// Extra items for tuning evaluation constants.
 pub trait TunableBoard: BoardTrait {
