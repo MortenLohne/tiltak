@@ -38,7 +38,9 @@ const BLOCKING_STONE_BLOCKS_EXTENSIONS_OF_TWO_FLATS: usize = ATTACK_STRONG_FLATS
 const STACK_MOVEMENT_THAT_GIVES_US_TOP_PIECES: usize =
     BLOCKING_STONE_BLOCKS_EXTENSIONS_OF_TWO_FLATS + 1;
 const STACK_CAPTURED_BY_MOVEMENT: usize = STACK_MOVEMENT_THAT_GIVES_US_TOP_PIECES + 6;
-const MOVE_CAP_ONTO_STRONG_LINE: usize = STACK_CAPTURED_BY_MOVEMENT + 1;
+const STACK_CAPTURE_IN_STRONG_LINE: usize = STACK_CAPTURED_BY_MOVEMENT + 1;
+const STACK_CAPTURE_IN_STRONG_LINE_CAP: usize = STACK_CAPTURE_IN_STRONG_LINE + 2;
+const MOVE_CAP_ONTO_STRONG_LINE: usize = STACK_CAPTURE_IN_STRONG_LINE_CAP + 2;
 const MOVE_ONTO_CRITICAL_SQUARE: usize = MOVE_CAP_ONTO_STRONG_LINE + 4;
 const _NEXT_CONST: usize = MOVE_ONTO_CRITICAL_SQUARE + 2;
 
@@ -312,6 +314,20 @@ pub(crate) fn coefficients_for_move_colortr<Us: ColorTr, Them: ColorTr>(
                         } else {
                             coefficients[STACK_CAPTURED_BY_MOVEMENT] -=
                                 destination_stack.len() as f32;
+                        }
+                    }
+                    for &line in BitBoard::lines_for_square(destination_square).iter() {
+                        let our_road_stones = (line & Us::road_stones(group_data)).count() as usize;
+                        let color_factor = if Us::piece_is_ours(piece) { 1.0 } else { -1.0 };
+                        if our_road_stones > 2 {
+                            if piece.role() == Cap {
+                                coefficients
+                                    [STACK_CAPTURE_IN_STRONG_LINE_CAP + our_road_stones - 3] +=
+                                    color_factor * destination_stack.len() as f32;
+                            } else {
+                                coefficients[STACK_CAPTURE_IN_STRONG_LINE + our_road_stones - 3] +=
+                                    color_factor * destination_stack.len() as f32;
+                            }
                         }
                     }
                 }
