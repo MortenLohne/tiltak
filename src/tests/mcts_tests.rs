@@ -4,6 +4,14 @@ use crate::tests::do_moves_and_check_validity;
 use board_game_traits::board::Board as BoardTrait;
 use pgn_traits::pgn::PgnBoard;
 use std::time;
+use std::time::Duration;
+
+#[test]
+fn play_on_low_time() {
+    let time = Duration::from_millis(5);
+    let board = Board::default();
+    search::play_move_time(board, time);
+}
 
 #[test]
 fn win_in_two_moves_test() {

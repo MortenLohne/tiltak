@@ -206,7 +206,8 @@ pub fn play_move_time(board: Board, max_time: time::Duration) -> (Move, Score) {
 
         let (best_move, best_score) = tree.best_move();
 
-        if start_time.elapsed() > max_time - time::Duration::from_millis(50)
+        if max_time < (time::Duration::from_millis(10))
+            || start_time.elapsed() > max_time - (time::Duration::from_millis(10))
             || tree.children().len() == 1
         {
             return tree.best_move();
