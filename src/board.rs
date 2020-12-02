@@ -12,7 +12,6 @@ use crate::board::Direction::*;
 use crate::board::Piece::*;
 use crate::board::Role::Flat;
 use crate::board::Role::*;
-use crate::policy_eval::sigmoid;
 use crate::{policy_eval, search};
 use arrayvec::ArrayVec;
 use board_game_traits::board;
@@ -52,14 +51,6 @@ pub trait TunableBoard: BoardTrait {
         simple_moves: &mut Vec<<Self as BoardTrait>::Move>,
         moves: &mut Vec<(<Self as BoardTrait>::Move, search::Score)>,
     );
-
-    fn probability_for_move(
-        &self,
-        params: &[f32],
-        mv: &Self::Move,
-        data: &Self::ExtraData,
-        num_moves: usize,
-    ) -> f32;
 
     fn coefficients_for_move(
         &self,
@@ -1857,20 +1848,6 @@ impl TunableBoard for Board {
                 moves,
             ),
         }
-    }
-
-    fn probability_for_move(
-        &self,
-        params: &[f32],
-        mv: &Move,
-        group_data: &GroupData,
-        num_moves: usize,
-    ) -> f32 {
-        let mut coefficients = vec![0.0; Self::POLICY_PARAMS.len()];
-        self.coefficients_for_move(&mut coefficients, mv, group_data, num_moves);
-        let total_value: f32 = coefficients.iter().zip(params).map(|(c, p)| c * p).sum();
-
-        sigmoid(total_value)
     }
 
     fn coefficients_for_move(
