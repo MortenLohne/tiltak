@@ -37,10 +37,9 @@ pub fn play_game(
             }
         };
 
-        // For the first regular move (White's move #2),
-        // choose a random flatstone move 50% of the time
+        // For the first regular move (White's move #2), choose a random flatstone move
         // This reduces white's first move advantage, and prevents white from always playing 2.Cc3
-        let best_move = if board.half_moves_played() == 2 && rng.gen() {
+        let best_move = if board.half_moves_played() == 2 {
             let flat_moves = moves_scores
                 .iter()
                 .map(|(mv, _)| mv)
