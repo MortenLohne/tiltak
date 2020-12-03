@@ -168,9 +168,11 @@ impl Tree {
     ) {
         board.generate_moves_with_params(policy_params, group_data, simple_moves, moves);
         self.children.reserve_exact(moves.len());
+        let policy_sum: f32 = moves.iter().map(|(_, score)| *score).sum();
+        let inv_sum = 1.0 / policy_sum;
         for (mv, heuristic_score) in moves.drain(..) {
             self.children
-                .push(TreeEdge::new(mv.clone(), heuristic_score));
+                .push(TreeEdge::new(mv.clone(), heuristic_score * inv_sum));
         }
     }
 
