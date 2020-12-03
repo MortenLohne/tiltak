@@ -30,7 +30,13 @@ fn main() {
                     .value_name("move_scores.txt"))
         )
         .subcommand(SubCommand::with_name("spsa")
-            .about("Tune exploration parameters using SPSA. Starting values are hard-coded."));
+            .about("Tune exploration parameters using SPSA. Starting values are hard-coded.")
+            .arg(Arg::with_name("book")
+                .takes_value(true)
+                .long("book")
+                .help("Opening book for the games.")
+                .value_name("book.txt")
+            ));
 
     let matches = app.get_matches();
     match matches.subcommand() {
@@ -71,7 +77,7 @@ fn main() {
             println!("Value: {:?}", value_params);
             println!("Policy: {:?}", policy_params);
         }
-        ("spsa", _) => {
+        ("spsa", Some(arg)) => {
             let mut variables = vec![
                 spsa::Variable {
                     value: 0.57,
@@ -84,7 +90,7 @@ fn main() {
                     apply_factor: 0.002,
                 },
             ];
-            spsa::tune(&mut variables);
+            spsa::tune(&mut variables, arg.value_of("book"));
         }
         ("", None) => {
             println!("Error: No subcommand selected. Try the 'help' subcommand for a list.");

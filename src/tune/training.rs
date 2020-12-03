@@ -199,7 +199,7 @@ fn play_game_pair(
         .add_policy_params(last_policy_params.to_vec())
         .add_dirichlet(0.2);
     if i % 2 == 0 {
-        let game = play_game(&settings, &last_settings);
+        let game = play_game(&settings, &last_settings, &[], 1.0);
         match game.0.game_result {
             Some(GameResult::WhiteWin) => {
                 current_params_wins.fetch_add(1, Ordering::Relaxed);
@@ -211,7 +211,7 @@ fn play_game_pair(
         };
         game
     } else {
-        let game = play_game(&last_settings, &settings);
+        let game = play_game(&last_settings, &settings, &[], 1.0);
         match game.0.game_result {
             Some(GameResult::BlackWin) => {
                 current_params_wins.fetch_add(1, Ordering::Relaxed);

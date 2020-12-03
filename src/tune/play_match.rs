@@ -13,13 +13,17 @@ use std::sync::atomic::{AtomicU64, Ordering};
 pub fn play_game(
     white_settings: &MctsSetting,
     black_settings: &MctsSetting,
+    opening: &[Move],
+    temperature: f64,
 ) -> (Game<Board>, Vec<Vec<(Move, Score)>>) {
     const MCTS_NODES: u64 = 100_000;
-    const TEMPERATURE: f64 = 1.0;
 
     let mut board = Board::start_board();
-    let mut game_moves = vec![];
-    let mut move_scores = vec![];
+    let mut game_moves = opening.to_vec();
+    let mut move_scores = vec![vec![]; opening.len()];
+    for mv in opening {
+        board.do_move(mv.clone());
+    }
     let mut rng = rand::thread_rng();
 
     while board.game_result().is_none() {
@@ -49,7 +53,7 @@ pub fn play_game(
         }
         // Turn off temperature in the middle-game, when all games are expected to be unique
         else if board.half_moves_played() < 20 {
-            best_move(TEMPERATURE, &moves_scores[..])
+            best_move(temperature, &moves_scores[..])
         } else {
             best_move(0.1, &moves_scores[..])
         };
