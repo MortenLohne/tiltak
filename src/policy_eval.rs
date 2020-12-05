@@ -32,11 +32,10 @@ const NEXT_TO_THEIR_LAST_STONE: usize = NEXT_TO_OUR_LAST_STONE + 1;
 const DIAGONAL_TO_OUR_LAST_STONE: usize = NEXT_TO_THEIR_LAST_STONE + 1;
 const DIAGONAL_TO_THEIR_LAST_STONE: usize = DIAGONAL_TO_OUR_LAST_STONE + 1;
 const ATTACK_STRONG_FLATS: usize = DIAGONAL_TO_THEIR_LAST_STONE + 1;
-
 const BLOCKING_STONE_BLOCKS_EXTENSIONS_OF_TWO_FLATS: usize = ATTACK_STRONG_FLATS + 1;
 
-const STACK_MOVEMENT_THAT_GIVES_US_TOP_PIECES: usize =
-    BLOCKING_STONE_BLOCKS_EXTENSIONS_OF_TWO_FLATS + 1;
+const MOVE_ROLE_BONUS: usize = BLOCKING_STONE_BLOCKS_EXTENSIONS_OF_TWO_FLATS + 1;
+const STACK_MOVEMENT_THAT_GIVES_US_TOP_PIECES: usize = MOVE_ROLE_BONUS + 3;
 const STACK_CAPTURED_BY_MOVEMENT: usize = STACK_MOVEMENT_THAT_GIVES_US_TOP_PIECES + 6;
 const STACK_CAPTURE_IN_STRONG_LINE: usize = STACK_CAPTURED_BY_MOVEMENT + 1;
 const STACK_CAPTURE_IN_STRONG_LINE_CAP: usize = STACK_CAPTURE_IN_STRONG_LINE + 2;
@@ -255,6 +254,14 @@ pub(crate) fn coefficients_for_move_colortr<Us: ColorTr, Them: ColorTr>(
         }
 
         Move::Move(square, direction, stack_movement) => {
+            let role_id = match board[*square].top_stone().unwrap().role() {
+                Flat => 0,
+                Wall => 1,
+                Cap => 2,
+            };
+
+            coefficients[MOVE_ROLE_BONUS + role_id] += 1.0;
+
             let mut destination_square =
                 if stack_movement.movements[0].pieces_to_take == board[*square].len() {
                     square.go_direction(*direction).unwrap()
