@@ -45,3 +45,4 @@ pub use search::mcts;
 pub mod pgn_parser;
 pub mod pgn_writer;
 mod policy_eval;
+mod value_eval;
