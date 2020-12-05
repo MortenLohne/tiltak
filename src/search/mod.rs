@@ -24,7 +24,7 @@ impl Default for MctsSetting {
         MctsSetting {
             value_params: Vec::from(Board::VALUE_PARAMS),
             policy_params: Vec::from(Board::POLICY_PARAMS),
-            search_params: vec![0.57, 10000.0],
+            search_params: vec![1.2, 3500.0],
             #[cfg(feature = "constant-tuning")]
             dirichlet: None,
         }
