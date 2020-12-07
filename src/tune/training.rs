@@ -131,18 +131,27 @@ pub fn train_perpetually(
             games.len(), all_games.len(), game_stats.white_wins, game_stats.draws, game_stats.black_wins, game_stats.aborted, wins, losses, draws
         );
 
+        // Only take the most recent half of the games, to avoid training on bad, old games
+        let max_training_games = all_games.len() / 2;
+
         let games_in_training_batch = all_games
             .iter()
             .cloned()
             .rev()
-            .take(BATCH_SIZE * BATCHES_FOR_TRAINING)
+            .take(usize::min(
+                max_training_games,
+                BATCH_SIZE * BATCHES_FOR_TRAINING,
+            ))
             .collect::<Vec<_>>();
 
         let move_scores_in_training_batch = all_move_scores
             .iter()
             .cloned()
             .rev()
-            .take(BATCH_SIZE * BATCHES_FOR_TRAINING)
+            .take(usize::min(
+                max_training_games,
+                BATCH_SIZE * BATCHES_FOR_TRAINING,
+            ))
             .collect::<Vec<_>>();
 
         let value_tuning_start_time = time::Instant::now();
