@@ -76,17 +76,21 @@ pub fn main() -> Result<()> {
 
     if let Some(log_file) = matches.value_of("logfile") {
         log_dispatcher
-            .chain(fern::log_file(log_file)?)
             .chain(
                 fern::Dispatch::new()
-                    .level(log::LevelFilter::Info)
+                    .level(log::LevelFilter::Debug)
+                    .chain(fern::log_file(log_file)?),
+            )
+            .chain(
+                fern::Dispatch::new()
+                    .level(log::LevelFilter::Warn)
                     .chain(io::stderr()),
             )
             .apply()
             .unwrap()
     } else {
         log_dispatcher
-            .level(log::LevelFilter::Info)
+            .level(log::LevelFilter::Warn)
             .chain(io::stderr())
             .apply()
             .unwrap()
