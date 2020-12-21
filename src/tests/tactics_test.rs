@@ -80,6 +80,38 @@ fn find_win_in_two3() {
 }
 
 #[test]
+fn find_capstone_spread_win_in_two() {
+    // b4 a5 e5 b5 b3 Cc3 Cc5 d5 d4 d3 b3+ a4 2b4+ a4+ a4 b4 d4+ b4< b4 a3 b3 a2 3b5< 2a4+ Sa4 b2 e3 e2 a4+ d2 5a5-122 3a5-21 3a2+ c2 5a3- c3< 5a2>113 2a4- a5 Sb5 d4 c3 e3< c3> 4d2< e3 Sc3 3d3+12 c5> e4 5d5> c4 5e5-212 2d4> e3+ e1
+    let move_strings = [
+        "b4", "a5", "e5", "b5", "b3", "Cc3", "Cc5", "d5", "d4", "d3", "b3+", "a4", "2b4+", "a4+",
+        "a4", "b4", "d4+", "b4<", "b4", "a3", "b3", "a2", "3b5<", "2a4+", "Sa4", "b2", "e3", "e2",
+        "a4+", "d2", "5a5-122", "3a5-21", "3a2+", "c2", "5a3-", "c3<", "5a2>113", "2a4-", "a5",
+        "Sb5", "d4", "c3", "e3<", "c3>", "4d2<", "e3", "Sc3", "3d3+12", "c5>", "e4", "5d5>", "c4",
+        "5e5-212", "2d4>", "e3+", "e1",
+    ];
+
+    let mut board = Board::start_board();
+
+    do_moves_and_check_validity(&mut board, &move_strings);
+
+    plays_correct_hard_move_property(&move_strings, &["2e2+11"]);
+}
+
+#[test]
+fn capture_stack_in_strong_file() {
+    // b5 a5 e1 b3 Cc3 b4 b2 c5 a4 d5 c4 e5 a3 b3< a5>
+    let move_strings = [
+        "b5", "a5", "e1", "b3", "Cc3", "b4", "b2", "c5", "a4", "d5", "c4", "e5", "a3", "b3<", "a5>",
+    ];
+
+    let mut board = Board::start_board();
+
+    do_moves_and_check_validity(&mut board, &move_strings);
+
+    plays_correct_hard_move_property(&move_strings, &["b4+"]);
+}
+
+#[test]
 fn find_win_in_three() {
     // e1 e5 Cc3 c1 d1 d2 a3 b1 b3 d2- a1 a2 a1> Cb2 Sc2 a1 2b1> b2+ b5 b1 c4 d2 c5
     let move_strings = [
