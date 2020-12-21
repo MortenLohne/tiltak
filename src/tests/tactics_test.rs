@@ -112,6 +112,24 @@ fn capture_stack_in_strong_file() {
 }
 
 #[test]
+fn spread_stack_for_tinue() {
+    // c3 a5 e1 b3 Cc2 d4 a4 a3 b4 d3 c2+ d2 c4 d5 2c3> Cc3 c2 e4 b2 c5 3d3+ d3 4d4- d4 5d3+ d3 b4- c3< e3 c3 e3< b4 b5 e3 2d3> d3 3e3< d2+ Se3 d2 e3< e3 2d3< e3< 3c3> c3 a2 2b3- a4> b3+ c4< b3 4d3< b3+ b5- d2+ 5c3> 3b2+ c1 a3- d1 3b3>21
+    let move_strings = [
+        "c3", "a5", "e1", "b3", "Cc2", "d4", "a4", "a3", "b4", "d3", "c2+", "d2", "c4", "d5",
+        "2c3>", "Cc3", "c2", "e4", "b2", "c5", "3d3+", "d3", "4d4-", "d4", "5d3+", "d3", "b4-",
+        "c3<", "e3", "c3", "e3<", "b4", "b5", "e3", "2d3>", "d3", "3e3<", "d2+", "Se3", "d2",
+        "e3<", "e3", "2d3<", "e3<", "3c3>", "c3", "a2", "2b3-", "a4>", "b3+", "c4<", "b3", "4d3<",
+        "b3+", "b5-", "d2+", "5c3>", "3b2+", "c1", "a3-", "d1", "3b3>21",
+    ];
+
+    let mut board = Board::start_board();
+
+    do_moves_and_check_validity(&mut board, &move_strings);
+
+    plays_correct_hard_move_property(&move_strings, &["4b4-211"]);
+}
+
+#[test]
 fn find_win_in_three() {
     // e1 e5 Cc3 c1 d1 d2 a3 b1 b3 d2- a1 a2 a1> Cb2 Sc2 a1 2b1> b2+ b5 b1 c4 d2 c5
     let move_strings = [
