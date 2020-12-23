@@ -181,6 +181,14 @@ fn play_random_games_test() {
         let mut board = board_mod::Board::default();
         let mut moves = vec![];
         for i in 0.. {
+            let hash_from_scratch = board.zobrist_hash_from_scratch();
+            assert_eq!(
+                hash_from_scratch,
+                board.zobrist_hash(),
+                "Hash mismatch for board:\n{:?}\nMoves: {:?}",
+                board,
+                board.moves()
+            );
             assert_eq!(board, board.flip_colors().flip_colors());
 
             let group_data = board.group_data();
@@ -208,6 +216,8 @@ fn play_random_games_test() {
                 .clone();
             assert_eq!(mv, board.move_from_san(&board.move_to_san(&mv)).unwrap());
             board.do_move(mv);
+
+            assert_ne!(hash_from_scratch, board.zobrist_hash_from_scratch());
 
             let result = board.game_result();
             for rotation in board.symmetries_with_swapped_colors() {
@@ -548,4 +558,20 @@ fn static_eval_after_move_test() {
     let mut board = Board::start_board();
     minmax(&mut board, 1);
     board.static_eval();
+}
+
+#[test]
+fn repetitions_are_draws_test() {
+    let mut board = Board::start_board();
+    do_moves_and_check_validity(&mut board, &["a1", "e5"]);
+
+    let cycle_move_strings = ["e5-", "a1+", "e4+", "a2-"];
+    do_moves_and_check_validity(&mut board, &cycle_move_strings);
+    assert_eq!(board.game_result(), None);
+
+    do_moves_and_check_validity(&mut board, &cycle_move_strings);
+    assert_eq!(board.game_result(), Some(GameResult::Draw));
+
+    do_moves_and_check_validity(&mut board, &["e4"]);
+    assert_eq!(board.game_result(), None);
 }

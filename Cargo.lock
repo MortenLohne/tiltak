@@ -1811,6 +1811,7 @@ dependencies = [
  "clap",
  "fern",
  "lambda_runtime",
+ "lazy_static",
  "log",
  "nom",
  "pgn-traits",

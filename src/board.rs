@@ -1,10 +1,17 @@
 //! Tak move generation, along with all required data types.
 
+use lazy_static::lazy_static;
+
+lazy_static! {
+    pub(crate) static ref ZOBRIST_KEYS: Box<ZobristKeys> = ZobristKeys::new();
+}
+
 /// The size of the board. Only 5 works correctly for now.
 pub const BOARD_SIZE: usize = 5;
 
 pub const BOARD_AREA: usize = BOARD_SIZE * BOARD_SIZE;
 
+pub const STARTING_STONES: u8 = 21;
 pub const STARTING_CAPSTONES: u8 = 1;
 
 use crate::bitboard::BitBoard;
@@ -19,6 +26,7 @@ use board_game_traits::board::GameResult::{BlackWin, Draw, WhiteWin};
 use board_game_traits::board::{Board as BoardTrait, EvalBoard as EvalBoardTrait};
 use board_game_traits::board::{Color, GameResult};
 use pgn_traits::pgn;
+use rand::{Rng, SeedableRng};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
@@ -357,12 +365,12 @@ pub enum Role {
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Hash)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum Piece {
-    WhiteFlat,
-    BlackFlat,
-    WhiteWall,
-    BlackWall,
-    WhiteCap,
-    BlackCap,
+    WhiteFlat = 0,
+    BlackFlat = 1,
+    WhiteWall = 2,
+    BlackWall = 3,
+    WhiteCap = 4,
+    BlackCap = 5,
 }
 
 impl Piece {
@@ -781,6 +789,26 @@ impl GroupData {
         }
     }
 }
+#[derive(PartialEq, Eq, Debug)]
+pub struct ZobristKeys {
+    top_stones: AbstractBoard<[u64; 6]>,
+    stones_in_stack: [AbstractBoard<[u64; 256]>; 8],
+    to_move: [u64; 2],
+}
+
+impl ZobristKeys {
+    pub(crate) fn new() -> Box<Self> {
+        let mut rng = rand::rngs::StdRng::from_seed([0; 32]);
+        let mut random_vec: Vec<u64> = vec![0; mem::size_of::<ZobristKeys>() / 8];
+        for word in random_vec.iter_mut() {
+            *word = rng.gen();
+        }
+        let zobrist = unsafe { mem::transmute(Box::from_raw(random_vec.as_mut_ptr())) };
+
+        mem::forget(random_vec);
+        zobrist
+    }
+}
 
 /// Complete representation of a Tak position
 #[derive(Clone)]
@@ -795,6 +823,8 @@ pub struct Board {
     black_caps_left: u8,
     moves_played: u16,
     moves: Vec<Move>,
+    hash: u64,              // Zobrist hash of current position
+    hash_history: Vec<u64>, // Zobrist hashes of previous board states, up to the last irreversible move. Does not include the corrent position
 }
 
 impl PartialEq for Board {
@@ -806,6 +836,7 @@ impl PartialEq for Board {
             && self.white_caps_left == other.white_caps_left
             && self.black_caps_left == other.black_caps_left
             && self.moves_played == other.moves_played
+            && self.hash == other.hash
     }
 }
 
@@ -842,12 +873,14 @@ impl Default for Board {
         Board {
             cells: Default::default(),
             to_move: Color::White,
-            white_stones_left: 21,
-            black_stones_left: 21,
+            white_stones_left: STARTING_STONES,
+            black_stones_left: STARTING_STONES,
             white_caps_left: STARTING_CAPSTONES,
             black_caps_left: STARTING_CAPSTONES,
             moves_played: 0,
             moves: vec![],
+            hash: ZOBRIST_KEYS.to_move[Color::White as u16 as usize],
+            hash_history: vec![],
         }
     }
 }
@@ -884,11 +917,21 @@ impl fmt::Debug for Board {
             self.white_caps_left, self.black_caps_left
         )?;
         writeln!(f, "{} to move.", self.side_to_move())?;
+        writeln!(
+            f,
+            "Hash: {}, hash history: {:?}",
+            self.hash, self.hash_history
+        )?;
         Ok(())
     }
 }
 
 impl Board {
+    #[cfg(test)]
+    pub fn zobrist_hash(&self) -> u64 {
+        self.hash
+    }
+
     /// Number of moves/plies played in the game
     pub fn half_moves_played(&self) -> u16 {
         self.moves_played
@@ -901,6 +944,30 @@ impl Board {
 
     pub fn null_move(&mut self) {
         self.to_move = !self.to_move;
+    }
+
+    #[cfg(test)]
+    pub(crate) fn zobrist_hash_from_scratch(&self) -> u64 {
+        let mut hash = 0;
+        hash ^= ZOBRIST_KEYS.to_move[self.to_move.disc()];
+
+        for square in squares_iterator() {
+            hash ^= self.zobrist_hash_for_square(square);
+        }
+        hash
+    }
+
+    pub(crate) fn zobrist_hash_for_square(&self, square: Square) -> u64 {
+        let mut hash = 0;
+        let stack = &self[square];
+        if let Some(top_stone) = stack.top_stone {
+            hash ^= ZOBRIST_KEYS.top_stones[square][top_stone as u16 as usize];
+            for i in 0..(stack.len() as usize - 1) / 8 {
+                hash ^= ZOBRIST_KEYS.stones_in_stack[i][square]
+                    [stack.bitboard.board as usize >> (i * 8) & 255]
+            }
+        }
+        hash
     }
 
     fn is_critical_square_from_scratch(
@@ -1115,6 +1182,16 @@ impl Board {
     }
 
     pub(crate) fn game_result_with_group_data(&self, group_data: &GroupData) -> Option<GameResult> {
+        let repetitions = self
+            .hash_history
+            .iter()
+            .filter(|hash| **hash == self.hash)
+            .count();
+
+        if repetitions >= 2 {
+            return Some(GameResult::Draw);
+        }
+
         if group_data
             .amount_in_group
             .iter()
@@ -1232,13 +1309,6 @@ impl board::Board for Board {
     ///
     /// TODO: Suicide moves are allowed if it fills the board, both place and move moves
     fn generate_moves(&self, moves: &mut Vec<Self::Move>) {
-        debug_assert!(
-            self.game_result().is_none(),
-            "Tried to generate moves on position with {:?} on\n{:?}",
-            self.game_result(),
-            self
-        );
-
         match self.moves_played {
             0 | 1 => {
                 for square in squares_iterator() {
@@ -1255,6 +1325,7 @@ impl board::Board for Board {
     }
 
     fn do_move(&mut self, mv: Self::Move) -> Self::ReverseMove {
+        self.hash_history.push(self.hash);
         let reverse_move = match mv.clone() {
             Move::Place(role, to) => {
                 debug_assert!(self[to].is_empty());
@@ -1264,7 +1335,8 @@ impl board::Board for Board {
                 } else {
                     !self.side_to_move()
                 };
-                self[to].push(Piece::from_role_color(role, color_to_place));
+                let piece = Piece::from_role_color(role, color_to_place);
+                self[to].push(piece);
 
                 match (color_to_place, role) {
                     (Color::White, Flat) => self.white_stones_left -= 1,
@@ -1274,12 +1346,23 @@ impl board::Board for Board {
                     (Color::Black, Wall) => self.black_stones_left -= 1,
                     (Color::Black, Cap) => self.black_caps_left -= 1,
                 }
+
+                self.hash ^= ZOBRIST_KEYS.top_stones[to][piece as u16 as usize];
+                self.hash_history.clear(); // This move is irreversible, so previous position are never repeated from here
+
                 ReverseMove::Place(to)
             }
-            Move::Move(mut from, direction, stack_movement) => {
+            Move::Move(square, direction, stack_movement) => {
+                let mut from = square;
+
                 let mut pieces_left_behind: ArrayVec<[u8; BOARD_SIZE - 1]> = ArrayVec::new();
                 let mut flattens_stone = false;
-                for Movement { pieces_to_take } in stack_movement.movements {
+
+                for sq in MoveIterator::new(square, direction, stack_movement.clone()) {
+                    self.hash ^= self.zobrist_hash_for_square(sq);
+                }
+
+                for Movement { pieces_to_take } in stack_movement.movements.iter() {
                     let to = from.go_direction(direction).unwrap();
 
                     if self[to].top_stone.map(Piece::role) == Some(Wall) {
@@ -1288,7 +1371,7 @@ impl board::Board for Board {
                     }
 
                     let pieces_to_leave = self[from].len() - pieces_to_take;
-                    pieces_left_behind.push(pieces_to_take);
+                    pieces_left_behind.push(*pieces_to_take);
 
                     for _ in pieces_to_leave..self[from].len() {
                         let piece = self[from].get(pieces_to_leave).unwrap();
@@ -1297,6 +1380,10 @@ impl board::Board for Board {
                     }
 
                     from = to;
+                }
+
+                for sq in MoveIterator::new(square, direction, stack_movement) {
+                    self.hash ^= self.zobrist_hash_for_square(sq);
                 }
 
                 pieces_left_behind.reverse();
@@ -1325,7 +1412,11 @@ impl board::Board for Board {
         );
 
         self.moves.push(mv);
+
+        self.hash ^= ZOBRIST_KEYS.to_move[self.to_move.disc()];
         self.to_move = !self.to_move;
+        self.hash ^= ZOBRIST_KEYS.to_move[self.to_move.disc()];
+
         self.moves_played += 1;
         reverse_move
     }
@@ -1334,6 +1425,9 @@ impl board::Board for Board {
         match reverse_move {
             ReverseMove::Place(square) => {
                 let piece = self[square].pop().unwrap();
+
+                self.hash ^= ZOBRIST_KEYS.top_stones[square][piece as u16 as usize];
+
                 debug_assert!(piece.color() != self.side_to_move() || self.moves_played < 3);
 
                 match piece {
@@ -1346,7 +1440,12 @@ impl board::Board for Board {
 
             ReverseMove::Move(from, direction, stack_movement, flattens_wall) => {
                 let mut square = from;
-                for Movement { pieces_to_take } in stack_movement.movements {
+
+                for square in MoveIterator::new(from, direction, stack_movement.clone()) {
+                    self.hash ^= self.zobrist_hash_for_square(square);
+                }
+
+                for Movement { pieces_to_take } in stack_movement.movements.iter() {
                     let to = square.go_direction(direction).unwrap();
 
                     let pieces_to_leave = self[square].len() - pieces_to_take;
@@ -1365,12 +1464,20 @@ impl board::Board for Board {
                         Color::Black => self[from].replace_top(BlackWall),
                     };
                 };
+
+                for square in MoveIterator::new(from, direction, stack_movement) {
+                    self.hash ^= self.zobrist_hash_for_square(square);
+                }
             }
         }
 
         self.moves.pop();
         self.moves_played -= 1;
+        self.hash_history.pop();
+
+        self.hash ^= ZOBRIST_KEYS.to_move[self.to_move.disc()];
         self.to_move = !self.to_move;
+        self.hash ^= ZOBRIST_KEYS.to_move[self.to_move.disc()];
     }
 
     fn game_result(&self) -> Option<GameResult> {
@@ -1402,7 +1509,10 @@ impl Iterator for MoveIterator {
             None
         } else {
             let next_square = self.square;
-            self.square = self.square.go_direction(self.direction).unwrap();
+            self.square = self
+                .square
+                .go_direction(self.direction)
+                .unwrap_or(Square(0));
             self.squares_left -= 1;
             Some(next_square)
         }
