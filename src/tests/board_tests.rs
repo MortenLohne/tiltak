@@ -528,6 +528,22 @@ fn critical_square_test() {
 }
 
 #[test]
+fn move_iterator_test() {
+    let mut board = Board::start_board();
+    do_moves_and_check_validity(&mut board, &["a1", "e5"]);
+    let mv = board.move_from_san("e5-").unwrap();
+    match mv {
+        Move::Move(square, direction, stack_movement) => assert_eq!(
+            board_mod::MoveIterator::new(square, direction, stack_movement)
+                .map(|sq| sq.to_string())
+                .collect::<Vec<String>>(),
+            vec!["e5", "e4"]
+        ),
+        _ => panic!(),
+    }
+}
+
+#[test]
 fn static_eval_after_move_test() {
     let mut board = Board::start_board();
     minmax(&mut board, 1);

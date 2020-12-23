@@ -1378,6 +1378,37 @@ impl board::Board for Board {
     }
 }
 
+pub(crate) struct MoveIterator {
+    square: Square,
+    direction: Direction,
+    squares_left: usize,
+}
+
+impl MoveIterator {
+    pub fn new(square: Square, direction: Direction, stack_movement: StackMovement) -> Self {
+        MoveIterator {
+            square,
+            direction,
+            squares_left: stack_movement.movements.len() + 1,
+        }
+    }
+}
+
+impl Iterator for MoveIterator {
+    type Item = Square;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.squares_left == 0 {
+            None
+        } else {
+            let next_square = self.square;
+            self.square = self.square.go_direction(self.direction).unwrap();
+            self.squares_left -= 1;
+            Some(next_square)
+        }
+    }
+}
+
 impl EvalBoardTrait for Board {
     fn static_eval(&self) -> f32 {
         self.static_eval_with_params(Self::VALUE_PARAMS)
