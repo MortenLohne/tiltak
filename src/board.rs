@@ -821,7 +821,6 @@ pub struct Board {
     black_stones_left: u8,
     white_caps_left: u8,
     black_caps_left: u8,
-    moves_played: u16,
     moves: Vec<Move>,
     hash: u64,              // Zobrist hash of current position
     hash_history: Vec<u64>, // Zobrist hashes of previous board states, up to the last irreversible move. Does not include the corrent position
@@ -835,7 +834,6 @@ impl PartialEq for Board {
             && self.black_stones_left == other.black_stones_left
             && self.white_caps_left == other.white_caps_left
             && self.black_caps_left == other.black_caps_left
-            && self.moves_played == other.moves_played
             && self.hash == other.hash
     }
 }
@@ -850,7 +848,6 @@ impl Hash for Board {
         self.black_stones_left.hash(state);
         self.white_caps_left.hash(state);
         self.black_caps_left.hash(state);
-        self.moves_played.hash(state);
     }
 }
 
@@ -877,7 +874,6 @@ impl Default for Board {
             black_stones_left: STARTING_STONES,
             white_caps_left: STARTING_CAPSTONES,
             black_caps_left: STARTING_CAPSTONES,
-            moves_played: 0,
             moves: vec![],
             hash: ZOBRIST_KEYS.to_move[Color::White as u16 as usize],
             hash_history: vec![],
@@ -933,8 +929,8 @@ impl Board {
     }
 
     /// Number of moves/plies played in the game
-    pub fn half_moves_played(&self) -> u16 {
-        self.moves_played
+    pub fn half_moves_played(&self) -> usize {
+        self.moves.len()
     }
 
     /// All the moves played in the game
@@ -1309,7 +1305,7 @@ impl board::Board for Board {
     ///
     /// TODO: Suicide moves are allowed if it fills the board, both place and move moves
     fn generate_moves(&self, moves: &mut Vec<Self::Move>) {
-        match self.moves_played {
+        match self.half_moves_played() {
             0 | 1 => {
                 for square in squares_iterator() {
                     if self[square].is_empty() {
@@ -1330,7 +1326,7 @@ impl board::Board for Board {
             Move::Place(role, to) => {
                 debug_assert!(self[to].is_empty());
                 // On the first move, the players place the opponent's color
-                let color_to_place = if self.moves_played > 1 {
+                let color_to_place = if self.half_moves_played() > 1 {
                     self.side_to_move()
                 } else {
                     !self.side_to_move()
@@ -1417,7 +1413,6 @@ impl board::Board for Board {
         self.to_move = !self.to_move;
         self.hash ^= ZOBRIST_KEYS.to_move[self.to_move.disc()];
 
-        self.moves_played += 1;
         reverse_move
     }
 
@@ -1428,7 +1423,7 @@ impl board::Board for Board {
 
                 self.hash ^= ZOBRIST_KEYS.top_stones[square][piece as u16 as usize];
 
-                debug_assert!(piece.color() != self.side_to_move() || self.moves_played < 3);
+                debug_assert!(piece.color() != self.side_to_move() || self.half_moves_played() < 3);
 
                 match piece {
                     WhiteFlat | WhiteWall => self.white_stones_left += 1,
@@ -1472,7 +1467,6 @@ impl board::Board for Board {
         }
 
         self.moves.pop();
-        self.moves_played -= 1;
         self.hash_history.pop();
 
         self.hash ^= ZOBRIST_KEYS.to_move[self.to_move.disc()];
