@@ -110,8 +110,8 @@ pub fn main() {
                     }
 
                     let max_time = match position.side_to_move() {
-                        Color::White => white_time / 5 + white_inc,
-                        Color::Black => black_time / 5 + black_inc,
+                        Color::White => white_time / 5 + white_inc / 2,
+                        Color::Black => black_time / 5 + black_inc / 2,
                     };
 
                     let start_time = Instant::now();
