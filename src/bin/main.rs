@@ -488,6 +488,7 @@ fn mem_usage() {
     println!("Tak board: {} bytes", mem::size_of::<board::Board>());
     println!("Tak board cell: {} bytes", mem::size_of::<board::Stack>());
     println!("Tak move: {} bytes", mem::size_of::<board::Move>());
+    println!("Zobrist keys: {}", mem::size_of::<board::ZobristKeys>())
 }
 
 fn do_moves_and_check_validity(board: &mut Board, move_strings: &[&str]) {

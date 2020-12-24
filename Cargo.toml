@@ -12,7 +12,7 @@ default-run = "main"
 debug = true
 
 [features]
-constant-tuning = ["rayon", "rand", "rand_distr"]
+constant-tuning = ["rayon", "rand_distr"]
 aws-lambda = ["lambda_runtime", "serde", "serde_json", "arrayvec/serde", "rusoto_core", "rusoto_lambda", "bytes", "tokio"]
 
 [[bin]]
@@ -27,7 +27,7 @@ required-features = ["constant-tuning"]
 board-game-traits = "0.1"
 pgn-traits = "0.1"
 arrayvec = "0.5.1"
-rand = { version = "0.7", optional = true }
+rand = "0.7"
 rayon = { version = "1.3.*", optional = true }
 serde = { version = "1.0", optional = true, features = ["derive"] }
 serde_json = { version = "1", optional = true }
@@ -42,9 +42,7 @@ fern = "0.5"
 chrono = "0.4"
 bufstream = "0.1"
 clap = "2.33"
-
-[dev-dependencies]
-rand = "0.7"
+lazy_static = "1.4"
 
 [dependencies.nom]
 version = "4.2"
