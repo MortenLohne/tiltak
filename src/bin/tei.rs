@@ -42,9 +42,14 @@ pub fn main() {
             "position" => {
                 let mut words_iter = line.split_whitespace();
                 assert_eq!(words_iter.next(), Some("position"));
-                assert_eq!(words_iter.next(), Some("startpos"));
-
-                position = Board::default();
+                position = match words_iter.next() {
+                    Some("startpos") => Board::default(),
+                    Some("tps") => {
+                        let tps: String = (&mut words_iter).take(3).collect::<Vec<_>>().join(" ");
+                        Board::from_fen(&tps).unwrap()
+                    }
+                    _ => panic!("Expected \"startpos\" or \"tps\" to specify position."),
+                };
 
                 match words_iter.next() {
                     Some("moves") => {
