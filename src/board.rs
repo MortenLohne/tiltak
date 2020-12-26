@@ -1754,22 +1754,16 @@ impl pgn_traits::pgn::PgnBoard for Board {
         let fen_words: Vec<&str> = fen.split_whitespace().collect();
 
         if fen_words.len() < 3 {
-            return Err(pgn::Error::new(
-                pgn::ErrorKind::ParseError,
-                format!(
-                    "Couldn't parse TPS string \"{}\", missing move counter.",
-                    fen
-                ),
-            ));
+            return Err(pgn::Error::new_parse_error(format!(
+                "Couldn't parse TPS string \"{}\", missing move counter.",
+                fen
+            )));
         }
         if fen_words.len() > 3 {
-            return Err(pgn::Error::new(
-                pgn::ErrorKind::ParseError,
-                format!(
-                    "Couldn't parse TPS string \"{}\", unexpected \"{}\"",
-                    fen, fen_words[3]
-                ),
-            ));
+            return Err(pgn::Error::new_parse_error(format!(
+                "Couldn't parse TPS string \"{}\", unexpected \"{}\"",
+                fen, fen_words[3]
+            )));
         }
 
         let fen_rows: Vec<&str> = fen_words[0].split('/').collect();
@@ -1830,10 +1824,10 @@ impl pgn_traits::pgn::PgnBoard for Board {
             while column_id < BOARD_SIZE as u8 {
                 match row_str_iter.peek() {
                     None => {
-                        return Err(pgn::Error::new(
-                            pgn::ErrorKind::ParseError,
-                            format!("Couldn't parse row \"{}\": not enough pieces", row_str),
-                        ))
+                        return Err(pgn::Error::new_parse_error(format!(
+                            "Couldn't parse row \"{}\": not enough pieces",
+                            row_str
+                        )))
                     }
                     Some('x') => {
                         row_str_iter.next();
@@ -1846,14 +1840,11 @@ impl pgn_traits::pgn::PgnBoard for Board {
                         if let Some(',') | None = row_str_iter.peek() {
                             row_str_iter.next();
                         } else {
-                            return Err(pgn::Error::new(
-                                pgn::ErrorKind::ParseError,
-                                format!(
-                                    "Expected ',' on row \"{}\", found {:?}",
-                                    row_str,
-                                    row_str_iter.next()
-                                ),
-                            ));
+                            return Err(pgn::Error::new_parse_error(format!(
+                                "Expected ',' on row \"{}\", found {:?}",
+                                row_str,
+                                row_str_iter.next()
+                            )));
                         }
                     }
                     Some('1') | Some('2') => {
@@ -1875,22 +1866,19 @@ impl pgn_traits::pgn::PgnBoard for Board {
                                     break;
                                 }
                                 Some(ch) => {
-                                    return Err(pgn::Error::new(
-                                        pgn::ErrorKind::ParseError,
-                                        format!(
-                                            "Expected '1', '2', 'S' or 'C' on row \"{}\", found {}",
-                                            row_str, ch
-                                        ),
-                                    ))
+                                    return Err(pgn::Error::new_parse_error(format!(
+                                        "Expected '1', '2', 'S' or 'C' on row \"{}\", found {}",
+                                        row_str, ch
+                                    )))
                                 }
                             }
                         }
                     }
                     Some(x) => {
-                        return Err(pgn::Error::new(
-                            pgn::ErrorKind::ParseError,
-                            format!("Unexpected '{}' in row \"{}\".", x, row_str),
-                        ))
+                        return Err(pgn::Error::new_parse_error(format!(
+                            "Unexpected '{}' in row \"{}\".",
+                            x, row_str
+                        )))
                     }
                 }
             }
