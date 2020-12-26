@@ -821,6 +821,7 @@ pub struct Board {
     black_stones_left: u8,
     white_caps_left: u8,
     black_caps_left: u8,
+    half_moves_played: usize,
     moves: Vec<Move>,
     hash: u64,              // Zobrist hash of current position
     hash_history: Vec<u64>, // Zobrist hashes of previous board states, up to the last irreversible move. Does not include the corrent position
@@ -835,6 +836,7 @@ impl PartialEq for Board {
             && self.white_caps_left == other.white_caps_left
             && self.black_caps_left == other.black_caps_left
             && self.hash == other.hash
+            && self.half_moves_played == other.half_moves_played
     }
 }
 
@@ -848,6 +850,7 @@ impl Hash for Board {
         self.black_stones_left.hash(state);
         self.white_caps_left.hash(state);
         self.black_caps_left.hash(state);
+        self.half_moves_played.hash(state);
     }
 }
 
@@ -874,6 +877,7 @@ impl Default for Board {
             black_stones_left: STARTING_STONES,
             white_caps_left: STARTING_CAPSTONES,
             black_caps_left: STARTING_CAPSTONES,
+            half_moves_played: 0,
             moves: vec![],
             hash: ZOBRIST_KEYS.to_move[Color::White as u16 as usize],
             hash_history: vec![],
@@ -930,7 +934,7 @@ impl Board {
 
     /// Number of moves/plies played in the game
     pub fn half_moves_played(&self) -> usize {
-        self.moves.len()
+        self.half_moves_played
     }
 
     /// All the moves played in the game
@@ -1407,6 +1411,7 @@ impl board::Board for Board {
         );
 
         self.moves.push(mv);
+        self.half_moves_played += 1;
 
         self.hash ^= ZOBRIST_KEYS.to_move[self.to_move.disc()];
         self.to_move = !self.to_move;
@@ -1467,6 +1472,7 @@ impl board::Board for Board {
 
         self.moves.pop();
         self.hash_history.pop();
+        self.half_moves_played -= 1;
 
         self.hash ^= ZOBRIST_KEYS.to_move[self.to_move.disc()];
         self.to_move = !self.to_move;
@@ -1810,6 +1816,23 @@ impl pgn_traits::pgn::PgnBoard for Board {
                     "Error parsing TPS \"{}\": Got bad side to move \"{}\"",
                     fen, s
                 )))
+            }
+        }
+
+        match fen_words[2].parse::<usize>() {
+            Ok(n) => match board.side_to_move() {
+                Color::White => board.half_moves_played = (n - 1) * 2,
+                Color::Black => board.half_moves_played = (n - 1) * 2 + 1,
+            },
+            Err(e) => {
+                return Err(pgn::Error::new_caused_by(
+                    pgn::ErrorKind::ParseError,
+                    format!(
+                        "Error parsing TPS \"{}\": Got bad move number \"{}\"",
+                        fen, fen_words[2]
+                    ),
+                    e,
+                ))
             }
         }
 
