@@ -575,3 +575,16 @@ fn repetitions_are_draws_test() {
     do_moves_and_check_validity(&mut board, &["e4"]);
     assert_eq!(board.game_result(), None);
 }
+
+#[test]
+fn parse_tps_test() {
+    let tps_string = "x4,1/x5/x5/x5/2,x4 1 2";
+
+    let mut board = Board::start_board();
+    do_moves_and_check_validity(&mut board, &["a1", "e5"]);
+    assert_eq!(Board::from_fen(tps_string).unwrap(), board);
+
+    do_moves_and_check_validity(&mut board, &["c5"]);
+    let tps_string = "x2,1,x,1/x5/x5/x5/2,x4 2 2";
+    assert_eq!(Board::from_fen(tps_string).unwrap(), board);
+}

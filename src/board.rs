@@ -432,7 +432,7 @@ impl ops::Not for Piece {
 }
 
 /// The contents of a square on the board, consisting of zero or more pieces
-#[derive(Clone, PartialEq, Eq, Debug, Default, Hash)]
+#[derive(Copy, Clone, PartialEq, Eq, Debug, Default, Hash)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Stack {
     pub(crate) top_stone: Option<Piece>,
@@ -942,7 +942,6 @@ impl Board {
         self.to_move = !self.to_move;
     }
 
-    #[cfg(test)]
     pub(crate) fn zobrist_hash_from_scratch(&self) -> u64 {
         let mut hash = 0;
         hash ^= ZOBRIST_KEYS.to_move[self.to_move.disc()];
@@ -990,7 +989,7 @@ impl Board {
         for x in 0..BOARD_SIZE as u8 {
             for y in 0..BOARD_SIZE as u8 {
                 new_board[Square(y * BOARD_SIZE as u8 + x)] =
-                    self[Square((BOARD_SIZE as u8 - y - 1) * BOARD_SIZE as u8 + x)].clone();
+                    self[Square((BOARD_SIZE as u8 - y - 1) * BOARD_SIZE as u8 + x)];
             }
         }
         new_board
@@ -1001,7 +1000,7 @@ impl Board {
         for x in 0..BOARD_SIZE as u8 {
             for y in 0..BOARD_SIZE as u8 {
                 new_board[Square(y * BOARD_SIZE as u8 + x)] =
-                    self[Square(y * BOARD_SIZE as u8 + (BOARD_SIZE as u8 - x - 1))].clone();
+                    self[Square(y * BOARD_SIZE as u8 + (BOARD_SIZE as u8 - x - 1))];
             }
         }
         new_board
@@ -1014,7 +1013,7 @@ impl Board {
                 let new_x = y;
                 let new_y = BOARD_SIZE as u8 - x - 1;
                 new_board[Square(y * BOARD_SIZE as u8 + x)] =
-                    self[Square(new_y * BOARD_SIZE as u8 + new_x)].clone();
+                    self[Square(new_y * BOARD_SIZE as u8 + new_x)];
             }
         }
         new_board
@@ -1024,7 +1023,7 @@ impl Board {
         let mut new_board = self.clone();
         for square in squares_iterator() {
             new_board[square] = Stack::default();
-            for piece in self[square].clone() {
+            for piece in self[square] {
                 new_board[square].push(piece.flip_color());
             }
         }
@@ -1751,14 +1750,158 @@ impl TunableBoard for Board {
 }
 
 impl pgn_traits::pgn::PgnBoard for Board {
-    fn from_fen(_fen: &str) -> Result<Self, pgn::Error> {
-        unimplemented!()
+    fn from_fen(fen: &str) -> Result<Self, pgn::Error> {
+        let fen_words: Vec<&str> = fen.split_whitespace().collect();
+
+        if fen_words.len() < 3 {
+            return Err(pgn::Error::new(
+                pgn::ErrorKind::ParseError,
+                format!(
+                    "Couldn't parse TPS string \"{}\", missing move counter.",
+                    fen
+                ),
+            ));
+        }
+        if fen_words.len() > 3 {
+            return Err(pgn::Error::new(
+                pgn::ErrorKind::ParseError,
+                format!(
+                    "Couldn't parse TPS string \"{}\", unexpected \"{}\"",
+                    fen, fen_words[3]
+                ),
+            ));
+        }
+
+        let fen_rows: Vec<&str> = fen_words[0].split('/').collect();
+        if fen_rows.len() != BOARD_SIZE {
+            return Err(pgn::Error::new_parse_error(format!(
+                "Couldn't parse TPS string \"{}\", had {} rows instead of {}.",
+                fen,
+                fen_rows.len(),
+                BOARD_SIZE
+            )));
+        }
+
+        let rows: Vec<[Stack; BOARD_SIZE]> = fen_rows
+            .into_iter()
+            .map(parse_row)
+            .collect::<Result<_, _>>()
+            .map_err(|e| {
+                pgn::Error::new_caused_by(
+                    pgn::ErrorKind::ParseError,
+                    format!("Couldn't parse TPS string \"{}\"", fen),
+                    e,
+                )
+            })?;
+        let mut board = Board::default();
+        for square in squares_iterator() {
+            let (file, rank) = (square.file(), square.rank());
+            let stack = rows[rank as usize][file as usize];
+            for piece in stack.into_iter() {
+                match piece {
+                    WhiteFlat | WhiteWall => board.white_stones_left -= 1,
+                    WhiteCap => board.white_caps_left -= 1,
+                    BlackFlat | BlackWall => board.black_stones_left -= 1,
+                    BlackCap => board.black_caps_left -= 1,
+                }
+            }
+            board[square] = stack;
+        }
+
+        match fen_words[1] {
+            "1" => board.to_move = Color::White,
+            "2" => board.to_move = Color::Black,
+            s => {
+                return Err(pgn::Error::new_parse_error(format!(
+                    "Error parsing TPS \"{}\": Got bad side to move \"{}\"",
+                    fen, s
+                )))
+            }
+        }
+
+        board.hash = board.zobrist_hash_from_scratch();
+
+        return Ok(board);
+
+        fn parse_row(row_str: &str) -> Result<[Stack; BOARD_SIZE], pgn::Error> {
+            let mut column_id = 0;
+            let mut row = [Stack::default(); BOARD_SIZE];
+            let mut row_str_iter = row_str.chars().peekable();
+            while column_id < BOARD_SIZE as u8 {
+                match row_str_iter.peek() {
+                    None => {
+                        return Err(pgn::Error::new(
+                            pgn::ErrorKind::ParseError,
+                            format!("Couldn't parse row \"{}\": not enough pieces", row_str),
+                        ))
+                    }
+                    Some('x') => {
+                        row_str_iter.next();
+                        if let Some(n) = row_str_iter.peek().and_then(|ch| ch.to_digit(10)) {
+                            row_str_iter.next();
+                            column_id += n as u8;
+                        } else {
+                            column_id += 1;
+                        }
+                        if let Some(',') | None = row_str_iter.peek() {
+                            row_str_iter.next();
+                        } else {
+                            return Err(pgn::Error::new(
+                                pgn::ErrorKind::ParseError,
+                                format!(
+                                    "Expected ',' on row \"{}\", found {:?}",
+                                    row_str,
+                                    row_str_iter.next()
+                                ),
+                            ));
+                        }
+                    }
+                    Some('1') | Some('2') => {
+                        let stack = &mut row[column_id as usize];
+                        loop {
+                            match row_str_iter.next() {
+                                Some('1') => stack.push(Piece::from_role_color(Flat, Color::White)),
+                                Some('2') => stack.push(Piece::from_role_color(Flat, Color::Black)),
+                                Some('S') => {
+                                    let piece = stack.pop().unwrap();
+                                    stack.push(Piece::from_role_color(Wall, piece.color()));
+                                }
+                                Some('C') => {
+                                    let piece = stack.pop().unwrap();
+                                    stack.push(Piece::from_role_color(Cap, piece.color()));
+                                }
+                                Some(',') | None => {
+                                    column_id += 1;
+                                    break;
+                                }
+                                Some(ch) => {
+                                    return Err(pgn::Error::new(
+                                        pgn::ErrorKind::ParseError,
+                                        format!(
+                                            "Expected '1', '2', 'S' or 'C' on row \"{}\", found {}",
+                                            row_str, ch
+                                        ),
+                                    ))
+                                }
+                            }
+                        }
+                    }
+                    Some(x) => {
+                        return Err(pgn::Error::new(
+                            pgn::ErrorKind::ParseError,
+                            format!("Unexpected '{}' in row \"{}\".", x, row_str),
+                        ))
+                    }
+                }
+            }
+            Ok(row)
+        }
     }
 
     fn to_fen(&self) -> String {
         let mut f = String::new();
         squares_iterator()
-            .map(|square| self[square].clone())
+            .map(|square| self[square])
             .for_each(|stack: Stack| {
                 (match stack.top_stone() {
                     None => write!(f, "-"),
