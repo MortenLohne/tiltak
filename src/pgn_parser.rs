@@ -61,8 +61,14 @@ pub fn parse_pgn<B: PgnBoard + Debug + Clone>(
                     })
                     .flatten();
 
+                let start_board = tags
+                    .iter()
+                    .find(|(name, _)| name == "TPS")
+                    .map(|(_, result)| B::from_fen(result))
+                    .unwrap_or(Ok(B::start_board()))?;
+
                 let game = Game {
-                    start_board: B::start_board(),
+                    start_board,
                     moves,
                     game_result,
                     tags,
