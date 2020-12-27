@@ -29,136 +29,62 @@ fn main() {
     println!("play: Play against the engine through the command line");
     println!("aimatch: Watch the engine play against a very simple minmax implementation");
     println!("analyze: Analyze a given position, provided from a simple move list");
-
-    let mut input = String::new();
-    io::stdin().read_line(&mut input).unwrap();
-    let words = input.split_whitespace().collect::<Vec<_>>();
-    match words[0] {
-        "play" => {
-            let board = Board::default();
-            play_human(board);
-        }
-        "aimatch" => {
-            for i in 1..10 {
-                mcts_vs_minmax(3, 50000 * i);
+    loop {
+        let mut input = String::new();
+        io::stdin().read_line(&mut input).unwrap();
+        let words = input.split_whitespace().collect::<Vec<_>>();
+        match words[0] {
+            "play" => {
+                let board = Board::default();
+                play_human(board);
             }
-        }
-        "analyze" => test_position(),
-        #[cfg(feature = "constant-tuning")]
-        "openings" => {
-            let depth = 4;
-            let mut positions = HashSet::new();
-            let openings = generate_openings(Board::start_board(), &mut positions, depth);
-
-            let mut evaled_openings: Vec<_> = openings
-                .into_par_iter()
-                .filter(|position| position.len() == depth as usize)
-                .map(|position| {
-                    let mut board = Board::start_board();
-                    for mv in position.iter() {
-                        board.do_move(mv.clone());
-                    }
-                    (position, search::mcts(board, 100_000))
-                })
-                .collect();
-
-            evaled_openings
-                .sort_by(|(_, (_, score1)), (_, (_, score2))| score1.partial_cmp(score2).unwrap());
-            for (p, s) in evaled_openings {
-                println!("{:?}: {:?}", p, s);
+            "aimatch" => {
+                for i in 1..10 {
+                    mcts_vs_minmax(3, 50000 * i);
+                }
             }
-        }
-        "game" => {
-            let mut input = String::new();
-            io::stdin().read_to_string(&mut input).unwrap();
+            "analyze" => test_position(),
+            #[cfg(feature = "constant-tuning")]
+            "openings" => {
+                let depth = 4;
+                let mut positions = HashSet::new();
+                let openings = generate_openings(Board::start_board(), &mut positions, depth);
 
-            let games = taik::pgn_parser::parse_pgn(&input).unwrap();
-            if games.is_empty() {
-                panic!("Couldn't parse any games")
+                let mut evaled_openings: Vec<_> = openings
+                    .into_par_iter()
+                    .filter(|position| position.len() == depth as usize)
+                    .map(|position| {
+                        let mut board = Board::start_board();
+                        for mv in position.iter() {
+                            board.do_move(mv.clone());
+                        }
+                        (position, search::mcts(board, 100_000))
+                    })
+                    .collect();
+
+                evaled_openings.sort_by(|(_, (_, score1)), (_, (_, score2))| {
+                    score1.partial_cmp(score2).unwrap()
+                });
+                for (p, s) in evaled_openings {
+                    println!("{:?}: {:?}", p, s);
+                }
             }
+            "game" => {
+                let mut input = String::new();
+                io::stdin().read_to_string(&mut input).unwrap();
 
-            analyze_game(games[0].clone());
+                let games = taik::pgn_parser::parse_pgn(&input).unwrap();
+                if games.is_empty() {
+                    println!("Couldn't parse any games")
+                }
+
+                analyze_game(games[0].clone());
+            }
+            "mem_usage" => mem_usage(),
+            "bench" => bench(),
+            "selfplay" => mcts_selfplay(time::Duration::from_secs(10)),
+            s => println!("Unknown option \"{}\"", s),
         }
-        "mem_usage" => mem_usage(),
-        "bench" => bench(),
-        "selfplay" => mcts_selfplay(time::Duration::from_secs(10)),
-        #[cfg(feature = "constant-tuning")]
-        "play_params" => {
-            #[allow(clippy::unreadable_literal)]
-            let value_params1: &'static [f32] = &[
-                0.054227155,
-                0.3407015,
-                0.4347485,
-                0.54618615,
-                0.5894169,
-                0.41717935,
-                0.80713177,
-                1.6106186,
-                1.3977867,
-                1.6436608,
-                2.0145588,
-                0.8530996,
-                -0.9235043,
-                -0.5978478,
-                -0.31175753,
-                0.14952391,
-                0.77818716,
-                1.5191432,
-                1.3946671,
-                2.035646,
-                0.981081,
-                0.24216132,
-                1.2395397,
-                1.0178914,
-                -2.203359,
-                -1.7674192,
-                -0.7277705,
-                0.64038795,
-                2.176997,
-                -0.04819244,
-                0.91904986,
-                -1.266337,
-                -0.828557,
-                -0.42983347,
-                0.080568284,
-                0.69053686,
-            ];
-            #[allow(clippy::unreadable_literal)]
-            let policy_params1: &'static [f32] = &[
-                -3.9616194,
-                -3.4906785,
-                -3.277753,
-                -2.7917902,
-                -2.6880484,
-                -2.9846509,
-                -5.028032,
-                -5.2466316,
-                -4.9179077,
-                -4.7460146,
-                -4.6174083,
-                -3.8573232,
-                -4.1148667,
-                -4.5389056,
-                -4.1252546,
-                -3.9228675,
-                -2.4650762,
-                1.3357767,
-                0.9857822,
-                0.051044937,
-                1.1140109,
-                -0.09581065,
-                0.25960785,
-                -4.472624,
-                0.8161406,
-                0.53994584,
-                0.7810427,
-                1.5053948,
-            ];
-            let value_params2 = Board::VALUE_PARAMS;
-            let policy_params2 = Board::POLICY_PARAMS;
-            play_match_between_params(value_params1, value_params2, policy_params1, policy_params2);
-        }
-        s => println!("Unknown option \"{}\"", s),
     }
 }
 
