@@ -5,10 +5,14 @@
 /// This module contains the public-facing convenience API for the search.
 /// The implementation itself in in mcts_core.
 mod mcts_core;
+#[cfg(feature = "wasm-bindgen")]
+mod wasm;
 
 use self::mcts_core::{TreeEdge, PV};
 use crate::board::{Board, Move, Role, Square, TunableBoard};
 use std::time;
+#[cfg(feature = "wasm-bindgen")]
+use wasm_bindgen::prelude::*;
 
 #[derive(Clone, PartialEq, Debug)]
 pub struct MctsSetting {
@@ -67,6 +71,7 @@ pub type Score = f32;
 
 /// Abstract representation of a Monte Carlo Search Tree.
 /// Gives more fine-grained control of the search process compared to using the `mcts` function.
+#[cfg_attr(feature = "wasm", wasm_bindgen)]
 #[derive(Clone, PartialEq, Debug)]
 pub struct MonteCarloTree {
     edge: TreeEdge, // A virtual edge to the first node, with fake move and heuristic score

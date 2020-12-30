@@ -600,6 +600,7 @@ impl fmt::Debug for Move {
 }
 /// The counterpart of `Move`. When applied to a `Board`, it fully reverses the accompanying `Move`.
 #[derive(Clone, PartialEq, Eq, Debug)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum ReverseMove {
     Place(Square),
     Move(Square, Direction, StackMovement, bool),
