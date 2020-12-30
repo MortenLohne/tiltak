@@ -1823,6 +1823,7 @@ dependencies = [
  "serde",
  "serde_json",
  "tokio 0.2.24",
+ "wasm-bindgen",
 ]
 
 [[package]]
@@ -2282,6 +2283,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3cd364751395ca0f68cafb17666eee36b63077fb5ecd972bbcd74c90c4bf736e"
 dependencies = [
  "cfg-if 1.0.0",
+ "serde",
+ "serde_json",
  "wasm-bindgen-macro",
 ]
 
