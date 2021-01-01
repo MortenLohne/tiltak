@@ -34,6 +34,7 @@ use std::fmt::Write;
 use std::hash::{Hash, Hasher};
 use std::mem;
 use std::ops::{Index, IndexMut};
+use std::str::FromStr;
 use std::{fmt, iter, ops};
 
 /// Extra items for tuning evaluation constants.
@@ -608,6 +609,76 @@ impl fmt::Debug for Move {
         write!(f, "{}", self)
     }
 }
+
+impl FromStr for Move {
+    type Err = pgn::Error;
+    fn from_str(input: &str) -> Result<Self, pgn::Error> {
+        if input.len() < 2 {
+            return Err(pgn::Error::new(
+                pgn::ErrorKind::ParseError,
+                "Input move too short.",
+            ));
+        }
+        if !input.is_ascii() {
+            return Err(pgn::Error::new(
+                pgn::ErrorKind::ParseError,
+                "Input move contained non-ascii characters.",
+            ));
+        }
+        let first_char = input.chars().next().unwrap();
+        match first_char {
+            'a'..='e' if input.len() == 2 => {
+                let square = Square::parse_square(input)?;
+                Ok(Move::Place(Flat, square))
+            }
+            'a'..='e' if input.len() == 3 => {
+                let square = Square::parse_square(&input[0..2])?;
+                let direction = Direction::parse(input.chars().nth(2).unwrap());
+                // Moves in the simplified move notation always move one piece
+                let movements = iter::once(Movement { pieces_to_take: 1 }).collect();
+                Ok(Move::Move(square, direction, StackMovement { movements }))
+            }
+            'C' if input.len() == 3 => Ok(Move::Place(Cap, Square::parse_square(&input[1..])?)),
+            'S' if input.len() == 3 => Ok(Move::Place(Wall, Square::parse_square(&input[1..])?)),
+            '1'..='9' if input.len() > 3 => {
+                let square = Square::parse_square(&input[1..3])?;
+                let direction = Direction::parse(input.chars().nth(3).unwrap());
+                let pieces_taken = first_char.to_digit(10).unwrap() as u8;
+                let mut pieces_held = pieces_taken;
+
+                let mut amounts_to_drop = input
+                    .chars()
+                    .skip(4)
+                    .map(|ch| ch.to_digit(10).unwrap() as u8)
+                    .collect::<Vec<u8>>();
+                amounts_to_drop.pop(); //
+
+                let mut movements = ArrayVec::new();
+                movements.push(Movement {
+                    pieces_to_take: pieces_taken,
+                });
+
+                for amount_to_drop in amounts_to_drop {
+                    movements.push(Movement {
+                        pieces_to_take: pieces_held - amount_to_drop,
+                    });
+                    pieces_held -= amount_to_drop;
+                }
+                Ok(Move::Move(square, direction, StackMovement { movements }))
+            }
+            _ => Err(pgn::Error::new(
+                pgn::ErrorKind::ParseError,
+                format!(
+                    "Couldn't parse move \"{}\". Moves cannot start with {} and have length {}.",
+                    input,
+                    first_char,
+                    input.len()
+                ),
+            )),
+        }
+    }
+}
+
 /// The counterpart of `Move`. When applied to a `Board`, it fully reverses the accompanying `Move`.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub enum ReverseMove {
@@ -1932,69 +2003,7 @@ impl pgn_traits::pgn::PgnBoard for Board {
     }
 
     fn move_from_san(&self, input: &str) -> Result<Self::Move, pgn::Error> {
-        if input.len() < 2 {
-            return Err(pgn::Error::new(
-                pgn::ErrorKind::ParseError,
-                "Input move too short.",
-            ));
-        }
-        if !input.is_ascii() {
-            return Err(pgn::Error::new(
-                pgn::ErrorKind::ParseError,
-                "Input move contained non-ascii characters.",
-            ));
-        }
-        let first_char = input.chars().next().unwrap();
-        match first_char {
-            'a'..='e' if input.len() == 2 => {
-                let square = Square::parse_square(input)?;
-                Ok(Move::Place(Flat, square))
-            }
-            'a'..='e' if input.len() == 3 => {
-                let square = Square::parse_square(&input[0..2])?;
-                let direction = Direction::parse(input.chars().nth(2).unwrap());
-                // Moves in the simplified move notation always move one piece
-                let movements = iter::once(Movement { pieces_to_take: 1 }).collect();
-                Ok(Move::Move(square, direction, StackMovement { movements }))
-            }
-            'C' if input.len() == 3 => Ok(Move::Place(Cap, Square::parse_square(&input[1..])?)),
-            'S' if input.len() == 3 => Ok(Move::Place(Wall, Square::parse_square(&input[1..])?)),
-            '1'..='9' if input.len() > 3 => {
-                let square = Square::parse_square(&input[1..3])?;
-                let direction = Direction::parse(input.chars().nth(3).unwrap());
-                let pieces_taken = first_char.to_digit(10).unwrap() as u8;
-                let mut pieces_held = pieces_taken;
-
-                let mut amounts_to_drop = input
-                    .chars()
-                    .skip(4)
-                    .map(|ch| ch.to_digit(10).unwrap() as u8)
-                    .collect::<Vec<u8>>();
-                amounts_to_drop.pop(); //
-
-                let mut movements = ArrayVec::new();
-                movements.push(Movement {
-                    pieces_to_take: pieces_taken,
-                });
-
-                for amount_to_drop in amounts_to_drop {
-                    movements.push(Movement {
-                        pieces_to_take: pieces_held - amount_to_drop,
-                    });
-                    pieces_held -= amount_to_drop;
-                }
-                Ok(Move::Move(square, direction, StackMovement { movements }))
-            }
-            _ => Err(pgn::Error::new(
-                pgn::ErrorKind::ParseError,
-                format!(
-                    "Couldn't parse move \"{}\". Moves cannot start with {} and have length {}.",
-                    input,
-                    first_char,
-                    input.len()
-                ),
-            )),
-        }
+        Self::Move::from_str(input)
     }
 
     fn move_to_san(&self, mv: &Self::Move) -> String {
@@ -2004,7 +2013,7 @@ impl pgn_traits::pgn::PgnBoard for Board {
     }
 
     fn move_from_lan(&self, input: &str) -> Result<Self::Move, pgn::Error> {
-        self.move_from_san(input)
+        Self::Move::from_str(input)
     }
 
     fn move_to_lan(&self, mv: &Self::Move) -> String {
