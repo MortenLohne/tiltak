@@ -36,6 +36,8 @@ use std::mem;
 use std::ops::{Index, IndexMut};
 use std::str::FromStr;
 use std::{fmt, iter, ops};
+#[cfg(feature = "wasm-bindgen")]
+use wasm_bindgen::prelude::*;
 
 /// Extra items for tuning evaluation constants.
 pub trait TunableBoard: BoardTrait {
@@ -893,6 +895,7 @@ impl ZobristKeys {
 }
 
 /// Complete representation of a Tak position
+#[cfg_attr(feature = "wasm", wasm_bindgen)]
 #[derive(Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Board {
