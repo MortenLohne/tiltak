@@ -16,15 +16,27 @@ impl MonteCarloTree {
         }
     }
 
-    /// Returns the best move in the position, as determined by the search so far. Will return `undefined` if no calls to `doSearchIterations` have been done, or if the game is already decided.
+    /// Returns the best move in the position, as determined by the search so far.
+    ///
+    /// Returns `undefined` if no calls to `doSearchIterations` have been done, or if the game is already decided.
     pub fn bestMove(&self) -> Option<String> {
-        if self.visits() < 2
-            || self.edge.child.is_none()
-            || self.edge.child.as_ref().unwrap().is_terminal
-        {
+        if self.visits() < 2 || self.board.game_result().is_some() {
             None
         } else {
             Some(self.best_move().0.to_string())
+        }
+    }
+
+    /// Returns the score of the position, as determined by the search so far.
+    /// The score is represented as winning probability from the side to move's perspective.
+    /// For example, 1.0 when you have Tinuë, and 0.5 for a roughly equal position.
+    ///
+    /// Returns `undefined` if no calls to `doSearchIterations` have been done, or if the game is already decided.
+    pub fn score(&self) -> Option<f32> {
+        if self.visits() < 2 || self.board.game_result().is_some() {
+            None
+        } else {
+            Some(self.best_move().1)
         }
     }
 }
