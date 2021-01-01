@@ -17,6 +17,7 @@ impl MonteCarloTree {
     }
 
     /// Returns the best move in the position, as determined by the search so far.
+    /// The move will be a string in PTN move notation.
     ///
     /// Returns `undefined` if no calls to `doSearchIterations` have been done, or if the game is already decided.
     pub fn bestMove(&self) -> Option<String> {
