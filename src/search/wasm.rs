@@ -1,7 +1,7 @@
 #![allow(non_snake_case)]
 
 use crate::board::{Board, Move};
-use crate::search::MonteCarloTree;
+use crate::search::{MctsSetting, MonteCarloTree};
 use board_game_traits::board::{Board as BoardTrait, Color};
 use pgn_traits::pgn::PgnBoard;
 use std::str::FromStr;
@@ -9,6 +9,11 @@ use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]
 impl MonteCarloTree {
+    #[wasm_bindgen(constructor)]
+    pub fn construct(board: Board) -> Self {
+        Self::with_settings(board, MctsSetting::default())
+    }
+
     /// Run `n` iterations of MCTS. Subsequent calls to this function will continue the same search, not restart it.
     pub fn doSearchIterations(&mut self, n: u32) {
         for _ in 0..n {
