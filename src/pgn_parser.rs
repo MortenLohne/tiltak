@@ -65,7 +65,7 @@ pub fn parse_pgn<B: PgnBoard + Debug + Clone>(
                     .iter()
                     .find(|(name, _)| name == "TPS")
                     .map(|(_, result)| B::from_fen(result))
-                    .unwrap_or(Ok(B::start_board()))?;
+                    .unwrap_or_else(|| Ok(B::start_board()))?;
 
                 let game = Game {
                     start_board,

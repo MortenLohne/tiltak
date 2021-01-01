@@ -32,7 +32,6 @@ use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use std::fmt::Write;
 use std::hash::{Hash, Hasher};
-use std::iter::FromIterator;
 use std::mem;
 use std::ops::{Index, IndexMut};
 use std::{fmt, iter, ops};
@@ -1093,13 +1092,6 @@ impl Board {
     pub fn group_data(&self) -> GroupData {
         let mut group_data = GroupData::default();
 
-        group_data.white_flat_stones = BitBoard::empty();
-        group_data.black_flat_stones = BitBoard::empty();
-        group_data.white_walls = BitBoard::empty();
-        group_data.black_walls = BitBoard::empty();
-        group_data.white_caps = BitBoard::empty();
-        group_data.black_caps = BitBoard::empty();
-
         for square in squares_iterator() {
             match self[square].top_stone() {
                 Some(WhiteFlat) => {
@@ -1951,7 +1943,7 @@ impl pgn_traits::pgn::PgnBoard for Board {
                 let square = Square::parse_square(&input[0..2]);
                 let direction = Direction::parse(input.chars().nth(2).unwrap());
                 // Moves in the simplified move notation always move one piece
-                let movements = ArrayVec::from_iter(iter::once(Movement { pieces_to_take: 1 }));
+                let movements = iter::once(Movement { pieces_to_take: 1 }).collect();
                 Ok(Move::Move(square, direction, StackMovement { movements }))
             }
             'C' if input.len() == 3 => Ok(Move::Place(Cap, Square::parse_square(&input[1..]))),

@@ -121,6 +121,7 @@ impl BitBoard {
     #[inline]
     pub fn file(self, i: u8) -> Self {
         debug_assert!(i < BOARD_SIZE as u8);
+        #[allow(clippy::unusual_byte_groupings)]
         const MASK: u64 = 0b1_00001_00001_00001_00001; // TODO: Change for 6x6
         BitBoard::from_u64(self.board & (MASK << i as u64))
     }
