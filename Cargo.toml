@@ -11,10 +11,16 @@ default-run = "main"
 [profile.release]
 debug = true
 
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = false
+
 [features]
 constant-tuning = ["rayon", "rand_distr"]
 aws-lambda = ["lambda_runtime", "serde", "serde_json", "arrayvec/serde", "rusoto_core", "rusoto_lambda", "bytes", "tokio"]
 wasm = ["wasm-bindgen", "wasm-bindgen/serde-serialize", "serde", "arrayvec/serde", "js-sys"]
+
+[lib]
+crate-type = ["cdylib", "rlib"]
 
 [[bin]]
 name = "bootstrap"
