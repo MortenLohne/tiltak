@@ -21,8 +21,6 @@ use taik::board::TunableBoard;
 use taik::board::{Move, Role};
 use taik::minmax;
 use taik::pgn_writer::Game;
-#[cfg(feature = "constant-tuning")]
-use taik::tune::play_match::play_match_between_params;
 use taik::{board, search};
 
 fn main() {
