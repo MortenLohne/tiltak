@@ -322,13 +322,24 @@ impl Square {
         }
     }
 
-    pub fn parse_square(input: &str) -> Square {
-        assert_eq!(input.len(), 2, "Couldn't parse square {}", input);
-        Square(
-            (input.chars().next().unwrap() as u8 - b'a')
-                + (BOARD_SIZE as u8 + b'0' - input.chars().nth(1).unwrap() as u8)
-                    * BOARD_SIZE as u8,
-        )
+    pub fn parse_square(input: &str) -> Result<Square, pgn::Error> {
+        if input.len() != 2 {
+            return Err(pgn::Error::new_parse_error(format!(
+                "Couldn't parse square \"{}\"",
+                input
+            )));
+        }
+        let mut chars = input.chars();
+        let file = chars.next().unwrap() as u8 - b'a';
+        let rank = BOARD_SIZE as u8 + b'0' - chars.next().unwrap() as u8;
+        if file >= BOARD_SIZE as u8 || rank >= BOARD_SIZE as u8 {
+            Err(pgn::Error::new_parse_error(format!(
+                "Couldn't parse square \"{}\"",
+                input
+            )))
+        } else {
+            Ok(Square(file + rank * BOARD_SIZE as u8))
+        }
     }
 }
 
@@ -1936,20 +1947,20 @@ impl pgn_traits::pgn::PgnBoard for Board {
         let first_char = input.chars().next().unwrap();
         match first_char {
             'a'..='e' if input.len() == 2 => {
-                let square = Square::parse_square(input);
+                let square = Square::parse_square(input)?;
                 Ok(Move::Place(Flat, square))
             }
             'a'..='e' if input.len() == 3 => {
-                let square = Square::parse_square(&input[0..2]);
+                let square = Square::parse_square(&input[0..2])?;
                 let direction = Direction::parse(input.chars().nth(2).unwrap());
                 // Moves in the simplified move notation always move one piece
                 let movements = iter::once(Movement { pieces_to_take: 1 }).collect();
                 Ok(Move::Move(square, direction, StackMovement { movements }))
             }
-            'C' if input.len() == 3 => Ok(Move::Place(Cap, Square::parse_square(&input[1..]))),
-            'S' if input.len() == 3 => Ok(Move::Place(Wall, Square::parse_square(&input[1..]))),
+            'C' if input.len() == 3 => Ok(Move::Place(Cap, Square::parse_square(&input[1..])?)),
+            'S' if input.len() == 3 => Ok(Move::Place(Wall, Square::parse_square(&input[1..])?)),
             '1'..='9' if input.len() > 3 => {
-                let square = Square::parse_square(&input[1..3]);
+                let square = Square::parse_square(&input[1..3])?;
                 let direction = Direction::parse(input.chars().nth(3).unwrap());
                 let pieces_taken = first_char.to_digit(10).unwrap() as u8;
                 let mut pieces_held = pieces_taken;

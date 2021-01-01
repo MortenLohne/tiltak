@@ -496,7 +496,7 @@ fn square_rank_file_test() {
 fn group_connection_test() {
     let group_connection = GroupEdgeConnection::default();
 
-    let a1_connection = group_connection.connect_square(Square::parse_square("a1"));
+    let a1_connection = group_connection.connect_square(Square::parse_square("a1").unwrap());
 
     assert!(!a1_connection.is_connected_south());
     assert!(!a1_connection.is_connected_east());
@@ -512,8 +512,8 @@ fn critical_square_test() {
 
     do_moves_and_check_validity(&mut board, &move_strings);
 
-    let e1 = Square::parse_square("e1");
-    let a5 = Square::parse_square("a5");
+    let e1 = Square::parse_square("e1").unwrap();
+    let a5 = Square::parse_square("a5").unwrap();
     let group_data = board.group_data();
     assert!(group_data.is_critical_square(e1, Color::White));
     assert!(!group_data.is_critical_square(e1, Color::Black));

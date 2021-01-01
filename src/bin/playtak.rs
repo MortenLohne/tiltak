@@ -473,7 +473,7 @@ use taik::search;
 pub fn parse_move(input: &str) -> board::Move {
     let words: Vec<&str> = input.split_whitespace().collect();
     if words[0] == "P" {
-        let square = board::Square::parse_square(&words[1].to_lowercase());
+        let square = board::Square::parse_square(&words[1].to_lowercase()).unwrap();
         let role = match words.get(2) {
             Some(&"C") => Role::Cap,
             Some(&"W") => Role::Wall,
@@ -482,8 +482,8 @@ pub fn parse_move(input: &str) -> board::Move {
         };
         board::Move::Place(role, square)
     } else if words[0] == "M" {
-        let start_square = board::Square::parse_square(&words[1].to_lowercase());
-        let end_square = board::Square::parse_square(&words[2].to_lowercase());
+        let start_square = board::Square::parse_square(&words[1].to_lowercase()).unwrap();
+        let end_square = board::Square::parse_square(&words[2].to_lowercase()).unwrap();
         let pieces_dropped: ArrayVec<[u8; board::BOARD_SIZE - 1]> = words
             .iter()
             .skip(3)
