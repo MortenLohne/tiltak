@@ -33,6 +33,16 @@ impl MonteCarloTree {
         }
     }
 
+    /// Returns the principle variation in the position, i.e., the most likely line to be played, as determined by the search so far.
+    /// The moves will be an array of strings in PTN move notation.
+    ///
+    /// Returns an empty array if no calls to `doSearchIterations` have been done, or if the game is already decided.
+    pub fn getPV(&self) -> js_sys::Array {
+        self.pv()
+            .map(|mv| JsValue::from_str(&mv.to_string()))
+            .collect()
+    }
+
     /// Returns the score of the position, as determined by the search so far.
     /// The score is represented as winning probability from the side to move's perspective.
     /// For example, 1.0 when you have Tinuë, and 0.5 for a roughly equal position.
