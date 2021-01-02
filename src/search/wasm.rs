@@ -45,7 +45,7 @@ impl MonteCarloTree {
 
     /// Returns the score of the position, as determined by the search so far.
     /// The score is represented as winning probability from the side to move's perspective.
-    /// For example, 1.0 when you have Tinuë, and 0.5 for a roughly equal position.
+    /// For example, 1.0 when you have tinuë, or 0.5 for an equal position.
     ///
     /// Returns `undefined` if no calls to `doSearchIterations` have been done, or if the game is already decided.
     pub fn score(&self) -> Option<f32> {
@@ -64,16 +64,25 @@ impl Board {
         Self::start_board()
     }
 
+    /// Plays a move on the board, given in PTN move notation.
+    /// Returns a special `ReverseMove` type, which can be used with `reverseMove` to undo the move.
+    /// Move legality is not checked. Doing an illegal move will cause unspecified behavior.
+    ///
+    /// Doing and then reversing a move always restores the board to exactly the same state.
     pub fn doMove(&mut self, move_string: &str) -> JsValue {
         let reverse_move = self.do_move(Move::from_str(move_string).unwrap());
         JsValue::from_serde(&reverse_move).unwrap()
     }
 
-    pub fn reverseMove(&mut self, reverse_move_string: JsValue) {
-        let reverse_move = JsValue::into_serde(&reverse_move_string).unwrap();
+    /// Reverse a move on the board.
+    /// This function can only be called with `ReverseMove`s from the `doMove` method.
+    pub fn reverseMove(&mut self, reverse_move: JsValue) {
+        let reverse_move = JsValue::into_serde(&reverse_move).unwrap();
         self.reverse_move(reverse_move);
     }
 
+    /// Returns an array of all legal moves on the board.
+    /// The moves will be strings in PTN move notation.
     pub fn getLegalMoves(&self) -> js_sys::Array {
         let mut moves = vec![];
         self.generate_moves(&mut moves);
@@ -83,6 +92,7 @@ impl Board {
             .collect()
     }
 
+    /// Returns the side to move. `1` for white, `2` for black.
     pub fn getSideToMove(&self) -> u32 {
         match self.side_to_move() {
             Color::White => 1,
@@ -90,10 +100,12 @@ impl Board {
         }
     }
 
+    /// Returns `true` if the game is over, `false` otherwise.
     pub fn isGameOver(&self) -> bool {
         self.game_result().is_some()
     }
 
+    /// Constructs a new board from Tak Positional Notation
     pub fn newFromTps(tps_string: &str) -> Result<Board, JsValue> {
         Self::from_fen(tps_string).map_err(|err| JsValue::from_serde(&err.to_string()).unwrap())
     }
