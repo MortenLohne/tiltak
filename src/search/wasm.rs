@@ -58,6 +58,12 @@ impl MonteCarloTree {
 }
 #[wasm_bindgen]
 impl Board {
+    #[wasm_bindgen(constructor)]
+    /// Constructs a board in the starting position.
+    pub fn new() -> Self {
+        Self::start_board()
+    }
+
     pub fn doMove(&mut self, move_string: &str) -> JsValue {
         let reverse_move = self.do_move(Move::from_str(move_string).unwrap());
         JsValue::from_serde(&reverse_move).unwrap()
@@ -66,10 +72,6 @@ impl Board {
     pub fn reverseMove(&mut self, reverse_move_string: JsValue) {
         let reverse_move = JsValue::into_serde(&reverse_move_string).unwrap();
         self.reverse_move(reverse_move);
-    }
-
-    pub fn startBoard() -> Self {
-        Self::start_board()
     }
 
     pub fn legalMoves(&self) -> js_sys::Array {
