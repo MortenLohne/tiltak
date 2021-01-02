@@ -74,7 +74,7 @@ impl Board {
         self.reverse_move(reverse_move);
     }
 
-    pub fn legalMoves(&self) -> js_sys::Array {
+    pub fn getLegalMoves(&self) -> js_sys::Array {
         let mut moves = vec![];
         self.generate_moves(&mut moves);
         moves
@@ -83,18 +83,18 @@ impl Board {
             .collect()
     }
 
-    pub fn sideToMove(&self) -> u32 {
+    pub fn getSideToMove(&self) -> u32 {
         match self.side_to_move() {
             Color::White => 1,
             Color::Black => 2,
         }
     }
 
-    pub fn gameIsOver(&self) -> bool {
+    pub fn isGameOver(&self) -> bool {
         self.game_result().is_some()
     }
 
-    pub fn fromTps(tps_string: &str) -> Result<Board, JsValue> {
+    pub fn newFromTps(tps_string: &str) -> Result<Board, JsValue> {
         Self::from_fen(tps_string).map_err(|err| JsValue::from_serde(&err.to_string()).unwrap())
     }
 }
