@@ -51,11 +51,11 @@ pub fn train_perpetually(
     let mut all_games = vec![];
     let mut all_move_scores = vec![];
 
-    let mut last_value_params = initial_value_params.clone();
-    let mut last_policy_params = initial_policy_params.clone();
+    let mut last_value_params = *initial_value_params;
+    let mut last_policy_params = *initial_policy_params;
 
-    let mut value_params = initial_value_params.clone();
-    let mut policy_params = initial_policy_params.clone();
+    let mut value_params = *initial_value_params;
+    let mut policy_params = *initial_policy_params;
 
     let mut batch_id = 0;
     let start_time = time::Instant::now();

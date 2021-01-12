@@ -33,7 +33,7 @@ pub fn gradient_descent<const N: usize>(
     );
 
     let mut lowest_error = initial_error;
-    let mut best_parameter_set = params.clone();
+    let mut best_parameter_set = *params;
 
     for eta in [
         initial_learning_rate,
@@ -44,7 +44,7 @@ pub fn gradient_descent<const N: usize>(
     .iter()
     {
         trace!("\nTuning with eta = {}\n", eta);
-        let mut parameter_set = best_parameter_set.clone();
+        let mut parameter_set = best_parameter_set;
         let mut gradients = [0.0; N];
 
         let mut iterations_since_improvement = 0;
@@ -78,7 +78,7 @@ pub fn gradient_descent<const N: usize>(
                     }
                 }
                 lowest_error = error;
-                best_parameter_set = parameter_set.clone();
+                best_parameter_set = parameter_set;
             } else {
                 iterations_since_improvement += 1;
                 iterations_since_large_improvement += 1;
