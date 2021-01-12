@@ -59,6 +59,23 @@ impl BitBoard {
         }
     }
 
+    pub fn all_lines() -> [Self; BOARD_SIZE * 2] {
+        let mut result = [BitBoard::empty(); BOARD_SIZE * 2];
+        let full = BitBoard::full();
+        for i in 0..BOARD_SIZE {
+            result[i * 2] = full.rank(i as u8);
+            result[i * 2 + 1] = full.file(i as u8);
+        }
+        result
+    }
+
+    pub fn lines_for_square(square: Square) -> [Self; 2] {
+        [
+            Self::full().rank(square.rank()),
+            Self::full().file(square.file()),
+        ]
+    }
+
     #[inline]
     pub fn lower_n_bits(n: u8) -> Self {
         if n >= 64 {
@@ -104,6 +121,7 @@ impl BitBoard {
     #[inline]
     pub fn file(self, i: u8) -> Self {
         debug_assert!(i < BOARD_SIZE as u8);
+        #[allow(clippy::unusual_byte_groupings)]
         const MASK: u64 = 0b1_00001_00001_00001_00001; // TODO: Change for 6x6
         BitBoard::from_u64(self.board & (MASK << i as u64))
     }

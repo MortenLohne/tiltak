@@ -1,3 +1,4 @@
+use log::trace;
 use rayon::prelude::*;
 use std::time::Instant;
 

@@ -1,10 +1,17 @@
 //! Tak move generation, along with all required data types.
 
+use lazy_static::lazy_static;
+
+lazy_static! {
+    pub(crate) static ref ZOBRIST_KEYS: Box<ZobristKeys> = ZobristKeys::new();
+}
+
 /// The size of the board. Only 5 works correctly for now.
 pub const BOARD_SIZE: usize = 5;
 
 pub const BOARD_AREA: usize = BOARD_SIZE * BOARD_SIZE;
 
+pub const STARTING_STONES: u8 = 21;
 pub const STARTING_CAPSTONES: u8 = 1;
 
 use crate::bitboard::BitBoard;
@@ -12,30 +19,29 @@ use crate::board::Direction::*;
 use crate::board::Piece::*;
 use crate::board::Role::Flat;
 use crate::board::Role::*;
-use crate::mcts;
-use crate::move_gen::sigmoid;
+use crate::{policy_eval, search, value_eval};
 use arrayvec::ArrayVec;
 use board_game_traits::board;
 use board_game_traits::board::GameResult::{BlackWin, Draw, WhiteWin};
 use board_game_traits::board::{Board as BoardTrait, EvalBoard as EvalBoardTrait};
 use board_game_traits::board::{Color, GameResult};
 use pgn_traits::pgn;
+use rand::{Rng, SeedableRng};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
-use std::cell::RefCell;
 use std::cmp::Ordering;
 use std::fmt::Write;
 use std::hash::{Hash, Hasher};
-use std::iter::FromIterator;
-#[cfg(test)]
 use std::mem;
-use std::ops::{Deref, DerefMut, Index, IndexMut};
+use std::ops::{Index, IndexMut};
+use std::str::FromStr;
 use std::{fmt, iter, ops};
 
 /// Extra items for tuning evaluation constants.
 pub trait TunableBoard<const N: usize, const M: usize>: BoardTrait {
     const VALUE_PARAMS: [f32; N];
     const POLICY_PARAMS: [f32; M];
+    type ExtraData;
 
     fn static_eval_coefficients(&self, coefficients: &mut [f32]);
 
@@ -49,13 +55,18 @@ pub trait TunableBoard<const N: usize, const M: usize>: BoardTrait {
     fn generate_moves_with_params(
         &self,
         params: &[f32],
+        data: &Self::ExtraData,
         simple_moves: &mut Vec<<Self as BoardTrait>::Move>,
-        moves: &mut Vec<(<Self as BoardTrait>::Move, mcts::Score)>,
+        moves: &mut Vec<(<Self as BoardTrait>::Move, search::Score)>,
     );
 
-    fn probability_for_move(&self, params: &[f32], mv: &Self::Move, num_moves: usize) -> f32;
-
-    fn coefficients_for_move(&self, coefficients: &mut [f32], mv: &Move, num_legal_moves: usize);
+    fn coefficients_for_move(
+        &self,
+        coefficients: &mut [f32],
+        mv: &Move,
+        data: &Self::ExtraData,
+        num_legal_moves: usize,
+    );
 }
 
 pub(crate) trait ColorTr {
@@ -63,15 +74,21 @@ pub(crate) trait ColorTr {
 
     fn stones_left(board: &Board) -> u8;
 
-    fn capstones_left(board: &Board) -> u8;
+    fn caps_left(board: &Board) -> u8;
 
-    fn road_stones(board: &Board) -> BitBoard;
+    fn road_stones(group_data: &GroupData) -> BitBoard;
 
-    fn blocking_stones(board: &Board) -> BitBoard;
+    fn blocking_stones(group_data: &GroupData) -> BitBoard;
+
+    fn flats(group_data: &GroupData) -> BitBoard;
+
+    fn walls(group_data: &GroupData) -> BitBoard;
+
+    fn caps(group_data: &GroupData) -> BitBoard;
 
     fn flat_piece() -> Piece;
 
-    fn standing_piece() -> Piece;
+    fn wall_piece() -> Piece;
 
     fn cap_piece() -> Piece;
 
@@ -84,7 +101,7 @@ pub(crate) trait ColorTr {
     fn critical_squares(group_data: &GroupData) -> BitBoard;
 }
 
-struct WhiteTr {}
+pub(crate) struct WhiteTr {}
 
 impl ColorTr for WhiteTr {
     fn color() -> Color {
@@ -95,24 +112,36 @@ impl ColorTr for WhiteTr {
         board.white_stones_left
     }
 
-    fn capstones_left(board: &Board) -> u8 {
-        board.white_capstones_left
+    fn caps_left(board: &Board) -> u8 {
+        board.white_caps_left
     }
 
-    fn road_stones(board: &Board) -> BitBoard {
-        board.white_road_pieces()
+    fn road_stones(group_data: &GroupData) -> BitBoard {
+        group_data.white_road_pieces()
     }
 
-    fn blocking_stones(board: &Board) -> BitBoard {
-        board.white_blocking_pieces()
+    fn blocking_stones(group_data: &GroupData) -> BitBoard {
+        group_data.white_blocking_pieces()
+    }
+
+    fn flats(group_data: &GroupData) -> BitBoard {
+        group_data.white_flat_stones
+    }
+
+    fn walls(group_data: &GroupData) -> BitBoard {
+        group_data.white_walls
+    }
+
+    fn caps(group_data: &GroupData) -> BitBoard {
+        group_data.white_caps
     }
 
     fn flat_piece() -> Piece {
         Piece::WhiteFlat
     }
 
-    fn standing_piece() -> Piece {
-        Piece::WhiteStanding
+    fn wall_piece() -> Piece {
+        Piece::WhiteWall
     }
 
     fn cap_piece() -> Piece {
@@ -124,7 +153,7 @@ impl ColorTr for WhiteTr {
     }
 
     fn piece_is_ours(piece: Piece) -> bool {
-        piece == WhiteFlat || piece == WhiteStanding || piece == WhiteCap
+        piece == WhiteFlat || piece == WhiteWall || piece == WhiteCap
     }
 
     fn is_critical_square(group_data: &GroupData, square: Square) -> bool {
@@ -136,7 +165,7 @@ impl ColorTr for WhiteTr {
     }
 }
 
-struct BlackTr {}
+pub(crate) struct BlackTr {}
 
 impl ColorTr for BlackTr {
     fn color() -> Color {
@@ -147,24 +176,36 @@ impl ColorTr for BlackTr {
         board.black_stones_left
     }
 
-    fn capstones_left(board: &Board) -> u8 {
-        board.black_capstones_left
+    fn caps_left(board: &Board) -> u8 {
+        board.black_caps_left
     }
 
-    fn road_stones(board: &Board) -> BitBoard {
-        board.black_road_pieces()
+    fn road_stones(group_data: &GroupData) -> BitBoard {
+        group_data.black_road_pieces()
     }
 
-    fn blocking_stones(board: &Board) -> BitBoard {
-        board.black_blocking_pieces()
+    fn blocking_stones(group_data: &GroupData) -> BitBoard {
+        group_data.black_blocking_pieces()
+    }
+
+    fn flats(group_data: &GroupData) -> BitBoard {
+        group_data.black_flat_stones
+    }
+
+    fn walls(group_data: &GroupData) -> BitBoard {
+        group_data.black_walls
+    }
+
+    fn caps(group_data: &GroupData) -> BitBoard {
+        group_data.black_caps
     }
 
     fn flat_piece() -> Piece {
         Piece::BlackFlat
     }
 
-    fn standing_piece() -> Piece {
-        Piece::BlackStanding
+    fn wall_piece() -> Piece {
+        Piece::BlackWall
     }
 
     fn cap_piece() -> Piece {
@@ -176,7 +217,7 @@ impl ColorTr for BlackTr {
     }
 
     fn piece_is_ours(piece: Piece) -> bool {
-        piece == BlackFlat || piece == BlackCap || piece == BlackStanding
+        piece == BlackFlat || piece == BlackCap || piece == BlackWall
     }
 
     fn is_critical_square(group_data: &GroupData, square: Square) -> bool {
@@ -282,13 +323,24 @@ impl Square {
         }
     }
 
-    pub fn parse_square(input: &str) -> Square {
-        assert_eq!(input.len(), 2, "Couldn't parse square {}", input);
-        Square(
-            (input.chars().next().unwrap() as u8 - b'a')
-                + (BOARD_SIZE as u8 + b'0' - input.chars().nth(1).unwrap() as u8)
-                    * BOARD_SIZE as u8,
-        )
+    pub fn parse_square(input: &str) -> Result<Square, pgn::Error> {
+        if input.len() != 2 {
+            return Err(pgn::Error::new_parse_error(format!(
+                "Couldn't parse square \"{}\"",
+                input
+            )));
+        }
+        let mut chars = input.chars();
+        let file = chars.next().unwrap() as u8 - b'a';
+        let rank = BOARD_SIZE as u8 + b'0' - chars.next().unwrap() as u8;
+        if file >= BOARD_SIZE as u8 || rank >= BOARD_SIZE as u8 {
+            Err(pgn::Error::new_parse_error(format!(
+                "Couldn't parse square \"{}\"",
+                input
+            )))
+        } else {
+            Ok(Square(file + rank * BOARD_SIZE as u8))
+        }
     }
 }
 
@@ -316,7 +368,7 @@ pub fn squares_iterator() -> impl Iterator<Item = Square> {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum Role {
     Flat,
-    Standing,
+    Wall,
     Cap,
 }
 
@@ -324,22 +376,22 @@ pub enum Role {
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Hash)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum Piece {
-    WhiteFlat,
-    BlackFlat,
-    WhiteStanding,
-    BlackStanding,
-    WhiteCap,
-    BlackCap,
+    WhiteFlat = 0,
+    BlackFlat = 1,
+    WhiteWall = 2,
+    BlackWall = 3,
+    WhiteCap = 4,
+    BlackCap = 5,
 }
 
 impl Piece {
     pub fn from_role_color(role: Role, color: Color) -> Self {
         match (role, color) {
             (Flat, Color::White) => WhiteFlat,
-            (Standing, Color::White) => WhiteStanding,
+            (Wall, Color::White) => WhiteWall,
             (Cap, Color::White) => WhiteCap,
             (Flat, Color::Black) => BlackFlat,
-            (Standing, Color::Black) => BlackStanding,
+            (Wall, Color::Black) => BlackWall,
             (Cap, Color::Black) => BlackCap,
         }
     }
@@ -347,15 +399,15 @@ impl Piece {
     pub fn role(self) -> Role {
         match self {
             WhiteFlat | BlackFlat => Flat,
-            WhiteStanding | BlackStanding => Standing,
+            WhiteWall | BlackWall => Wall,
             WhiteCap | BlackCap => Cap,
         }
     }
 
     pub fn color(self) -> Color {
         match self {
-            WhiteFlat | WhiteStanding | WhiteCap => Color::White,
-            BlackFlat | BlackStanding | BlackCap => Color::Black,
+            WhiteFlat | WhiteWall | WhiteCap => Color::White,
+            BlackFlat | BlackWall | BlackCap => Color::Black,
         }
     }
 
@@ -367,8 +419,8 @@ impl Piece {
         match self {
             WhiteFlat => BlackFlat,
             BlackFlat => WhiteFlat,
-            WhiteStanding => BlackStanding,
-            BlackStanding => WhiteStanding,
+            WhiteWall => BlackWall,
+            BlackWall => WhiteWall,
             WhiteCap => BlackCap,
             BlackCap => WhiteCap,
         }
@@ -382,8 +434,8 @@ impl ops::Not for Piece {
         match self {
             WhiteFlat => BlackFlat,
             BlackFlat => WhiteFlat,
-            WhiteStanding => BlackStanding,
-            BlackStanding => WhiteStanding,
+            WhiteWall => BlackWall,
+            BlackWall => WhiteWall,
             WhiteCap => BlackCap,
             BlackCap => WhiteCap,
         }
@@ -391,12 +443,12 @@ impl ops::Not for Piece {
 }
 
 /// The contents of a square on the board, consisting of zero or more pieces
-#[derive(Clone, PartialEq, Eq, Debug, Default, Hash)]
+#[derive(Copy, Clone, PartialEq, Eq, Debug, Default, Hash)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Stack {
-    top_stone: Option<Piece>,
-    bitboard: BitBoard,
-    height: u8,
+    pub(crate) top_stone: Option<Piece>,
+    pub(crate) bitboard: BitBoard,
+    pub(crate) height: u8,
 }
 
 impl Stack {
@@ -482,7 +534,7 @@ impl Stack {
     }
 }
 
-/// An iterator over the pieces in a stack.
+/// An iterator over the pieces in a stack, from the bottom up
 pub struct StackIterator {
     stack: Stack,
 }
@@ -522,7 +574,7 @@ impl fmt::Display for Move {
             Move::Place(role, square) => match role {
                 Cap => write!(f, "C{}", square)?,
                 Flat => write!(f, "{}", square)?,
-                Standing => write!(f, "S{}", square)?,
+                Wall => write!(f, "S{}", square)?,
             },
             Move::Move(square, direction, stack_movements) => {
                 let mut pieces_held = stack_movements.movements[0].pieces_to_take;
@@ -557,6 +609,76 @@ impl fmt::Debug for Move {
         write!(f, "{}", self)
     }
 }
+
+impl FromStr for Move {
+    type Err = pgn::Error;
+    fn from_str(input: &str) -> Result<Self, pgn::Error> {
+        if input.len() < 2 {
+            return Err(pgn::Error::new(
+                pgn::ErrorKind::ParseError,
+                "Input move too short.",
+            ));
+        }
+        if !input.is_ascii() {
+            return Err(pgn::Error::new(
+                pgn::ErrorKind::ParseError,
+                "Input move contained non-ascii characters.",
+            ));
+        }
+        let first_char = input.chars().next().unwrap();
+        match first_char {
+            'a'..='e' if input.len() == 2 => {
+                let square = Square::parse_square(input)?;
+                Ok(Move::Place(Flat, square))
+            }
+            'a'..='e' if input.len() == 3 => {
+                let square = Square::parse_square(&input[0..2])?;
+                let direction = Direction::parse(input.chars().nth(2).unwrap());
+                // Moves in the simplified move notation always move one piece
+                let movements = iter::once(Movement { pieces_to_take: 1 }).collect();
+                Ok(Move::Move(square, direction, StackMovement { movements }))
+            }
+            'C' if input.len() == 3 => Ok(Move::Place(Cap, Square::parse_square(&input[1..])?)),
+            'S' if input.len() == 3 => Ok(Move::Place(Wall, Square::parse_square(&input[1..])?)),
+            '1'..='9' if input.len() > 3 => {
+                let square = Square::parse_square(&input[1..3])?;
+                let direction = Direction::parse(input.chars().nth(3).unwrap());
+                let pieces_taken = first_char.to_digit(10).unwrap() as u8;
+                let mut pieces_held = pieces_taken;
+
+                let mut amounts_to_drop = input
+                    .chars()
+                    .skip(4)
+                    .map(|ch| ch.to_digit(10).unwrap() as u8)
+                    .collect::<Vec<u8>>();
+                amounts_to_drop.pop(); //
+
+                let mut movements = ArrayVec::new();
+                movements.push(Movement {
+                    pieces_to_take: pieces_taken,
+                });
+
+                for amount_to_drop in amounts_to_drop {
+                    movements.push(Movement {
+                        pieces_to_take: pieces_held - amount_to_drop,
+                    });
+                    pieces_held -= amount_to_drop;
+                }
+                Ok(Move::Move(square, direction, StackMovement { movements }))
+            }
+            _ => Err(pgn::Error::new(
+                pgn::ErrorKind::ParseError,
+                format!(
+                    "Couldn't parse move \"{}\". Moves cannot start with {} and have length {}.",
+                    input,
+                    first_char,
+                    input.len()
+                ),
+            )),
+        }
+    }
+}
+
 /// The counterpart of `Move`. When applied to a `Board`, it fully reverses the accompanying `Move`.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub enum ReverseMove {
@@ -702,10 +824,38 @@ pub struct GroupData {
     pub(crate) amount_in_group: [(u8, GroupEdgeConnection); BOARD_AREA + 1],
     pub(crate) white_critical_squares: BitBoard,
     pub(crate) black_critical_squares: BitBoard,
-    updated_groups: bool,
+    white_flat_stones: BitBoard,
+    black_flat_stones: BitBoard,
+    white_caps: BitBoard,
+    black_caps: BitBoard,
+    white_walls: BitBoard,
+    black_walls: BitBoard,
 }
 
 impl GroupData {
+    pub(crate) fn white_road_pieces(&self) -> BitBoard {
+        self.white_flat_stones | self.white_caps
+    }
+
+    pub(crate) fn black_road_pieces(&self) -> BitBoard {
+        self.black_flat_stones | self.black_caps
+    }
+
+    pub(crate) fn white_blocking_pieces(&self) -> BitBoard {
+        self.white_walls | self.white_caps
+    }
+
+    pub(crate) fn black_blocking_pieces(&self) -> BitBoard {
+        self.black_walls | self.black_caps
+    }
+
+    pub(crate) fn all_pieces(&self) -> BitBoard {
+        self.white_flat_stones
+            | self.white_blocking_pieces()
+            | self.black_flat_stones
+            | self.black_blocking_pieces()
+    }
+
     pub fn is_critical_square(&self, square: Square, color: Color) -> bool {
         match color {
             Color::White => WhiteTr::is_critical_square(self, square),
@@ -720,6 +870,26 @@ impl GroupData {
         }
     }
 }
+#[derive(PartialEq, Eq, Debug)]
+pub struct ZobristKeys {
+    top_stones: AbstractBoard<[u64; 6]>,
+    stones_in_stack: [AbstractBoard<[u64; 256]>; 8],
+    to_move: [u64; 2],
+}
+
+impl ZobristKeys {
+    pub(crate) fn new() -> Box<Self> {
+        let mut rng = rand::rngs::StdRng::from_seed([0; 32]);
+        let mut random_vec: Vec<u64> = vec![0; mem::size_of::<ZobristKeys>() / 8];
+        for word in random_vec.iter_mut() {
+            *word = rng.gen();
+        }
+        let zobrist = unsafe { mem::transmute(Box::from_raw(random_vec.as_mut_ptr())) };
+
+        mem::forget(random_vec);
+        zobrist
+    }
+}
 
 /// Complete representation of a Tak position
 #[derive(Clone)]
@@ -728,19 +898,14 @@ pub struct Board {
     cells: AbstractBoard<Stack>,
     #[cfg_attr(feature = "serde", serde(with = "ColorDef"))]
     to_move: Color,
-    white_flat_stones: BitBoard,
-    black_flat_stones: BitBoard,
-    white_capstones: BitBoard,
-    black_capstones: BitBoard,
-    white_standing_stones: BitBoard,
-    black_standing_stones: BitBoard,
     white_stones_left: u8,
     black_stones_left: u8,
-    white_capstones_left: u8,
-    black_capstones_left: u8,
-    moves_played: u16,
+    white_caps_left: u8,
+    black_caps_left: u8,
+    half_moves_played: usize,
     moves: Vec<Move>,
-    group_data: RefCell<GroupData>,
+    hash: u64,              // Zobrist hash of current position
+    hash_history: Vec<u64>, // Zobrist hashes of previous board states, up to the last irreversible move. Does not include the corrent position
 }
 
 impl PartialEq for Board {
@@ -749,9 +914,10 @@ impl PartialEq for Board {
             && self.to_move == other.to_move
             && self.white_stones_left == other.white_stones_left
             && self.black_stones_left == other.black_stones_left
-            && self.white_capstones_left == other.white_capstones_left
-            && self.black_capstones_left == other.black_capstones_left
-            && self.moves_played == other.moves_played
+            && self.white_caps_left == other.white_caps_left
+            && self.black_caps_left == other.black_caps_left
+            && self.hash == other.hash
+            && self.half_moves_played == other.half_moves_played
     }
 }
 
@@ -763,9 +929,9 @@ impl Hash for Board {
         self.to_move.hash(state);
         self.white_stones_left.hash(state);
         self.black_stones_left.hash(state);
-        self.white_capstones_left.hash(state);
-        self.black_capstones_left.hash(state);
-        self.moves_played.hash(state);
+        self.white_caps_left.hash(state);
+        self.black_caps_left.hash(state);
+        self.half_moves_played.hash(state);
     }
 }
 
@@ -785,26 +951,18 @@ impl IndexMut<Square> for Board {
 
 impl Default for Board {
     fn default() -> Self {
-        let board = Board {
+        Board {
             cells: Default::default(),
             to_move: Color::White,
-            white_flat_stones: Default::default(),
-            black_flat_stones: Default::default(),
-            white_capstones: Default::default(),
-            black_capstones: Default::default(),
-            white_standing_stones: Default::default(),
-            black_standing_stones: Default::default(),
-            white_stones_left: 21,
-            black_stones_left: 21,
-            white_capstones_left: STARTING_CAPSTONES,
-            black_capstones_left: STARTING_CAPSTONES,
-            moves_played: 0,
+            white_stones_left: STARTING_STONES,
+            black_stones_left: STARTING_STONES,
+            white_caps_left: STARTING_CAPSTONES,
+            black_caps_left: STARTING_CAPSTONES,
+            half_moves_played: 0,
             moves: vec![],
-            group_data: RefCell::new(GroupData::default()),
-        };
-        board.group_data.borrow_mut().amount_in_group[0] =
-            (BOARD_AREA as u8, GroupEdgeConnection::default());
-        board
+            hash: ZOBRIST_KEYS.to_move[Color::White as u16 as usize],
+            hash_history: vec![],
+        }
     }
 }
 
@@ -817,10 +975,10 @@ impl fmt::Debug for Board {
                         match self.cells.raw[x][y].get(print_column * 3 + print_row) {
                             None => write!(f, "[.]")?,
                             Some(WhiteFlat) => write!(f, "[w]")?,
-                            Some(WhiteStanding) => write!(f, "[W]")?,
+                            Some(WhiteWall) => write!(f, "[W]")?,
                             Some(WhiteCap) => write!(f, "[C]")?,
                             Some(BlackFlat) => write!(f, "[b]")?,
-                            Some(BlackStanding) => write!(f, "[B]")?,
+                            Some(BlackWall) => write!(f, "[B]")?,
                             Some(BlackCap) => write!(f, "[c]")?,
                         }
                     }
@@ -837,56 +995,27 @@ impl fmt::Debug for Board {
         writeln!(
             f,
             "Capstones left: {}/{}.",
-            self.white_capstones_left, self.black_capstones_left
+            self.white_caps_left, self.black_caps_left
         )?;
         writeln!(f, "{} to move.", self.side_to_move())?;
-        writeln!(f, "White road stones: {:b}", self.white_road_pieces().board)?;
-        writeln!(f, "Black road stones: {:b}", self.black_road_pieces().board)?;
-        writeln!(f, "Groups: {:?}", self.group_data.borrow().groups)?;
         writeln!(
             f,
-            "Amount in groups: {:?}",
-            self.group_data.borrow().amount_in_group
+            "Hash: {}, hash history: {:?}",
+            self.hash, self.hash_history
         )?;
         Ok(())
     }
 }
 
 impl Board {
-    pub(crate) fn white_road_pieces(&self) -> BitBoard {
-        self.white_flat_stones | self.white_capstones
-    }
-
-    pub(crate) fn black_road_pieces(&self) -> BitBoard {
-        self.black_flat_stones | self.black_capstones
-    }
-
-    pub(crate) fn white_blocking_pieces(&self) -> BitBoard {
-        self.white_standing_stones | self.white_capstones
-    }
-
-    pub(crate) fn black_blocking_pieces(&self) -> BitBoard {
-        self.black_standing_stones | self.black_capstones
-    }
-
-    pub(crate) fn all_pieces(&self) -> BitBoard {
-        self.white_flat_stones
-            | self.white_blocking_pieces()
-            | self.black_flat_stones
-            | self.black_blocking_pieces()
-    }
-
-    pub fn white_flat_tops_count(&self) -> u8 {
-        self.white_road_pieces().count() - (STARTING_CAPSTONES - self.white_capstones_left)
-    }
-
-    pub fn black_flat_tops_count(&self) -> u8 {
-        self.black_road_pieces().count() - (STARTING_CAPSTONES - self.black_capstones_left)
+    #[cfg(test)]
+    pub fn zobrist_hash(&self) -> u64 {
+        self.hash
     }
 
     /// Number of moves/plies played in the game
-    pub fn half_moves_played(&self) -> u16 {
-        self.moves_played
+    pub fn half_moves_played(&self) -> usize {
+        self.half_moves_played
     }
 
     /// All the moves played in the game
@@ -894,11 +1023,31 @@ impl Board {
         &self.moves
     }
 
-    pub(crate) fn group_data<'a>(&'a self) -> impl Deref<Target = GroupData> + 'a {
-        if !self.group_data.borrow().updated_groups {
-            self.update_group_connectedness();
+    pub fn null_move(&mut self) {
+        self.to_move = !self.to_move;
+    }
+
+    pub(crate) fn zobrist_hash_from_scratch(&self) -> u64 {
+        let mut hash = 0;
+        hash ^= ZOBRIST_KEYS.to_move[self.to_move.disc()];
+
+        for square in squares_iterator() {
+            hash ^= self.zobrist_hash_for_square(square);
         }
-        self.group_data.borrow()
+        hash
+    }
+
+    pub(crate) fn zobrist_hash_for_square(&self, square: Square) -> u64 {
+        let mut hash = 0;
+        let stack = &self[square];
+        if let Some(top_stone) = stack.top_stone {
+            hash ^= ZOBRIST_KEYS.top_stones[square][top_stone as u16 as usize];
+            for i in 0..(stack.len() as usize - 1) / 8 {
+                hash ^= ZOBRIST_KEYS.stones_in_stack[i][square]
+                    [stack.bitboard.board as usize >> (i * 8) & 255]
+            }
+        }
+        hash
     }
 
     fn is_critical_square_from_scratch(
@@ -920,35 +1069,28 @@ impl Board {
         sum_of_connections.is_winning()
     }
 
-    #[cfg(test)]
     pub fn flip_board_y(&self) -> Board {
         let mut new_board = self.clone();
         for x in 0..BOARD_SIZE as u8 {
             for y in 0..BOARD_SIZE as u8 {
                 new_board[Square(y * BOARD_SIZE as u8 + x)] =
-                    self[Square((BOARD_SIZE as u8 - y - 1) * BOARD_SIZE as u8 + x)].clone();
+                    self[Square((BOARD_SIZE as u8 - y - 1) * BOARD_SIZE as u8 + x)];
             }
         }
-        new_board.bitboards_from_scratch();
-        new_board.update_group_connectedness();
         new_board
     }
 
-    #[cfg(test)]
     pub fn flip_board_x(&self) -> Board {
         let mut new_board = self.clone();
         for x in 0..BOARD_SIZE as u8 {
             for y in 0..BOARD_SIZE as u8 {
                 new_board[Square(y * BOARD_SIZE as u8 + x)] =
-                    self[Square(y * BOARD_SIZE as u8 + (BOARD_SIZE as u8 - x - 1))].clone();
+                    self[Square(y * BOARD_SIZE as u8 + (BOARD_SIZE as u8 - x - 1))];
             }
         }
-        new_board.bitboards_from_scratch();
-        new_board.update_group_connectedness();
         new_board
     }
 
-    #[cfg(test)]
     pub fn rotate_board(&self) -> Board {
         let mut new_board = self.clone();
         for x in 0..BOARD_SIZE as u8 {
@@ -956,20 +1098,17 @@ impl Board {
                 let new_x = y;
                 let new_y = BOARD_SIZE as u8 - x - 1;
                 new_board[Square(y * BOARD_SIZE as u8 + x)] =
-                    self[Square(new_y * BOARD_SIZE as u8 + new_x)].clone();
+                    self[Square(new_y * BOARD_SIZE as u8 + new_x)];
             }
         }
-        new_board.bitboards_from_scratch();
-        new_board.update_group_connectedness();
         new_board
     }
 
-    #[cfg(test)]
     pub fn flip_colors(&self) -> Board {
         let mut new_board = self.clone();
         for square in squares_iterator() {
             new_board[square] = Stack::default();
-            for piece in self[square].clone() {
+            for piece in self[square] {
                 new_board[square].push(piece.flip_color());
             }
         }
@@ -978,29 +1117,17 @@ impl Board {
             &mut new_board.black_stones_left,
         );
         mem::swap(
-            &mut new_board.white_capstones_left,
-            &mut new_board.black_capstones_left,
-        );
-        mem::swap(
-            &mut new_board.white_flat_stones,
-            &mut new_board.black_flat_stones,
-        );
-        mem::swap(
-            &mut new_board.white_standing_stones,
-            &mut new_board.black_standing_stones,
-        );
-        mem::swap(
-            &mut new_board.white_capstones,
-            &mut new_board.black_capstones,
+            &mut new_board.white_caps_left,
+            &mut new_board.black_caps_left,
         );
         new_board.to_move = !new_board.to_move;
-        new_board.update_group_connectedness();
         new_board
     }
 
-    #[cfg(test)]
-    pub fn rotations_and_symmetries(&self) -> Vec<Board> {
+    /// Returns all 8 symmetries of the board
+    pub fn symmetries(&self) -> Vec<Board> {
         vec![
+            self.clone(),
             self.flip_board_x(),
             self.flip_board_y(),
             self.rotate_board(),
@@ -1008,8 +1135,15 @@ impl Board {
             self.rotate_board().rotate_board().rotate_board(),
             self.rotate_board().flip_board_x(),
             self.rotate_board().flip_board_y(),
-            self.flip_colors(),
         ]
+    }
+
+    /// Returns all 16 symmetries of the board, where swapping the colors is also a symmetry
+    pub fn symmetries_with_swapped_colors(&self) -> Vec<Board> {
+        self.symmetries()
+            .into_iter()
+            .flat_map(|board| vec![board.clone(), board.flip_colors()])
+            .collect()
     }
 
     /// Move generation that includes a heuristic probability of each move being played.
@@ -1020,10 +1154,11 @@ impl Board {
     /// * `moves` A vector to place the moves and associated probabilities.
     pub fn generate_moves_with_probabilities(
         &self,
+        group_data: &GroupData,
         simple_moves: &mut Vec<Move>,
-        moves: &mut Vec<(Move, mcts::Score)>,
+        moves: &mut Vec<(Move, search::Score)>,
     ) {
-        self.generate_moves_with_params(&Board::POLICY_PARAMS, simple_moves, moves)
+        self.generate_moves_with_params(&Board::POLICY_PARAMS, group_data, simple_moves, moves)
     }
 
     fn count_all_pieces(&self) -> u8 {
@@ -1035,74 +1170,68 @@ impl Board {
             .sum()
     }
 
-    fn bitboards_from_scratch(&mut self) {
-        self.white_flat_stones = BitBoard::empty();
-        self.black_flat_stones = BitBoard::empty();
-        self.white_standing_stones = BitBoard::empty();
-        self.black_standing_stones = BitBoard::empty();
-        self.white_capstones = BitBoard::empty();
-        self.black_capstones = BitBoard::empty();
+    #[inline(never)]
+    pub fn group_data(&self) -> GroupData {
+        let mut group_data = GroupData::default();
+
         for square in squares_iterator() {
             match self[square].top_stone() {
-                Some(WhiteFlat) => self.white_flat_stones = self.white_flat_stones.set(square.0),
-                Some(BlackFlat) => self.black_flat_stones = self.black_flat_stones.set(square.0),
-                Some(WhiteStanding) => {
-                    self.white_standing_stones = self.white_standing_stones.set(square.0)
+                Some(WhiteFlat) => {
+                    group_data.white_flat_stones = group_data.white_flat_stones.set(square.0)
                 }
-                Some(BlackStanding) => {
-                    self.black_standing_stones = self.black_standing_stones.set(square.0)
+                Some(BlackFlat) => {
+                    group_data.black_flat_stones = group_data.black_flat_stones.set(square.0)
                 }
-                Some(WhiteCap) => self.white_capstones = self.white_capstones.set(square.0),
-                Some(BlackCap) => self.black_capstones = self.black_capstones.set(square.0),
+                Some(WhiteWall) => group_data.white_walls = group_data.white_walls.set(square.0),
+                Some(BlackWall) => group_data.black_walls = group_data.black_walls.set(square.0),
+                Some(WhiteCap) => group_data.white_caps = group_data.white_caps.set(square.0),
+                Some(BlackCap) => group_data.black_caps = group_data.black_caps.set(square.0),
                 None => (),
             }
         }
-    }
-
-    pub fn update_group_connectedness(&self) {
-        let mut group_data = self.group_data.borrow_mut();
-
-        let GroupData {
-            groups,
-            amount_in_group,
-            white_critical_squares,
-            black_critical_squares,
-            updated_groups,
-        } = group_data.deref_mut();
 
         let mut highest_component_id = 1;
 
-        *groups = Default::default();
-
-        connected_components_graph(self.white_road_pieces(), groups, &mut highest_component_id);
-        connected_components_graph(self.black_road_pieces(), groups, &mut highest_component_id);
-
-        *amount_in_group = Default::default();
+        connected_components_graph(
+            group_data.white_road_pieces(),
+            &mut group_data.groups,
+            &mut highest_component_id,
+        );
+        connected_components_graph(
+            group_data.black_road_pieces(),
+            &mut group_data.groups,
+            &mut highest_component_id,
+        );
 
         for square in squares_iterator() {
-            amount_in_group[groups[square] as usize].0 += 1;
+            group_data.amount_in_group[group_data.groups[square] as usize].0 += 1;
             if self[square].top_stone().map(Piece::is_road_piece) == Some(true) {
-                amount_in_group[groups[square] as usize].1 = amount_in_group
-                    [groups[square] as usize]
+                group_data.amount_in_group[group_data.groups[square] as usize].1 = group_data
+                    .amount_in_group[group_data.groups[square] as usize]
                     .1
                     .connect_square(square);
             }
         }
 
-        *white_critical_squares = BitBoard::default();
-        *black_critical_squares = BitBoard::default();
-
         for square in squares_iterator() {
-            if self.is_critical_square_from_scratch(&groups, &amount_in_group, square, Color::White)
-            {
-                *white_critical_squares = white_critical_squares.set(square.0);
+            if self.is_critical_square_from_scratch(
+                &group_data.groups,
+                &group_data.amount_in_group,
+                square,
+                Color::White,
+            ) {
+                group_data.white_critical_squares = group_data.white_critical_squares.set(square.0);
             }
-            if self.is_critical_square_from_scratch(&groups, &amount_in_group, square, Color::Black)
-            {
-                *black_critical_squares = black_critical_squares.set(square.0);
+            if self.is_critical_square_from_scratch(
+                &group_data.groups,
+                &group_data.amount_in_group,
+                square,
+                Color::Black,
+            ) {
+                group_data.black_critical_squares = group_data.black_critical_squares.set(square.0);
             }
         }
-        *updated_groups = true;
+        group_data
     }
 
     /// An iterator over the top stones left behind after a stack movement
@@ -1125,267 +1254,67 @@ impl Board {
             .chain(std::iter::once(self[square].top_stone()))
     }
 
-    fn static_eval_game_phase(&self, coefficients: &mut [f32]) {
-        const FLAT_PSQT: usize = 0;
-        const STAND_PSQT: usize = FLAT_PSQT + 6;
-        const CAP_PSQT: usize = STAND_PSQT + 6;
+    pub(crate) fn game_result_with_group_data(&self, group_data: &GroupData) -> Option<GameResult> {
+        let repetitions = self
+            .hash_history
+            .iter()
+            .filter(|hash| **hash == self.hash)
+            .count();
 
-        for square in squares_iterator() {
-            if let Some(piece) = self[square].top_stone() {
-                let i = square.0 as usize;
-                match piece {
-                    WhiteFlat => coefficients[FLAT_PSQT + SQUARE_SYMMETRIES[i]] += 1.0,
-                    BlackFlat => coefficients[FLAT_PSQT + SQUARE_SYMMETRIES[i]] -= 1.0,
-                    WhiteStanding => coefficients[STAND_PSQT + SQUARE_SYMMETRIES[i]] += 1.0,
-                    BlackStanding => coefficients[STAND_PSQT + SQUARE_SYMMETRIES[i]] -= 1.0,
-                    WhiteCap => coefficients[CAP_PSQT + SQUARE_SYMMETRIES[i]] += 1.0,
-                    BlackCap => coefficients[CAP_PSQT + SQUARE_SYMMETRIES[i]] -= 1.0,
-                }
-            }
+        if repetitions >= 2 {
+            return Some(GameResult::Draw);
         }
 
-        const SIDE_TO_MOVE: usize = CAP_PSQT + 6;
-        const FLATSTONE_LEAD: usize = SIDE_TO_MOVE + 3;
-        const NUMBER_OF_GROUPS: usize = FLATSTONE_LEAD + 3;
+        if group_data
+            .amount_in_group
+            .iter()
+            .any(|(_, group_connection)| group_connection.is_winning())
+        {
+            let highest_component_id = group_data
+                .amount_in_group
+                .iter()
+                .enumerate()
+                .skip(1)
+                .find(|(_i, v)| (**v).0 == 0)
+                .map(|(i, _v)| i)
+                .unwrap_or(BOARD_AREA + 1) as u8;
 
-        // Give the side to move a bonus/malus depending on flatstone lead
-        let white_flatstone_lead =
-            self.white_flat_tops_count() as i8 - self.black_flat_tops_count() as i8;
-
-        // Bonus/malus depending on the number of groups each side has
-        let mut seen_groups = [false; BOARD_AREA + 1];
-        seen_groups[0] = true;
-        let group_data = self.group_data.borrow();
-
-        let number_of_groups = squares_iterator()
-            .map(|square| {
-                let group_id = group_data.groups[square] as usize;
-                if !seen_groups[group_id] {
-                    seen_groups[group_id] = true;
-                    self[square].top_stone.unwrap().color().multiplier()
+            if let Some(square) = self.is_win_by_road(&group_data.groups, highest_component_id) {
+                debug_assert!(self[square].top_stone().unwrap().is_road_piece());
+                return if self[square].top_stone().unwrap().color() == Color::White {
+                    Some(GameResult::WhiteWin)
                 } else {
-                    0
-                }
-            })
-            .sum::<isize>() as f32;
-
-        let opening_scale_factor = f32::min(
-            f32::max((24.0 - self.half_moves_played() as f32) / 12.0, 0.0),
-            1.0,
-        );
-        let endgame_scale_factor = f32::min(
-            f32::max((self.half_moves_played() as f32 - 24.0) / 24.0, 0.0),
-            1.0,
-        );
-        let middlegame_scale_factor = 1.0 - opening_scale_factor - endgame_scale_factor;
-
-        debug_assert!(middlegame_scale_factor <= 1.0);
-        debug_assert!(opening_scale_factor == 0.0 || endgame_scale_factor == 0.0);
-
-        coefficients[SIDE_TO_MOVE] = self.side_to_move().multiplier() as f32 * opening_scale_factor;
-        coefficients[FLATSTONE_LEAD] = white_flatstone_lead as f32 * opening_scale_factor;
-        coefficients[NUMBER_OF_GROUPS] = number_of_groups * opening_scale_factor;
-
-        coefficients[SIDE_TO_MOVE + 1] =
-            self.side_to_move().multiplier() as f32 * middlegame_scale_factor;
-        coefficients[FLATSTONE_LEAD + 1] = white_flatstone_lead as f32 * middlegame_scale_factor;
-        coefficients[NUMBER_OF_GROUPS + 1] = number_of_groups * middlegame_scale_factor;
-
-        coefficients[SIDE_TO_MOVE + 2] =
-            self.side_to_move().multiplier() as f32 * endgame_scale_factor;
-        coefficients[FLATSTONE_LEAD + 2] = white_flatstone_lead as f32 * endgame_scale_factor;
-        coefficients[NUMBER_OF_GROUPS + 2] = number_of_groups * endgame_scale_factor;
-
-        const CRITICAL_SQUARES: usize = NUMBER_OF_GROUPS + 3;
-
-        for critical_square in group_data.critical_squares(Color::White) {
-            match self[critical_square].top_stone {
-                None => coefficients[CRITICAL_SQUARES] += 1.0,
-                Some(Piece::WhiteStanding) => coefficients[CRITICAL_SQUARES + 1] += 1.0,
-                Some(Piece::BlackFlat) => coefficients[CRITICAL_SQUARES + 2] += 1.0,
-                Some(Piece::BlackCap) | Some(Piece::BlackStanding) => {
-                    coefficients[CRITICAL_SQUARES + 3] += 1.0
-                }
-                _ => unreachable!(),
-            }
+                    Some(GameResult::BlackWin)
+                };
+            };
+            unreachable!(
+                "Board has winning connection, but isn't winning\n{:?}",
+                self
+            )
         }
 
-        for critical_square in group_data.critical_squares(Color::Black) {
-            match self[critical_square].top_stone {
-                None => coefficients[CRITICAL_SQUARES] -= 1.0,
-                Some(Piece::BlackStanding) => coefficients[CRITICAL_SQUARES + 1] -= 1.0,
-                Some(Piece::WhiteFlat) => coefficients[CRITICAL_SQUARES + 2] -= 1.0,
-                Some(Piece::WhiteCap) | Some(Piece::WhiteStanding) => {
-                    coefficients[CRITICAL_SQUARES + 3] -= 1.0
-                }
-                _ => unreachable!(),
-            }
-        }
-
-        const PIECES_IN_OUR_STACK: usize = CRITICAL_SQUARES + 4;
-        const PIECES_IN_THEIR_STACK: usize = PIECES_IN_OUR_STACK + 1;
-        const CAPSTONE_OVER_OWN_PIECE: usize = PIECES_IN_THEIR_STACK + 1;
-        const CAPSTONE_ON_STACK: usize = CAPSTONE_OVER_OWN_PIECE + 1;
-        const STANDING_STONE_ON_STACK: usize = CAPSTONE_ON_STACK + 1;
-        const FLAT_STONE_NEXT_TO_OUR_STACK: usize = STANDING_STONE_ON_STACK + 1;
-        const STANDING_STONE_NEXT_TO_OUR_STACK: usize = FLAT_STONE_NEXT_TO_OUR_STACK + 1;
-        const CAPSTONE_NEXT_TO_OUR_STACK: usize = STANDING_STONE_NEXT_TO_OUR_STACK + 1;
-
-        squares_iterator()
-            .map(|sq| (sq, &self[sq]))
-            .filter(|(_, stack)| stack.len() > 1)
-            .for_each(|(square, stack)| {
-                let top_stone = stack.top_stone().unwrap();
-                let controlling_player = top_stone.color();
-                let color_factor = top_stone.color().multiplier() as f32;
-                stack
-                    .clone()
-                    .into_iter()
-                    .take(stack.len() as usize - 1)
-                    .for_each(|piece| {
-                        if piece.color() == controlling_player {
-                            coefficients[PIECES_IN_OUR_STACK] += color_factor
-                        } else {
-                            coefficients[PIECES_IN_THEIR_STACK] -= color_factor
-                        }
-                    });
-
-                // Extra bonus for having your capstone over your own piece
-                if top_stone.role() == Cap
-                    && stack.get(stack.len() - 2).unwrap().color() == controlling_player
-                {
-                    coefficients[CAPSTONE_OVER_OWN_PIECE] += color_factor;
-                }
-
-                match top_stone.role() {
-                    Cap => coefficients[CAPSTONE_ON_STACK] += color_factor,
-                    Flat => (),
-                    Standing => coefficients[STANDING_STONE_ON_STACK] += color_factor,
-                }
-
-                // Malus for them having stones next to our stack with flat stones on top
-                for neighbour in square.neighbours() {
-                    if let Some(neighbour_top_stone) = self[neighbour].top_stone() {
-                        if top_stone.role() == Flat
-                            && neighbour_top_stone.color() != controlling_player
-                        {
-                            match neighbour_top_stone.role() {
-                                Flat => {
-                                    coefficients[FLAT_STONE_NEXT_TO_OUR_STACK] +=
-                                        color_factor * stack.len() as f32
-                                }
-                                Standing => {
-                                    coefficients[STANDING_STONE_NEXT_TO_OUR_STACK] +=
-                                        color_factor * stack.len() as f32
-                                }
-                                Cap => {
-                                    coefficients[CAPSTONE_NEXT_TO_OUR_STACK] +=
-                                        color_factor * stack.len() as f32
-                                }
-                            }
-                        }
-                    }
-                }
-            });
-
-        // Number of pieces in each rank/file
-        const NUM_RANKS_FILES_OCCUPIED: usize = CAPSTONE_NEXT_TO_OUR_STACK + 1;
-        // Number of ranks/files with at least one road stone
-        const RANK_FILE_CONTROL: usize = NUM_RANKS_FILES_OCCUPIED + 6;
-
-        let mut num_ranks_occupied_white = 0;
-        let mut num_files_occupied_white = 0;
-        let mut num_ranks_occupied_black = 0;
-        let mut num_files_occupied_black = 0;
-
-        for i in 0..BOARD_SIZE as u8 {
-            num_ranks_occupied_white +=
-                self.rank_score::<WhiteTr, BlackTr>(i, coefficients, RANK_FILE_CONTROL);
-            num_ranks_occupied_black +=
-                self.rank_score::<BlackTr, WhiteTr>(i, coefficients, RANK_FILE_CONTROL);
-        }
-
-        for i in 0..BOARD_SIZE as u8 {
-            num_files_occupied_white +=
-                self.file_score::<WhiteTr, BlackTr>(i, coefficients, RANK_FILE_CONTROL);
-            num_files_occupied_black +=
-                self.file_score::<BlackTr, WhiteTr>(i, coefficients, RANK_FILE_CONTROL);
-        }
-
-        coefficients[NUM_RANKS_FILES_OCCUPIED + num_ranks_occupied_white] += 1.0;
-        coefficients[NUM_RANKS_FILES_OCCUPIED + num_files_occupied_white] += 1.0;
-        coefficients[NUM_RANKS_FILES_OCCUPIED + num_ranks_occupied_black] -= 1.0;
-        coefficients[NUM_RANKS_FILES_OCCUPIED + num_files_occupied_black] -= 1.0;
-
-        const _NEXT_CONST: usize = RANK_FILE_CONTROL + 10;
-
-        assert_eq!(_NEXT_CONST, coefficients.len());
-    }
-
-    fn rank_score<Us: ColorTr, Them: ColorTr>(
-        &self,
-        rank_id: u8,
-        coefficients: &mut [f32],
-        rank_file_control: usize,
-    ) -> usize {
-        let rank = Us::road_stones(self).rank(rank_id);
-        let num_ranks_occupied = if rank.is_empty() { 0 } else { 1 };
-        let road_pieces_in_rank = rank.count();
-        coefficients[rank_file_control + road_pieces_in_rank as usize] +=
-            Us::color().multiplier() as f32;
-
-        let block_rank_file_with_capstone = rank_file_control + 6;
-        let block_rank_file_with_standing_stone = block_rank_file_with_capstone + 2;
-
-        // Give them a bonus for capstones/standing stones in our strong ranks
-        if road_pieces_in_rank >= 3 {
-            for file_id in 0..BOARD_SIZE as u8 {
-                let square = Square::from_rank_file(rank_id, file_id);
-                if self[square].top_stone() == Some(Them::cap_piece()) {
-                    coefficients
-                        [block_rank_file_with_capstone + road_pieces_in_rank as usize - 3] +=
-                        Them::color().multiplier() as f32
-                } else if self[square].top_stone() == Some(Them::standing_piece()) {
-                    coefficients
-                        [block_rank_file_with_standing_stone + road_pieces_in_rank as usize - 3] +=
-                        Them::color().multiplier() as f32
+        if (self.white_stones_left == 0 && self.white_caps_left == 0)
+            || (self.black_stones_left == 0 && self.black_caps_left == 0)
+            || squares_iterator().all(|square| !self[square].is_empty())
+        {
+            // Count points
+            let mut white_points = 0;
+            let mut black_points = 0;
+            for square in squares_iterator() {
+                match self[square].top_stone() {
+                    Some(WhiteFlat) => white_points += 1,
+                    Some(BlackFlat) => black_points += 1,
+                    _ => (),
                 }
             }
-        }
-        num_ranks_occupied
-    }
-
-    fn file_score<Us: ColorTr, Them: ColorTr>(
-        &self,
-        file_id: u8,
-        coefficients: &mut [f32],
-        rank_file_control: usize,
-    ) -> usize {
-        let rank = Us::road_stones(self).file(file_id);
-        let num_ranks_occupied = if rank.is_empty() { 0 } else { 1 };
-        let road_pieces_in_rank = rank.count();
-        coefficients[rank_file_control + road_pieces_in_rank as usize] +=
-            Us::color().multiplier() as f32;
-
-        let block_rank_file_with_capstone = rank_file_control + 6;
-        let block_rank_file_with_standing_stone = block_rank_file_with_capstone + 2;
-
-        // Give them a bonus for capstones/standing stones in our strong files
-        if road_pieces_in_rank >= 3 {
-            for rank_id in 0..BOARD_SIZE as u8 {
-                let square = Square::from_rank_file(rank_id, file_id);
-                if self[square].top_stone() == Some(Them::cap_piece()) {
-                    coefficients
-                        [block_rank_file_with_capstone + road_pieces_in_rank as usize - 3] +=
-                        Them::color().multiplier() as f32
-                } else if self[square].top_stone() == Some(Them::standing_piece()) {
-                    coefficients
-                        [block_rank_file_with_standing_stone + road_pieces_in_rank as usize - 3] +=
-                        Them::color().multiplier() as f32
-                }
+            match white_points.cmp(&black_points) {
+                Ordering::Greater => Some(WhiteWin),
+                Ordering::Less => Some(BlackWin),
+                Ordering::Equal => Some(Draw),
             }
+        } else {
+            None
         }
-        num_ranks_occupied
     }
 
     /// Check if either side has completed a road
@@ -1418,6 +1347,17 @@ impl Board {
         }
         suicide_win_square
     }
+
+    pub(crate) fn static_eval_with_params_and_data(
+        &self,
+        group_data: &GroupData,
+        params: &[f32],
+    ) -> f32 {
+        // TODO: Using a vector here is inefficient, we would like to use an array
+        let mut coefficients: Vec<f32> = vec![0.0; params.len()];
+        value_eval::static_eval_game_phase(&self, group_data, &mut coefficients);
+        coefficients.iter().zip(params).map(|(a, b)| a * b).sum()
+    }
 }
 
 impl board::Board for Board {
@@ -1442,14 +1382,7 @@ impl board::Board for Board {
     ///
     /// TODO: Suicide moves are allowed if it fills the board, both place and move moves
     fn generate_moves(&self, moves: &mut Vec<Self::Move>) {
-        debug_assert!(
-            self.game_result().is_none(),
-            "Tried to generate moves on position with {:?} on\n{:?}",
-            self.game_result(),
-            self
-        );
-
-        match self.moves_played {
+        match self.half_moves_played() {
             0 | 1 => {
                 for square in squares_iterator() {
                     if self[square].is_empty() {
@@ -1465,56 +1398,53 @@ impl board::Board for Board {
     }
 
     fn do_move(&mut self, mv: Self::Move) -> Self::ReverseMove {
+        self.hash_history.push(self.hash);
         let reverse_move = match mv.clone() {
             Move::Place(role, to) => {
                 debug_assert!(self[to].is_empty());
                 // On the first move, the players place the opponent's color
-                let color_to_place = if self.moves_played > 1 {
+                let color_to_place = if self.half_moves_played() > 1 {
                     self.side_to_move()
                 } else {
                     !self.side_to_move()
                 };
-                self[to].push(Piece::from_role_color(role, color_to_place));
-                match (role, color_to_place) {
-                    (Flat, Color::White) => {
-                        self.white_flat_stones = self.white_flat_stones.set(to.0)
-                    }
-                    (Flat, Color::Black) => {
-                        self.black_flat_stones = self.black_flat_stones.set(to.0)
-                    }
-                    (Standing, Color::White) => {
-                        self.white_standing_stones = self.white_standing_stones.set(to.0)
-                    }
-                    (Standing, Color::Black) => {
-                        self.black_standing_stones = self.black_standing_stones.set(to.0)
-                    }
-                    (Cap, Color::White) => self.white_capstones = self.white_capstones.set(to.0),
-                    (Cap, Color::Black) => self.black_capstones = self.black_capstones.set(to.0),
-                }
+                let piece = Piece::from_role_color(role, color_to_place);
+                self[to].push(piece);
 
                 match (color_to_place, role) {
                     (Color::White, Flat) => self.white_stones_left -= 1,
-                    (Color::White, Standing) => self.white_stones_left -= 1,
-                    (Color::White, Cap) => self.white_capstones_left -= 1,
+                    (Color::White, Wall) => self.white_stones_left -= 1,
+                    (Color::White, Cap) => self.white_caps_left -= 1,
                     (Color::Black, Flat) => self.black_stones_left -= 1,
-                    (Color::Black, Standing) => self.black_stones_left -= 1,
-                    (Color::Black, Cap) => self.black_capstones_left -= 1,
+                    (Color::Black, Wall) => self.black_stones_left -= 1,
+                    (Color::Black, Cap) => self.black_caps_left -= 1,
                 }
+
+                self.hash ^= ZOBRIST_KEYS.top_stones[to][piece as u16 as usize];
+                self.hash_history.clear(); // This move is irreversible, so previous position are never repeated from here
+
                 ReverseMove::Place(to)
             }
-            Move::Move(mut from, direction, stack_movement) => {
+            Move::Move(square, direction, stack_movement) => {
+                let mut from = square;
+
                 let mut pieces_left_behind: ArrayVec<[u8; BOARD_SIZE - 1]> = ArrayVec::new();
                 let mut flattens_stone = false;
-                for Movement { pieces_to_take } in stack_movement.movements {
+
+                for sq in MoveIterator::new(square, direction, stack_movement.clone()) {
+                    self.hash ^= self.zobrist_hash_for_square(sq);
+                }
+
+                for Movement { pieces_to_take } in stack_movement.movements.iter() {
                     let to = from.go_direction(direction).unwrap();
 
-                    if self[to].top_stone.map(Piece::role) == Some(Standing) {
+                    if self[to].top_stone.map(Piece::role) == Some(Wall) {
                         flattens_stone = true;
                         debug_assert!(self[from].top_stone().unwrap().role() == Cap);
                     }
 
                     let pieces_to_leave = self[from].len() - pieces_to_take;
-                    pieces_left_behind.push(pieces_to_take);
+                    pieces_left_behind.push(*pieces_to_take);
 
                     for _ in pieces_to_leave..self[from].len() {
                         let piece = self[from].get(pieces_to_leave).unwrap();
@@ -1525,7 +1455,9 @@ impl board::Board for Board {
                     from = to;
                 }
 
-                self.bitboards_from_scratch();
+                for sq in MoveIterator::new(square, direction, stack_movement) {
+                    self.hash ^= self.zobrist_hash_for_square(sq);
+                }
 
                 pieces_left_behind.reverse();
                 ReverseMove::Move(
@@ -1545,17 +1477,20 @@ impl board::Board for Board {
         debug_assert_eq!(
             44 - self.white_stones_left
                 - self.black_stones_left
-                - self.white_capstones_left
-                - self.black_capstones_left,
+                - self.white_caps_left
+                - self.black_caps_left,
             self.count_all_pieces(),
             "Wrong number of stones on board:\n{:?}",
             self
         );
 
-        self.group_data.borrow_mut().updated_groups = false;
         self.moves.push(mv);
+        self.half_moves_played += 1;
+
+        self.hash ^= ZOBRIST_KEYS.to_move[self.to_move.disc()];
         self.to_move = !self.to_move;
-        self.moves_played += 1;
+        self.hash ^= ZOBRIST_KEYS.to_move[self.to_move.disc()];
+
         reverse_move
     }
 
@@ -1563,33 +1498,27 @@ impl board::Board for Board {
         match reverse_move {
             ReverseMove::Place(square) => {
                 let piece = self[square].pop().unwrap();
-                debug_assert!(piece.color() != self.side_to_move() || self.moves_played < 3);
+
+                self.hash ^= ZOBRIST_KEYS.top_stones[square][piece as u16 as usize];
+
+                debug_assert!(piece.color() != self.side_to_move() || self.half_moves_played() < 3);
 
                 match piece {
-                    WhiteFlat | WhiteStanding => {
-                        self.white_flat_stones = self.white_flat_stones.clear(square.0);
-                        self.white_standing_stones = self.white_standing_stones.clear(square.0);
-                        self.white_stones_left += 1
-                    }
-                    WhiteCap => {
-                        self.white_capstones = self.white_capstones.clear(square.0);
-                        self.white_capstones_left += 1
-                    }
-                    BlackFlat | BlackStanding => {
-                        self.black_flat_stones = self.black_flat_stones.clear(square.0);
-                        self.black_standing_stones = self.black_standing_stones.clear(square.0);
-                        self.black_stones_left += 1
-                    }
-                    BlackCap => {
-                        self.black_capstones = self.black_capstones.clear(square.0);
-                        self.black_capstones_left += 1
-                    }
+                    WhiteFlat | WhiteWall => self.white_stones_left += 1,
+                    WhiteCap => self.white_caps_left += 1,
+                    BlackFlat | BlackWall => self.black_stones_left += 1,
+                    BlackCap => self.black_caps_left += 1,
                 };
             }
 
             ReverseMove::Move(from, direction, stack_movement, flattens_wall) => {
                 let mut square = from;
-                for Movement { pieces_to_take } in stack_movement.movements {
+
+                for square in MoveIterator::new(from, direction, stack_movement.clone()) {
+                    self.hash ^= self.zobrist_hash_for_square(square);
+                }
+
+                for Movement { pieces_to_take } in stack_movement.movements.iter() {
                     let to = square.go_direction(direction).unwrap();
 
                     let pieces_to_leave = self[square].len() - pieces_to_take;
@@ -1604,71 +1533,61 @@ impl board::Board for Board {
 
                 if flattens_wall {
                     match self[from].top_stone().unwrap().color() {
-                        Color::White => self[from].replace_top(WhiteStanding),
-                        Color::Black => self[from].replace_top(BlackStanding),
+                        Color::White => self[from].replace_top(WhiteWall),
+                        Color::Black => self[from].replace_top(BlackWall),
                     };
                 };
-                self.bitboards_from_scratch();
+
+                for square in MoveIterator::new(from, direction, stack_movement) {
+                    self.hash ^= self.zobrist_hash_for_square(square);
+                }
             }
         }
 
-        self.group_data.borrow_mut().updated_groups = false;
         self.moves.pop();
-        self.moves_played -= 1;
+        self.hash_history.pop();
+        self.half_moves_played -= 1;
+
+        self.hash ^= ZOBRIST_KEYS.to_move[self.to_move.disc()];
         self.to_move = !self.to_move;
+        self.hash ^= ZOBRIST_KEYS.to_move[self.to_move.disc()];
     }
 
     fn game_result(&self) -> Option<GameResult> {
-        let group_data = self.group_data();
-        if group_data
-            .amount_in_group
-            .iter()
-            .any(|(_, group_connection)| group_connection.is_winning())
-        {
-            let highest_component_id = group_data
-                .amount_in_group
-                .iter()
-                .enumerate()
-                .skip(1)
-                .find(|(_i, v)| (**v).0 == 0)
-                .map(|(i, _v)| i)
-                .unwrap_or(BOARD_AREA + 1) as u8;
+        self.game_result_with_group_data(&self.group_data())
+    }
+}
 
-            if let Some(square) = self.is_win_by_road(&group_data.groups, highest_component_id) {
-                debug_assert!(self[square].top_stone().unwrap().is_road_piece());
-                return if self[square].top_stone().unwrap().color() == Color::White {
-                    Some(GameResult::WhiteWin)
-                } else {
-                    Some(GameResult::BlackWin)
-                };
-            };
-            unreachable!(
-                "Board has winning connection, but isn't winning\n{:?}",
-                self
-            )
+pub(crate) struct MoveIterator {
+    square: Square,
+    direction: Direction,
+    squares_left: usize,
+}
+
+impl MoveIterator {
+    pub fn new(square: Square, direction: Direction, stack_movement: StackMovement) -> Self {
+        MoveIterator {
+            square,
+            direction,
+            squares_left: stack_movement.movements.len() + 1,
         }
+    }
+}
 
-        if (self.white_stones_left == 0 && self.white_capstones_left == 0)
-            || (self.black_stones_left == 0 && self.black_capstones_left == 0)
-            || squares_iterator().all(|square| !self[square].is_empty())
-        {
-            // Count points
-            let mut white_points = 0;
-            let mut black_points = 0;
-            for square in squares_iterator() {
-                match self[square].top_stone() {
-                    Some(WhiteFlat) => white_points += 1,
-                    Some(BlackFlat) => black_points += 1,
-                    _ => (),
-                }
-            }
-            match white_points.cmp(&black_points) {
-                Ordering::Greater => Some(WhiteWin),
-                Ordering::Less => Some(BlackWin),
-                Ordering::Equal => Some(Draw),
-            }
-        } else {
+impl Iterator for MoveIterator {
+    type Item = Square;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.squares_left == 0 {
             None
+        } else {
+            let next_square = self.square;
+            self.square = self
+                .square
+                .go_direction(self.direction)
+                .unwrap_or(Square(0));
+            self.squares_left -= 1;
+            Some(next_square)
         }
     }
 }
@@ -1683,143 +1602,186 @@ pub(crate) const SQUARE_SYMMETRIES: [usize; 25] = [
     0, 1, 2, 1, 0, 1, 3, 4, 3, 1, 2, 4, 5, 4, 2, 1, 3, 4, 3, 1, 0, 1, 2, 1, 0,
 ];
 
-impl TunableBoard<55, 65> for Board {
+impl TunableBoard<69, 91> for Board {
+    type ExtraData = GroupData;
     #[allow(clippy::unreadable_literal)]
-    const VALUE_PARAMS: [f32; 55] = [
-        0.02410072,
-        0.18671544,
-        0.26740885,
-        0.2908829,
-        0.318866,
-        0.26012158,
-        0.286522,
-        0.60670507,
-        0.3965485,
-        0.9069464,
-        0.8984828,
-        0.2710555,
-        -0.49013802,
-        -0.07806004,
-        -0.07385007,
-        0.3303005,
-        0.5447981,
-        1.0391511,
-        0.89429027,
-        0.94668573,
-        1.1238872,
-        0.39352033,
-        0.30208322,
-        0.6673585,
-        -0.34026077,
-        -0.14737698,
-        -0.14405948,
-        0.30268943,
-        -0.04500769,
-        0.14808108,
-        -0.06126654,
-        1.2800529,
-        0.84339494,
-        0.06345847,
-        0.6141379,
-        0.3910885,
-        -0.038572367,
-        -0.16753507,
-        -0.15440479,
-        0.60737604,
-        -0.7032435,
-        -0.36058593,
-        -0.07766759,
-        0.11693997,
-        0.43863094,
-        -0.9403858,
-        -0.6100272,
-        -0.103776984,
-        0.49591404,
-        1.1538436,
-        0.006547498,
-        -0.012822034,
-        -0.16325843,
-        0.2083021,
-        0.20223762,
+    const VALUE_PARAMS: [f32; 69] = [
+        -0.00044795033,
+        0.15347332,
+        0.14927012,
+        0.25764394,
+        0.2447137,
+        0.27844432,
+        0.7183903,
+        0.79589164,
+        0.69361377,
+        0.93700093,
+        0.77688575,
+        1.0438795,
+        -0.47725853,
+        0.023881366,
+        0.10956399,
+        0.6041755,
+        0.7021375,
+        0.9956894,
+        1.1578636,
+        1.1255516,
+        1.2779299,
+        1.2831495,
+        1.311057,
+        1.2934446,
+        0.7101744,
+        0.73263896,
+        0.77619076,
+        0.8653954,
+        0.8186914,
+        0.8584326,
+        0.98251414,
+        0.7959507,
+        1.0613332,
+        0.61214393,
+        0.04162296,
+        0.47685462,
+        -0.18535407,
+        -0.175548,
+        0.025191614,
+        0.31633365,
+        0.044689283,
+        0.08818814,
+        -0.04582565,
+        0.036502212,
+        0.11076386,
+        0.12404986,
+        0.60829574,
+        0.35141426,
+        -0.032268483,
+        -0.15010805,
+        -0.15450484,
+        0.7011735,
+        -0.77606714,
+        -0.432654,
+        -0.1280988,
+        0.12062097,
+        0.5066281,
+        -1.0205822,
+        -0.7606904,
+        -0.18055946,
+        0.6164267,
+        1.3433626,
+        0.0029393125,
+        0.012231762,
+        -0.07691176,
+        0.14723985,
+        0.103527844,
+        0.08759902,
+        -0.0380222,
     ];
     #[allow(clippy::unreadable_literal)]
-    const POLICY_PARAMS: [f32; 65] = [
-        0.9477754,
-        0.10378754,
-        0.3924614,
-        0.6056344,
-        0.8877768,
-        1.0994278,
-        0.5811459,
-        -1.6633384,
-        -1.7922355,
-        -1.9501796,
-        -1.4877243,
-        -1.3517424,
-        -1.1867427,
-        -1.0821244,
-        -0.82188815,
-        -0.60064805,
-        -0.5356799,
-        -0.0032036346,
-        5.35226,
-        -0.52322936,
-        -0.3393809,
-        0.36032686,
-        0.98925066,
-        1.0633111,
-        -0.45140892,
-        -0.036213383,
-        0.5973497,
-        0.5468772,
-        0.14228758,
-        0.49661297,
-        0.18683204,
-        0.6364823,
-        0.016629428,
-        0.0055891047,
-        0.036096517,
-        -0.00076785433,
-        -0.41087645,
-        0.6694517,
-        0.030015104,
-        0.23381847,
-        0.21762341,
-        0.7227703,
-        -0.5002703,
-        2.6378138,
-        0.7903876,
-        2.4286666,
-        3.6136656,
-        0.74163043,
-        -3.5361943,
-        -1.6966891,
-        0.85231364,
-        1.0696448,
-        0.37735894,
-        0.5030796,
-        0.08526104,
-        0.50788814,
-        -0.61148083,
-        0.27265176,
-        -1.5981321,
-        -1.8658592,
-        -1.3648456,
-        -1.5702316,
-        0.56705284,
-        0.8650048,
-        1.9087225,
+    const POLICY_PARAMS: [f32; 91] = [
+        0.9308273,
+        -0.07929533,
+        0.057767794,
+        0.2882359,
+        0.531935,
+        0.21098736,
+        0.04213818,
+        0.09557081,
+        -0.19456874,
+        -0.36536214,
+        -0.11494864,
+        -0.22052413,
+        0.0093151545,
+        -1.3283435,
+        -1.2656128,
+        -0.85109675,
+        -0.40520072,
+        0.5878558,
+        3.4571137,
+        -0.16756311,
+        -0.2252186,
+        0.28233698,
+        0.85837847,
+        1.365391,
+        -0.4172503,
+        -0.4432623,
+        -0.3845675,
+        -0.31344506,
+        -0.004058682,
+        -0.11987572,
+        -0.39426184,
+        0.11714657,
+        0.979083,
+        -0.22664826,
+        0.37094262,
+        -0.0974089,
+        0.16831143,
+        0.7246095,
+        0.9175918,
+        -0.439185,
+        -0.5486194,
+        -0.66271234,
+        -0.14276715,
+        0.21165304,
+        -0.029816588,
+        -0.7650466,
+        -0.39566195,
+        0.7590662,
+        0.81015515,
+        0.034725398,
+        0.010433739,
+        -0.03970129,
+        0.5491879,
+        0.052991133,
+        0.59455854,
+        0.2506343,
+        0.6803255,
+        0.9312398,
+        2.072926,
+        0.4359224,
+        2.7277956,
+        1.893014,
+        0.71989006,
+        -3.5187004,
+        -1.5348065,
+        0.88657194,
+        1.1540254,
+        0.26089153,
+        0.21742074,
+        0.10011237,
+        0.36579394,
+        -0.703495,
+        -1.116258,
+        -0.6946902,
+        -0.17518687,
+        0.3844842,
+        -1.1586666,
+        -1.5351807,
+        -1.1871732,
+        -1.4655167,
+        0.56302536,
+        0.04595746,
+        -0.13931844,
+        -0.07628846,
+        0.060224842,
+        0.28914,
+        0.60682046,
+        -0.054207996,
+        -0.09838614,
+        1.0067077,
+        1.4960983,
     ];
 
     fn static_eval_coefficients(&self, coefficients: &mut [f32]) {
         debug_assert!(self.game_result().is_none());
 
-        self.static_eval_game_phase(coefficients)
+        let group_data = self.group_data();
+        value_eval::static_eval_game_phase(&self, &group_data, coefficients)
     }
 
     fn generate_moves_with_params(
         &self,
         params: &[f32],
+        group_data: &GroupData,
         simple_moves: &mut Vec<Self::Move>,
         moves: &mut Vec<(Self::Move, f32)>,
     ) {
@@ -1828,35 +1790,39 @@ impl TunableBoard<55, 65> for Board {
         match self.side_to_move() {
             Color::White => self.generate_moves_with_probabilities_colortr::<WhiteTr, BlackTr>(
                 params,
+                group_data,
                 simple_moves,
                 moves,
             ),
             Color::Black => self.generate_moves_with_probabilities_colortr::<BlackTr, WhiteTr>(
                 params,
+                group_data,
                 simple_moves,
                 moves,
             ),
         }
     }
 
-    fn probability_for_move(&self, params: &[f32], mv: &Move, num_moves: usize) -> f32 {
-        let mut coefficients = vec![0.0; Self::POLICY_PARAMS.len()];
-        self.coefficients_for_move(&mut coefficients, mv, num_moves);
-        let total_value: f32 = coefficients.iter().zip(params).map(|(c, p)| c * p).sum();
-
-        sigmoid(total_value)
-    }
-
-    fn coefficients_for_move(&self, coefficients: &mut [f32], mv: &Move, num_legal_moves: usize) {
+    fn coefficients_for_move(
+        &self,
+        coefficients: &mut [f32],
+        mv: &Move,
+        group_data: &GroupData,
+        num_legal_moves: usize,
+    ) {
         match self.side_to_move() {
-            Color::White => self.coefficients_for_move_colortr::<WhiteTr, BlackTr>(
+            Color::White => policy_eval::coefficients_for_move_colortr::<WhiteTr, BlackTr>(
+                &self,
                 coefficients,
                 mv,
+                group_data,
                 num_legal_moves,
             ),
-            Color::Black => self.coefficients_for_move_colortr::<BlackTr, WhiteTr>(
+            Color::Black => policy_eval::coefficients_for_move_colortr::<BlackTr, WhiteTr>(
+                &self,
                 coefficients,
                 mv,
+                group_data,
                 num_legal_moves,
             ),
         }
@@ -1864,22 +1830,171 @@ impl TunableBoard<55, 65> for Board {
 }
 
 impl pgn_traits::pgn::PgnBoard for Board {
-    fn from_fen(_fen: &str) -> Result<Self, pgn::Error> {
-        unimplemented!()
+    fn from_fen(fen: &str) -> Result<Self, pgn::Error> {
+        let fen_words: Vec<&str> = fen.split_whitespace().collect();
+
+        if fen_words.len() < 3 {
+            return Err(pgn::Error::new_parse_error(format!(
+                "Couldn't parse TPS string \"{}\", missing move counter.",
+                fen
+            )));
+        }
+        if fen_words.len() > 3 {
+            return Err(pgn::Error::new_parse_error(format!(
+                "Couldn't parse TPS string \"{}\", unexpected \"{}\"",
+                fen, fen_words[3]
+            )));
+        }
+
+        let fen_rows: Vec<&str> = fen_words[0].split('/').collect();
+        if fen_rows.len() != BOARD_SIZE {
+            return Err(pgn::Error::new_parse_error(format!(
+                "Couldn't parse TPS string \"{}\", had {} rows instead of {}.",
+                fen,
+                fen_rows.len(),
+                BOARD_SIZE
+            )));
+        }
+
+        let rows: Vec<[Stack; BOARD_SIZE]> = fen_rows
+            .into_iter()
+            .map(parse_row)
+            .collect::<Result<_, _>>()
+            .map_err(|e| {
+                pgn::Error::new_caused_by(
+                    pgn::ErrorKind::ParseError,
+                    format!("Couldn't parse TPS string \"{}\"", fen),
+                    e,
+                )
+            })?;
+        let mut board = Board::default();
+        for square in squares_iterator() {
+            let (file, rank) = (square.file(), square.rank());
+            let stack = rows[rank as usize][file as usize];
+            for piece in stack.into_iter() {
+                match piece {
+                    WhiteFlat | WhiteWall => board.white_stones_left -= 1,
+                    WhiteCap => board.white_caps_left -= 1,
+                    BlackFlat | BlackWall => board.black_stones_left -= 1,
+                    BlackCap => board.black_caps_left -= 1,
+                }
+            }
+            board[square] = stack;
+        }
+
+        match fen_words[1] {
+            "1" => board.to_move = Color::White,
+            "2" => board.to_move = Color::Black,
+            s => {
+                return Err(pgn::Error::new_parse_error(format!(
+                    "Error parsing TPS \"{}\": Got bad side to move \"{}\"",
+                    fen, s
+                )))
+            }
+        }
+
+        match fen_words[2].parse::<usize>() {
+            Ok(n) => match board.side_to_move() {
+                Color::White => board.half_moves_played = (n - 1) * 2,
+                Color::Black => board.half_moves_played = (n - 1) * 2 + 1,
+            },
+            Err(e) => {
+                return Err(pgn::Error::new_caused_by(
+                    pgn::ErrorKind::ParseError,
+                    format!(
+                        "Error parsing TPS \"{}\": Got bad move number \"{}\"",
+                        fen, fen_words[2]
+                    ),
+                    e,
+                ))
+            }
+        }
+
+        board.hash = board.zobrist_hash_from_scratch();
+
+        return Ok(board);
+
+        fn parse_row(row_str: &str) -> Result<[Stack; BOARD_SIZE], pgn::Error> {
+            let mut column_id = 0;
+            let mut row = [Stack::default(); BOARD_SIZE];
+            let mut row_str_iter = row_str.chars().peekable();
+            while column_id < BOARD_SIZE as u8 {
+                match row_str_iter.peek() {
+                    None => {
+                        return Err(pgn::Error::new_parse_error(format!(
+                            "Couldn't parse row \"{}\": not enough pieces",
+                            row_str
+                        )))
+                    }
+                    Some('x') => {
+                        row_str_iter.next();
+                        if let Some(n) = row_str_iter.peek().and_then(|ch| ch.to_digit(10)) {
+                            row_str_iter.next();
+                            column_id += n as u8;
+                        } else {
+                            column_id += 1;
+                        }
+                        if let Some(',') | None = row_str_iter.peek() {
+                            row_str_iter.next();
+                        } else {
+                            return Err(pgn::Error::new_parse_error(format!(
+                                "Expected ',' on row \"{}\", found {:?}",
+                                row_str,
+                                row_str_iter.next()
+                            )));
+                        }
+                    }
+                    Some('1') | Some('2') => {
+                        let stack = &mut row[column_id as usize];
+                        loop {
+                            match row_str_iter.next() {
+                                Some('1') => stack.push(Piece::from_role_color(Flat, Color::White)),
+                                Some('2') => stack.push(Piece::from_role_color(Flat, Color::Black)),
+                                Some('S') => {
+                                    let piece = stack.pop().unwrap();
+                                    stack.push(Piece::from_role_color(Wall, piece.color()));
+                                }
+                                Some('C') => {
+                                    let piece = stack.pop().unwrap();
+                                    stack.push(Piece::from_role_color(Cap, piece.color()));
+                                }
+                                Some(',') | None => {
+                                    column_id += 1;
+                                    break;
+                                }
+                                Some(ch) => {
+                                    return Err(pgn::Error::new_parse_error(format!(
+                                        "Expected '1', '2', 'S' or 'C' on row \"{}\", found {}",
+                                        row_str, ch
+                                    )))
+                                }
+                            }
+                        }
+                    }
+                    Some(x) => {
+                        return Err(pgn::Error::new_parse_error(format!(
+                            "Unexpected '{}' in row \"{}\".",
+                            x, row_str
+                        )))
+                    }
+                }
+            }
+            Ok(row)
+        }
     }
 
     fn to_fen(&self) -> String {
         let mut f = String::new();
         squares_iterator()
-            .map(|square| self[square].clone())
+            .map(|square| self[square])
             .for_each(|stack: Stack| {
                 (match stack.top_stone() {
                     None => write!(f, "-"),
                     Some(WhiteFlat) => write!(f, "w"),
-                    Some(WhiteStanding) => write!(f, "W"),
+                    Some(WhiteWall) => write!(f, "W"),
                     Some(WhiteCap) => write!(f, "C"),
                     Some(BlackFlat) => write!(f, "b"),
-                    Some(BlackStanding) => write!(f, "B"),
+                    Some(BlackWall) => write!(f, "B"),
                     Some(BlackCap) => write!(f, "c"),
                 })
                 .unwrap()
@@ -1888,69 +2003,7 @@ impl pgn_traits::pgn::PgnBoard for Board {
     }
 
     fn move_from_san(&self, input: &str) -> Result<Self::Move, pgn::Error> {
-        if input.len() < 2 {
-            return Err(pgn::Error::new(
-                pgn::ErrorKind::ParseError,
-                "Input move too short.",
-            ));
-        }
-        if !input.is_ascii() {
-            return Err(pgn::Error::new(
-                pgn::ErrorKind::ParseError,
-                "Input move contained non-ascii characters.",
-            ));
-        }
-        let first_char = input.chars().next().unwrap();
-        match first_char {
-            'a'..='e' if input.len() == 2 => {
-                let square = Square::parse_square(input);
-                Ok(Move::Place(Flat, square))
-            }
-            'a'..='e' if input.len() == 3 => {
-                let square = Square::parse_square(&input[0..2]);
-                let direction = Direction::parse(input.chars().nth(2).unwrap());
-                // Moves in the simplified move notation always move one piece
-                let movements = ArrayVec::from_iter(iter::once(Movement { pieces_to_take: 1 }));
-                Ok(Move::Move(square, direction, StackMovement { movements }))
-            }
-            'C' if input.len() == 3 => Ok(Move::Place(Cap, Square::parse_square(&input[1..]))),
-            'S' if input.len() == 3 => Ok(Move::Place(Standing, Square::parse_square(&input[1..]))),
-            '1'..='9' if input.len() > 3 => {
-                let square = Square::parse_square(&input[1..3]);
-                let direction = Direction::parse(input.chars().nth(3).unwrap());
-                let pieces_taken = first_char.to_digit(10).unwrap() as u8;
-                let mut pieces_held = pieces_taken;
-
-                let mut amounts_to_drop = input
-                    .chars()
-                    .skip(4)
-                    .map(|ch| ch.to_digit(10).unwrap() as u8)
-                    .collect::<Vec<u8>>();
-                amounts_to_drop.pop(); //
-
-                let mut movements = ArrayVec::new();
-                movements.push(Movement {
-                    pieces_to_take: pieces_taken,
-                });
-
-                for amount_to_drop in amounts_to_drop {
-                    movements.push(Movement {
-                        pieces_to_take: pieces_held - amount_to_drop,
-                    });
-                    pieces_held -= amount_to_drop;
-                }
-                Ok(Move::Move(square, direction, StackMovement { movements }))
-            }
-            _ => Err(pgn::Error::new(
-                pgn::ErrorKind::ParseError,
-                format!(
-                    "Couldn't parse move \"{}\". Moves cannot start with {} and have length {}.",
-                    input,
-                    first_char,
-                    input.len()
-                ),
-            )),
-        }
+        Self::Move::from_str(input)
     }
 
     fn move_to_san(&self, mv: &Self::Move) -> String {
@@ -1960,7 +2013,7 @@ impl pgn_traits::pgn::PgnBoard for Board {
     }
 
     fn move_from_lan(&self, input: &str) -> Result<Self::Move, pgn::Error> {
-        self.move_from_san(input)
+        Self::Move::from_str(input)
     }
 
     fn move_to_lan(&self, mv: &Self::Move) -> String {

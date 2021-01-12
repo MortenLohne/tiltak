@@ -1,20 +1,21 @@
 use crate::tune::play_match::play_game;
-use crate::tune::{pgn_parser, play_match, real_gradient_descent};
+use crate::tune::{gradient_descent, play_match};
 use board_game_traits::board::Board as BoardTrait;
 use board_game_traits::board::GameResult;
 use rand::prelude::*;
 use rayon::prelude::*;
 
+use crate::board::TunableBoard;
+use crate::board::{Board, Move};
+use crate::pgn_parser;
+use crate::pgn_writer::Game;
+use crate::search::MctsSetting;
 use pgn_traits::pgn::PgnBoard;
 use std::io::Read;
 use std::io::Write;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time;
 use std::{error, fs, io};
-use taik::board::TunableBoard;
-use taik::board::{Board, Move};
-use taik::mcts::MctsSetting;
-use taik::pgn_writer::Game;
 
 // The score, or probability of being played, for a given move
 type MoveScore = (Move, f32);
@@ -128,29 +129,40 @@ pub fn train_perpetually(
             games.len(), all_games.len(), game_stats.white_wins, game_stats.draws, game_stats.black_wins, game_stats.aborted, wins, losses, draws
         );
 
+        // Only take the most recent half of the games, to avoid training on bad, old games
+        let max_training_games = all_games.len() / 2;
+
         let games_in_training_batch = all_games
             .iter()
             .cloned()
             .rev()
-            .take(BATCH_SIZE * BATCHES_FOR_TRAINING)
+            .take(usize::min(
+                max_training_games,
+                BATCH_SIZE * BATCHES_FOR_TRAINING,
+            ))
             .collect::<Vec<_>>();
 
         let move_scores_in_training_batch = all_move_scores
             .iter()
             .cloned()
             .rev()
-            .take(BATCH_SIZE * BATCHES_FOR_TRAINING)
+            .take(usize::min(
+                max_training_games,
+                BATCH_SIZE * BATCHES_FOR_TRAINING,
+            ))
             .collect::<Vec<_>>();
 
         let value_tuning_start_time = time::Instant::now();
 
-        let (new_value_params, new_policy_params): ([f32; 55], [f32; 65]) =
-            tune_real_value_and_policy(
-                &games_in_training_batch,
-                &move_scores_in_training_batch,
-                &value_params,
-                &policy_params,
-            )?;
+        let (new_value_params, new_policy_params): (
+            [f32; Board::VALUE_PARAMS.len()],
+            [f32; Board::POLICY_PARAMS.len()],
+        ) = tune_value_and_policy(
+            &games_in_training_batch,
+            &move_scores_in_training_batch,
+            &value_params,
+            &policy_params,
+        )?;
 
         last_value_params = value_params;
         last_policy_params = policy_params;
@@ -179,11 +191,16 @@ fn play_game_pair(
     last_params_wins: &AtomicU64,
     i: usize,
 ) -> (Game<Board>, Vec<Vec<(Move, f32)>>) {
-    let settings = MctsSetting::with_eval_params(value_params.to_vec(), policy_params.to_vec());
-    let last_settings =
-        MctsSetting::with_eval_params(last_value_params.to_vec(), last_policy_params.to_vec());
+    let settings = MctsSetting::default()
+        .add_value_params(value_params.to_vec())
+        .add_policy_params(policy_params.to_vec())
+        .add_dirichlet(0.2);
+    let last_settings = MctsSetting::default()
+        .add_value_params(last_value_params.to_vec())
+        .add_policy_params(last_policy_params.to_vec())
+        .add_dirichlet(0.2);
     if i % 2 == 0 {
-        let game = play_game(&settings, &last_settings);
+        let game = play_game(&settings, &last_settings, &[], 1.0);
         match game.0.game_result {
             Some(GameResult::WhiteWin) => {
                 current_params_wins.fetch_add(1, Ordering::Relaxed);
@@ -195,7 +212,7 @@ fn play_game_pair(
         };
         game
     } else {
-        let game = play_game(&last_settings, &settings);
+        let game = play_game(&last_settings, &settings, &[], 1.0);
         match game.0.game_result {
             Some(GameResult::BlackWin) => {
                 current_params_wins.fetch_add(1, Ordering::Relaxed);
@@ -232,15 +249,18 @@ impl GameStats {
     }
 }
 
-pub fn read_games_from_file() -> Result<Vec<Game<Board>>, Box<dyn error::Error>> {
-    let mut file = fs::File::open("games1_all.ptn")?;
+pub fn read_games_from_file(file_name: &str) -> Result<Vec<Game<Board>>, Box<dyn error::Error>> {
+    let mut file = fs::File::open(file_name)?;
     let mut input = String::new();
     file.read_to_string(&mut input)?;
     pgn_parser::parse_pgn(&input)
 }
 
-pub fn tune_real_from_file<const N: usize>() -> Result<[f32; N], Box<dyn error::Error>> {
-    let games = read_games_from_file()?;
+pub fn tune_value_from_file(
+    file_name: &str,
+) -> Result<[f32; Board::VALUE_PARAMS.len()], Box<dyn error::Error>> {
+    let games = read_games_from_file(file_name)?;
+    const N: usize = Board::VALUE_PARAMS.len();
 
     let (positions, results) = positions_and_results_from_games(games);
 
@@ -270,7 +290,7 @@ pub fn tune_real_from_file<const N: usize>() -> Result<[f32; N], Box<dyn error::
     for param in initial_params.iter_mut() {
         *param = rng.gen_range(-0.01, 0.01)
     }
-    let tuned_parameters = real_gradient_descent::gradient_descent(
+    let tuned_parameters = gradient_descent::gradient_descent(
         &coefficient_sets[0..middle_index],
         &f32_results[0..middle_index],
         &coefficient_sets[middle_index..],
@@ -284,7 +304,7 @@ pub fn tune_real_from_file<const N: usize>() -> Result<[f32; N], Box<dyn error::
     Ok(tuned_parameters)
 }
 
-pub fn tune_real_value_and_policy<const N: usize, const M: usize>(
+pub fn tune_value_and_policy<const N: usize, const M: usize>(
     games: &[Game<Board>],
     move_scoress: &[MoveScoresForGame],
     initial_value_params: &[f32; N],
@@ -330,9 +350,15 @@ pub fn tune_real_value_and_policy<const N: usize, const M: usize>(
         let mut board = game.start_board.clone();
 
         for (mv, move_scores) in game.moves.iter().map(|(mv, _)| mv).zip(move_scores) {
+            let group_data = board.group_data();
             for (possible_move, score) in move_scores {
                 let mut coefficients = [0.0; M];
-                board.coefficients_for_move(&mut coefficients, possible_move, move_scores.len());
+                board.coefficients_for_move(
+                    &mut coefficients,
+                    possible_move,
+                    &group_data,
+                    move_scores.len(),
+                );
 
                 policy_coefficients_sets.push(coefficients);
                 policy_results.push(*score);
@@ -343,7 +369,7 @@ pub fn tune_real_value_and_policy<const N: usize, const M: usize>(
 
     let middle_index = value_coefficient_sets.len() / 2;
 
-    let tuned_value_parameters = real_gradient_descent::gradient_descent(
+    let tuned_value_parameters = gradient_descent::gradient_descent(
         &value_coefficient_sets[0..middle_index],
         &value_results[0..middle_index],
         &value_coefficient_sets[middle_index..],
@@ -356,7 +382,7 @@ pub fn tune_real_value_and_policy<const N: usize, const M: usize>(
 
     let middle_index = policy_coefficients_sets.len() / 2;
 
-    let tuned_policy_parameters = real_gradient_descent::gradient_descent(
+    let tuned_policy_parameters = gradient_descent::gradient_descent(
         &policy_coefficients_sets[0..middle_index],
         &policy_results[0..middle_index],
         &policy_coefficients_sets[middle_index..],
@@ -370,14 +396,18 @@ pub fn tune_real_value_and_policy<const N: usize, const M: usize>(
     Ok((tuned_value_parameters, tuned_policy_parameters))
 }
 
-pub fn tune_real_value_and_policy_from_file() -> Result<
+pub fn tune_value_and_policy_from_file(
+    value_file_name: &str,
+    policy_file_name: &str,
+) -> Result<
     (
         [f32; Board::VALUE_PARAMS.len()],
         [f32; Board::POLICY_PARAMS.len()],
     ),
     Box<dyn error::Error>,
 > {
-    let (games, move_scoress) = games_and_move_scoress_from_file()?;
+    let (games, move_scoress) =
+        games_and_move_scoress_from_file(value_file_name, policy_file_name)?;
 
     let mut rng = rand::thread_rng();
 
@@ -390,7 +420,7 @@ pub fn tune_real_value_and_policy_from_file() -> Result<
     // The move number parameter should always be around 1.0, so start it here
     // If we don't, variation of this parameter completely dominates the other parameters
     initial_policy_params[0] = 1.0;
-    tune_real_value_and_policy(
+    tune_value_and_policy(
         &games,
         &move_scoress,
         &initial_value_params,
@@ -399,9 +429,11 @@ pub fn tune_real_value_and_policy_from_file() -> Result<
 }
 
 pub fn games_and_move_scoress_from_file(
+    value_file_name: &str,
+    policy_file_name: &str,
 ) -> Result<(Vec<Game<Board>>, Vec<MoveScoresForGame>), Box<dyn error::Error>> {
-    let mut move_scoress = read_move_scores_from_file()?;
-    let mut games = read_games_from_file()?;
+    let mut move_scoress = read_move_scores_from_file(policy_file_name)?;
+    let mut games = read_games_from_file(value_file_name)?;
 
     // Only keep the last n games, since all the training data doesn't fit in memory while training
     move_scoress.reverse();
@@ -428,8 +460,10 @@ pub fn games_and_move_scoress_from_file(
     Ok((games, move_scoress))
 }
 
-pub fn read_move_scores_from_file() -> Result<Vec<MoveScoresForGame>, Box<dyn error::Error>> {
-    let mut file = fs::File::open("move_scores1_all.txt")?;
+pub fn read_move_scores_from_file(
+    file_name: &str,
+) -> Result<Vec<MoveScoresForGame>, Box<dyn error::Error>> {
+    let mut file = fs::File::open(file_name)?;
     let mut input = String::new();
     file.read_to_string(&mut input)?;
 

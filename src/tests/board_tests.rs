@@ -1,8 +1,9 @@
-use crate::board::Piece::{BlackCap, BlackFlat, WhiteFlat, WhiteStanding};
+use crate::board::Piece::{BlackCap, BlackFlat, WhiteFlat, WhiteWall};
 use crate::board::{
     squares_iterator, Board, Direction::*, GroupEdgeConnection, Move, Piece, Role, Square,
     BOARD_SIZE,
 };
+use crate::minmax::minmax;
 use crate::tests::do_moves_and_check_validity;
 use crate::{board as board_mod, board};
 use board_game_traits::board::{Board as BoardTrait, Color, EvalBoard};
@@ -35,13 +36,13 @@ fn go_in_directions_test() {
 
 #[test]
 fn get_set_test() {
-    let pieces = vec![WhiteFlat, BlackFlat, BlackFlat, WhiteStanding];
+    let pieces = vec![WhiteFlat, BlackFlat, BlackFlat, WhiteWall];
     let mut board = Board::default();
     for &piece in pieces.iter() {
         board[Square(12)].push(piece);
     }
     assert_eq!(board[Square(12)].len(), 4);
-    assert_eq!(board[Square(12)].top_stone(), Some(WhiteStanding));
+    assert_eq!(board[Square(12)].top_stone(), Some(WhiteWall));
 
     for (i, &piece) in pieces.iter().enumerate() {
         assert_eq!(
@@ -75,7 +76,7 @@ fn get_set_test() {
 #[test]
 fn flatten_stack_test() {
     let mut stack = board::Stack::default();
-    stack.push(WhiteStanding);
+    stack.push(WhiteWall);
     stack.push(BlackCap);
     assert_eq!(stack.get(0), Some(WhiteFlat));
     assert_eq!(stack.pop(), Some(BlackCap));
@@ -180,13 +181,25 @@ fn play_random_games_test() {
         let mut board = board_mod::Board::default();
         let mut moves = vec![];
         for i in 0.. {
+            let hash_from_scratch = board.zobrist_hash_from_scratch();
+            assert_eq!(
+                hash_from_scratch,
+                board.zobrist_hash(),
+                "Hash mismatch for board:\n{:?}\nMoves: {:?}",
+                board,
+                board.moves()
+            );
             assert_eq!(board, board.flip_colors().flip_colors());
 
-            assert!((board.white_road_pieces() & board.black_road_pieces()).is_empty());
-            assert!((board.white_road_pieces() & board.white_blocking_pieces()).count() <= 1);
+            let group_data = board.group_data();
+
+            assert!((group_data.white_road_pieces() & group_data.black_road_pieces()).is_empty());
+            assert!(
+                (group_data.white_road_pieces() & group_data.white_blocking_pieces()).count() <= 1
+            );
 
             let eval = board.static_eval();
-            for rotation in board.rotations_and_symmetries() {
+            for rotation in board.symmetries_with_swapped_colors() {
                 if board.side_to_move() == rotation.side_to_move() {
                     assert!(rotation.static_eval() - eval < 0.0001,
                     "Static eval changed with rotation from {} to {} on board\n{:?}Rotated board:\n{:?}", eval, rotation.static_eval(), board, rotation);
@@ -204,8 +217,10 @@ fn play_random_games_test() {
             assert_eq!(mv, board.move_from_san(&board.move_to_san(&mv)).unwrap());
             board.do_move(mv);
 
+            assert_ne!(hash_from_scratch, board.zobrist_hash_from_scratch());
+
             let result = board.game_result();
-            for rotation in board.rotations_and_symmetries() {
+            for rotation in board.symmetries_with_swapped_colors() {
                 if board.side_to_move() == rotation.side_to_move() {
                     assert_eq!(rotation.game_result(), result);
                 } else {
@@ -215,7 +230,7 @@ fn play_random_games_test() {
 
             if result.is_none() {
                 let static_eval = board.static_eval();
-                for rotation in board.rotations_and_symmetries() {
+                for rotation in board.symmetries_with_swapped_colors() {
                     assert!(
                         rotation.static_eval().abs() - static_eval.abs() < 0.0001,
                         "Original static eval {}, rotated static eval {}.Board:\n{:?}\nRotated board:\n{:?}",
@@ -325,7 +340,7 @@ fn double_road_wins_test() {
 }
 
 // Black is behind by one point, with one stone left to place
-// Check that placing it standing is suicide, but placing it flat is not
+// Check that placing it as a wall is suicide, but placing it flat is not
 #[test]
 fn suicide_into_points_loss_test() {
     let mut board = Board::start_board();
@@ -344,10 +359,10 @@ fn suicide_into_points_loss_test() {
     for mv in moves.iter() {
         let reverse_move = board.do_move(mv.clone());
         match mv {
-            Move::Place(Role::Standing, _) => assert_eq!(
+            Move::Place(Role::Wall, _) => assert_eq!(
                 board.game_result(),
                 Some(GameResult::WhiteWin),
-                "Placing a standing stone is suicide"
+                "Placing a wall is suicide"
             ),
             Move::Place(Role::Flat, _) => assert_eq!(
                 board.game_result(),
@@ -361,7 +376,7 @@ fn suicide_into_points_loss_test() {
 
     assert!(moves
         .iter()
-        .any(|mv| matches!(mv, Move::Place(Role::Standing, _))));
+        .any(|mv| matches!(mv, Move::Place(Role::Wall, _))));
     assert!(moves
         .iter()
         .any(|mv| matches!(mv, Move::Place(Role::Flat, _))));
@@ -438,7 +453,9 @@ fn bitboard_full_board_file_rank_test() {
     );
     assert_eq!(board.game_result(), Some(WhiteWin));
 
-    let road_pieces = board.white_road_pieces() | board.black_road_pieces();
+    let group_data = board.group_data();
+
+    let road_pieces = group_data.white_road_pieces() | group_data.black_road_pieces();
 
     assert_eq!(road_pieces.count(), 25);
 
@@ -465,8 +482,11 @@ fn square_rank_file_test() {
 
             let mv = Move::Place(Role::Flat, square);
             let reverse_move = board.do_move(mv);
-            assert_eq!(board.black_road_pieces().rank(rank_id).count(), 1);
-            assert_eq!(board.black_road_pieces().file(file_id).count(), 1);
+
+            let group_data = board.group_data();
+
+            assert_eq!(group_data.black_road_pieces().rank(rank_id).count(), 1);
+            assert_eq!(group_data.black_road_pieces().file(file_id).count(), 1);
             board.reverse_move(reverse_move);
         }
     }
@@ -476,7 +496,7 @@ fn square_rank_file_test() {
 fn group_connection_test() {
     let group_connection = GroupEdgeConnection::default();
 
-    let a1_connection = group_connection.connect_square(Square::parse_square("a1"));
+    let a1_connection = group_connection.connect_square(Square::parse_square("a1").unwrap());
 
     assert!(!a1_connection.is_connected_south());
     assert!(!a1_connection.is_connected_east());
@@ -492,28 +512,79 @@ fn critical_square_test() {
 
     do_moves_and_check_validity(&mut board, &move_strings);
 
-    let e1 = Square::parse_square("e1");
-    let a5 = Square::parse_square("a5");
-    assert!(board.group_data().is_critical_square(e1, Color::White));
-    assert!(!board.group_data().is_critical_square(e1, Color::Black));
+    let e1 = Square::parse_square("e1").unwrap();
+    let a5 = Square::parse_square("a5").unwrap();
+    let group_data = board.group_data();
+    assert!(group_data.is_critical_square(e1, Color::White));
+    assert!(!group_data.is_critical_square(e1, Color::Black));
 
-    assert!(board.group_data().is_critical_square(a5, Color::Black));
-    assert!(!board.group_data().is_critical_square(a5, Color::White));
+    assert!(group_data.is_critical_square(a5, Color::Black));
+    assert!(!group_data.is_critical_square(a5, Color::White));
 
     assert_eq!(
-        board
-            .group_data()
+        group_data
             .critical_squares(Color::White)
             .into_iter()
             .collect::<Vec<_>>(),
         vec![e1]
     );
     assert_eq!(
-        board
-            .group_data()
+        group_data
             .critical_squares(Color::Black)
             .into_iter()
             .collect::<Vec<_>>(),
         vec![a5]
     );
+}
+
+#[test]
+fn move_iterator_test() {
+    let mut board = Board::start_board();
+    do_moves_and_check_validity(&mut board, &["a1", "e5"]);
+    let mv = board.move_from_san("e5-").unwrap();
+    match mv {
+        Move::Move(square, direction, stack_movement) => assert_eq!(
+            board_mod::MoveIterator::new(square, direction, stack_movement)
+                .map(|sq| sq.to_string())
+                .collect::<Vec<String>>(),
+            vec!["e5", "e4"]
+        ),
+        _ => panic!(),
+    }
+}
+
+#[test]
+fn static_eval_after_move_test() {
+    let mut board = Board::start_board();
+    minmax(&mut board, 1);
+    board.static_eval();
+}
+
+#[test]
+fn repetitions_are_draws_test() {
+    let mut board = Board::start_board();
+    do_moves_and_check_validity(&mut board, &["a1", "e5"]);
+
+    let cycle_move_strings = ["e5-", "a1+", "e4+", "a2-"];
+    do_moves_and_check_validity(&mut board, &cycle_move_strings);
+    assert_eq!(board.game_result(), None);
+
+    do_moves_and_check_validity(&mut board, &cycle_move_strings);
+    assert_eq!(board.game_result(), Some(GameResult::Draw));
+
+    do_moves_and_check_validity(&mut board, &["e4"]);
+    assert_eq!(board.game_result(), None);
+}
+
+#[test]
+fn parse_tps_test() {
+    let tps_string = "x4,1/x5/x5/x5/2,x4 1 2";
+
+    let mut board = Board::start_board();
+    do_moves_and_check_validity(&mut board, &["a1", "e5"]);
+    assert_eq!(Board::from_fen(tps_string).unwrap(), board);
+
+    do_moves_and_check_validity(&mut board, &["c5"]);
+    let tps_string = "x2,1,x,1/x5/x5/x5/2,x4 2 2";
+    assert_eq!(Board::from_fen(tps_string).unwrap(), board);
 }

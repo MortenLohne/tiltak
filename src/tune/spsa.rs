@@ -1,3 +1,6 @@
+use crate::board::Move;
+use crate::search::MctsSetting;
+use crate::tune::openings::openings_from_file;
 /// Tune search variable using a version of SPSA (Simultaneous perturbation stochastic approximation),
 /// similar to [Stockfish's tuning method](https://www.chessprogramming.org/Stockfish%27s_Tuning_Method)
 use crate::tune::play_match::play_game;
@@ -5,7 +8,6 @@ use board_game_traits::board::GameResult;
 use rand::SeedableRng;
 use rayon::prelude::*;
 use std::sync::Mutex;
-use taik::mcts::MctsSetting;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Variable {
@@ -23,14 +25,19 @@ enum SPSADirection {
 }
 
 /// Tune the variables indefinitely
-pub fn tune(variables: &mut [Variable]) {
+pub fn tune(variables: &mut [Variable], book_path: Option<&str>) {
+    let openings = if let Some(path) = book_path {
+        openings_from_file(path).unwrap()
+    } else {
+        vec![vec![]]
+    };
     let mutex_variables = Mutex::new(variables);
 
-    (1..u64::max_value()).into_par_iter().for_each(|i| {
+    (1..usize::max_value()).into_par_iter().for_each(|i| {
         let cloned_variables = (*mutex_variables.lock().unwrap()).to_vec();
         let mut rng = rand::rngs::StdRng::from_entropy();
 
-        let result = tuning_iteration(&cloned_variables, &mut rng);
+        let result = tuning_iteration(&cloned_variables, &mut rng, &openings[i % openings.len()]);
         {
             let mut mut_variables = mutex_variables.lock().unwrap();
             for (variable, result) in (*mut_variables).iter_mut().zip(&result) {
@@ -62,7 +69,11 @@ pub fn tune(variables: &mut [Variable]) {
 }
 
 /// Run one iteration of the SPSA algorithm
-fn tuning_iteration<R: rand::Rng>(variables: &[Variable], rng: &mut R) -> Vec<SPSADirection> {
+fn tuning_iteration<R: rand::Rng>(
+    variables: &[Variable],
+    rng: &mut R,
+    opening: &[Move],
+) -> Vec<SPSADirection> {
     let (player1_variables, player2_variables): (
         Vec<(SPSADirection, f32)>,
         Vec<(SPSADirection, f32)>,
@@ -77,12 +88,12 @@ fn tuning_iteration<R: rand::Rng>(variables: &[Variable], rng: &mut R) -> Vec<SP
         .map(|(a, b)| if rng.gen() { (a, b) } else { (b, a) })
         .unzip();
 
-    let player1_settings =
-        MctsSetting::with_search_params(player1_variables.iter().map(|(_, a)| *a).collect());
-    let player2_settings =
-        MctsSetting::with_search_params(player2_variables.iter().map(|(_, a)| *a).collect());
+    let player1_settings = MctsSetting::default()
+        .add_search_params(player1_variables.iter().map(|(_, a)| *a).collect());
+    let player2_settings = MctsSetting::default()
+        .add_search_params(player2_variables.iter().map(|(_, a)| *a).collect());
 
-    let (game, _) = play_game(&player1_settings, &player2_settings);
+    let (game, _) = play_game(&player1_settings, &player2_settings, opening, 0.2);
     match game.game_result {
         Some(GameResult::WhiteWin) => player1_variables.iter().map(|(a, _)| *a).collect(),
         Some(GameResult::BlackWin) => player2_variables.iter().map(|(a, _)| *a).collect(),
