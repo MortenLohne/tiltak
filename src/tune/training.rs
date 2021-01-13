@@ -24,7 +24,7 @@ type MoveScore = (Move, f32);
 type MoveScoresForGame = Vec<Vec<MoveScore>>;
 
 pub fn train_from_scratch(training_id: usize) -> Result<(), Box<dyn error::Error>> {
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rngs::StdRng::from_seed([0; 32]);
 
     let initial_value_params: Vec<f32> = iter::from_fn(|| Some(rng.gen_range(-0.01, 0.01)))
         .take(Board::VALUE_PARAMS.len())
@@ -289,7 +289,8 @@ pub fn tune_value_from_file(file_name: &str) -> Result<Vec<f64>, Box<dyn error::
 
     let middle_index = positions.len() / 2;
 
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rngs::StdRng::from_seed([0; 32]);
+
     let initial_params: Vec<f64> = iter::from_fn(|| Some(rng.gen_range(-0.01, 0.01)))
         .take(Board::VALUE_PARAMS.len())
         .collect();
@@ -410,7 +411,7 @@ pub fn tune_value_and_policy_from_file(
     let (games, move_scoress) =
         games_and_move_scoress_from_file(value_file_name, policy_file_name)?;
 
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rngs::StdRng::from_seed([0; 32]);
 
     let initial_value_params: Vec<f64> = iter::from_fn(|| Some(rng.gen_range(-0.01, 0.01)))
         .take(Board::VALUE_PARAMS.len())
