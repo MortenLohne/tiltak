@@ -122,11 +122,20 @@ fn calc_slope<const N: usize>(
                 .iter_mut()
                 .zip(coefficients)
                 .for_each(|(gradient, coefficient)| {
-                    *gradient = ((estimated_sigmoid - result)
-                        * derived_sigmoid_result
-                        * *coefficient) as f64
+                    *gradient = (estimated_sigmoid - result) * derived_sigmoid_result * *coefficient
                 });
             gradients_for_this_training_sample
+        })
+        // Sum each individual chunk as f32
+        // Then sum those chunks as f64, to avoid rounding errors
+        .chunks(256)
+        .map(|chunks: Vec<[f32; N]>| {
+            chunks.into_iter().fold([0.0; N], |mut a, b| {
+                for (c, d) in a.iter_mut().zip(b.iter()) {
+                    *c += *d;
+                }
+                a
+            })
         })
         .fold(
             || [0.0; N],
@@ -141,7 +150,7 @@ fn calc_slope<const N: usize>(
             || [0.0; N],
             |mut a, b| {
                 for (c, d) in a.iter_mut().zip(b.iter()) {
-                    *c += *d as f64;
+                    *c += *d;
                 }
                 a
             },
