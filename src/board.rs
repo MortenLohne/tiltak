@@ -331,8 +331,10 @@ impl Square {
             )));
         }
         let mut chars = input.chars();
-        let file = chars.next().unwrap() as u8 - b'a';
-        let rank = BOARD_SIZE as u8 + b'0' - chars.next().unwrap() as u8;
+        let file = (chars.next().unwrap() as u8).overflowing_sub(b'a').0;
+        let rank = (BOARD_SIZE as u8 + b'0')
+            .overflowing_sub(chars.next().unwrap() as u8)
+            .0;
         if file >= BOARD_SIZE as u8 || rank >= BOARD_SIZE as u8 {
             Err(pgn::Error::new_parse_error(format!(
                 "Couldn't parse square \"{}\"",
@@ -1475,7 +1477,8 @@ impl board::Board for Board {
         };
 
         debug_assert_eq!(
-            44 - self.white_stones_left
+            2 * (STARTING_STONES + STARTING_CAPSTONES)
+                - self.white_stones_left
                 - self.black_stones_left
                 - self.white_caps_left
                 - self.black_caps_left,
@@ -1598,7 +1601,13 @@ impl EvalBoardTrait for Board {
     }
 }
 
-pub(crate) const SQUARE_SYMMETRIES: [usize; 25] = [
+pub(crate) const NUM_SQUARE_SYMMETRIES: usize = match BOARD_SIZE {
+    4 => 3,
+    5 => 6,
+    _ => 0,
+};
+
+pub(crate) const SQUARE_SYMMETRIES: [usize; BOARD_AREA] = [
     0, 1, 2, 1, 0, 1, 3, 4, 3, 1, 2, 4, 5, 4, 2, 1, 3, 4, 3, 1, 0, 1, 2, 1, 0,
 ];
 

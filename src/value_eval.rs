@@ -1,7 +1,7 @@
 use crate::bitboard::BitBoard;
 use crate::board::{
     squares_iterator, BlackTr, Board, ColorTr, GroupData, Piece::*, Role::*, Square, WhiteTr,
-    BOARD_AREA, BOARD_SIZE, SQUARE_SYMMETRIES,
+    BOARD_AREA, BOARD_SIZE, NUM_SQUARE_SYMMETRIES, SQUARE_SYMMETRIES,
 };
 use board_game_traits::board::{Board as EvalBoard, Color};
 
@@ -11,10 +11,10 @@ pub(crate) fn static_eval_game_phase(
     coefficients: &mut [f32],
 ) {
     const FLAT_PSQT: usize = 0;
-    const WALL_PSQT: usize = FLAT_PSQT + 6;
-    const CAP_PSQT: usize = WALL_PSQT + 6;
-    const OUR_STACK_PSQT: usize = CAP_PSQT + 6;
-    const THEIR_STACK_PSQT: usize = OUR_STACK_PSQT + 6;
+    const WALL_PSQT: usize = FLAT_PSQT + NUM_SQUARE_SYMMETRIES;
+    const CAP_PSQT: usize = WALL_PSQT + NUM_SQUARE_SYMMETRIES;
+    const OUR_STACK_PSQT: usize = CAP_PSQT + NUM_SQUARE_SYMMETRIES;
+    const THEIR_STACK_PSQT: usize = OUR_STACK_PSQT + NUM_SQUARE_SYMMETRIES;
 
     let mut white_flat_count = 0;
     let mut black_flat_count = 0;
@@ -51,7 +51,7 @@ pub(crate) fn static_eval_game_phase(
         }
     }
 
-    const SIDE_TO_MOVE: usize = THEIR_STACK_PSQT + 6;
+    const SIDE_TO_MOVE: usize = THEIR_STACK_PSQT + NUM_SQUARE_SYMMETRIES;
     const FLATSTONE_LEAD: usize = SIDE_TO_MOVE + 3;
     const NUMBER_OF_GROUPS: usize = FLATSTONE_LEAD + 3;
 
@@ -176,7 +176,7 @@ pub(crate) fn static_eval_game_phase(
     // Number of pieces in each line
     const NUM_LINES_OCCUPIED: usize = CAPSTONE_NEXT_TO_OUR_STACK + 1;
     // Number of lines with at least one road stone
-    const LINE_CONTROL: usize = NUM_LINES_OCCUPIED + 6;
+    const LINE_CONTROL: usize = NUM_LINES_OCCUPIED + BOARD_SIZE + 1;
 
     let mut num_ranks_occupied_white = 0;
     let mut num_files_occupied_white = 0;
@@ -211,7 +211,7 @@ pub(crate) fn static_eval_game_phase(
     coefficients[NUM_LINES_OCCUPIED + num_ranks_occupied_black] -= 1.0;
     coefficients[NUM_LINES_OCCUPIED + num_files_occupied_black] -= 1.0;
 
-    const _NEXT_CONST: usize = LINE_CONTROL + 12;
+    const _NEXT_CONST: usize = LINE_CONTROL + 2 * (BOARD_SIZE + 1);
 
     assert_eq!(_NEXT_CONST, coefficients.len());
 }
@@ -260,7 +260,7 @@ fn line_score<Us: ColorTr, Them: ColorTr>(
 
     coefficients[line_control + road_pieces_in_line as usize] += Us::color().multiplier() as f32;
 
-    let block_their_line = line_control + 6;
+    let block_their_line = line_control + BOARD_SIZE + 1;
 
     // Bonus for blocking their lines
     if road_pieces_in_line >= 3 {

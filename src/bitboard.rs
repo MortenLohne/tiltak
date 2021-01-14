@@ -114,7 +114,7 @@ impl BitBoard {
     #[inline]
     pub fn rank(self, i: u8) -> Self {
         debug_assert!(i < BOARD_SIZE as u8);
-        const MASK: u64 = 0b11111;
+        const MASK: u64 = (1 << BOARD_SIZE) - 1;
         BitBoard::from_u64(self.board & (MASK << (i as u64 * BOARD_SIZE as u64)))
     }
 
@@ -122,7 +122,17 @@ impl BitBoard {
     pub fn file(self, i: u8) -> Self {
         debug_assert!(i < BOARD_SIZE as u8);
         #[allow(clippy::unusual_byte_groupings)]
-        const MASK: u64 = 0b1_00001_00001_00001_00001; // TODO: Change for 6x6
+        const MASK: u64 = match BOARD_SIZE {
+            1 => 0b1,
+            2 => 0b0101,
+            3 => 0b1_001_001,
+            4 => 0b1_0001_0001_0001,
+            5 => 0b1_00001_00001_00001_00001,
+            6 => 0b1_000001_000001_000001_000001_000001,
+            7 => 0b1_0000001_0000001_0000001_0000001_0000001_0000001,
+            8 => 0b1_00000001_00000001_00000001_00000001_00000001_00000001_00000001,
+            _ => 0,
+        };
         BitBoard::from_u64(self.board & (MASK << i as u64))
     }
 

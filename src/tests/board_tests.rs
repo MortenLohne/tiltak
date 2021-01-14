@@ -1,7 +1,7 @@
 use crate::board::Piece::{BlackCap, BlackFlat, WhiteFlat, WhiteWall};
 use crate::board::{
     squares_iterator, Board, Direction::*, GroupEdgeConnection, Move, Piece, Role, Square,
-    BOARD_SIZE,
+    BOARD_AREA, BOARD_SIZE,
 };
 use crate::minmax::minmax;
 use crate::tests::do_moves_and_check_validity;
@@ -451,13 +451,17 @@ fn bitboard_full_board_file_rank_test() {
         &mut board,
         &(move_strings.iter().map(AsRef::as_ref).collect::<Vec<_>>()),
     );
-    assert_eq!(board.game_result(), Some(WhiteWin));
+    if BOARD_AREA % 2 == 0 {
+        assert_eq!(board.game_result(), Some(BlackWin));
+    } else {
+        assert_eq!(board.game_result(), Some(WhiteWin));
+    }
 
     let group_data = board.group_data();
 
     let road_pieces = group_data.white_road_pieces() | group_data.black_road_pieces();
 
-    assert_eq!(road_pieces.count(), 25);
+    assert_eq!(road_pieces.count(), BOARD_AREA as u8);
 
     for x in 0..BOARD_SIZE as u8 {
         assert_eq!(road_pieces.rank(x).count() as usize, BOARD_SIZE);
