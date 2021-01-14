@@ -24,7 +24,7 @@ type MoveScore = (Move, f32);
 type MoveScoresForGame = Vec<Vec<MoveScore>>;
 
 pub fn train_from_scratch(training_id: usize) -> Result<(), Box<dyn error::Error>> {
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rngs::StdRng::from_seed([0; 32]);
 
     let initial_value_params: [f32; Board::VALUE_PARAMS.len()] =
         array_from_fn(|| rng.gen_range(-0.01, 0.01));
@@ -284,7 +284,7 @@ pub fn tune_value_from_file(
 
     let middle_index = positions.len() / 2;
 
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rngs::StdRng::from_seed([0; 32]);
     let mut initial_params = [0.00; N];
 
     for param in initial_params.iter_mut() {
@@ -409,7 +409,7 @@ pub fn tune_value_and_policy_from_file(
     let (games, move_scoress) =
         games_and_move_scoress_from_file(value_file_name, policy_file_name)?;
 
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rngs::StdRng::from_seed([0; 32]);
 
     let initial_value_params: [f32; Board::VALUE_PARAMS.len()] =
         array_from_fn(|| rng.gen_range(-0.01, 0.01));
