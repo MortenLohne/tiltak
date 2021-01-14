@@ -46,8 +46,7 @@ pub trait TunableBoard<const N: usize, const M: usize>: BoardTrait {
     fn static_eval_coefficients(&self, coefficients: &mut [f32]);
 
     fn static_eval_with_params(&self, params: &[f32]) -> f32 {
-        // TODO: Using a vector here is inefficient, we would like to use an array
-        let mut coefficients: Vec<f32> = vec![0.0; params.len()];
+        let mut coefficients: [f32; N] = [0.0; N];
         self.static_eval_coefficients(&mut coefficients);
         coefficients.iter().zip(params).map(|(a, b)| a * b).sum()
     }
@@ -1353,8 +1352,7 @@ impl Board {
         group_data: &GroupData,
         params: &[f32],
     ) -> f32 {
-        // TODO: Using a vector here is inefficient, we would like to use an array
-        let mut coefficients: Vec<f32> = vec![0.0; params.len()];
+        let mut coefficients = [0.0; Self::VALUE_PARAMS.len()];
         value_eval::static_eval_game_phase(&self, group_data, &mut coefficients);
         coefficients.iter().zip(params).map(|(a, b)| a * b).sum()
     }
