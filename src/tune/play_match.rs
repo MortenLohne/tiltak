@@ -14,7 +14,7 @@ pub fn play_game(
     opening: &[Move],
     temperature: f64,
 ) -> (Game<Board>, Vec<Vec<(Move, Score)>>) {
-    const MCTS_NODES: u64 = 100_000;
+    const MCTS_NODES: u64 = 20_000;
 
     let mut board = Board::start_board();
     let mut game_moves = opening.to_vec();
