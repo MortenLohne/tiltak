@@ -7,12 +7,12 @@ lazy_static! {
 }
 
 /// The size of the board. Only 5 works correctly for now.
-pub const BOARD_SIZE: usize = 5;
+pub const BOARD_SIZE: usize = 4;
 
 pub const BOARD_AREA: usize = BOARD_SIZE * BOARD_SIZE;
 
-pub const STARTING_STONES: u8 = 21;
-pub const STARTING_CAPSTONES: u8 = 1;
+pub const STARTING_STONES: u8 = 15;
+pub const STARTING_CAPSTONES: u8 = 0;
 
 use crate::bitboard::BitBoard;
 use crate::board::Direction::*;
@@ -1606,9 +1606,13 @@ pub(crate) const NUM_SQUARE_SYMMETRIES: usize = match BOARD_SIZE {
     5 => 6,
     _ => 0,
 };
-
+/*
 pub(crate) const SQUARE_SYMMETRIES: [usize; BOARD_AREA] = [
     0, 1, 2, 1, 0, 1, 3, 4, 3, 1, 2, 4, 5, 4, 2, 1, 3, 4, 3, 1, 0, 1, 2, 1, 0,
+];
+*/
+pub(crate) const SQUARE_SYMMETRIES: [usize; BOARD_AREA] = [
+    0, 1, 1, 0, 1, 2, 2, 1, 1, 2, 2, 1, 0, 1, 1, 0
 ];
 
 impl TunableBoard for Board {
@@ -1665,7 +1669,7 @@ impl TunableBoard for Board {
         0.35141426,
         -0.032268483,
         -0.15010805,
-        -0.15450484,
+        -0.15450484, ]; /*
         0.7011735,
         -0.77606714,
         -0.432654,
@@ -1684,7 +1688,7 @@ impl TunableBoard for Board {
         0.103527844,
         0.08759902,
         -0.0380222,
-    ];
+    ]; */
     #[allow(clippy::unreadable_literal)]
     const POLICY_PARAMS: &'static [f32] = &[
         0.9308273,
@@ -1762,7 +1766,7 @@ impl TunableBoard for Board {
         -1.116258,
         -0.6946902,
         -0.17518687,
-        0.3844842,
+        0.3844842, ]; /*
         -1.1586666,
         -1.5351807,
         -1.1871732,
@@ -1778,7 +1782,7 @@ impl TunableBoard for Board {
         -0.09838614,
         1.0067077,
         1.4960983,
-    ];
+    ];*/
 
     fn static_eval_coefficients(&self, coefficients: &mut [f32]) {
         debug_assert!(self.game_result().is_none());
