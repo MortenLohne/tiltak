@@ -1,9 +1,6 @@
 use crate::bitboard::BitBoard;
 use crate::board::Role::{Cap, Flat, Wall};
-use crate::board::{
-    Board, ColorTr, Direction::*, GroupData, Move, Square, TunableBoard, BOARD_SIZE,
-    SQUARE_SYMMETRIES,
-};
+use crate::board::{Board, ColorTr, Direction::*, GroupData, Move, Square, TunableBoard, BOARD_SIZE, SQUARE_SYMMETRIES, NUM_SQUARE_SYMMETRIES};
 use crate::search;
 use arrayvec::ArrayVec;
 
@@ -18,11 +15,11 @@ pub fn inverse_sigmoid(x: f32) -> f32 {
 
 const MOVE_COUNT: usize = 0;
 const FLAT_PSQT: usize = MOVE_COUNT + 1;
-const WALL_PSQT: usize = FLAT_PSQT + 6;
-const CAP_PSQT: usize = WALL_PSQT + 6;
-const OUR_ROAD_STONES_IN_LINE: usize = CAP_PSQT + 6;
-const THEIR_ROAD_STONES_IN_LINE: usize = OUR_ROAD_STONES_IN_LINE + 15;
-const EXTEND_GROUP: usize = THEIR_ROAD_STONES_IN_LINE + 15;
+const WALL_PSQT: usize = FLAT_PSQT + NUM_SQUARE_SYMMETRIES;
+const CAP_PSQT: usize = WALL_PSQT + NUM_SQUARE_SYMMETRIES;
+const OUR_ROAD_STONES_IN_LINE: usize = CAP_PSQT + NUM_SQUARE_SYMMETRIES;
+const THEIR_ROAD_STONES_IN_LINE: usize = OUR_ROAD_STONES_IN_LINE + BOARD_SIZE * 3;
+const EXTEND_GROUP: usize = THEIR_ROAD_STONES_IN_LINE + BOARD_SIZE * 3;
 const MERGE_TWO_GROUPS: usize = EXTEND_GROUP + 3;
 const BLOCK_MERGER: usize = MERGE_TWO_GROUPS + 3;
 const PLACE_CRITICAL_SQUARE: usize = BLOCK_MERGER + 3;
@@ -294,14 +291,14 @@ pub(crate) fn coefficients_for_move_colortr<Us: ColorTr, Them: ColorTr>(
                         East => Us::road_stones(group_data).file(destination_square.file()),
                         South => Us::road_stones(group_data).rank(destination_square.rank()),
                     };
-                    let road_count = destination_line.count() as usize;
-                    if road_count > 2 {
-                        coefficients[MOVE_CAP_ONTO_STRONG_LINE + road_count - 3] += 1.0;
+                    let road_piece_count = destination_line.count() as usize;
+                    if road_piece_count > 2 {
+                        coefficients[MOVE_CAP_ONTO_STRONG_LINE + road_piece_count - 3] += 1.0;
                         if destination_square
                             .neighbours()
                             .any(|n| Us::is_critical_square(group_data, n))
                         {
-                            coefficients[MOVE_CAP_ONTO_STRONG_LINE + road_count - 1] += 1.0;
+                            coefficients[MOVE_CAP_ONTO_STRONG_LINE + road_piece_count - 1] += 1.0;
                         }
                     }
                 }
