@@ -1,6 +1,9 @@
 use crate::bitboard::BitBoard;
 use crate::board::Role::{Cap, Flat, Wall};
-use crate::board::{Board, ColorTr, Direction::*, GroupData, Move, Square, TunableBoard, BOARD_SIZE, SQUARE_SYMMETRIES, NUM_SQUARE_SYMMETRIES};
+use crate::board::{
+    Board, ColorTr, Direction::*, GroupData, Move, Square, TunableBoard, BOARD_SIZE,
+    NUM_SQUARE_SYMMETRIES, SQUARE_SYMMETRIES,
+};
 use crate::search;
 use arrayvec::ArrayVec;
 
