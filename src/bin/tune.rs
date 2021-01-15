@@ -44,7 +44,7 @@ fn main() {
             for i in 0.. {
                 let file_name = format!("games{}_batch0.ptn", i);
                 if !Path::new(&file_name).exists() {
-                    training::train_perpetually(i, Board::VALUE_PARAMS, Board::POLICY_PARAMS)
+                    training::train_perpetually(i, &Board::VALUE_PARAMS, &Board::POLICY_PARAMS)
                         .unwrap();
                     break;
                 } else {

@@ -38,16 +38,15 @@ use std::str::FromStr;
 use std::{fmt, iter, ops};
 
 /// Extra items for tuning evaluation constants.
-pub trait TunableBoard: BoardTrait {
+pub trait TunableBoard<const N: usize, const M: usize>: BoardTrait {
+    const VALUE_PARAMS: [f32; N];
+    const POLICY_PARAMS: [f32; M];
     type ExtraData;
-    const VALUE_PARAMS: &'static [f32];
-    const POLICY_PARAMS: &'static [f32];
 
     fn static_eval_coefficients(&self, coefficients: &mut [f32]);
 
     fn static_eval_with_params(&self, params: &[f32]) -> f32 {
-        // TODO: Using a vector here is inefficient, we would like to use an array
-        let mut coefficients: Vec<f32> = vec![0.0; params.len()];
+        let mut coefficients: [f32; N] = [0.0; N];
         self.static_eval_coefficients(&mut coefficients);
         coefficients.iter().zip(params).map(|(a, b)| a * b).sum()
     }
@@ -1160,7 +1159,7 @@ impl Board {
         simple_moves: &mut Vec<Move>,
         moves: &mut Vec<(Move, search::Score)>,
     ) {
-        self.generate_moves_with_params(Board::POLICY_PARAMS, group_data, simple_moves, moves)
+        self.generate_moves_with_params(&Board::POLICY_PARAMS, group_data, simple_moves, moves)
     }
 
     fn count_all_pieces(&self) -> u8 {
@@ -1355,8 +1354,7 @@ impl Board {
         group_data: &GroupData,
         params: &[f32],
     ) -> f32 {
-        // TODO: Using a vector here is inefficient, we would like to use an array
-        let mut coefficients: Vec<f32> = vec![0.0; params.len()];
+        let mut coefficients = [0.0; Self::VALUE_PARAMS.len()];
         value_eval::static_eval_game_phase(&self, group_data, &mut coefficients);
         coefficients.iter().zip(params).map(|(a, b)| a * b).sum()
     }
@@ -1597,7 +1595,7 @@ impl Iterator for MoveIterator {
 
 impl EvalBoardTrait for Board {
     fn static_eval(&self) -> f32 {
-        self.static_eval_with_params(Self::VALUE_PARAMS)
+        self.static_eval_with_params(&Self::VALUE_PARAMS)
     }
 }
 
@@ -1611,10 +1609,10 @@ pub(crate) const SQUARE_SYMMETRIES: [usize; BOARD_AREA] = [
     0, 1, 2, 1, 0, 1, 3, 4, 3, 1, 2, 4, 5, 4, 2, 1, 3, 4, 3, 1, 0, 1, 2, 1, 0,
 ];
 
-impl TunableBoard for Board {
+impl TunableBoard<69, 91> for Board {
     type ExtraData = GroupData;
     #[allow(clippy::unreadable_literal)]
-    const VALUE_PARAMS: &'static [f32] = &[
+    const VALUE_PARAMS: [f32; 69] = [
         -0.00044795033,
         0.15347332,
         0.14927012,
@@ -1686,7 +1684,7 @@ impl TunableBoard for Board {
         -0.0380222,
     ];
     #[allow(clippy::unreadable_literal)]
-    const POLICY_PARAMS: &'static [f32] = &[
+    const POLICY_PARAMS: [f32; 91] = [
         0.9308273,
         -0.07929533,
         0.057767794,
