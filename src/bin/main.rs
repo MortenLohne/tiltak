@@ -44,19 +44,19 @@ fn main() {
             "analyze" => test_position(),
             #[cfg(feature = "constant-tuning")]
             "openings" => {
-                let depth = 3;
+                let depth = 4;
                 let mut positions = HashSet::new();
-                let openings = generate_openings(Board::start_board(), &mut positions, depth);
+                let openings = generate_openings::<5>(Board::start_board(), &mut positions, depth);
 
                 let mut evaled_openings: Vec<_> = openings
                     .into_par_iter()
                     .filter(|position| position.len() == depth as usize)
                     .map(|position| {
-                        let mut board = Board::start_board();
+                        let mut board = <Board<5>>::start_board();
                         for mv in position.iter() {
                             board.do_move(mv.clone());
                         }
-                        (position, search::mcts(board, 10_000))
+                        (position, search::mcts(board, 100_000))
                     })
                     .collect();
 
@@ -87,9 +87,9 @@ fn main() {
 }
 
 #[cfg(feature = "constant-tuning")]
-fn generate_openings(
-    mut board: Board,
-    positions: &mut HashSet<Board>,
+fn generate_openings<const S: usize>(
+    mut board: Board<S>,
+    positions: &mut HashSet<Board<S>>,
     depth: u8,
 ) -> Vec<Vec<Move>> {
     let mut moves = vec![];
