@@ -8,12 +8,12 @@ use rand::Rng;
 use std::io;
 
 /// Play a single training game between two parameter sets
-pub fn play_game(
-    white_settings: &MctsSetting,
-    black_settings: &MctsSetting,
+pub fn play_game<const S: usize, const N: usize>(
+    white_settings: &MctsSetting<S>,
+    black_settings: &MctsSetting<S>,
     opening: &[Move],
     temperature: f64,
-) -> (Game<Board>, Vec<Vec<(Move, Score)>>) {
+) -> (Game<Board<S>>, Vec<Vec<(Move, Score)>>) {
     const MCTS_NODES: u64 = 100_000;
 
     let mut board = Board::start_board();
@@ -32,10 +32,10 @@ pub fn play_game(
 
         let moves_scores = match board.side_to_move() {
             Color::White => {
-                search::mcts_training(board.clone(), MCTS_NODES, white_settings.clone())
+                search::mcts_training::<S, N>(board.clone(), MCTS_NODES, white_settings.clone())
             }
             Color::Black => {
-                search::mcts_training(board.clone(), MCTS_NODES, black_settings.clone())
+                search::mcts_training::<S, N>(board.clone(), MCTS_NODES, black_settings.clone())
             }
         };
 
@@ -93,7 +93,10 @@ pub fn best_move(temperature: f64, move_scores: &[(Move, Score)]) -> Move {
 }
 
 /// Write a single game in ptn format with the given writer
-pub fn game_to_ptn<W: io::Write>(game: &Game<Board>, writer: &mut W) -> Result<(), io::Error> {
+pub fn game_to_ptn<W: io::Write, const N: usize>(
+    game: &Game<Board<N>>,
+    writer: &mut W,
+) -> Result<(), io::Error> {
     let Game {
         start_board,
         moves,

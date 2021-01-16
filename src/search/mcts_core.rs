@@ -37,15 +37,15 @@ impl TreeEdge {
     /// Perform one iteration of monte carlo tree search.
     ///
     /// Moves done on the board are not reversed.
-    pub fn select(
+    pub fn select<const S: usize, const N: usize>(
         &mut self,
-        board: &mut Board,
-        settings: &MctsSetting,
+        board: &mut Board<S>,
+        settings: &MctsSetting<S>,
         simple_moves: &mut Vec<Move>,
         moves: &mut Vec<(Move, Score)>,
     ) -> Score {
         if self.visits == 0 {
-            self.expand(board, &settings.value_params)
+            self.expand::<S, N>(board, &settings.value_params)
         } else if self.child.as_ref().unwrap().is_terminal {
             self.visits += 1;
             self.child.as_mut().unwrap().total_action_value += self.mean_action_value as f64;
@@ -99,7 +99,7 @@ impl TreeEdge {
             let child_edge = node.children.get_mut(best_child_node_index).unwrap();
 
             board.do_move(child_edge.mv.clone());
-            let result = 1.0 - child_edge.select(board, settings, simple_moves, moves);
+            let result = 1.0 - child_edge.select::<S, N>(board, settings, simple_moves, moves);
             self.visits += 1;
 
             node.total_action_value += result as f64;
@@ -111,7 +111,11 @@ impl TreeEdge {
 
     // Never inline, for profiling purposes
     #[inline(never)]
-    fn expand(&mut self, board: &Board, params: &[f32]) -> Score {
+    fn expand<const S: usize, const N: usize>(
+        &mut self,
+        board: &Board<S>,
+        params: &[f32],
+    ) -> Score {
         debug_assert!(self.child.is_none());
         self.child = Some(Box::new(Tree::new_node()));
         let child = self.child.as_mut().unwrap();
@@ -137,7 +141,7 @@ impl TreeEdge {
         }
 
         let mut static_eval =
-            cp_to_win_percentage(board.static_eval_with_params_and_data(&group_data, params));
+            cp_to_win_percentage(board.static_eval_with_params_and_data::<N>(&group_data, params));
         if board.side_to_move() == Color::Black {
             static_eval = 1.0 - static_eval;
         }
@@ -158,9 +162,9 @@ impl Tree {
     /// Do not initialize children in the expansion phase, for better performance
     /// Never inline, for profiling purposes
     #[inline(never)]
-    fn init_children(
+    fn init_children<const N: usize>(
         &mut self,
-        board: &Board,
+        board: &Board<N>,
         group_data: &GroupData,
         simple_moves: &mut Vec<Move>,
         policy_params: &[f32],

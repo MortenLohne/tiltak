@@ -25,9 +25,9 @@ enum SPSADirection {
 }
 
 /// Tune the variables indefinitely
-pub fn tune(variables: &mut [Variable], book_path: Option<&str>) {
+pub fn tune<const S: usize, const N: usize>(variables: &mut [Variable], book_path: Option<&str>) {
     let openings = if let Some(path) = book_path {
-        openings_from_file(path).unwrap()
+        openings_from_file::<S>(path).unwrap()
     } else {
         vec![vec![]]
     };
@@ -37,7 +37,8 @@ pub fn tune(variables: &mut [Variable], book_path: Option<&str>) {
         let cloned_variables = (*mutex_variables.lock().unwrap()).to_vec();
         let mut rng = rand::rngs::StdRng::from_entropy();
 
-        let result = tuning_iteration(&cloned_variables, &mut rng, &openings[i % openings.len()]);
+        let result =
+            tuning_iteration::<_, S, N>(&cloned_variables, &mut rng, &openings[i % openings.len()]);
         {
             let mut mut_variables = mutex_variables.lock().unwrap();
             for (variable, result) in (*mut_variables).iter_mut().zip(&result) {
@@ -69,7 +70,7 @@ pub fn tune(variables: &mut [Variable], book_path: Option<&str>) {
 }
 
 /// Run one iteration of the SPSA algorithm
-fn tuning_iteration<R: rand::Rng>(
+fn tuning_iteration<R: rand::Rng, const S: usize, const N: usize>(
     variables: &[Variable],
     rng: &mut R,
     opening: &[Move],
@@ -88,12 +89,12 @@ fn tuning_iteration<R: rand::Rng>(
         .map(|(a, b)| if rng.gen() { (a, b) } else { (b, a) })
         .unzip();
 
-    let player1_settings = MctsSetting::default()
+    let player1_settings = <MctsSetting<S>>::default()
         .add_search_params(player1_variables.iter().map(|(_, a)| *a).collect());
-    let player2_settings = MctsSetting::default()
+    let player2_settings = <MctsSetting<S>>::default()
         .add_search_params(player2_variables.iter().map(|(_, a)| *a).collect());
 
-    let (game, _) = play_game(&player1_settings, &player2_settings, opening, 0.2);
+    let (game, _) = play_game::<S, N>(&player1_settings, &player2_settings, opening, 0.2);
     match game.game_result {
         Some(GameResult::WhiteWin) => player1_variables.iter().map(|(a, _)| *a).collect(),
         Some(GameResult::BlackWin) => player2_variables.iter().map(|(a, _)| *a).collect(),

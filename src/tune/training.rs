@@ -23,26 +23,26 @@ type MoveScore = (Move, f32);
 // The probability of each possible move being played, through a whole game.
 type MoveScoresForGame = Vec<Vec<MoveScore>>;
 
-pub fn train_from_scratch(training_id: usize) -> Result<(), Box<dyn error::Error>> {
+pub fn train_from_scratch<const S: usize, const N: usize, const M: usize>(
+    training_id: usize,
+) -> Result<(), Box<dyn error::Error>> {
     let mut rng = rand::rngs::StdRng::from_seed([0; 32]);
 
-    let initial_value_params: [f32; Board::VALUE_PARAMS.len()] =
-        array_from_fn(|| rng.gen_range(-0.01, 0.01));
+    let initial_value_params: [f32; N] = array_from_fn(|| rng.gen_range(-0.01, 0.01));
 
-    let mut initial_policy_params: [f32; Board::POLICY_PARAMS.len()] =
-        array_from_fn(|| rng.gen_range(-0.01, 0.01));
+    let mut initial_policy_params: [f32; M] = array_from_fn(|| rng.gen_range(-0.01, 0.01));
 
     // The move number parameter should always be around 1.0, so start it here
     // If we don't, variation of this parameter completely dominates the other parameters
     initial_policy_params[0] = 1.0;
 
-    train_perpetually(training_id, &initial_value_params, &initial_policy_params)
+    train_perpetually::<S, N, M>(training_id, &initial_value_params, &initial_policy_params)
 }
 
-pub fn train_perpetually(
+pub fn train_perpetually<const S: usize, const N: usize, const M: usize>(
     training_id: usize,
-    initial_value_params: &[f32; Board::VALUE_PARAMS.len()],
-    initial_policy_params: &[f32; Board::POLICY_PARAMS.len()],
+    initial_value_params: &[f32; N],
+    initial_policy_params: &[f32; M],
 ) -> Result<(), Box<dyn error::Error>> {
     const BATCH_SIZE: usize = 100;
     // Only train from the last n batches
@@ -70,7 +70,7 @@ pub fn train_perpetually(
         let (games, move_scores): (Vec<_>, Vec<_>) = (0..BATCH_SIZE)
             .into_par_iter()
             .map(|i| {
-                play_game_pair(
+                play_game_pair::<S, N>(
                     &last_value_params,
                     &last_policy_params,
                     &value_params,
@@ -157,10 +157,7 @@ pub fn train_perpetually(
 
         let value_tuning_start_time = time::Instant::now();
 
-        let (new_value_params, new_policy_params): (
-            [f32; Board::VALUE_PARAMS.len()],
-            [f32; Board::POLICY_PARAMS.len()],
-        ) = tune_value_and_policy(
+        let (new_value_params, new_policy_params): ([f32; N], [f32; M]) = tune_value_and_policy(
             &games_in_training_batch,
             &move_scores_in_training_batch,
             &value_params,
@@ -185,7 +182,7 @@ pub fn train_perpetually(
     }
 }
 
-fn play_game_pair(
+fn play_game_pair<const S: usize, const N: usize>(
     last_value_params: &[f32],
     last_policy_params: &[f32],
     value_params: &[f32],
@@ -193,7 +190,7 @@ fn play_game_pair(
     current_params_wins: &AtomicU64,
     last_params_wins: &AtomicU64,
     i: usize,
-) -> (Game<Board>, Vec<Vec<(Move, f32)>>) {
+) -> (Game<Board<S>>, Vec<Vec<(Move, f32)>>) {
     let settings = MctsSetting::default()
         .add_value_params(value_params.to_vec())
         .add_policy_params(policy_params.to_vec())
@@ -203,7 +200,7 @@ fn play_game_pair(
         .add_policy_params(last_policy_params.to_vec())
         .add_dirichlet(0.2);
     if i % 2 == 0 {
-        let game = play_game(&settings, &last_settings, &[], 1.0);
+        let game = play_game::<S, N>(&settings, &last_settings, &[], 1.0);
         match game.0.game_result {
             Some(GameResult::WhiteWin) => {
                 current_params_wins.fetch_add(1, Ordering::Relaxed);
@@ -215,7 +212,7 @@ fn play_game_pair(
         };
         game
     } else {
-        let game = play_game(&last_settings, &settings, &[], 1.0);
+        let game = play_game::<S, N>(&last_settings, &settings, &[], 1.0);
         match game.0.game_result {
             Some(GameResult::BlackWin) => {
                 current_params_wins.fetch_add(1, Ordering::Relaxed);
@@ -238,7 +235,7 @@ pub struct GameStats {
 }
 
 impl GameStats {
-    pub fn from_games(games: &[Game<Board>]) -> Self {
+    pub fn from_games<const N: usize>(games: &[Game<Board<N>>]) -> Self {
         let mut stats = GameStats::default();
         for game in games {
             match game.game_result {
@@ -252,18 +249,19 @@ impl GameStats {
     }
 }
 
-pub fn read_games_from_file(file_name: &str) -> Result<Vec<Game<Board>>, Box<dyn error::Error>> {
+pub fn read_games_from_file<const N: usize>(
+    file_name: &str,
+) -> Result<Vec<Game<Board<N>>>, Box<dyn error::Error>> {
     let mut file = fs::File::open(file_name)?;
     let mut input = String::new();
     file.read_to_string(&mut input)?;
     pgn_parser::parse_pgn(&input)
 }
 
-pub fn tune_value_from_file(
+pub fn tune_value_from_file<const S: usize, const N: usize>(
     file_name: &str,
-) -> Result<[f32; Board::VALUE_PARAMS.len()], Box<dyn error::Error>> {
-    let games = read_games_from_file(file_name)?;
-    const N: usize = Board::VALUE_PARAMS.len();
+) -> Result<[f32; N], Box<dyn error::Error>> {
+    let games = read_games_from_file::<N>(file_name)?;
 
     let (positions, results) = positions_and_results_from_games(games);
 
@@ -307,13 +305,13 @@ pub fn tune_value_from_file(
     Ok(tuned_parameters)
 }
 
-pub fn tune_value_and_policy<const N: usize, const M: usize>(
-    games: &[Game<Board>],
+pub fn tune_value_and_policy<const S: usize, const N: usize, const M: usize>(
+    games: &[Game<Board<S>>],
     move_scoress: &[MoveScoresForGame],
     initial_value_params: &[f32; N],
     initial_policy_params: &[f32; M],
 ) -> Result<([f32; N], [f32; M]), Box<dyn error::Error>> {
-    let mut games_and_move_scoress: Vec<(&Game<Board>, &MoveScoresForGame)> =
+    let mut games_and_move_scoress: Vec<(&Game<Board<S>>, &MoveScoresForGame)> =
         games.iter().zip(move_scoress).collect();
 
     let mut rng = rand::rngs::StdRng::from_seed([0; 32]);
@@ -399,26 +397,18 @@ pub fn tune_value_and_policy<const N: usize, const M: usize>(
     Ok((tuned_value_parameters, tuned_policy_parameters))
 }
 
-pub fn tune_value_and_policy_from_file(
+pub fn tune_value_and_policy_from_file<const S: usize, const N: usize, const M: usize>(
     value_file_name: &str,
     policy_file_name: &str,
-) -> Result<
-    (
-        [f32; Board::VALUE_PARAMS.len()],
-        [f32; Board::POLICY_PARAMS.len()],
-    ),
-    Box<dyn error::Error>,
-> {
+) -> Result<([f32; N], [f32; M]), Box<dyn error::Error>> {
     let (games, move_scoress) =
-        games_and_move_scoress_from_file(value_file_name, policy_file_name)?;
+        games_and_move_scoress_from_file::<S>(value_file_name, policy_file_name)?;
 
     let mut rng = rand::rngs::StdRng::from_seed([0; 32]);
 
-    let initial_value_params: [f32; Board::VALUE_PARAMS.len()] =
-        array_from_fn(|| rng.gen_range(-0.01, 0.01));
+    let initial_value_params: [f32; N] = array_from_fn(|| rng.gen_range(-0.01, 0.01));
 
-    let mut initial_policy_params: [f32; Board::POLICY_PARAMS.len()] =
-        array_from_fn(|| rng.gen_range(-0.01, 0.01));
+    let mut initial_policy_params: [f32; M] = array_from_fn(|| rng.gen_range(-0.01, 0.01));
 
     // The move number parameter should always be around 1.0, so start it here
     // If we don't, variation of this parameter completely dominates the other parameters
@@ -431,11 +421,11 @@ pub fn tune_value_and_policy_from_file(
     )
 }
 
-pub fn games_and_move_scoress_from_file(
+pub fn games_and_move_scoress_from_file<const S: usize>(
     value_file_name: &str,
     policy_file_name: &str,
-) -> Result<(Vec<Game<Board>>, Vec<MoveScoresForGame>), Box<dyn error::Error>> {
-    let mut move_scoress = read_move_scores_from_file(policy_file_name)?;
+) -> Result<(Vec<Game<Board<S>>>, Vec<MoveScoresForGame>), Box<dyn error::Error>> {
+    let mut move_scoress = read_move_scores_from_file::<S>(policy_file_name)?;
     let mut games = read_games_from_file(value_file_name)?;
 
     // Only keep the last n games, since all the training data doesn't fit in memory while training
@@ -463,14 +453,14 @@ pub fn games_and_move_scoress_from_file(
     Ok((games, move_scoress))
 }
 
-pub fn read_move_scores_from_file(
+pub fn read_move_scores_from_file<const S: usize>(
     file_name: &str,
 ) -> Result<Vec<MoveScoresForGame>, Box<dyn error::Error>> {
     let mut file = fs::File::open(file_name)?;
     let mut input = String::new();
     file.read_to_string(&mut input)?;
 
-    let board = Board::start_board();
+    let board = <Board<S>>::start_board();
 
     // Move scores grouped by the game they were played
     let mut move_scoress: Vec<Vec<Vec<(Move, f32)>>> = vec![vec![]];
@@ -497,7 +487,9 @@ pub fn read_move_scores_from_file(
     Ok(move_scoress)
 }
 
-pub fn positions_and_results_from_games(games: Vec<Game<Board>>) -> (Vec<Board>, Vec<GameResult>) {
+pub fn positions_and_results_from_games<const S: usize>(
+    games: Vec<Game<Board<S>>>,
+) -> (Vec<Board<S>>, Vec<GameResult>) {
     let mut positions = vec![];
     let mut results = vec![];
     for game in games.into_iter() {

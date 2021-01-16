@@ -5,8 +5,8 @@ use crate::board::{
 };
 use board_game_traits::board::{Board as EvalBoard, Color};
 
-pub(crate) fn static_eval_game_phase(
-    board: &Board,
+pub(crate) fn static_eval_game_phase<const S: usize>(
+    board: &Board<S>,
     group_data: &GroupData,
     coefficients: &mut [f32],
 ) {
@@ -104,7 +104,7 @@ pub(crate) fn static_eval_game_phase(
     const CRITICAL_SQUARES: usize = NUMBER_OF_GROUPS + 3;
 
     for critical_square in group_data.critical_squares(Color::White) {
-        critical_squares_eval::<WhiteTr, BlackTr>(
+        critical_squares_eval::<WhiteTr, BlackTr, S>(
             board,
             critical_square,
             coefficients,
@@ -113,7 +113,7 @@ pub(crate) fn static_eval_game_phase(
     }
 
     for critical_square in group_data.critical_squares(Color::Black) {
-        critical_squares_eval::<BlackTr, WhiteTr>(
+        critical_squares_eval::<BlackTr, WhiteTr, S>(
             board,
             critical_square,
             coefficients,
@@ -217,8 +217,8 @@ pub(crate) fn static_eval_game_phase(
 }
 
 /// Give bonus for our critical squares
-fn critical_squares_eval<Us: ColorTr, Them: ColorTr>(
-    board: &Board,
+fn critical_squares_eval<Us: ColorTr, Them: ColorTr, const N: usize>(
+    board: &Board<N>,
     critical_square: Square,
     coefficients: &mut [f32],
     critical_squares: usize,

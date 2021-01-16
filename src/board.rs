@@ -71,9 +71,9 @@ pub trait TunableBoard<const N: usize, const M: usize>: BoardTrait {
 pub(crate) trait ColorTr {
     fn color() -> Color;
 
-    fn stones_left(board: &Board) -> u8;
+    fn stones_left<const S: usize>(board: &Board<S>) -> u8;
 
-    fn caps_left(board: &Board) -> u8;
+    fn caps_left<const S: usize>(board: &Board<S>) -> u8;
 
     fn road_stones(group_data: &GroupData) -> BitBoard;
 
@@ -107,11 +107,11 @@ impl ColorTr for WhiteTr {
         Color::White
     }
 
-    fn stones_left(board: &Board) -> u8 {
+    fn stones_left<const S: usize>(board: &Board<S>) -> u8 {
         board.white_stones_left
     }
 
-    fn caps_left(board: &Board) -> u8 {
+    fn caps_left<const S: usize>(board: &Board<S>) -> u8 {
         board.white_caps_left
     }
 
@@ -171,11 +171,11 @@ impl ColorTr for BlackTr {
         Color::Black
     }
 
-    fn stones_left(board: &Board) -> u8 {
+    fn stones_left<const S: usize>(board: &Board<S>) -> u8 {
         board.black_stones_left
     }
 
-    fn caps_left(board: &Board) -> u8 {
+    fn caps_left<const S: usize>(board: &Board<S>) -> u8 {
         board.black_caps_left
     }
 
@@ -895,7 +895,7 @@ impl ZobristKeys {
 /// Complete representation of a Tak position
 #[derive(Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-pub struct Board {
+pub struct Board<const S: usize> {
     cells: AbstractBoard<Stack>,
     #[cfg_attr(feature = "serde", serde(with = "ColorDef"))]
     to_move: Color,
@@ -909,7 +909,7 @@ pub struct Board {
     hash_history: Vec<u64>, // Zobrist hashes of previous board states, up to the last irreversible move. Does not include the corrent position
 }
 
-impl PartialEq for Board {
+impl<const S: usize> PartialEq for Board<S> {
     fn eq(&self, other: &Self) -> bool {
         self.cells == other.cells
             && self.to_move == other.to_move
@@ -922,9 +922,9 @@ impl PartialEq for Board {
     }
 }
 
-impl Eq for Board {}
+impl<const S: usize> Eq for Board<S> {}
 
-impl Hash for Board {
+impl<const S: usize> Hash for Board<S> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.cells.hash(state);
         self.to_move.hash(state);
@@ -936,7 +936,7 @@ impl Hash for Board {
     }
 }
 
-impl Index<Square> for Board {
+impl<const S: usize> Index<Square> for Board<S> {
     type Output = Stack;
 
     fn index(&self, square: Square) -> &Self::Output {
@@ -944,13 +944,13 @@ impl Index<Square> for Board {
     }
 }
 
-impl IndexMut<Square> for Board {
+impl<const S: usize> IndexMut<Square> for Board<S> {
     fn index_mut(&mut self, square: Square) -> &mut Self::Output {
         &mut self.cells[square]
     }
 }
 
-impl Default for Board {
+impl<const S: usize> Default for Board<S> {
     fn default() -> Self {
         Board {
             cells: Default::default(),
@@ -967,7 +967,7 @@ impl Default for Board {
     }
 }
 
-impl fmt::Debug for Board {
+impl<const S: usize> fmt::Debug for Board<S> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
         for y in 0..BOARD_SIZE {
             for print_row in 0..3 {
@@ -1008,7 +1008,7 @@ impl fmt::Debug for Board {
     }
 }
 
-impl Board {
+impl<const S: usize> Board<S> {
     #[cfg(test)]
     pub fn zobrist_hash(&self) -> u64 {
         self.hash
@@ -1070,7 +1070,7 @@ impl Board {
         sum_of_connections.is_winning()
     }
 
-    pub fn flip_board_y(&self) -> Board {
+    pub fn flip_board_y(&self) -> Board<S> {
         let mut new_board = self.clone();
         for x in 0..BOARD_SIZE as u8 {
             for y in 0..BOARD_SIZE as u8 {
@@ -1081,7 +1081,7 @@ impl Board {
         new_board
     }
 
-    pub fn flip_board_x(&self) -> Board {
+    pub fn flip_board_x(&self) -> Board<S> {
         let mut new_board = self.clone();
         for x in 0..BOARD_SIZE as u8 {
             for y in 0..BOARD_SIZE as u8 {
@@ -1092,7 +1092,7 @@ impl Board {
         new_board
     }
 
-    pub fn rotate_board(&self) -> Board {
+    pub fn rotate_board(&self) -> Board<S> {
         let mut new_board = self.clone();
         for x in 0..BOARD_SIZE as u8 {
             for y in 0..BOARD_SIZE as u8 {
@@ -1105,7 +1105,7 @@ impl Board {
         new_board
     }
 
-    pub fn flip_colors(&self) -> Board {
+    pub fn flip_colors(&self) -> Board<S> {
         let mut new_board = self.clone();
         for square in squares_iterator() {
             new_board[square] = Stack::default();
@@ -1126,7 +1126,7 @@ impl Board {
     }
 
     /// Returns all 8 symmetries of the board
-    pub fn symmetries(&self) -> Vec<Board> {
+    pub fn symmetries(&self) -> Vec<Board<S>> {
         vec![
             self.clone(),
             self.flip_board_x(),
@@ -1140,7 +1140,7 @@ impl Board {
     }
 
     /// Returns all 16 symmetries of the board, where swapping the colors is also a symmetry
-    pub fn symmetries_with_swapped_colors(&self) -> Vec<Board> {
+    pub fn symmetries_with_swapped_colors(&self) -> Vec<Board<S>> {
         self.symmetries()
             .into_iter()
             .flat_map(|board| vec![board.clone(), board.flip_colors()])
@@ -1159,7 +1159,7 @@ impl Board {
         simple_moves: &mut Vec<Move>,
         moves: &mut Vec<(Move, search::Score)>,
     ) {
-        self.generate_moves_with_params(&Board::POLICY_PARAMS, group_data, simple_moves, moves)
+        self.generate_moves_with_params(&<Board<S>>::POLICY_PARAMS, group_data, simple_moves, moves)
     }
 
     fn count_all_pieces(&self) -> u8 {
@@ -1349,18 +1349,18 @@ impl Board {
         suicide_win_square
     }
 
-    pub(crate) fn static_eval_with_params_and_data(
+    pub(crate) fn static_eval_with_params_and_data<const N: usize>(
         &self,
         group_data: &GroupData,
         params: &[f32],
     ) -> f32 {
-        let mut coefficients = [0.0; Self::VALUE_PARAMS.len()];
+        let mut coefficients = [0.0; N];
         value_eval::static_eval_game_phase(&self, group_data, &mut coefficients);
         coefficients.iter().zip(params).map(|(a, b)| a * b).sum()
     }
 }
 
-impl board::Board for Board {
+impl<const S: usize> board::Board for Board<S> {
     type Move = Move;
     type ReverseMove = ReverseMove;
 
@@ -1593,7 +1593,7 @@ impl Iterator for MoveIterator {
     }
 }
 
-impl EvalBoardTrait for Board {
+impl<const S: usize> EvalBoardTrait for Board<S> {
     fn static_eval(&self) -> f32 {
         self.static_eval_with_params(&Self::VALUE_PARAMS)
     }
@@ -1609,10 +1609,14 @@ pub(crate) const SQUARE_SYMMETRIES: [usize; BOARD_AREA] = [
     0, 1, 2, 1, 0, 1, 3, 4, 3, 1, 2, 4, 5, 4, 2, 1, 3, 4, 3, 1, 0, 1, 2, 1, 0,
 ];
 
-impl TunableBoard<69, 91> for Board {
+pub const NUM_VALUE_PARAMS: usize = 69;
+pub const NUM_POLICY_PARAMS: usize = 91;
+
+impl<const S: usize> TunableBoard<NUM_VALUE_PARAMS, NUM_POLICY_PARAMS> for Board<S> {
     type ExtraData = GroupData;
+
     #[allow(clippy::unreadable_literal)]
-    const VALUE_PARAMS: [f32; 69] = [
+    const VALUE_PARAMS: [f32; NUM_VALUE_PARAMS] = [
         -0.00044795033,
         0.15347332,
         0.14927012,
@@ -1684,7 +1688,7 @@ impl TunableBoard<69, 91> for Board {
         -0.0380222,
     ];
     #[allow(clippy::unreadable_literal)]
-    const POLICY_PARAMS: [f32; 91] = [
+    const POLICY_PARAMS: [f32; NUM_POLICY_PARAMS] = [
         0.9308273,
         -0.07929533,
         0.057767794,
@@ -1818,14 +1822,14 @@ impl TunableBoard<69, 91> for Board {
         num_legal_moves: usize,
     ) {
         match self.side_to_move() {
-            Color::White => policy_eval::coefficients_for_move_colortr::<WhiteTr, BlackTr>(
+            Color::White => policy_eval::coefficients_for_move_colortr::<WhiteTr, BlackTr, S>(
                 &self,
                 coefficients,
                 mv,
                 group_data,
                 num_legal_moves,
             ),
-            Color::Black => policy_eval::coefficients_for_move_colortr::<BlackTr, WhiteTr>(
+            Color::Black => policy_eval::coefficients_for_move_colortr::<BlackTr, WhiteTr, S>(
                 &self,
                 coefficients,
                 mv,
@@ -1836,7 +1840,7 @@ impl TunableBoard<69, 91> for Board {
     }
 }
 
-impl pgn_traits::pgn::PgnBoard for Board {
+impl<const S: usize> pgn_traits::pgn::PgnBoard for Board<S> {
     fn from_fen(fen: &str) -> Result<Self, pgn::Error> {
         let fen_words: Vec<&str> = fen.split_whitespace().collect();
 

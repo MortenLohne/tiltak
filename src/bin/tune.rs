@@ -1,6 +1,6 @@
 use clap::{App, Arg, SubCommand};
 use std::path::Path;
-use taik::board::{Board, TunableBoard};
+use taik::board::{Board, TunableBoard, NUM_POLICY_PARAMS, NUM_VALUE_PARAMS};
 use taik::tune::{spsa, training};
 
 fn main() {
@@ -44,8 +44,12 @@ fn main() {
             for i in 0.. {
                 let file_name = format!("games{}_batch0.ptn", i);
                 if !Path::new(&file_name).exists() {
-                    training::train_perpetually(i, &Board::VALUE_PARAMS, &Board::POLICY_PARAMS)
-                        .unwrap();
+                    training::train_perpetually::<5, 69, 91>(
+                        i,
+                        &<Board<5>>::VALUE_PARAMS,
+                        &<Board<5>>::POLICY_PARAMS,
+                    )
+                    .unwrap();
                     break;
                 } else {
                     println!("File {} already exists, trying next.", file_name);
@@ -56,7 +60,7 @@ fn main() {
             for i in 0.. {
                 let file_name = format!("games{}_batch0.ptn", i);
                 if !Path::new(&file_name).exists() {
-                    training::train_from_scratch(i).unwrap();
+                    training::train_from_scratch::<5, NUM_VALUE_PARAMS, 91>(i).unwrap();
                     break;
                 } else {
                     println!("File {} already exists, trying next.", file_name);
@@ -65,15 +69,19 @@ fn main() {
         }
         ("value-from-file", Some(arg)) => {
             let file_name = arg.value_of("file-name").unwrap();
-            let value_params = training::tune_value_from_file(file_name).unwrap();
+            let value_params =
+                training::tune_value_from_file::<5, NUM_VALUE_PARAMS>(file_name).unwrap();
             println!("{:?}", value_params);
         }
         ("both-from-file", Some(arg)) => {
             let value_file_name = arg.value_of("value-file-name").unwrap();
             let policy_file_name = arg.value_of("policy-file-name").unwrap();
-            let (value_params, policy_params) =
-                training::tune_value_and_policy_from_file(value_file_name, policy_file_name)
-                    .unwrap();
+            let (value_params, policy_params) = training::tune_value_and_policy_from_file::<
+                5,
+                NUM_VALUE_PARAMS,
+                NUM_POLICY_PARAMS,
+            >(value_file_name, policy_file_name)
+            .unwrap();
             println!("Value: {:?}", value_params);
             println!("Policy: {:?}", policy_params);
         }
@@ -90,7 +98,7 @@ fn main() {
                     apply_factor: 0.002,
                 },
             ];
-            spsa::tune(&mut variables, arg.value_of("book"));
+            spsa::tune::<5, NUM_VALUE_PARAMS>(&mut variables, arg.value_of("book"));
         }
         ("", None) => {
             println!("Error: No subcommand selected. Try the 'help' subcommand for a list.");

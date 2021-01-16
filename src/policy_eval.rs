@@ -1,6 +1,9 @@
 use crate::bitboard::BitBoard;
 use crate::board::Role::{Cap, Flat, Wall};
-use crate::board::{Board, ColorTr, Direction::*, GroupData, Move, Square, TunableBoard, BOARD_SIZE, SQUARE_SYMMETRIES, NUM_SQUARE_SYMMETRIES};
+use crate::board::{
+    Board, ColorTr, Direction::*, GroupData, Move, Square, TunableBoard, BOARD_SIZE,
+    NUM_SQUARE_SYMMETRIES, SQUARE_SYMMETRIES,
+};
 use crate::search;
 use arrayvec::ArrayVec;
 
@@ -40,7 +43,7 @@ const MOVE_CAP_ONTO_STRONG_LINE: usize = STACK_CAPTURE_IN_STRONG_LINE_CAP + 2;
 const MOVE_ONTO_CRITICAL_SQUARE: usize = MOVE_CAP_ONTO_STRONG_LINE + 4;
 const _NEXT_CONST: usize = MOVE_ONTO_CRITICAL_SQUARE + 2;
 
-impl Board {
+impl<const N: usize> Board<N> {
     pub(crate) fn generate_moves_with_probabilities_colortr<Us: ColorTr, Them: ColorTr>(
         &self,
         params: &[f32],
@@ -65,7 +68,7 @@ impl Board {
         num_moves: usize,
     ) -> f32 {
         let mut coefficients = vec![0.0; Self::POLICY_PARAMS.len()];
-        coefficients_for_move_colortr::<Us, Them>(
+        coefficients_for_move_colortr::<Us, Them, N>(
             self,
             &mut coefficients,
             mv,
@@ -77,8 +80,8 @@ impl Board {
         sigmoid(total_value)
     }
 }
-pub(crate) fn coefficients_for_move_colortr<Us: ColorTr, Them: ColorTr>(
-    board: &Board,
+pub(crate) fn coefficients_for_move_colortr<Us: ColorTr, Them: ColorTr, const N: usize>(
+    board: &Board<N>,
     coefficients: &mut [f32],
     mv: &Move,
     group_data: &GroupData,

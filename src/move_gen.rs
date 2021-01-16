@@ -5,10 +5,10 @@ use crate::board::{
 };
 use arrayvec::ArrayVec;
 
-impl Board {
+impl<const N: usize> Board<N> {
     pub(crate) fn generate_moves_colortr<Us: ColorTr, Them: ColorTr>(
         &self,
-        moves: &mut Vec<<Board as board_game_traits::board::Board>::Move>,
+        moves: &mut Vec<<Board<N> as board_game_traits::board::Board>::Move>,
     ) {
         for square in board::squares_iterator() {
             match self[square].top_stone() {

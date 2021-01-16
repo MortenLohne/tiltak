@@ -17,6 +17,7 @@ use rayon::prelude::*;
 use std::collections::HashSet;
 use taik::board::Board;
 use taik::board::TunableBoard;
+use taik::board::NUM_VALUE_PARAMS;
 #[cfg(feature = "constant-tuning")]
 use taik::board::{Move, Role};
 use taik::minmax;
@@ -76,7 +77,7 @@ fn main() {
                     println!("Couldn't parse any games")
                 }
 
-                analyze_game(games[0].clone());
+                analyze_game::<5, NUM_VALUE_PARAMS>(games[0].clone());
             }
             "mem_usage" => mem_usage(),
             "bench" => bench(),
@@ -126,7 +127,7 @@ fn generate_openings(
 }
 
 fn mcts_selfplay(max_time: time::Duration) {
-    let mut board = Board::default();
+    let mut board = <Board<5>>::default();
     let mut moves = vec![];
 
     let mut white_elapsed = time::Duration::default();
@@ -134,7 +135,8 @@ fn mcts_selfplay(max_time: time::Duration) {
 
     while board.game_result().is_none() {
         let start_time = time::Instant::now();
-        let (best_move, score) = search::play_move_time(board.clone(), max_time);
+        let (best_move, score) =
+            search::play_move_time::<5, NUM_VALUE_PARAMS>(board.clone(), max_time);
 
         match board.side_to_move() {
             Color::White => white_elapsed += start_time.elapsed(),
@@ -178,7 +180,7 @@ fn mcts_selfplay(max_time: time::Duration) {
 
 fn mcts_vs_minmax(minmax_depth: u16, mcts_nodes: u64) {
     println!("Minmax depth {} vs mcts {} nodes", minmax_depth, mcts_nodes);
-    let mut board = Board::default();
+    let mut board = <Board<5>>::default();
     let mut moves = vec![];
     while board.game_result().is_none() {
         let num_moves = moves.len();
@@ -187,7 +189,8 @@ fn mcts_vs_minmax(minmax_depth: u16, mcts_nodes: u64) {
         }
         match board.side_to_move() {
             Color::Black => {
-                let (best_move, score) = search::mcts(board.clone(), mcts_nodes);
+                let (best_move, score) =
+                    search::mcts::<5, NUM_VALUE_PARAMS>(board.clone(), mcts_nodes);
                 board.do_move(best_move.clone());
                 moves.push(best_move.clone());
                 println!("{:6}: {:.3}", best_move, score);
@@ -222,7 +225,7 @@ fn mcts_vs_minmax(minmax_depth: u16, mcts_nodes: u64) {
 }
 
 fn test_position() {
-    let mut board = Board::default();
+    let mut board = <Board<5>>::default();
     let mut moves = vec![];
 
     println!("Enter moves:");
@@ -249,7 +252,7 @@ fn test_position() {
     println!("Top 10 heuristic moves:");
     for (mv, score) in moves.iter().take(10) {
         println!("{}: {:.3}", mv, score);
-        let mut coefficients = vec![0.0; Board::POLICY_PARAMS.len()];
+        let mut coefficients = vec![0.0; <Board<5>>::POLICY_PARAMS.len()];
         board.coefficients_for_move(&mut coefficients, mv, &board.group_data(), moves.len());
         for coefficient in coefficients {
             print!("{:.1}, ", coefficient);
@@ -267,7 +270,7 @@ fn test_position() {
     }
     let mut tree = search::MonteCarloTree::new(board.clone());
     for i in 1.. {
-        tree.select();
+        tree.select::<NUM_VALUE_PARAMS>();
         if i % 100_000 == 0 {
             println!(
                 "{} visits, val={:.2}%, static eval={:.4}, static winning probability={:.2}%",
@@ -282,7 +285,7 @@ fn test_position() {
     }
 }
 
-fn analyze_game(game: Game<Board>) {
+fn analyze_game<const S: usize, const N: usize>(game: Game<Board<S>>) {
     let mut board = game.start_board.clone();
     let mut ply_number = 2;
     for (mv, _) in game.moves {
@@ -290,7 +293,7 @@ fn analyze_game(game: Game<Board>) {
         if board.game_result().is_some() {
             break;
         }
-        let (best_move, score) = search::mcts(board.clone(), 1_000_000);
+        let (best_move, score) = search::mcts::<S, N>(board.clone(), 1_000_000);
         if ply_number % 2 == 0 {
             print!(
                 "{}. {}: {{{:.2}%, best reply {}}} ",
@@ -313,7 +316,7 @@ fn analyze_game(game: Game<Board>) {
 }
 
 /// Play a game against the engine through stdin
-fn play_human(mut board: Board) {
+fn play_human(mut board: Board<5>) {
     match board.game_result() {
         None => {
             use board_game_traits::board::Color::*;
@@ -351,7 +354,8 @@ fn play_human(mut board: Board) {
                 board.do_move(c_move);
                 play_human(board);
             } else {
-                let (best_move, score) = search::mcts(board.clone(), 1_000_000);
+                let (best_move, score) =
+                    search::mcts::<5, NUM_VALUE_PARAMS>(board.clone(), 1_000_000);
 
                 println!("Computer played {:?} with score {}", best_move, score);
                 board.do_move(best_move);
@@ -369,9 +373,9 @@ fn bench() {
     const NODES: u64 = 1_000_000;
     let start_time = time::Instant::now();
     {
-        let board = Board::default();
+        let board = <Board<5>>::default();
 
-        let (_move, score) = search::mcts(board, NODES);
+        let (_move, score) = search::mcts::<5, NUM_VALUE_PARAMS>(board, NODES);
         print!("{:.3}, ", score);
     }
 
@@ -380,7 +384,7 @@ fn bench() {
 
         do_moves_and_check_validity(&mut board, &["d3", "c3", "c4", "1d3<", "1c4+", "Sc4"]);
 
-        let (_move, score) = search::mcts(board, NODES);
+        let (_move, score) = search::mcts::<5, NUM_VALUE_PARAMS>(board, NODES);
         print!("{:.3}, ", score);
     }
     {
@@ -394,7 +398,7 @@ fn bench() {
             ],
         );
 
-        let (_move, score) = search::mcts(board, NODES);
+        let (_move, score) = search::mcts::<5, NUM_VALUE_PARAMS>(board, NODES);
         println!("{:.3}", score);
     }
     let time_taken = start_time.elapsed();
@@ -409,13 +413,13 @@ fn bench() {
 /// Print memory usage of various data types in the project, for debugging purposes
 fn mem_usage() {
     use std::mem;
-    println!("Tak board: {} bytes", mem::size_of::<board::Board>());
+    println!("Tak board: {} bytes", mem::size_of::<board::Board<5>>());
     println!("Tak board cell: {} bytes", mem::size_of::<board::Stack>());
     println!("Tak move: {} bytes", mem::size_of::<board::Move>());
     println!("Zobrist keys: {}", mem::size_of::<board::ZobristKeys>())
 }
 
-fn do_moves_and_check_validity(board: &mut Board, move_strings: &[&str]) {
+fn do_moves_and_check_validity(board: &mut Board<5>, move_strings: &[&str]) {
     let mut moves = vec![];
     for mv_san in move_strings.iter() {
         let mv = board.move_from_san(&mv_san).unwrap();

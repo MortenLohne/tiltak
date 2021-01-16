@@ -4,7 +4,7 @@ use std::io;
 use std::io::{BufRead, BufReader};
 use std::str::FromStr;
 use std::time::{Duration, Instant};
-use taik::board::Board;
+use taik::board::{Board, NUM_VALUE_PARAMS};
 
 use taik::search;
 
@@ -46,7 +46,7 @@ pub fn main() {
                     Some("startpos") => Board::default(),
                     Some("tps") => {
                         let tps: String = (&mut words_iter).take(3).collect::<Vec<_>>().join(" ");
-                        Board::from_fen(&tps).unwrap()
+                        <Board<5>>::from_fen(&tps).unwrap()
                     }
                     _ => panic!("Expected \"startpos\" or \"tps\" to specify position."),
                 };
@@ -72,7 +72,7 @@ pub fn main() {
                     for i in 0.. {
                         let nodes_to_search = (1000.0 * f64::powf(1.26, i as f64)) as u64;
                         for _ in 0..nodes_to_search {
-                            tree.select();
+                            tree.select::<NUM_VALUE_PARAMS>();
                         }
                         total_nodes += nodes_to_search;
                         let (best_move, score) = tree.best_move();
@@ -120,7 +120,8 @@ pub fn main() {
                     };
 
                     let start_time = Instant::now();
-                    let (best_move, score) = search::play_move_time(position.clone(), max_time);
+                    let (best_move, score) =
+                        search::play_move_time::<5, NUM_VALUE_PARAMS>(position.clone(), max_time);
 
                     println!(
                         "info score cp {} time {} pv {}",
