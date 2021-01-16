@@ -26,8 +26,8 @@ pub struct Output {
 }
 
 /// AWS serverside handler
-pub fn handle_aws_event(e: Event, _c: Context) -> Result<Output, HandlerError> {
-    let mut board = Board::default();
+pub fn handle_aws_event<const S: usize>(e: Event, _c: Context) -> Result<Output, HandlerError> {
+    let mut board = <Board<S>>::default();
     for mv in e.moves {
         board.do_move(mv);
     }

@@ -17,7 +17,6 @@ use rayon::prelude::*;
 use std::collections::HashSet;
 use taik::board::Board;
 use taik::board::TunableBoard;
-use taik::board::NUM_VALUE_PARAMS;
 #[cfg(feature = "constant-tuning")]
 use taik::board::{Move, Role};
 use taik::minmax;
@@ -45,7 +44,7 @@ fn main() {
             "analyze" => test_position(),
             #[cfg(feature = "constant-tuning")]
             "openings" => {
-                let depth = 4;
+                let depth = 3;
                 let mut positions = HashSet::new();
                 let openings = generate_openings(Board::start_board(), &mut positions, depth);
 
@@ -57,7 +56,7 @@ fn main() {
                         for mv in position.iter() {
                             board.do_move(mv.clone());
                         }
-                        (position, search::mcts(board, 100_000))
+                        (position, search::mcts(board, 10_000))
                     })
                     .collect();
 
@@ -77,7 +76,7 @@ fn main() {
                     println!("Couldn't parse any games")
                 }
 
-                analyze_game::<5, NUM_VALUE_PARAMS>(games[0].clone());
+                analyze_game::<5>(games[0].clone());
             }
             "mem_usage" => mem_usage(),
             "bench" => bench(),
@@ -136,7 +135,7 @@ fn mcts_selfplay(max_time: time::Duration) {
     while board.game_result().is_none() {
         let start_time = time::Instant::now();
         let (best_move, score) =
-            search::play_move_time::<5, NUM_VALUE_PARAMS>(board.clone(), max_time);
+            search::play_move_time::<5>(board.clone(), max_time);
 
         match board.side_to_move() {
             Color::White => white_elapsed += start_time.elapsed(),
@@ -190,7 +189,7 @@ fn mcts_vs_minmax(minmax_depth: u16, mcts_nodes: u64) {
         match board.side_to_move() {
             Color::Black => {
                 let (best_move, score) =
-                    search::mcts::<5, NUM_VALUE_PARAMS>(board.clone(), mcts_nodes);
+                    search::mcts::<5>(board.clone(), mcts_nodes);
                 board.do_move(best_move.clone());
                 moves.push(best_move.clone());
                 println!("{:6}: {:.3}", best_move, score);
@@ -270,7 +269,7 @@ fn test_position() {
     }
     let mut tree = search::MonteCarloTree::new(board.clone());
     for i in 1.. {
-        tree.select::<NUM_VALUE_PARAMS>();
+        tree.select();
         if i % 100_000 == 0 {
             println!(
                 "{} visits, val={:.2}%, static eval={:.4}, static winning probability={:.2}%",
@@ -285,7 +284,7 @@ fn test_position() {
     }
 }
 
-fn analyze_game<const S: usize, const N: usize>(game: Game<Board<S>>) {
+fn analyze_game<const S: usize>(game: Game<Board<S>>) {
     let mut board = game.start_board.clone();
     let mut ply_number = 2;
     for (mv, _) in game.moves {
@@ -293,7 +292,7 @@ fn analyze_game<const S: usize, const N: usize>(game: Game<Board<S>>) {
         if board.game_result().is_some() {
             break;
         }
-        let (best_move, score) = search::mcts::<S, N>(board.clone(), 1_000_000);
+        let (best_move, score) = search::mcts::<S>(board.clone(), 1_000_000);
         if ply_number % 2 == 0 {
             print!(
                 "{}. {}: {{{:.2}%, best reply {}}} ",
@@ -355,7 +354,7 @@ fn play_human(mut board: Board<5>) {
                 play_human(board);
             } else {
                 let (best_move, score) =
-                    search::mcts::<5, NUM_VALUE_PARAMS>(board.clone(), 1_000_000);
+                    search::mcts::<5>(board.clone(), 1_000_000);
 
                 println!("Computer played {:?} with score {}", best_move, score);
                 board.do_move(best_move);
@@ -375,7 +374,7 @@ fn bench() {
     {
         let board = <Board<5>>::default();
 
-        let (_move, score) = search::mcts::<5, NUM_VALUE_PARAMS>(board, NODES);
+        let (_move, score) = search::mcts::<5>(board, NODES);
         print!("{:.3}, ", score);
     }
 
@@ -384,7 +383,7 @@ fn bench() {
 
         do_moves_and_check_validity(&mut board, &["d3", "c3", "c4", "1d3<", "1c4+", "Sc4"]);
 
-        let (_move, score) = search::mcts::<5, NUM_VALUE_PARAMS>(board, NODES);
+        let (_move, score) = search::mcts::<5>(board, NODES);
         print!("{:.3}, ", score);
     }
     {
@@ -398,7 +397,7 @@ fn bench() {
             ],
         );
 
-        let (_move, score) = search::mcts::<5, NUM_VALUE_PARAMS>(board, NODES);
+        let (_move, score) = search::mcts::<5>(board, NODES);
         println!("{:.3}", score);
     }
     let time_taken = start_time.elapsed();

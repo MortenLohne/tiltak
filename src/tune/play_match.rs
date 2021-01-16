@@ -8,7 +8,7 @@ use rand::Rng;
 use std::io;
 
 /// Play a single training game between two parameter sets
-pub fn play_game<const S: usize, const N: usize>(
+pub fn play_game<const S: usize>(
     white_settings: &MctsSetting<S>,
     black_settings: &MctsSetting<S>,
     opening: &[Move],
@@ -32,10 +32,10 @@ pub fn play_game<const S: usize, const N: usize>(
 
         let moves_scores = match board.side_to_move() {
             Color::White => {
-                search::mcts_training::<S, N>(board.clone(), MCTS_NODES, white_settings.clone())
+                search::mcts_training::<S>(board.clone(), MCTS_NODES, white_settings.clone())
             }
             Color::Black => {
-                search::mcts_training::<S, N>(board.clone(), MCTS_NODES, black_settings.clone())
+                search::mcts_training::<S>(board.clone(), MCTS_NODES, black_settings.clone())
             }
         };
 

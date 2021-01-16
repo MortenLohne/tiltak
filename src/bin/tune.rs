@@ -98,7 +98,7 @@ fn main() {
                     apply_factor: 0.002,
                 },
             ];
-            spsa::tune::<5, NUM_VALUE_PARAMS>(&mut variables, arg.value_of("book"));
+            spsa::tune::<5>(&mut variables, arg.value_of("book"));
         }
         ("", None) => {
             println!("Error: No subcommand selected. Try the 'help' subcommand for a list.");

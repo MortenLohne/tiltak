@@ -70,7 +70,7 @@ pub fn train_perpetually<const S: usize, const N: usize, const M: usize>(
         let (games, move_scores): (Vec<_>, Vec<_>) = (0..BATCH_SIZE)
             .into_par_iter()
             .map(|i| {
-                play_game_pair::<S, N>(
+                play_game_pair::<S>(
                     &last_value_params,
                     &last_policy_params,
                     &value_params,
@@ -182,7 +182,7 @@ pub fn train_perpetually<const S: usize, const N: usize, const M: usize>(
     }
 }
 
-fn play_game_pair<const S: usize, const N: usize>(
+fn play_game_pair<const S: usize>(
     last_value_params: &[f32],
     last_policy_params: &[f32],
     value_params: &[f32],
@@ -200,7 +200,7 @@ fn play_game_pair<const S: usize, const N: usize>(
         .add_policy_params(last_policy_params.to_vec())
         .add_dirichlet(0.2);
     if i % 2 == 0 {
-        let game = play_game::<S, N>(&settings, &last_settings, &[], 1.0);
+        let game = play_game::<S>(&settings, &last_settings, &[], 1.0);
         match game.0.game_result {
             Some(GameResult::WhiteWin) => {
                 current_params_wins.fetch_add(1, Ordering::Relaxed);
@@ -212,7 +212,7 @@ fn play_game_pair<const S: usize, const N: usize>(
         };
         game
     } else {
-        let game = play_game::<S, N>(&last_settings, &settings, &[], 1.0);
+        let game = play_game::<S>(&last_settings, &settings, &[], 1.0);
         match game.0.game_result {
             Some(GameResult::BlackWin) => {
                 current_params_wins.fetch_add(1, Ordering::Relaxed);

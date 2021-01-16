@@ -93,7 +93,7 @@ impl<const S: usize> MonteCarloTree<S> {
         }
     }
 
-    pub fn with_settings<const N: usize>(board: Board<S>, settings: MctsSetting<S>) -> Self {
+    pub fn with_settings(board: Board<S>, settings: MctsSetting<S>) -> Self {
         #[allow(unused_mut)]
         let mut tree = MonteCarloTree {
             edge: TreeEdge {
@@ -111,16 +111,16 @@ impl<const S: usize> MonteCarloTree<S> {
 
         #[cfg(feature = "constant-tuning")]
         if let Some(alpha) = tree.settings.dirichlet {
-            tree.select::<N>();
-            tree.select::<N>();
+            tree.select();
+            tree.select();
             (*tree.edge.child.as_mut().unwrap()).apply_dirichlet(0.25, alpha);
         }
         tree
     }
 
     /// Run one iteration of MCTS
-    pub fn select<const N: usize>(&mut self) -> f32 {
-        self.edge.select::<S, N>(
+    pub fn select(&mut self) -> f32 {
+        self.edge.select::<S>(
             &mut self.board.clone(),
             &self.settings,
             &mut self.simple_moves,
@@ -182,11 +182,11 @@ impl<const S: usize> MonteCarloTree<S> {
 }
 
 /// The simplest way to use the mcts module. Run Monte Carlo Tree Search for `nodes` nodes, returning the best move, and its estimated winning probability for the side to move.
-pub fn mcts<const S: usize, const N: usize>(board: Board<S>, nodes: u64) -> (Move, Score) {
+pub fn mcts<const S: usize>(board: Board<S>, nodes: u64) -> (Move, Score) {
     let mut tree = MonteCarloTree::new(board);
 
     for _ in 0..nodes.max(2) {
-        tree.select::<N>();
+        tree.select();
     }
     let (mv, score) = tree.best_move();
     (mv, score)
@@ -195,7 +195,7 @@ pub fn mcts<const S: usize, const N: usize>(board: Board<S>, nodes: u64) -> (Mov
 /// Play a move, calculating for a maximum duration.
 /// It will usually spend much less time, especially if the move is obvious.
 /// On average, it will spend around 20% of `max_time`, and rarely more than 50%.
-pub fn play_move_time<const S: usize, const N: usize>(
+pub fn play_move_time<const S: usize>(
     board: Board<S>,
     max_time: time::Duration,
 ) -> (Move, Score) {
@@ -204,7 +204,7 @@ pub fn play_move_time<const S: usize, const N: usize>(
 
     for i in 1.. {
         for _ in 0..i * 100 {
-            tree.select::<N>();
+            tree.select();
         }
 
         let (best_move, best_score) = tree.best_move();
@@ -240,15 +240,15 @@ pub fn play_move_time<const S: usize, const N: usize>(
 
 /// Run mcts with specific static evaluation parameters, for optimization the parameter set.
 /// Also applies Dirichlet noise to the root node
-pub fn mcts_training<const S: usize, const N: usize>(
+pub fn mcts_training<const S: usize>(
     board: Board<S>,
     nodes: u64,
     settings: MctsSetting<S>,
 ) -> Vec<(Move, Score)> {
-    let mut tree = MonteCarloTree::with_settings::<N>(board, settings);
+    let mut tree = MonteCarloTree::with_settings(board, settings);
 
     for _ in 0..nodes {
-        tree.select::<N>();
+        tree.select();
     }
     let child_visits: u64 = tree.children().iter().map(|edge| edge.visits).sum();
     tree.children()

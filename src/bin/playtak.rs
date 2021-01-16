@@ -10,7 +10,7 @@ use std::time::Duration;
 use std::{io, net, thread};
 #[cfg(feature = "aws-lambda")]
 use taik::aws;
-use taik::board::{Board, NUM_VALUE_PARAMS};
+use taik::board::{Board};
 
 use log::{debug, info, warn};
 
@@ -112,9 +112,9 @@ pub fn main() -> Result<()> {
             session.login_guest()?;
         }
         let result = if let Some(name) = matches.value_of("playBot") {
-            session.seek_game::<5, NUM_VALUE_PARAMS>(SeekMode::PlayOtherBot(name.to_string()))
+            session.seek_game::<5>(SeekMode::PlayOtherBot(name.to_string()))
         } else {
-            session.seek_game::<5, NUM_VALUE_PARAMS>(SeekMode::OpenSeek)
+            session.seek_game::<5>(SeekMode::OpenSeek)
         };
 
         match result {
@@ -239,7 +239,7 @@ impl PlaytakSession {
 
     /// Place a game seek (challenge) on playtak, and wait for somebody to accept
     /// Mutually recursive with `play_game` when the challenge is accepted
-    pub fn seek_game<const S: usize, const N: usize>(
+    pub fn seek_game<const S: usize>(
         &mut self,
         seek_mode: SeekMode,
     ) -> io::Result<std::convert::Infallible> {
@@ -271,7 +271,7 @@ impl PlaytakSession {
                         "black" => Color::Black,
                         color => panic!("Bad color \"{}\"", color),
                     };
-                    self.play_game::<S, NUM_VALUE_PARAMS>(
+                    self.play_game::<S>(
                         seek_mode,
                         game_no,
                         board_size,
@@ -309,7 +309,7 @@ impl PlaytakSession {
 
     /// The main game loop of a playtak game.
     /// Mutually recursive with `seek_game`, which places a new seek as soon as the game finishes.
-    fn play_game<const S: usize, const N: usize>(
+    fn play_game<const S: usize>(
         &mut self,
         seek_mode: SeekMode,
         game_no: u64,
@@ -353,7 +353,7 @@ impl PlaytakSession {
                 #[cfg(not(feature = "aws-lambda"))]
                 let (best_move, score) = {
                     let maximum_time = our_time_left / 5 + increment;
-                    search::play_move_time::<S, N>(board.clone(), maximum_time)
+                    search::play_move_time(board.clone(), maximum_time)
                 };
 
                 board.do_move(best_move.clone());
@@ -450,7 +450,7 @@ impl PlaytakSession {
 
         info!("Move list: {}", move_list.join(" "));
 
-        self.seek_game::<S, N>(seek_mode)
+        self.seek_game::<S>(seek_mode)
     }
 }
 

@@ -1349,12 +1349,12 @@ impl<const S: usize> Board<S> {
         suicide_win_square
     }
 
-    pub(crate) fn static_eval_with_params_and_data<const N: usize>(
+    pub(crate) fn static_eval_with_params_and_data(
         &self,
         group_data: &GroupData,
         params: &[f32],
     ) -> f32 {
-        let mut coefficients = [0.0; N];
+        let mut coefficients = vec![0.0; NUM_VALUE_PARAMS];
         value_eval::static_eval_game_phase(&self, group_data, &mut coefficients);
         coefficients.iter().zip(params).map(|(a, b)| a * b).sum()
     }
