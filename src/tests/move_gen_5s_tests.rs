@@ -3,6 +3,7 @@ use crate::board::Move;
 use crate::tests::do_moves_and_check_validity;
 use board_game_traits::board::Board as BoardTrait;
 use pgn_traits::pgn::PgnBoard;
+use crate::tests::move_gen_generic_tests::perft_check_answers;
 
 #[test]
 fn move_stack_test() {
@@ -96,80 +97,4 @@ fn suicide_perf_test() {
     let mut board = <Board<5>>::default();
     do_moves_and_check_validity(&mut board, &move_strings);
     perft_check_answers(&mut board, &[1, 85, 11_206, 957_000]);
-}
-
-pub fn perft<const S: usize>(board: &mut Board<S>, depth: u16) -> u64 {
-    if depth == 0 || board.game_result().is_some() {
-        1
-    } else {
-        let mut moves = vec![];
-        board.generate_moves(&mut moves);
-        moves
-            .into_iter()
-            .map(|mv| {
-                let old_board = board.clone();
-                let reverse_move = board.do_move(mv.clone());
-                let num_moves = perft(board, depth - 1);
-                board.reverse_move(reverse_move);
-                debug_assert_eq!(
-                    *board, old_board,
-                    "Failed to restore old board after {:?} on\n{:?}",
-                    mv, old_board
-                );
-                num_moves
-            })
-            .sum()
-    }
-}
-
-#[cfg(test)]
-/// Verifies the perft result of a position against a known answer
-pub fn perft_check_answers<const S: usize>(board: &mut Board<S>, answers: &[u64]) {
-    for (depth, &answer) in answers.iter().enumerate() {
-        assert_eq!(
-            perft(board, depth as u16),
-            answer,
-            "Wrong perft result on\n{:?}",
-            board
-        );
-        assert_eq!(
-            perft(&mut board.flip_board_x(), depth as u16),
-            answer,
-            "Wrong perft result on\n{:?}",
-            board
-        );
-        assert_eq!(
-            perft(&mut board.flip_board_y(), depth as u16),
-            answer,
-            "Wrong perft result on\n{:?}",
-            board
-        );
-        assert_eq!(
-            perft(&mut board.flip_colors(), depth as u16),
-            answer,
-            "Wrong perft result on\n{:?}",
-            board
-        );
-        assert_eq!(
-            perft(&mut board.rotate_board(), depth as u16),
-            answer,
-            "Wrong perft result on\n{:?}",
-            board
-        );
-        assert_eq!(
-            perft(&mut board.rotate_board().rotate_board(), depth as u16),
-            answer,
-            "Wrong perft result on\n{:?}",
-            board
-        );
-        assert_eq!(
-            perft(
-                &mut board.rotate_board().rotate_board().rotate_board(),
-                depth as u16
-            ),
-            answer,
-            "Wrong perft result on\n{:?}",
-            board
-        );
-    }
 }
