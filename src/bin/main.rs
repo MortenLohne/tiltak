@@ -134,8 +134,7 @@ fn mcts_selfplay(max_time: time::Duration) {
 
     while board.game_result().is_none() {
         let start_time = time::Instant::now();
-        let (best_move, score) =
-            search::play_move_time::<5>(board.clone(), max_time);
+        let (best_move, score) = search::play_move_time::<5>(board.clone(), max_time);
 
         match board.side_to_move() {
             Color::White => white_elapsed += start_time.elapsed(),
@@ -188,8 +187,7 @@ fn mcts_vs_minmax(minmax_depth: u16, mcts_nodes: u64) {
         }
         match board.side_to_move() {
             Color::Black => {
-                let (best_move, score) =
-                    search::mcts::<5>(board.clone(), mcts_nodes);
+                let (best_move, score) = search::mcts::<5>(board.clone(), mcts_nodes);
                 board.do_move(best_move.clone());
                 moves.push(best_move.clone());
                 println!("{:6}: {:.3}", best_move, score);
@@ -353,8 +351,7 @@ fn play_human(mut board: Board<5>) {
                 board.do_move(c_move);
                 play_human(board);
             } else {
-                let (best_move, score) =
-                    search::mcts::<5>(board.clone(), 1_000_000);
+                let (best_move, score) = search::mcts::<5>(board.clone(), 1_000_000);
 
                 println!("Computer played {:?} with score {}", best_move, score);
                 board.do_move(best_move);

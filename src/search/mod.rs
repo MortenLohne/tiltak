@@ -195,10 +195,7 @@ pub fn mcts<const S: usize>(board: Board<S>, nodes: u64) -> (Move, Score) {
 /// Play a move, calculating for a maximum duration.
 /// It will usually spend much less time, especially if the move is obvious.
 /// On average, it will spend around 20% of `max_time`, and rarely more than 50%.
-pub fn play_move_time<const S: usize>(
-    board: Board<S>,
-    max_time: time::Duration,
-) -> (Move, Score) {
+pub fn play_move_time<const S: usize>(board: Board<S>, max_time: time::Duration) -> (Move, Score) {
     let mut tree = MonteCarloTree::new(board);
     let start_time = time::Instant::now();
 

@@ -1,9 +1,7 @@
 use crate::board::Piece::{BlackCap, BlackFlat, WhiteFlat, WhiteWall};
 use crate::board::{
     squares_iterator, Board, Direction::*, GroupEdgeConnection, Move, Piece, Role, Square,
-    BOARD_AREA, BOARD_SIZE,
 };
-use crate::minmax::minmax;
 use crate::tests::do_moves_and_check_validity;
 use crate::{board as board_mod, board};
 use board_game_traits::board::{Board as BoardTrait, Color, EvalBoard};
@@ -13,7 +11,11 @@ use rand::seq::SliceRandom;
 
 #[test]
 fn default_board_test() {
-    let board = board_mod::Board::default();
+    let board = <Board<5>>::default();
+    for square in squares_iterator() {
+        assert!(board[square].is_empty());
+    }
+    let board = <Board<6>>::default();
     for square in squares_iterator() {
         assert!(board[square].is_empty());
     }
@@ -37,7 +39,7 @@ fn go_in_directions_test() {
 #[test]
 fn get_set_test() {
     let pieces = vec![WhiteFlat, BlackFlat, BlackFlat, WhiteWall];
-    let mut board = Board::default();
+    let mut board = <Board<5>>::default();
     for &piece in pieces.iter() {
         board[Square(12)].push(piece);
     }
@@ -117,7 +119,7 @@ fn correct_number_of_legal_directions_test() {
 
 #[test]
 fn stones_left_behind_by_stack_movement_test() {
-    let mut board: Board = Board::default();
+    let mut board: Board<5> = <Board<5>>::default();
 
     do_moves_and_check_validity(&mut board, &["d3", "c3", "c4", "1d3<", "1c4-", "Sc4"]);
 
@@ -152,7 +154,7 @@ fn stones_left_behind_by_stack_movement_test() {
 
 #[test]
 fn black_can_win_with_road_test() {
-    let mut board = board_mod::Board::default();
+    let mut board = <Board<5>>::default();
     let mut moves = vec![];
 
     for mv_san in [
@@ -170,7 +172,21 @@ fn black_can_win_with_road_test() {
 }
 
 #[test]
-fn play_random_games_test() {
+fn play_random_4s_games_test() {
+    play_random_games_prop::<4>()
+}
+
+#[test]
+fn play_random_5s_games_test() {
+    play_random_games_prop::<5>()
+}
+
+#[test]
+fn play_random_6s_games_test() {
+    play_random_games_prop::<6>()
+}
+
+fn play_random_games_prop<const S: usize>() {
     let mut white_wins = 0;
     let mut black_wins = 0;
     let mut draws = 0;
@@ -178,7 +194,7 @@ fn play_random_games_test() {
 
     let mut rng = rand::thread_rng();
     for _ in 0..5_000 {
-        let mut board = board_mod::Board::default();
+        let mut board = <Board<S>>::default();
         let mut moves = vec![];
         for i in 0.. {
             let hash_from_scratch = board.zobrist_hash_from_scratch();
@@ -270,7 +286,7 @@ fn play_random_games_test() {
 
 #[test]
 fn game_win_test() {
-    let mut board = board_mod::Board::default();
+    let mut board = <Board<5>>::default();
     for mv in [
         Move::Place(Role::Flat, Square(13)),
         Move::Place(Role::Flat, Square(12)),
@@ -292,7 +308,7 @@ fn game_win_test() {
 
 #[test]
 fn game_win_test2() {
-    let mut board = board_mod::Board::default();
+    let mut board = <Board<5>>::default();
     for mv in [
         Move::Place(Role::Flat, Square(7)),
         Move::Place(Role::Flat, Square(12)),
@@ -314,7 +330,7 @@ fn game_win_test2() {
 
 #[test]
 fn double_road_wins_test() {
-    let mut board = Board::default();
+    let mut board = <Board<5>>::default();
     let mut moves = vec![];
 
     let move_strings = [
@@ -343,7 +359,7 @@ fn double_road_wins_test() {
 // Check that placing it as a wall is suicide, but placing it flat is not
 #[test]
 fn suicide_into_points_loss_test() {
-    let mut board = Board::start_board();
+    let mut board = <Board<5>>::start_board();
     let move_strings = [
         "a1", "e5", "e3", "Cc3", "e4", "e2", "d3", "c3>", "d4", "b2", "c3", "c2", "c4", "d2",
         "c3-", "a2", "c3", "c1", "2c2<", "c2", "c3-", "b1", "e3-", "e1", "2e2-", "d1", "2c2-",
@@ -391,7 +407,7 @@ fn suicide_into_road_loss_test() {
         "b4", "2a4>", "2b2>11", "d3>", "2c4-", "c4", "d4", "4e3+13", "a3", "3b4-", "3c3+12",
     ];
 
-    let mut board = Board::start_board();
+    let mut board = <Board<5>>::start_board();
 
     do_moves_and_check_validity(&mut board, &move_strings);
 
@@ -406,7 +422,7 @@ fn suicide_into_road_loss_test() {
 
 #[test]
 fn games_ends_when_board_is_full_test() {
-    let mut board = Board::start_board();
+    let mut board = <Board<5>>::start_board();
     let move_strings: Vec<String> = squares_iterator()
         .skip(1)
         .map(|sq| sq.to_string())
@@ -427,7 +443,7 @@ fn games_ends_when_board_is_full_test() {
 
 #[test]
 fn every_move_is_suicide_test() {
-    let mut board = Board::start_board();
+    let mut board = <Board<5>>::start_board();
 
     do_moves_and_check_validity(&mut board, &["b3", "c4", "c4-", "b3>"]);
 
@@ -444,14 +460,28 @@ fn every_move_is_suicide_test() {
 }
 
 #[test]
-fn bitboard_full_board_file_rank_test() {
-    let mut board = Board::start_board();
+fn bitboard_full_board_file_rank_4s_test() {
+    bitboard_full_board_file_rank_prop::<4>()
+}
+
+#[test]
+fn bitboard_full_board_file_rank_5s_test() {
+    bitboard_full_board_file_rank_prop::<5>()
+}
+
+#[test]
+fn bitboard_full_board_file_rank_6s_test() {
+    bitboard_full_board_file_rank_prop::<6>()
+}
+
+fn bitboard_full_board_file_rank_prop<const S: usize>() {
+    let mut board = <Board<S>>::start_board();
     let move_strings: Vec<String> = squares_iterator().map(|sq| sq.to_string()).collect();
     do_moves_and_check_validity(
         &mut board,
         &(move_strings.iter().map(AsRef::as_ref).collect::<Vec<_>>()),
     );
-    if BOARD_AREA % 2 == 0 {
+    if S % 2 == 0 {
         assert_eq!(board.game_result(), Some(BlackWin));
     } else {
         assert_eq!(board.game_result(), Some(WhiteWin));
@@ -461,12 +491,12 @@ fn bitboard_full_board_file_rank_test() {
 
     let road_pieces = group_data.white_road_pieces() | group_data.black_road_pieces();
 
-    assert_eq!(road_pieces.count(), BOARD_AREA as u8);
+    assert_eq!(road_pieces.count(), (S * S) as u8);
 
-    for x in 0..BOARD_SIZE as u8 {
-        assert_eq!(road_pieces.rank(x).count() as usize, BOARD_SIZE);
-        assert_eq!(road_pieces.file(x).count() as usize, BOARD_SIZE);
-        for y in 0..BOARD_SIZE as u8 {
+    for x in 0..S as u8 {
+        assert_eq!(road_pieces.rank(x).count() as usize, S);
+        assert_eq!(road_pieces.file(x).count() as usize, S);
+        for y in 0..S as u8 {
             if x != y {
                 assert!((road_pieces.rank(x) & road_pieces.rank(y)).is_empty());
                 assert!((road_pieces.file(x) & road_pieces.file(y)).is_empty());
@@ -477,9 +507,17 @@ fn bitboard_full_board_file_rank_test() {
 
 #[test]
 fn square_rank_file_test() {
-    let mut board = Board::start_board();
-    for rank_id in 0..BOARD_SIZE as u8 {
-        for file_id in 0..BOARD_SIZE as u8 {
+    square_rank_file_prop::<4>();
+    square_rank_file_prop::<5>();
+    square_rank_file_prop::<6>();
+    square_rank_file_prop::<7>();
+    square_rank_file_prop::<8>();
+}
+
+fn square_rank_file_prop<const S: usize>() {
+    let mut board = <Board<S>>::start_board();
+    for rank_id in 0..S as u8 {
+        for file_id in 0..S as u8 {
             let square = Square::from_rank_file(rank_id, file_id);
             assert_eq!(rank_id, square.rank());
             assert_eq!(file_id, square.file());
@@ -512,7 +550,7 @@ fn group_connection_test() {
 fn critical_square_test() {
     let move_strings = ["a1", "e5", "e4", "a2", "e3", "a3", "e2", "a4"];
 
-    let mut board = Board::default();
+    let mut board = <Board<5>>::default();
 
     do_moves_and_check_validity(&mut board, &move_strings);
 
@@ -543,7 +581,7 @@ fn critical_square_test() {
 
 #[test]
 fn move_iterator_test() {
-    let mut board = Board::start_board();
+    let mut board = <Board<5>>::start_board();
     do_moves_and_check_validity(&mut board, &["a1", "e5"]);
     let mv = board.move_from_san("e5-").unwrap();
     match mv {
@@ -558,15 +596,8 @@ fn move_iterator_test() {
 }
 
 #[test]
-fn static_eval_after_move_test() {
-    let mut board = Board::start_board();
-    minmax(&mut board, 1);
-    board.static_eval();
-}
-
-#[test]
 fn repetitions_are_draws_test() {
-    let mut board = Board::start_board();
+    let mut board = <Board<5>>::start_board();
     do_moves_and_check_validity(&mut board, &["a1", "e5"]);
 
     let cycle_move_strings = ["e5-", "a1+", "e4+", "a2-"];
@@ -584,11 +615,11 @@ fn repetitions_are_draws_test() {
 fn parse_tps_test() {
     let tps_string = "x4,1/x5/x5/x5/2,x4 1 2";
 
-    let mut board = Board::start_board();
+    let mut board = <Board<5>>::start_board();
     do_moves_and_check_validity(&mut board, &["a1", "e5"]);
-    assert_eq!(Board::from_fen(tps_string).unwrap(), board);
+    assert_eq!(<Board<5>>::from_fen(tps_string).unwrap(), board);
 
     do_moves_and_check_validity(&mut board, &["c5"]);
     let tps_string = "x2,1,x,1/x5/x5/x5/2,x4 2 2";
-    assert_eq!(Board::from_fen(tps_string).unwrap(), board);
+    assert_eq!(<Board<5>>::from_fen(tps_string).unwrap(), board);
 }

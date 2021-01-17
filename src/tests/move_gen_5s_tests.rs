@@ -5,23 +5,8 @@ use board_game_traits::board::Board as BoardTrait;
 use pgn_traits::pgn::PgnBoard;
 
 #[test]
-fn start_board_move_gen_test() {
-    let mut board = Board::default();
-    let mut moves = vec![];
-    board.generate_moves(&mut moves);
-    assert_eq!(moves.len(), 25);
-    for mv in moves {
-        let reverse_move = board.do_move(mv);
-        let mut moves = vec![];
-        board.generate_moves(&mut moves);
-        assert_eq!(moves.len(), 24);
-        board.reverse_move(reverse_move);
-    }
-}
-
-#[test]
 fn move_stack_test() {
-    let mut board = Board::default();
+    let mut board = <Board<5>>::default();
     let mut moves = vec![];
 
     do_moves_and_check_validity(&mut board, &["d3", "c3", "c4", "1d3<", "1c4-", "Sc4"]);
@@ -45,7 +30,7 @@ fn move_stack_test() {
 
 #[test]
 fn respect_carry_limit_test() {
-    let mut board = Board::default();
+    let mut board = <Board<5>>::default();
     let mut moves = vec![];
 
     do_moves_and_check_validity(
@@ -72,13 +57,13 @@ fn respect_carry_limit_test() {
 
 #[test]
 fn start_pos_perf_test() {
-    let mut board = Board::default();
+    let mut board = <Board<5>>::default();
     perft_check_answers(&mut board, &[1, 25, 600, 43_320, 2_999_784]);
 }
 
 #[test]
 fn perf_test2() {
-    let mut board = Board::default();
+    let mut board = <Board<5>>::default();
 
     do_moves_and_check_validity(&mut board, &["d3", "c3", "c4", "1d3<", "1c4-", "Sc4"]);
 
@@ -87,7 +72,7 @@ fn perf_test2() {
 
 #[test]
 fn perf_test3() {
-    let mut board = Board::default();
+    let mut board = <Board<5>>::default();
 
     do_moves_and_check_validity(
         &mut board,
@@ -108,12 +93,12 @@ fn suicide_perf_test() {
         "1c4<", "3c3-", "e5", "e2",
     ];
 
-    let mut board = Board::default();
+    let mut board = <Board<5>>::default();
     do_moves_and_check_validity(&mut board, &move_strings);
     perft_check_answers(&mut board, &[1, 85, 11_206, 957_000]);
 }
 
-pub fn perft(board: &mut Board, depth: u16) -> u64 {
+pub fn perft<const S: usize>(board: &mut Board<S>, depth: u16) -> u64 {
     if depth == 0 || board.game_result().is_some() {
         1
     } else {
@@ -139,7 +124,7 @@ pub fn perft(board: &mut Board, depth: u16) -> u64 {
 
 #[cfg(test)]
 /// Verifies the perft result of a position against a known answer
-pub fn perft_check_answers(board: &mut Board, answers: &[u64]) {
+pub fn perft_check_answers<const S: usize>(board: &mut Board<S>, answers: &[u64]) {
     for (depth, &answer) in answers.iter().enumerate() {
         assert_eq!(
             perft(board, depth as u16),

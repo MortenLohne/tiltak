@@ -4,7 +4,7 @@ use std::io;
 use std::io::{BufRead, BufReader};
 use std::str::FromStr;
 use std::time::{Duration, Instant};
-use taik::board::{Board};
+use taik::board::Board;
 
 use taik::search;
 

@@ -9,7 +9,7 @@ use std::time::Duration;
 #[test]
 fn play_on_low_time() {
     let time = Duration::from_millis(5);
-    let board = Board::default();
+    let board = <Board<5>>::default();
     search::play_move_time(board, time);
 }
 
@@ -98,7 +98,7 @@ fn do_not_play_suicide_move_as_black_test() {
         "e5", "e2",
     ];
 
-    let mut board = Board::default();
+    let mut board = <Board<5>>::default();
     do_moves_and_check_validity(&mut board, &move_strings);
 
     let mut moves = vec![];
@@ -116,7 +116,7 @@ fn do_not_play_suicide_move_as_black_test2() {
         "d2", "3b2<", "d2<", "2b2>", "d4", "d2", "5d3-14",
     ];
 
-    let mut board = Board::default();
+    let mut board = <Board<5>>::default();
     do_moves_and_check_validity(&mut board, &move_strings);
 
     let mut moves = vec![];
@@ -127,7 +127,7 @@ fn do_not_play_suicide_move_as_black_test2() {
 
 #[test]
 fn do_not_instamove_into_loss() {
-    let mut board = Board::start_board();
+    let mut board = <Board<5>>::start_board();
     let move_strings = [
         "e1", "a5", "Cc3", "d1", "c1", "b1", "c2", "1b1>1", "b1", "2c1<2", "c1", "Ca1", "c4",
         "3b1>3", "1c2-1", "1d1<1", "Sd1", "1a1>1", "b3", "a1", "1d1<1", "1b1>1", "d3", "2c1>2",
@@ -151,7 +151,7 @@ fn do_not_play_suicide_move_as_black_test3() {
         "b5", "b4+", "d3+",
     ];
 
-    let mut board = Board::default();
+    let mut board = <Board<5>>::default();
     do_moves_and_check_validity(&mut board, &move_strings);
 
     let mut moves = vec![];
@@ -161,7 +161,7 @@ fn do_not_play_suicide_move_as_black_test3() {
 }
 
 fn plays_correct_move_property(move_strings: &[&str], correct_moves: &[&str]) {
-    let mut board = Board::default();
+    let mut board = <Board<5>>::default();
     let mut moves = vec![];
 
     do_moves_and_check_validity(&mut board, move_strings);

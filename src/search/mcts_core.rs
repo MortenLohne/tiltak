@@ -111,11 +111,7 @@ impl TreeEdge {
 
     // Never inline, for profiling purposes
     #[inline(never)]
-    fn expand<const S: usize>(
-        &mut self,
-        board: &Board<S>,
-        params: &[f32],
-    ) -> Score {
+    fn expand<const S: usize>(&mut self, board: &Board<S>, params: &[f32]) -> Score {
         debug_assert!(self.child.is_none());
         self.child = Some(Box::new(Tree::new_node()));
         let child = self.child.as_mut().unwrap();

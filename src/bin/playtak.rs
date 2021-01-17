@@ -10,7 +10,7 @@ use std::time::Duration;
 use std::{io, net, thread};
 #[cfg(feature = "aws-lambda")]
 use taik::aws;
-use taik::board::{Board};
+use taik::board::Board;
 
 use log::{debug, info, warn};
 
