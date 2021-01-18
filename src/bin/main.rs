@@ -293,7 +293,7 @@ fn analyze_game(game: Game<Board>) {
         let (best_move, score) = search::mcts(board.clone(), 1_000_000);
         if ply_number % 2 == 0 {
             print!(
-                "{}. {}: {{{:.2}%, best reply {}}} ",
+                "{}. {} {{{:.2}%, best reply {}}} ",
                 ply_number / 2,
                 board.move_to_san(&mv),
                 (1.0 - score) * 100.0,
@@ -301,7 +301,7 @@ fn analyze_game(game: Game<Board>) {
             );
         } else {
             println!(
-                "{}... {}: {{{:.2}%, best reply {}}}",
+                "{}... {} {{{:.2}%, best reply {}}}",
                 ply_number / 2,
                 board.move_to_san(&mv),
                 (1.0 - score) * 100.0,
