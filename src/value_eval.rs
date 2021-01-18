@@ -7,7 +7,7 @@ use board_game_traits::board::{Board as EvalBoard, Color};
 
 pub(crate) fn static_eval_game_phase<const S: usize>(
     board: &Board<S>,
-    group_data: &GroupData,
+    group_data: &GroupData<S>,
     coefficients: &mut [f32],
 ) {
     const FLAT_PSQT: usize = 0;
@@ -184,8 +184,8 @@ pub(crate) fn static_eval_game_phase<const S: usize>(
     let mut num_files_occupied_black = 0;
 
     for line in BitBoard::all_lines().iter() {
-        line_score::<WhiteTr, BlackTr>(&group_data, *line, coefficients, LINE_CONTROL);
-        line_score::<BlackTr, WhiteTr>(&group_data, *line, coefficients, LINE_CONTROL);
+        line_score::<WhiteTr, BlackTr, S>(&group_data, *line, coefficients, LINE_CONTROL);
+        line_score::<BlackTr, WhiteTr, S>(&group_data, *line, coefficients, LINE_CONTROL);
     }
 
     for i in 0..BOARD_SIZE as u8 {
@@ -250,8 +250,8 @@ fn critical_squares_eval<Us: ColorTr, Them: ColorTr, const N: usize>(
     }
 }
 
-fn line_score<Us: ColorTr, Them: ColorTr>(
-    group_data: &GroupData,
+fn line_score<Us: ColorTr, Them: ColorTr, const S: usize>(
+    group_data: &GroupData<S>,
     line: BitBoard,
     coefficients: &mut [f32],
     line_control: usize,

@@ -3,7 +3,8 @@
 use lazy_static::lazy_static;
 
 lazy_static! {
-    pub(crate) static ref ZOBRIST_KEYS: Box<ZobristKeys> = ZobristKeys::new();
+    pub(crate) static ref ZOBRIST_KEYS_5S: Box<ZobristKeys<5>> = ZobristKeys::new();
+    pub(crate) static ref ZOBRIST_KEYS_6S: Box<ZobristKeys<6>> = ZobristKeys::new();
 }
 
 /// The size of the board. Only 5 works correctly for now.
@@ -75,15 +76,15 @@ pub(crate) trait ColorTr {
 
     fn caps_left<const S: usize>(board: &Board<S>) -> u8;
 
-    fn road_stones(group_data: &GroupData) -> BitBoard;
+    fn road_stones<const S: usize>(group_data: &GroupData<S>) -> BitBoard;
 
-    fn blocking_stones(group_data: &GroupData) -> BitBoard;
+    fn blocking_stones<const S: usize>(group_data: &GroupData<S>) -> BitBoard;
 
-    fn flats(group_data: &GroupData) -> BitBoard;
+    fn flats<const S: usize>(group_data: &GroupData<S>) -> BitBoard;
 
-    fn walls(group_data: &GroupData) -> BitBoard;
+    fn walls<const S: usize>(group_data: &GroupData<S>) -> BitBoard;
 
-    fn caps(group_data: &GroupData) -> BitBoard;
+    fn caps<const S: usize>(group_data: &GroupData<S>) -> BitBoard;
 
     fn flat_piece() -> Piece;
 
@@ -95,9 +96,9 @@ pub(crate) trait ColorTr {
 
     fn piece_is_ours(piece: Piece) -> bool;
 
-    fn is_critical_square(group_data: &GroupData, square: Square) -> bool;
+    fn is_critical_square<const S: usize>(group_data: &GroupData<S>, square: Square) -> bool;
 
-    fn critical_squares(group_data: &GroupData) -> BitBoard;
+    fn critical_squares<const S: usize>(group_data: &GroupData<S>) -> BitBoard;
 }
 
 pub(crate) struct WhiteTr {}
@@ -115,23 +116,23 @@ impl ColorTr for WhiteTr {
         board.white_caps_left
     }
 
-    fn road_stones(group_data: &GroupData) -> BitBoard {
+    fn road_stones<const S: usize>(group_data: &GroupData<S>) -> BitBoard {
         group_data.white_road_pieces()
     }
 
-    fn blocking_stones(group_data: &GroupData) -> BitBoard {
+    fn blocking_stones<const S: usize>(group_data: &GroupData<S>) -> BitBoard {
         group_data.white_blocking_pieces()
     }
 
-    fn flats(group_data: &GroupData) -> BitBoard {
+    fn flats<const S: usize>(group_data: &GroupData<S>) -> BitBoard {
         group_data.white_flat_stones
     }
 
-    fn walls(group_data: &GroupData) -> BitBoard {
+    fn walls<const S: usize>(group_data: &GroupData<S>) -> BitBoard {
         group_data.white_walls
     }
 
-    fn caps(group_data: &GroupData) -> BitBoard {
+    fn caps<const S: usize>(group_data: &GroupData<S>) -> BitBoard {
         group_data.white_caps
     }
 
@@ -155,11 +156,11 @@ impl ColorTr for WhiteTr {
         piece == WhiteFlat || piece == WhiteWall || piece == WhiteCap
     }
 
-    fn is_critical_square(group_data: &GroupData, square: Square) -> bool {
+    fn is_critical_square<const S: usize>(group_data: &GroupData<S>, square: Square) -> bool {
         group_data.white_critical_squares.get(square.0)
     }
 
-    fn critical_squares(group_data: &GroupData) -> BitBoard {
+    fn critical_squares<const S: usize>(group_data: &GroupData<S>) -> BitBoard {
         group_data.white_critical_squares
     }
 }
@@ -179,23 +180,23 @@ impl ColorTr for BlackTr {
         board.black_caps_left
     }
 
-    fn road_stones(group_data: &GroupData) -> BitBoard {
+    fn road_stones<const S: usize>(group_data: &GroupData<S>) -> BitBoard {
         group_data.black_road_pieces()
     }
 
-    fn blocking_stones(group_data: &GroupData) -> BitBoard {
+    fn blocking_stones<const S: usize>(group_data: &GroupData<S>) -> BitBoard {
         group_data.black_blocking_pieces()
     }
 
-    fn flats(group_data: &GroupData) -> BitBoard {
+    fn flats<const S: usize>(group_data: &GroupData<S>) -> BitBoard {
         group_data.black_flat_stones
     }
 
-    fn walls(group_data: &GroupData) -> BitBoard {
+    fn walls<const S: usize>(group_data: &GroupData<S>) -> BitBoard {
         group_data.black_walls
     }
 
-    fn caps(group_data: &GroupData) -> BitBoard {
+    fn caps<const S: usize>(group_data: &GroupData<S>) -> BitBoard {
         group_data.black_caps
     }
 
@@ -219,11 +220,11 @@ impl ColorTr for BlackTr {
         piece == BlackFlat || piece == BlackCap || piece == BlackWall
     }
 
-    fn is_critical_square(group_data: &GroupData, square: Square) -> bool {
+    fn is_critical_square<const S: usize>(group_data: &GroupData<S>, square: Square) -> bool {
         group_data.black_critical_squares.get(square.0)
     }
 
-    fn critical_squares(group_data: &GroupData) -> BitBoard {
+    fn critical_squares<const S: usize>(group_data: &GroupData<S>) -> BitBoard {
         group_data.black_critical_squares
     }
 }
@@ -818,11 +819,11 @@ impl ops::BitOr for GroupEdgeConnection {
         }
     }
 }
-#[derive(Clone, PartialEq, Eq, Debug, Default)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-pub struct GroupData {
-    pub(crate) groups: AbstractBoard<u8>,
-    pub(crate) amount_in_group: [(u8, GroupEdgeConnection); BOARD_AREA + 1],
+pub struct GroupData<const S: usize> {
+    pub(crate) groups: AbstractBoard<u8, S>,
+    pub(crate) amount_in_group: Box<[(u8, GroupEdgeConnection)]>,
     pub(crate) white_critical_squares: BitBoard,
     pub(crate) black_critical_squares: BitBoard,
     white_flat_stones: BitBoard,
@@ -833,7 +834,25 @@ pub struct GroupData {
     black_walls: BitBoard,
 }
 
-impl GroupData {
+impl<const S: usize> Default for GroupData<S> {
+    fn default() -> Self {
+        GroupData {
+            groups: Default::default(),
+            amount_in_group: vec![(0, GroupEdgeConnection::default()); S * S * 1]
+                .into_boxed_slice(),
+            white_critical_squares: Default::default(),
+            black_critical_squares: Default::default(),
+            white_flat_stones: Default::default(),
+            black_flat_stones: Default::default(),
+            white_caps: Default::default(),
+            black_caps: Default::default(),
+            white_walls: Default::default(),
+            black_walls: Default::default(),
+        }
+    }
+}
+
+impl<const S: usize> GroupData<S> {
     pub(crate) fn white_road_pieces(&self) -> BitBoard {
         self.white_flat_stones | self.white_caps
     }
@@ -872,16 +891,45 @@ impl GroupData {
     }
 }
 #[derive(PartialEq, Eq, Debug)]
-pub struct ZobristKeys {
-    top_stones: AbstractBoard<[u64; 6]>,
-    stones_in_stack: [AbstractBoard<[u64; 256]>; 8],
+pub struct ZobristKeys<const S: usize> {
+    top_stones: AbstractBoard<[u64; 6], S>,
+    stones_in_stack: [AbstractBoard<[u64; 256], S>; 8],
     to_move: [u64; 2],
 }
 
-impl ZobristKeys {
+pub fn zobrist_top_stones(s: usize, square: Square, piece: Piece) -> u64 {
+    match s {
+        5 => ZOBRIST_KEYS_5S.top_stones[square][piece as u16 as usize],
+        6 => ZOBRIST_KEYS_6S.top_stones[square][piece as u16 as usize],
+        _ => panic!(),
+    }
+}
+
+pub fn zobrist_stones_in_stack(
+    s: usize,
+    square: Square,
+    place_in_stack: usize,
+    stack_slice: usize,
+) -> u64 {
+    match s {
+        5 => ZOBRIST_KEYS_5S.stones_in_stack[place_in_stack][square][stack_slice],
+        6 => ZOBRIST_KEYS_6S.stones_in_stack[place_in_stack][square][stack_slice],
+        _ => panic!(),
+    }
+}
+
+pub fn zobrist_to_move(s: usize, color: Color) -> u64 {
+    match s {
+        5 => ZOBRIST_KEYS_5S.to_move[color.disc()],
+        6 => ZOBRIST_KEYS_6S.to_move[color.disc()],
+        _ => panic!(),
+    }
+}
+
+impl<const S: usize> ZobristKeys<S> {
     pub(crate) fn new() -> Box<Self> {
         let mut rng = rand::rngs::StdRng::from_seed([0; 32]);
-        let mut random_vec: Vec<u64> = vec![0; mem::size_of::<ZobristKeys>() / 8];
+        let mut random_vec: Vec<u64> = vec![0; mem::size_of::<ZobristKeys<S>>() / 8];
         for word in random_vec.iter_mut() {
             *word = rng.gen();
         }
@@ -896,7 +944,7 @@ impl ZobristKeys {
 #[derive(Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Board<const S: usize> {
-    cells: AbstractBoard<Stack>,
+    cells: AbstractBoard<Stack, S>,
     #[cfg_attr(feature = "serde", serde(with = "ColorDef"))]
     to_move: Color,
     white_stones_left: u8,
@@ -961,7 +1009,7 @@ impl<const S: usize> Default for Board<S> {
             black_caps_left: STARTING_CAPSTONES,
             half_moves_played: 0,
             moves: vec![],
-            hash: ZOBRIST_KEYS.to_move[Color::White as u16 as usize],
+            hash: zobrist_to_move(S, Color::White),
             hash_history: vec![],
         }
     }
@@ -1030,7 +1078,7 @@ impl<const S: usize> Board<S> {
 
     pub(crate) fn zobrist_hash_from_scratch(&self) -> u64 {
         let mut hash = 0;
-        hash ^= ZOBRIST_KEYS.to_move[self.to_move.disc()];
+        hash ^= zobrist_to_move(S, self.to_move);
 
         for square in squares_iterator() {
             hash ^= self.zobrist_hash_for_square(square);
@@ -1042,10 +1090,14 @@ impl<const S: usize> Board<S> {
         let mut hash = 0;
         let stack = &self[square];
         if let Some(top_stone) = stack.top_stone {
-            hash ^= ZOBRIST_KEYS.top_stones[square][top_stone as u16 as usize];
+            hash ^= zobrist_top_stones(S, square, top_stone);
             for i in 0..(stack.len() as usize - 1) / 8 {
-                hash ^= ZOBRIST_KEYS.stones_in_stack[i][square]
-                    [stack.bitboard.board as usize >> (i * 8) & 255]
+                hash ^= zobrist_stones_in_stack(
+                    S,
+                    square,
+                    i as usize,
+                    stack.bitboard.board as usize >> (i * 8) & 255,
+                )
             }
         }
         hash
@@ -1053,8 +1105,8 @@ impl<const S: usize> Board<S> {
 
     fn is_critical_square_from_scratch(
         &self,
-        groups: &AbstractBoard<u8>,
-        amount_in_group: &[(u8, GroupEdgeConnection); BOARD_AREA + 1],
+        groups: &AbstractBoard<u8, S>,
+        amount_in_group: &[(u8, GroupEdgeConnection)],
         square: Square,
         color: Color,
     ) -> bool {
@@ -1155,7 +1207,7 @@ impl<const S: usize> Board<S> {
     /// * `moves` A vector to place the moves and associated probabilities.
     pub fn generate_moves_with_probabilities(
         &self,
-        group_data: &GroupData,
+        group_data: &GroupData<S>,
         simple_moves: &mut Vec<Move>,
         moves: &mut Vec<(Move, search::Score)>,
     ) {
@@ -1172,7 +1224,7 @@ impl<const S: usize> Board<S> {
     }
 
     #[inline(never)]
-    pub fn group_data(&self) -> GroupData {
+    pub fn group_data(&self) -> GroupData<S> {
         let mut group_data = GroupData::default();
 
         for square in squares_iterator() {
@@ -1255,7 +1307,10 @@ impl<const S: usize> Board<S> {
             .chain(std::iter::once(self[square].top_stone()))
     }
 
-    pub(crate) fn game_result_with_group_data(&self, group_data: &GroupData) -> Option<GameResult> {
+    pub(crate) fn game_result_with_group_data(
+        &self,
+        group_data: &GroupData<S>,
+    ) -> Option<GameResult> {
         let repetitions = self
             .hash_history
             .iter()
@@ -1322,7 +1377,7 @@ impl<const S: usize> Board<S> {
     /// Returns one of the winning squares in the road
     pub(crate) fn is_win_by_road(
         &self,
-        components: &AbstractBoard<u8>,
+        components: &AbstractBoard<u8, S>,
         highest_component_id: u8,
     ) -> Option<Square> {
         // If the side to move is already winning,
@@ -1351,7 +1406,7 @@ impl<const S: usize> Board<S> {
 
     pub(crate) fn static_eval_with_params_and_data(
         &self,
-        group_data: &GroupData,
+        group_data: &GroupData<S>,
         params: &[f32],
     ) -> f32 {
         let mut coefficients = vec![0.0; NUM_VALUE_PARAMS];
@@ -1420,7 +1475,7 @@ impl<const S: usize> board::Board for Board<S> {
                     (Color::Black, Cap) => self.black_caps_left -= 1,
                 }
 
-                self.hash ^= ZOBRIST_KEYS.top_stones[to][piece as u16 as usize];
+                self.hash ^= zobrist_top_stones(S, to, piece);
                 self.hash_history.clear(); // This move is irreversible, so previous position are never repeated from here
 
                 ReverseMove::Place(to)
@@ -1488,9 +1543,9 @@ impl<const S: usize> board::Board for Board<S> {
         self.moves.push(mv);
         self.half_moves_played += 1;
 
-        self.hash ^= ZOBRIST_KEYS.to_move[self.to_move.disc()];
+        self.hash ^= zobrist_to_move(S, self.to_move);
         self.to_move = !self.to_move;
-        self.hash ^= ZOBRIST_KEYS.to_move[self.to_move.disc()];
+        self.hash ^= zobrist_to_move(S, self.to_move);
 
         reverse_move
     }
@@ -1500,7 +1555,7 @@ impl<const S: usize> board::Board for Board<S> {
             ReverseMove::Place(square) => {
                 let piece = self[square].pop().unwrap();
 
-                self.hash ^= ZOBRIST_KEYS.top_stones[square][piece as u16 as usize];
+                self.hash ^= zobrist_top_stones(S, square, piece);
 
                 debug_assert!(piece.color() != self.side_to_move() || self.half_moves_played() < 3);
 
@@ -1549,9 +1604,9 @@ impl<const S: usize> board::Board for Board<S> {
         self.hash_history.pop();
         self.half_moves_played -= 1;
 
-        self.hash ^= ZOBRIST_KEYS.to_move[self.to_move.disc()];
+        self.hash ^= zobrist_to_move(S, self.to_move);
         self.to_move = !self.to_move;
-        self.hash ^= ZOBRIST_KEYS.to_move[self.to_move.disc()];
+        self.hash ^= zobrist_to_move(S, self.to_move);
     }
 
     fn game_result(&self) -> Option<GameResult> {
@@ -1613,7 +1668,7 @@ pub const NUM_VALUE_PARAMS: usize = 69;
 pub const NUM_POLICY_PARAMS: usize = 91;
 
 impl<const S: usize> TunableBoard<NUM_VALUE_PARAMS, NUM_POLICY_PARAMS> for Board<S> {
-    type ExtraData = GroupData;
+    type ExtraData = GroupData<S>;
 
     #[allow(clippy::unreadable_literal)]
     const VALUE_PARAMS: [f32; NUM_VALUE_PARAMS] = [
@@ -1792,7 +1847,7 @@ impl<const S: usize> TunableBoard<NUM_VALUE_PARAMS, NUM_POLICY_PARAMS> for Board
     fn generate_moves_with_params(
         &self,
         params: &[f32],
-        group_data: &GroupData,
+        group_data: &GroupData<S>,
         simple_moves: &mut Vec<Self::Move>,
         moves: &mut Vec<(Self::Move, f32)>,
     ) {
@@ -1818,7 +1873,7 @@ impl<const S: usize> TunableBoard<NUM_VALUE_PARAMS, NUM_POLICY_PARAMS> for Board
         &self,
         coefficients: &mut [f32],
         mv: &Move,
-        group_data: &GroupData,
+        group_data: &GroupData<S>,
         num_legal_moves: usize,
     ) {
         match self.side_to_move() {
@@ -2032,29 +2087,38 @@ impl<const S: usize> pgn_traits::pgn::PgnBoard for Board<S> {
     }
 }
 
-#[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-pub(crate) struct AbstractBoard<T> {
-    raw: [[T; BOARD_SIZE]; BOARD_SIZE],
+pub(crate) struct AbstractBoard<T, const S: usize> {
+    raw: [[T; S]; S],
 }
 
-impl<T> Index<Square> for AbstractBoard<T> {
+impl<T: Default + Copy, const S: usize> Default for AbstractBoard<T, S> {
+    fn default() -> Self {
+        let default = T::default();
+        AbstractBoard {
+            raw: [[default.clone(); S]; S],
+        }
+    }
+}
+
+impl<T, const S: usize> Index<Square> for AbstractBoard<T, S> {
     type Output = T;
 
     fn index(&self, square: Square) -> &Self::Output {
-        &self.raw[square.0 as usize % BOARD_SIZE][square.0 as usize / BOARD_SIZE]
+        &self.raw[square.0 as usize % S][square.0 as usize / S]
     }
 }
 
-impl<T> IndexMut<Square> for AbstractBoard<T> {
+impl<T, const S: usize> IndexMut<Square> for AbstractBoard<T, S> {
     fn index_mut(&mut self, square: Square) -> &mut Self::Output {
-        &mut self.raw[square.0 as usize % BOARD_SIZE][square.0 as usize / BOARD_SIZE]
+        &mut self.raw[square.0 as usize % S][square.0 as usize / S]
     }
 }
 
-pub(crate) fn connected_components_graph(
+pub(crate) fn connected_components_graph<const S: usize>(
     road_pieces: BitBoard,
-    components: &mut AbstractBoard<u8>,
+    components: &mut AbstractBoard<u8, S>,
     id: &mut u8,
 ) {
     for square in squares_iterator() {
@@ -2065,9 +2129,9 @@ pub(crate) fn connected_components_graph(
     }
 }
 
-fn connect_component(
+fn connect_component<const S: usize>(
     road_pieces: BitBoard,
-    components: &mut AbstractBoard<u8>,
+    components: &mut AbstractBoard<u8, S>,
     square: Square,
     id: u8,
 ) {

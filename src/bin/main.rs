@@ -41,7 +41,7 @@ fn main() {
                     mcts_vs_minmax(3, 50000 * i);
                 }
             }
-            "analyze" => test_position(),
+            "analyze" => test_position::<6>(),
             #[cfg(feature = "constant-tuning")]
             "openings" => {
                 let depth = 4;
@@ -221,8 +221,8 @@ fn mcts_vs_minmax(minmax_depth: u16, mcts_nodes: u64) {
     println!("\n{:?}\nResult: {:?}", board, board.game_result());
 }
 
-fn test_position() {
-    let mut board = <Board<5>>::default();
+fn test_position<const S: usize>() {
+    let mut board = <Board<S>>::default();
     let mut moves = vec![];
 
     println!("Enter moves:");
@@ -412,7 +412,7 @@ fn mem_usage() {
     println!("Tak board: {} bytes", mem::size_of::<board::Board<5>>());
     println!("Tak board cell: {} bytes", mem::size_of::<board::Stack>());
     println!("Tak move: {} bytes", mem::size_of::<board::Move>());
-    println!("Zobrist keys: {}", mem::size_of::<board::ZobristKeys>())
+    println!("Zobrist keys: {}", mem::size_of::<board::ZobristKeys<5>>())
 }
 
 fn do_moves_and_check_validity(board: &mut Board<5>, move_strings: &[&str]) {

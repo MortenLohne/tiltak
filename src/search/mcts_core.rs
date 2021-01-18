@@ -158,10 +158,10 @@ impl Tree {
     /// Do not initialize children in the expansion phase, for better performance
     /// Never inline, for profiling purposes
     #[inline(never)]
-    fn init_children<const N: usize>(
+    fn init_children<const S: usize>(
         &mut self,
-        board: &Board<N>,
-        group_data: &GroupData,
+        board: &Board<S>,
+        group_data: &GroupData<S>,
         simple_moves: &mut Vec<Move>,
         policy_params: &[f32],
         moves: &mut Vec<(Move, Score)>,

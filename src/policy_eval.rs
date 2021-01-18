@@ -43,11 +43,11 @@ const MOVE_CAP_ONTO_STRONG_LINE: usize = STACK_CAPTURE_IN_STRONG_LINE_CAP + 2;
 const MOVE_ONTO_CRITICAL_SQUARE: usize = MOVE_CAP_ONTO_STRONG_LINE + 4;
 const _NEXT_CONST: usize = MOVE_ONTO_CRITICAL_SQUARE + 2;
 
-impl<const N: usize> Board<N> {
+impl<const S: usize> Board<S> {
     pub(crate) fn generate_moves_with_probabilities_colortr<Us: ColorTr, Them: ColorTr>(
         &self,
         params: &[f32],
-        group_data: &GroupData,
+        group_data: &GroupData<S>,
         simple_moves: &mut Vec<Move>,
         moves: &mut Vec<(Move, search::Score)>,
     ) {
@@ -64,11 +64,11 @@ impl<const N: usize> Board<N> {
         &self,
         params: &[f32],
         mv: &Move,
-        group_data: &GroupData,
+        group_data: &GroupData<S>,
         num_moves: usize,
     ) -> f32 {
         let mut coefficients = vec![0.0; Self::POLICY_PARAMS.len()];
-        coefficients_for_move_colortr::<Us, Them, N>(
+        coefficients_for_move_colortr::<Us, Them, S>(
             self,
             &mut coefficients,
             mv,
@@ -80,11 +80,11 @@ impl<const N: usize> Board<N> {
         sigmoid(total_value)
     }
 }
-pub(crate) fn coefficients_for_move_colortr<Us: ColorTr, Them: ColorTr, const N: usize>(
-    board: &Board<N>,
+pub(crate) fn coefficients_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usize>(
+    board: &Board<S>,
     coefficients: &mut [f32],
     mv: &Move,
-    group_data: &GroupData,
+    group_data: &GroupData<S>,
     num_legal_moves: usize,
 ) {
     assert_eq!(coefficients.len(), _NEXT_CONST);
