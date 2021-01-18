@@ -11,9 +11,9 @@ use std::io;
 pub fn play_game<const S: usize>(
     white_settings: &MctsSetting<S>,
     black_settings: &MctsSetting<S>,
-    opening: &[Move],
+    opening: &[Move<S>],
     temperature: f64,
-) -> (Game<Board<S>>, Vec<Vec<(Move, Score)>>) {
+) -> (Game<Board<S>>, Vec<Vec<(Move<S>, Score)>>) {
     const MCTS_NODES: u64 = 100_000;
 
     let mut board = Board::start_board();
@@ -73,7 +73,7 @@ pub fn play_game<const S: usize>(
     )
 }
 
-pub fn best_move(temperature: f64, move_scores: &[(Move, Score)]) -> Move {
+pub fn best_move<const S: usize>(temperature: f64, move_scores: &[(Move<S>, Score)]) -> Move<S> {
     let mut rng = rand::thread_rng();
     let mut move_probabilities = vec![];
     let mut cumulative_prob = 0.0;

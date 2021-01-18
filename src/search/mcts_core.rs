@@ -8,23 +8,23 @@ use std::ops;
 
 /// A Monte Carlo Search Tree, containing every node that has been seen in search.
 #[derive(Clone, PartialEq, Debug)]
-pub struct Tree {
-    pub children: Vec<TreeEdge>,
+pub struct Tree<const S: usize> {
+    pub children: Vec<TreeEdge<S>>,
     pub total_action_value: f64,
     pub is_terminal: bool,
 }
 
 #[derive(Clone, PartialEq, Debug)]
-pub struct TreeEdge {
-    pub child: Option<Box<Tree>>,
-    pub mv: Move,
+pub struct TreeEdge<const S: usize> {
+    pub child: Option<Box<Tree<S>>>,
+    pub mv: Move<S>,
     pub mean_action_value: Score,
     pub visits: u64,
     pub heuristic_score: Score,
 }
 
-impl TreeEdge {
-    pub fn new(mv: Move, heuristic_score: Score) -> Self {
+impl<const S: usize> TreeEdge<S> {
+    pub fn new(mv: Move<S>, heuristic_score: Score) -> Self {
         TreeEdge {
             child: None,
             mv,
@@ -37,12 +37,12 @@ impl TreeEdge {
     /// Perform one iteration of monte carlo tree search.
     ///
     /// Moves done on the board are not reversed.
-    pub fn select<const S: usize>(
+    pub fn select(
         &mut self,
         board: &mut Board<S>,
         settings: &MctsSetting<S>,
-        simple_moves: &mut Vec<Move>,
-        moves: &mut Vec<(Move, Score)>,
+        simple_moves: &mut Vec<Move<S>>,
+        moves: &mut Vec<(Move<S>, Score)>,
     ) -> Score {
         if self.visits == 0 {
             self.expand(board, &settings.value_params)
@@ -111,7 +111,7 @@ impl TreeEdge {
 
     // Never inline, for profiling purposes
     #[inline(never)]
-    fn expand<const S: usize>(&mut self, board: &Board<S>, params: &[f32]) -> Score {
+    fn expand(&mut self, board: &Board<S>, params: &[f32]) -> Score {
         debug_assert!(self.child.is_none());
         self.child = Some(Box::new(Tree::new_node()));
         let child = self.child.as_mut().unwrap();
@@ -154,17 +154,17 @@ impl TreeEdge {
     }
 }
 
-impl Tree {
+impl<const S: usize> Tree<S> {
     /// Do not initialize children in the expansion phase, for better performance
     /// Never inline, for profiling purposes
     #[inline(never)]
-    fn init_children<const S: usize>(
+    fn init_children(
         &mut self,
         board: &Board<S>,
         group_data: &GroupData<S>,
-        simple_moves: &mut Vec<Move>,
+        simple_moves: &mut Vec<Move<S>>,
         policy_params: &[f32],
-        moves: &mut Vec<(Move, Score)>,
+        moves: &mut Vec<(Move<S>, Score)>,
     ) {
         board.generate_moves_with_params(policy_params, group_data, simple_moves, moves);
         self.children.reserve_exact(moves.len());
@@ -234,18 +234,18 @@ impl GameResultForUs {
     }
 }
 
-pub struct PV<'a> {
-    tree: &'a Tree,
+pub struct PV<'a, const S: usize> {
+    tree: &'a Tree<S>,
 }
 
-impl<'a> PV<'a> {
-    pub fn new(tree: &'a Tree) -> PV<'a> {
+impl<'a, const S: usize> PV<'a, S> {
+    pub fn new(tree: &'a Tree<S>) -> PV<'a, S> {
         PV { tree }
     }
 }
 
-impl<'a> Iterator for PV<'a> {
-    type Item = Move;
+impl<'a, const S: usize> Iterator for PV<'a, S> {
+    type Item = Move<S>;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.tree

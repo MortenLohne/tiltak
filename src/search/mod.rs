@@ -69,11 +69,11 @@ pub type Score = f32;
 /// Gives more fine-grained control of the search process compared to using the `mcts` function.
 #[derive(Clone, PartialEq, Debug)]
 pub struct MonteCarloTree<const S: usize> {
-    edge: TreeEdge, // A virtual edge to the first node, with fake move and heuristic score
+    edge: TreeEdge<S>, // A virtual edge to the first node, with fake move and heuristic score
     board: Board<S>,
     settings: MctsSetting<S>,
-    simple_moves: Vec<Move>,
-    moves: Vec<(Move, f32)>,
+    simple_moves: Vec<Move<S>>,
+    moves: Vec<(Move<S>, f32)>,
 }
 
 impl<const S: usize> MonteCarloTree<S> {
@@ -130,7 +130,7 @@ impl<const S: usize> MonteCarloTree<S> {
 
     /// Returns the best move, and its score (as winning probability) from the perspective of the side to move
     /// Panics if no search iterations have been run
-    pub fn best_move(&self) -> (Move, f32) {
+    pub fn best_move(&self) -> (Move<S>, f32) {
         self.edge
             .child
             .as_ref()
@@ -142,7 +142,7 @@ impl<const S: usize> MonteCarloTree<S> {
             .unwrap_or_else(|| panic!("Couldn't find best move"))
     }
 
-    fn children(&self) -> &[TreeEdge] {
+    fn children(&self) -> &[TreeEdge<S>] {
         &self.edge.child.as_ref().unwrap().children
     }
 
@@ -182,7 +182,7 @@ impl<const S: usize> MonteCarloTree<S> {
 }
 
 /// The simplest way to use the mcts module. Run Monte Carlo Tree Search for `nodes` nodes, returning the best move, and its estimated winning probability for the side to move.
-pub fn mcts<const S: usize>(board: Board<S>, nodes: u64) -> (Move, Score) {
+pub fn mcts<const S: usize>(board: Board<S>, nodes: u64) -> (Move<S>, Score) {
     let mut tree = MonteCarloTree::new(board);
 
     for _ in 0..nodes.max(2) {
@@ -195,7 +195,7 @@ pub fn mcts<const S: usize>(board: Board<S>, nodes: u64) -> (Move, Score) {
 /// Play a move, calculating for a maximum duration.
 /// It will usually spend much less time, especially if the move is obvious.
 /// On average, it will spend around 20% of `max_time`, and rarely more than 50%.
-pub fn play_move_time<const S: usize>(board: Board<S>, max_time: time::Duration) -> (Move, Score) {
+pub fn play_move_time<const S: usize>(board: Board<S>, max_time: time::Duration) -> (Move<S>, Score) {
     let mut tree = MonteCarloTree::new(board);
     let start_time = time::Instant::now();
 
@@ -241,7 +241,7 @@ pub fn mcts_training<const S: usize>(
     board: Board<S>,
     nodes: u64,
     settings: MctsSetting<S>,
-) -> Vec<(Move, Score)> {
+) -> Vec<(Move<S>, Score)> {
     let mut tree = MonteCarloTree::with_settings(board, settings);
 
     for _ in 0..nodes {

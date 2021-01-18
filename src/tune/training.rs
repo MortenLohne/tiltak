@@ -18,10 +18,10 @@ use std::time;
 use std::{error, fs, io};
 
 // The score, or probability of being played, for a given move
-type MoveScore = (Move, f32);
+type MoveScore<const S: usize> = (Move<S>, f32);
 
 // The probability of each possible move being played, through a whole game.
-type MoveScoresForGame = Vec<Vec<MoveScore>>;
+type MoveScoresForGame<const S: usize> = Vec<Vec<MoveScore<S>>>;
 
 pub fn train_from_scratch<const S: usize, const N: usize, const M: usize>(
     training_id: usize,
@@ -190,7 +190,7 @@ fn play_game_pair<const S: usize>(
     current_params_wins: &AtomicU64,
     last_params_wins: &AtomicU64,
     i: usize,
-) -> (Game<Board<S>>, Vec<Vec<(Move, f32)>>) {
+) -> (Game<Board<S>>, Vec<Vec<(Move<S>, f32)>>) {
     let settings = MctsSetting::default()
         .add_value_params(value_params.to_vec())
         .add_policy_params(policy_params.to_vec())
@@ -307,7 +307,7 @@ pub fn tune_value_from_file<const S: usize, const N: usize>(
 
 pub fn tune_value_and_policy<const S: usize, const N: usize, const M: usize>(
     games: &[Game<Board<S>>],
-    move_scoress: &[MoveScoresForGame],
+    move_scoress: &[MoveScoresForGame<S>],
     initial_value_params: &[f32; N],
     initial_policy_params: &[f32; M],
 ) -> Result<([f32; N], [f32; M]), Box<dyn error::Error>> {
@@ -424,7 +424,7 @@ pub fn tune_value_and_policy_from_file<const S: usize, const N: usize, const M: 
 pub fn games_and_move_scoress_from_file<const S: usize>(
     value_file_name: &str,
     policy_file_name: &str,
-) -> Result<(Vec<Game<Board<S>>>, Vec<MoveScoresForGame>), Box<dyn error::Error>> {
+) -> Result<(Vec<Game<Board<S>>>, Vec<MoveScoresForGame<S>>), Box<dyn error::Error>> {
     let mut move_scoress = read_move_scores_from_file::<S>(policy_file_name)?;
     let mut games = read_games_from_file(value_file_name)?;
 
@@ -455,7 +455,7 @@ pub fn games_and_move_scoress_from_file<const S: usize>(
 
 pub fn read_move_scores_from_file<const S: usize>(
     file_name: &str,
-) -> Result<Vec<MoveScoresForGame>, Box<dyn error::Error>> {
+) -> Result<Vec<MoveScoresForGame<S>>, Box<dyn error::Error>> {
     let mut file = fs::File::open(file_name)?;
     let mut input = String::new();
     file.read_to_string(&mut input)?;
