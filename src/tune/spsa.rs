@@ -73,7 +73,7 @@ pub fn tune<const S: usize>(variables: &mut [Variable], book_path: Option<&str>)
 fn tuning_iteration<R: rand::Rng, const S: usize>(
     variables: &[Variable],
     rng: &mut R,
-    opening: &[Move<S>],
+    opening: &[Move],
 ) -> Vec<SPSADirection> {
     let (player1_variables, player2_variables): (
         Vec<(SPSADirection, f32)>,

@@ -39,7 +39,7 @@ use std::str::FromStr;
 use std::{fmt, iter, ops};
 
 /// Extra items for tuning evaluation constants.
-pub trait TunableBoard<const S: usize, const N: usize, const M: usize>: BoardTrait {
+pub trait TunableBoard<const N: usize, const M: usize>: BoardTrait {
     const VALUE_PARAMS: [f32; N];
     const POLICY_PARAMS: [f32; M];
     type ExtraData;
@@ -63,7 +63,7 @@ pub trait TunableBoard<const S: usize, const N: usize, const M: usize>: BoardTra
     fn coefficients_for_move(
         &self,
         coefficients: &mut [f32],
-        mv: &Move<S>,
+        mv: &Move,
         data: &Self::ExtraData,
         num_legal_moves: usize,
     );
@@ -565,12 +565,12 @@ impl IntoIterator for Stack {
 /// A legal move for a position.
 #[derive(Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-pub enum Move<const S: usize> {
+pub enum Move {
     Place(Role, Square),
-    Move(Square, Direction, StackMovement<S>), // Number of stones to take
+    Move(Square, Direction, StackMovement), // Number of stones to take
 }
 
-impl<const S: usize> fmt::Display for Move<S> {
+impl fmt::Display for Move {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
         match self {
             Move::Place(role, square) => match role {
@@ -606,13 +606,13 @@ impl<const S: usize> fmt::Display for Move<S> {
     }
 }
 
-impl<const S: usize> fmt::Debug for Move<S> {
+impl fmt::Debug for Move {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
         write!(f, "{}", self)
     }
 }
 
-impl<const S: usize> FromStr for Move<S> {
+impl FromStr for Move {
     type Err = pgn::Error;
     fn from_str(input: &str) -> Result<Self, pgn::Error> {
         if input.len() < 2 {
@@ -683,9 +683,9 @@ impl<const S: usize> FromStr for Move<S> {
 
 /// The counterpart of `Move`. When applied to a `Board`, it fully reverses the accompanying `Move`.
 #[derive(Clone, PartialEq, Eq, Debug)]
-pub enum ReverseMove<const S: usize> {
+pub enum ReverseMove {
     Place(Square),
-    Move(Square, Direction, StackMovement<S>, bool),
+    Move(Square, Direction, StackMovement, bool),
 }
 
 /// One of the four cardinal directions on the board
@@ -722,8 +722,8 @@ impl Direction {
 /// One or more `Movement`s, storing how many pieces are dropped off at each step
 #[derive(Clone, PartialEq, Eq, Debug)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-pub struct StackMovement<const S: usize> {
-    pub movements: ArrayVec<[Movement; S]>, // TODO: Could be S - 1, with full const generics
+pub struct StackMovement {
+    pub movements: ArrayVec<[Movement; BOARD_SIZE - 1]>,
 }
 
 /// Moving a stack of pieces consists of one or more `Movement`s
@@ -952,7 +952,7 @@ pub struct Board<const S: usize> {
     white_caps_left: u8,
     black_caps_left: u8,
     half_moves_played: usize,
-    moves: Vec<Move<S>>,
+    moves: Vec<Move>,
     hash: u64,              // Zobrist hash of current position
     hash_history: Vec<u64>, // Zobrist hashes of previous board states, up to the last irreversible move. Does not include the corrent position
 }
@@ -1068,7 +1068,7 @@ impl<const S: usize> Board<S> {
     }
 
     /// All the moves played in the game
-    pub fn moves(&self) -> &Vec<Move<S>> {
+    pub fn moves(&self) -> &Vec<Move> {
         &self.moves
     }
 
@@ -1208,8 +1208,8 @@ impl<const S: usize> Board<S> {
     pub fn generate_moves_with_probabilities(
         &self,
         group_data: &GroupData<S>,
-        simple_moves: &mut Vec<Move<S>>,
-        moves: &mut Vec<(Move<S>, search::Score)>,
+        simple_moves: &mut Vec<Move>,
+        moves: &mut Vec<(Move, search::Score)>,
     ) {
         self.generate_moves_with_params(&<Board<S>>::POLICY_PARAMS, group_data, simple_moves, moves)
     }
@@ -1291,7 +1291,7 @@ impl<const S: usize> Board<S> {
     pub fn top_stones_left_behind_by_move<'a>(
         &'a self,
         square: Square,
-        stack_movement: &'a StackMovement<S>,
+        stack_movement: &'a StackMovement,
     ) -> impl Iterator<Item = Option<Piece>> + 'a {
         stack_movement
             .movements
@@ -1416,8 +1416,8 @@ impl<const S: usize> Board<S> {
 }
 
 impl<const S: usize> board::Board for Board<S> {
-    type Move = Move<S>;
-    type ReverseMove = ReverseMove<S>;
+    type Move = Move;
+    type ReverseMove = ReverseMove;
 
     fn start_board() -> Self {
         Self::default()
@@ -1621,7 +1621,7 @@ pub(crate) struct MoveIterator {
 }
 
 impl MoveIterator {
-    pub fn new<const S: usize>(square: Square, direction: Direction, stack_movement: StackMovement<S>) -> Self {
+    pub fn new(square: Square, direction: Direction, stack_movement: StackMovement) -> Self {
         MoveIterator {
             square,
             direction,
@@ -1667,7 +1667,7 @@ pub(crate) const SQUARE_SYMMETRIES: [usize; BOARD_AREA] = [
 pub const NUM_VALUE_PARAMS: usize = 69;
 pub const NUM_POLICY_PARAMS: usize = 91;
 
-impl<const S: usize> TunableBoard<S, NUM_VALUE_PARAMS, NUM_POLICY_PARAMS> for Board<S> {
+impl<const S: usize> TunableBoard<NUM_VALUE_PARAMS, NUM_POLICY_PARAMS> for Board<S> {
     type ExtraData = GroupData<S>;
 
     #[allow(clippy::unreadable_literal)]
@@ -1872,7 +1872,7 @@ impl<const S: usize> TunableBoard<S, NUM_VALUE_PARAMS, NUM_POLICY_PARAMS> for Bo
     fn coefficients_for_move(
         &self,
         coefficients: &mut [f32],
-        mv: &Move<S>,
+        mv: &Move,
         group_data: &GroupData<S>,
         num_legal_moves: usize,
     ) {

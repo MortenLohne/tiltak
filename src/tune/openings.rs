@@ -5,7 +5,7 @@ use std::fs;
 use std::io;
 use std::io::BufRead;
 
-pub fn openings_from_file<const S: usize>(path: &str) -> io::Result<Vec<Vec<Move<S>>>> {
+pub fn openings_from_file<const S: usize>(path: &str) -> io::Result<Vec<Vec<Move>>> {
     let reader = io::BufReader::new(fs::File::open(path)?);
     let mut openings = vec![];
 

@@ -48,8 +48,8 @@ impl<const S: usize> Board<S> {
         &self,
         params: &[f32],
         group_data: &GroupData<S>,
-        simple_moves: &mut Vec<Move<S>>,
-        moves: &mut Vec<(Move<S>, search::Score)>,
+        simple_moves: &mut Vec<Move>,
+        moves: &mut Vec<(Move, search::Score)>,
     ) {
         let num_moves = simple_moves.len();
         moves.extend(simple_moves.drain(..).map(|mv| {
@@ -63,7 +63,7 @@ impl<const S: usize> Board<S> {
     fn probability_for_move_colortr<Us: ColorTr, Them: ColorTr>(
         &self,
         params: &[f32],
-        mv: &Move<S>,
+        mv: &Move,
         group_data: &GroupData<S>,
         num_moves: usize,
     ) -> f32 {
@@ -83,7 +83,7 @@ impl<const S: usize> Board<S> {
 pub(crate) fn coefficients_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usize>(
     board: &Board<S>,
     coefficients: &mut [f32],
-    mv: &Move<S>,
+    mv: &Move,
     group_data: &GroupData<S>,
     num_legal_moves: usize,
 ) {
