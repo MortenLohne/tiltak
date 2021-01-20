@@ -1,7 +1,7 @@
 use crate::board;
 use crate::board::Role::*;
 use crate::board::{
-    Board, ColorTr, Direction, Move, Movement, Piece, Square, StackMovement, BOARD_SIZE,
+    Board, ColorTr, Direction, Move, Movement, Piece, Square, StackMovement, MAX_BOARD_SIZE,
 };
 use arrayvec::ArrayVec;
 
@@ -61,14 +61,14 @@ impl<const N: usize> Board<N> {
         origin_square: Square,
         square: Square,
         pieces_carried: u8,
-        partial_movement: &ArrayVec<[Movement; BOARD_SIZE - 1]>,
-        movements: &mut Vec<ArrayVec<[Movement; BOARD_SIZE - 1]>>,
+        partial_movement: &ArrayVec<[Movement; MAX_BOARD_SIZE - 1]>,
+        movements: &mut Vec<ArrayVec<[Movement; MAX_BOARD_SIZE - 1]>>,
     ) {
         if let Some(neighbour) = square.go_direction(direction) {
             let max_pieces_to_take = if square == origin_square {
-                pieces_carried.min(BOARD_SIZE as u8)
+                pieces_carried.min(N as u8)
             } else {
-                (pieces_carried - 1).min(BOARD_SIZE as u8)
+                (pieces_carried - 1).min(N as u8)
             };
             let neighbour_piece = self[neighbour].top_stone();
             if neighbour_piece.map(Piece::role) == Some(Cap) {
@@ -103,8 +103,8 @@ impl<const N: usize> Board<N> {
         origin_square: Square,
         square: Square,
         pieces_carried: u8,
-        partial_movement: &ArrayVec<[Movement; BOARD_SIZE - 1]>,
-        movements: &mut Vec<ArrayVec<[Movement; BOARD_SIZE - 1]>>,
+        partial_movement: &ArrayVec<[Movement; MAX_BOARD_SIZE - 1]>,
+        movements: &mut Vec<ArrayVec<[Movement; MAX_BOARD_SIZE - 1]>>,
     ) {
         if let Some(neighbour) = square.go_direction(direction) {
             let neighbour_piece = self[neighbour].top_stone();
@@ -114,9 +114,9 @@ impl<const N: usize> Board<N> {
 
             let neighbour = square.go_direction(direction).unwrap();
             let max_pieces_to_take = if square == origin_square {
-                pieces_carried.min(BOARD_SIZE as u8)
+                pieces_carried.min(N as u8)
             } else {
-                (pieces_carried - 1).min(BOARD_SIZE as u8)
+                (pieces_carried - 1).min(N as u8)
             };
             for pieces_to_take in 1..=max_pieces_to_take {
                 let mut new_movement = partial_movement.clone();

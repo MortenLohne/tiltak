@@ -9,6 +9,7 @@ lazy_static! {
 
 /// The size of the board. Only 5 works correctly for now.
 pub const BOARD_SIZE: usize = 5;
+pub const MAX_BOARD_SIZE: usize = 8;
 
 pub const BOARD_AREA: usize = BOARD_SIZE * BOARD_SIZE;
 
@@ -723,7 +724,7 @@ impl Direction {
 #[derive(Clone, PartialEq, Eq, Debug)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct StackMovement {
-    pub movements: ArrayVec<[Movement; BOARD_SIZE - 1]>,
+    pub movements: ArrayVec<[Movement; MAX_BOARD_SIZE - 1]>,
 }
 
 /// Moving a stack of pieces consists of one or more `Movement`s

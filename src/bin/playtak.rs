@@ -10,7 +10,7 @@ use std::time::Duration;
 use std::{io, net, thread};
 #[cfg(feature = "aws-lambda")]
 use taik::aws;
-use taik::board::Board;
+use taik::board::{Board, MAX_BOARD_SIZE};
 
 use log::{debug, info, warn};
 
@@ -497,19 +497,18 @@ pub fn parse_move(input: &str) -> board::Move {
 
         let mut pieces_held = num_pieces_taken;
 
-        let pieces_taken: ArrayVec<[Movement; board::BOARD_SIZE - 1]> =
-            iter::once(num_pieces_taken)
-                .chain(
-                    pieces_dropped
-                        .iter()
-                        .take(pieces_dropped.len() - 1)
-                        .map(|pieces_to_drop| {
-                            pieces_held -= pieces_to_drop;
-                            pieces_held
-                        }),
-                )
-                .map(|pieces_to_take| Movement { pieces_to_take })
-                .collect();
+        let pieces_taken: ArrayVec<[Movement; MAX_BOARD_SIZE - 1]> = iter::once(num_pieces_taken)
+            .chain(
+                pieces_dropped
+                    .iter()
+                    .take(pieces_dropped.len() - 1)
+                    .map(|pieces_to_drop| {
+                        pieces_held -= pieces_to_drop;
+                        pieces_held
+                    }),
+            )
+            .map(|pieces_to_take| Movement { pieces_to_take })
+            .collect();
 
         let direction = match (
             start_square.rank().cmp(&end_square.rank()),
