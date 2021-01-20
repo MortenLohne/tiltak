@@ -257,14 +257,6 @@ fn test_position<const S: usize>() {
         println!();
     }
 
-    for d in 1..=3 {
-        let (best_move, score) = minmax::minmax(&mut board, d);
-
-        println!(
-            "Depth {}: minmax played {:?} with score {}",
-            d, best_move, score
-        );
-    }
     let mut tree = search::MonteCarloTree::new(board.clone());
     for i in 1.. {
         tree.select();
