@@ -34,10 +34,8 @@ use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use std::fmt::Write;
 use std::hash::{Hash, Hasher};
-use std::marker::PhantomData;
 use std::mem;
 use std::ops::{Index, IndexMut};
-use std::str::FromStr;
 use std::{fmt, iter, ops};
 
 /// Extra items for tuning evaluation constants.

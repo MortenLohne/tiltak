@@ -113,9 +113,9 @@ pub fn train_perpetually<const S: usize, const N: usize, const M: usize>(
 
         for (game, move_scores) in games.iter().zip(move_scores) {
             for (mv, move_scores) in game.moves.iter().map(|(mv, _comment)| mv).zip(move_scores) {
-                write!(writer, "{}: ", mv)?;
+                write!(writer, "{}: ", mv.to_string::<S>())?;
                 for (mv, score) in move_scores {
-                    write!(writer, "{} {}, ", mv, score)?;
+                    write!(writer, "{} {}, ", mv.to_string::<S>(), score)?;
                 }
                 writeln!(writer)?;
             }
@@ -443,7 +443,7 @@ pub fn games_and_move_scoress_from_file<const S: usize>(
                     .iter()
                     .any(|(scored_move, _score)| *mv == *scored_move),
                 "Played move {} not among move scores {:?}\nBoard:\n{:?}",
-                mv,
+                mv.to_string::<S>(),
                 move_score,
                 board
             );
