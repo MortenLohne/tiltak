@@ -1,4 +1,4 @@
-use crate::board::{Square, BOARD_SIZE};
+use crate::board::Square;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 use std::{fmt, ops};
@@ -59,20 +59,20 @@ impl BitBoard {
         }
     }
 
-    pub fn all_lines() -> [Self; BOARD_SIZE * 2] {
-        let mut result = [BitBoard::empty(); BOARD_SIZE * 2];
+    pub fn all_lines<const S: usize>() -> Vec<Self> {
+        let mut result = Vec::with_capacity(S * 2);
         let full = BitBoard::full();
-        for i in 0..BOARD_SIZE {
-            result[i * 2] = full.rank(i as u8);
-            result[i * 2 + 1] = full.file(i as u8);
+        for i in 0..S {
+            result.push(full.rank::<S>(i as u8));
+            result.push(full.file::<S>(i as u8));
         }
         result
     }
 
-    pub fn lines_for_square(square: Square) -> [Self; 2] {
+    pub fn lines_for_square<const S: usize>(square: Square) -> [Self; 2] {
         [
-            Self::full().rank(square.rank()),
-            Self::full().file(square.file()),
+            Self::full().rank::<S>(square.rank::<S>()),
+            Self::full().file::<S>(square.file::<S>()),
         ]
     }
 
@@ -112,17 +112,17 @@ impl BitBoard {
     }
 
     #[inline]
-    pub fn rank(self, i: u8) -> Self {
-        debug_assert!(i < BOARD_SIZE as u8);
-        const MASK: u64 = (1 << BOARD_SIZE) - 1;
-        BitBoard::from_u64(self.board & (MASK << (i as u64 * BOARD_SIZE as u64)))
+    pub fn rank<const S: usize>(self, i: u8) -> Self {
+        debug_assert!(i < S as u8);
+        let mask = (1 << S) - 1;
+        BitBoard::from_u64(self.board & (mask << (i as u64 * S as u64)))
     }
 
     #[inline]
-    pub fn file(self, i: u8) -> Self {
-        debug_assert!(i < BOARD_SIZE as u8);
+    pub fn file<const S: usize>(self, i: u8) -> Self {
+        debug_assert!(i < S as u8);
         #[allow(clippy::unusual_byte_groupings)]
-        const MASK: u64 = match BOARD_SIZE {
+        let mask = match S {
             1 => 0b1,
             2 => 0b0101,
             3 => 0b1_001_001,
@@ -133,7 +133,7 @@ impl BitBoard {
             8 => 0b1_00000001_00000001_00000001_00000001_00000001_00000001_00000001,
             _ => 0,
         };
-        BitBoard::from_u64(self.board & (MASK << i as u64))
+        BitBoard::from_u64(self.board & (mask << i as u64))
     }
 
     #[inline]

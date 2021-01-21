@@ -231,65 +231,65 @@ impl ColorTr for BlackTr {
 }
 
 /// A location on the board. Can be used to index a `Board`.
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Square(pub u8);
 
 impl Square {
-    pub fn from_rank_file(rank: u8, file: u8) -> Self {
-        debug_assert!(rank < BOARD_SIZE as u8 && file < BOARD_SIZE as u8);
-        Square(rank * BOARD_SIZE as u8 + file as u8)
+    pub fn from_rank_file<const S: usize>(rank: u8, file: u8) -> Self {
+        debug_assert!(rank < S as u8 && file < S as u8);
+        Square(rank * S as u8 + file as u8)
     }
 
-    pub fn rank(self) -> u8 {
-        self.0 / BOARD_SIZE as u8
+    pub fn rank<const S: usize>(self) -> u8 {
+        self.0 / S as u8
     }
 
-    pub fn file(self) -> u8 {
-        self.0 % BOARD_SIZE as u8
+    pub fn file<const S: usize>(self) -> u8 {
+        self.0 % S as u8
     }
 
-    pub fn neighbours(self) -> impl Iterator<Item = Square> {
+    pub fn neighbours<const S: usize>(self) -> impl Iterator<Item = Square> {
         (if self.0 as usize == 0 {
-            [1, BOARD_SIZE as i8].iter()
-        } else if self.0 as usize == BOARD_SIZE - 1 {
-            [-1, BOARD_SIZE as i8].iter()
-        } else if self.0 as usize == BOARD_SIZE * BOARD_SIZE - BOARD_SIZE {
-            [1, -(BOARD_SIZE as i8)].iter()
-        } else if self.0 as usize == BOARD_SIZE * BOARD_SIZE - 1 {
-            [-1, -(BOARD_SIZE as i8)].iter()
-        } else if self.rank() == 0 {
-            [-1, 1, BOARD_SIZE as i8].iter()
-        } else if self.rank() == BOARD_SIZE as u8 - 1 {
-            [-(BOARD_SIZE as i8), -1, 1].iter()
-        } else if self.file() == 0 {
-            [-(BOARD_SIZE as i8), 1, BOARD_SIZE as i8].iter()
-        } else if self.file() == BOARD_SIZE as u8 - 1 {
-            [-(BOARD_SIZE as i8), -1, BOARD_SIZE as i8].iter()
+            [1, S as i8].iter()
+        } else if self.0 as usize == S - 1 {
+            [-1, S as i8].iter()
+        } else if self.0 as usize == S * S - S {
+            [1, -(S as i8)].iter()
+        } else if self.0 as usize == S * S - 1 {
+            [-1, -(S as i8)].iter()
+        } else if self.rank::<S>() == 0 {
+            [-1, 1, S as i8].iter()
+        } else if self.rank::<S>() == S as u8 - 1 {
+            [-(S as i8), -1, 1].iter()
+        } else if self.file::<S>() == 0 {
+            [-(S as i8), 1, S as i8].iter()
+        } else if self.file::<S>() == S as u8 - 1 {
+            [-(S as i8), -1, S as i8].iter()
         } else {
-            [-(BOARD_SIZE as i8), -1, 1, BOARD_SIZE as i8].iter()
+            [-(S as i8), -1, 1, S as i8].iter()
         })
         .cloned()
         .map(move |sq| sq + self.0 as i8)
         .map(|sq| Square(sq as u8))
     }
 
-    pub fn directions(self) -> impl Iterator<Item = Direction> {
+    pub fn directions<const S: usize>(self) -> impl Iterator<Item = Direction> {
         (if self.0 as usize == 0 {
             [East, South].iter()
-        } else if self.0 as usize == BOARD_SIZE - 1 {
+        } else if self.0 as usize == S - 1 {
             [West, South].iter()
-        } else if self.0 as usize == BOARD_SIZE * BOARD_SIZE - BOARD_SIZE {
+        } else if self.0 as usize == S * S - S {
             [East, North].iter()
-        } else if self.0 as usize == BOARD_SIZE * BOARD_SIZE - 1 {
+        } else if self.0 as usize == S * S - 1 {
             [West, North].iter()
-        } else if self.rank() == 0 {
+        } else if self.rank::<S>() == 0 {
             [West, East, South].iter()
-        } else if self.rank() == BOARD_SIZE as u8 - 1 {
+        } else if self.rank::<S>() == S as u8 - 1 {
             [North, West, East].iter()
-        } else if self.file() == 0 {
+        } else if self.file::<S>() == 0 {
             [North, East, South].iter()
-        } else if self.file() == BOARD_SIZE as u8 - 1 {
+        } else if self.file::<S>() == S as u8 - 1 {
             [North, West, South].iter()
         } else {
             [North, West, East, South].iter()
@@ -297,34 +297,34 @@ impl Square {
         .cloned()
     }
 
-    pub fn go_direction(self, direction: Direction) -> Option<Self> {
+    pub fn go_direction<const S: usize>(self, direction: Direction) -> Option<Self> {
         match direction {
-            North => self.0.checked_sub(BOARD_SIZE as u8).map(Square),
+            North => self.0.checked_sub(S as u8).map(Square),
             West => {
-                if self.file() == 0 {
+                if self.file::<S>() == 0 {
                     None
                 } else {
                     Some(Square(self.0 - 1))
                 }
             }
             East => {
-                if self.file() == BOARD_SIZE as u8 - 1 {
+                if self.file::<S>() == S as u8 - 1 {
                     None
                 } else {
                     Some(Square(self.0 + 1))
                 }
             }
             South => {
-                if self.0 as usize + BOARD_SIZE >= BOARD_SIZE * BOARD_SIZE {
+                if self.0 as usize + S >= S * S {
                     None
                 } else {
-                    Some(Square(self.0 + BOARD_SIZE as u8))
+                    Some(Square(self.0 + S as u8))
                 }
             }
         }
     }
 
-    pub fn parse_square(input: &str) -> Result<Square, pgn::Error> {
+    pub fn parse_square<const S: usize>(input: &str) -> Result<Square, pgn::Error> {
         if input.len() != 2 {
             return Err(pgn::Error::new_parse_error(format!(
                 "Couldn't parse square \"{}\"",
@@ -333,31 +333,24 @@ impl Square {
         }
         let mut chars = input.chars();
         let file = (chars.next().unwrap() as u8).overflowing_sub(b'a').0;
-        let rank = (BOARD_SIZE as u8 + b'0')
+        let rank = (S as u8 + b'0')
             .overflowing_sub(chars.next().unwrap() as u8)
             .0;
-        if file >= BOARD_SIZE as u8 || rank >= BOARD_SIZE as u8 {
+        if file >= S as u8 || rank >= S as u8 {
             Err(pgn::Error::new_parse_error(format!(
                 "Couldn't parse square \"{}\"",
                 input
             )))
         } else {
-            Ok(Square(file + rank * BOARD_SIZE as u8))
+            Ok(Square(file + rank * S as u8))
         }
     }
-}
 
-impl fmt::Display for Square {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
-        write!(f, "{}", (self.file() + b'a') as char)?;
-        write!(f, "{}", BOARD_SIZE as u8 - self.rank())?;
-        Ok(())
-    }
-}
-
-impl fmt::Debug for Square {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
-        write!(f, "{}", self)
+    pub fn to_string<const S: usize>(&self) -> String {
+        let mut string = String::new();
+        write!(string, "{}", (self.file::<S>() + b'a') as char).unwrap();
+        write!(string, "{}", S as u8 - self.rank::<S>()).unwrap();
+        string
     }
 }
 
@@ -564,58 +557,50 @@ impl IntoIterator for Stack {
 }
 
 /// A legal move for a position.
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum Move {
     Place(Role, Square),
     Move(Square, Direction, StackMovement), // Number of stones to take
 }
 
-impl fmt::Display for Move {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
+impl Move {
+    fn to_string<const S: usize>(&self) -> String {
+        let mut string = String::new();
         match self {
             Move::Place(role, square) => match role {
-                Cap => write!(f, "C{}", square)?,
-                Flat => write!(f, "{}", square)?,
-                Wall => write!(f, "S{}", square)?,
+                Cap => write!(string, "C{}", square.to_string::<S>()).unwrap(),
+                Flat => write!(string, "{}", square.to_string::<S>()).unwrap(),
+                Wall => write!(string, "S{}", square.to_string::<S>()).unwrap(),
             },
             Move::Move(square, direction, stack_movements) => {
                 let mut pieces_held = stack_movements.movements[0].pieces_to_take;
                 if pieces_held == 1 {
-                    write!(f, "{}", square)?;
+                    write!(string, "{}", square.to_string::<S>()).unwrap();
                 } else {
-                    write!(f, "{}{}", pieces_held, square)?;
+                    write!(string, "{}{}", pieces_held, square.to_string::<S>()).unwrap();
                 }
                 match direction {
-                    North => f.write_char('+')?,
-                    West => f.write_char('<')?,
-                    East => f.write_char('>')?,
-                    South => f.write_char('-')?,
+                    North => string.push('+'),
+                    West => string.push('<'),
+                    East => string.push('>'),
+                    South => string.push('-'),
                 }
                 // Omit number of pieces dropped, if all stones are dropped immediately
                 if stack_movements.movements.len() > 1 {
                     for movement in stack_movements.movements.iter().skip(1) {
                         let pieces_to_drop = pieces_held - movement.pieces_to_take;
-                        write!(f, "{}", pieces_to_drop)?;
+                        write!(string, "{}", pieces_to_drop).unwrap();
                         pieces_held -= pieces_to_drop;
                     }
-                    write!(f, "{}", pieces_held)?;
+                    write!(string, "{}", pieces_held).unwrap();
                 }
             }
         }
-        Ok(())
+        string
     }
-}
 
-impl fmt::Debug for Move {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
-        write!(f, "{}", self)
-    }
-}
-
-impl FromStr for Move {
-    type Err = pgn::Error;
-    fn from_str(input: &str) -> Result<Self, pgn::Error> {
+    fn from_string<const S: usize>(input: &str) -> Result<Self, pgn::Error> {
         if input.len() < 2 {
             return Err(pgn::Error::new(
                 pgn::ErrorKind::ParseError,
@@ -631,20 +616,24 @@ impl FromStr for Move {
         let first_char = input.chars().next().unwrap();
         match first_char {
             'a'..='e' if input.len() == 2 => {
-                let square = Square::parse_square(input)?;
+                let square = Square::parse_square::<S>(input)?;
                 Ok(Move::Place(Flat, square))
             }
-            'a'..='e' if input.len() == 3 => {
-                let square = Square::parse_square(&input[0..2])?;
+            'a'..='g' if input.len() == 3 => {
+                let square = Square::parse_square::<S>(&input[0..2])?;
                 let direction = Direction::parse(input.chars().nth(2).unwrap());
                 // Moves in the simplified move notation always move one piece
                 let movements = iter::once(Movement { pieces_to_take: 1 }).collect();
                 Ok(Move::Move(square, direction, StackMovement { movements }))
             }
-            'C' if input.len() == 3 => Ok(Move::Place(Cap, Square::parse_square(&input[1..])?)),
-            'S' if input.len() == 3 => Ok(Move::Place(Wall, Square::parse_square(&input[1..])?)),
-            '1'..='9' if input.len() > 3 => {
-                let square = Square::parse_square(&input[1..3])?;
+            'C' if input.len() == 3 => {
+                Ok(Move::Place(Cap, Square::parse_square::<S>(&input[1..])?))
+            }
+            'S' if input.len() == 3 => {
+                Ok(Move::Place(Wall, Square::parse_square::<S>(&input[1..])?))
+            }
+            '1'..='8' if input.len() > 3 => {
+                let square = Square::parse_square::<S>(&input[1..3])?;
                 let direction = Direction::parse(input.chars().nth(3).unwrap());
                 let pieces_taken = first_char.to_digit(10).unwrap() as u8;
                 let mut pieces_held = pieces_taken;
@@ -748,18 +737,18 @@ pub struct GroupEdgeConnection {
 }
 
 impl GroupEdgeConnection {
-    pub fn connect_square(self, square: Square) -> Self {
+    pub fn connect_square<const S: usize>(self, square: Square) -> Self {
         let mut edge_connection = self;
-        if square.rank() == BOARD_SIZE as u8 - 1 {
+        if square.rank::<S>() == S as u8 - 1 {
             edge_connection = edge_connection.connect_north();
         }
-        if square.rank() == 0 {
+        if square.rank::<S>() == 0 {
             edge_connection = edge_connection.connect_south();
         }
-        if square.file() == 0 {
+        if square.file::<S>() == 0 {
             edge_connection = edge_connection.connect_west();
         }
-        if square.file() == BOARD_SIZE as u8 - 1 {
+        if square.file::<S>() == S as u8 - 1 {
             edge_connection = edge_connection.connect_east();
         }
         edge_connection
@@ -1112,11 +1101,11 @@ impl<const S: usize> Board<S> {
         color: Color,
     ) -> bool {
         let sum_of_connections = square
-            .neighbours()
+            .neighbours::<S>()
             .filter(|neighbour| self[*neighbour].top_stone().map(Piece::color) == Some(color))
             .map(|neighbour| amount_in_group[groups[neighbour] as usize].1)
             .fold(
-                GroupEdgeConnection::default().connect_square(square),
+                GroupEdgeConnection::default().connect_square::<S>(square),
                 |acc, connection| acc | connection,
             );
 
@@ -1263,7 +1252,7 @@ impl<const S: usize> Board<S> {
                 group_data.amount_in_group[group_data.groups[square] as usize].1 = group_data
                     .amount_in_group[group_data.groups[square] as usize]
                     .1
-                    .connect_square(square);
+                    .connect_square::<S>(square);
             }
         }
 
@@ -1492,7 +1481,7 @@ impl<const S: usize> board::Board for Board<S> {
                 }
 
                 for Movement { pieces_to_take } in stack_movement.movements.iter() {
-                    let to = from.go_direction(direction).unwrap();
+                    let to = from.go_direction::<S>(direction).unwrap();
 
                     if self[to].top_stone.map(Piece::role) == Some(Wall) {
                         flattens_stone = true;
@@ -1576,7 +1565,7 @@ impl<const S: usize> board::Board for Board<S> {
                 }
 
                 for Movement { pieces_to_take } in stack_movement.movements.iter() {
-                    let to = square.go_direction(direction).unwrap();
+                    let to = square.go_direction::<S>(direction).unwrap();
 
                     let pieces_to_leave = self[square].len() - pieces_to_take;
 
