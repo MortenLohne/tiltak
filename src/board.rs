@@ -827,7 +827,7 @@ impl<const S: usize> Default for GroupData<S> {
     fn default() -> Self {
         GroupData {
             groups: Default::default(),
-            amount_in_group: vec![(0, GroupEdgeConnection::default()); S * S * 1]
+            amount_in_group: vec![(0, GroupEdgeConnection::default()); S * S + 1]
                 .into_boxed_slice(),
             white_critical_squares: Default::default(),
             black_critical_squares: Default::default(),
