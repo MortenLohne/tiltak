@@ -360,7 +360,7 @@ impl PlaytakSession {
                 moves.push((best_move.clone(), score.to_string()));
 
                 let mut output_string = format!("Game#{} ", game_no);
-                write_move(best_move, &mut output_string);
+                write_move::<S>(best_move, &mut output_string);
                 self.send_line(&output_string)?;
 
                 // Say "Tak" whenever there is a threat to win
@@ -395,7 +395,7 @@ impl PlaytakSession {
                         match words[1] {
                             "P" | "M" => {
                                 let move_string = words[1..].join(" ");
-                                let move_played = parse_move(&move_string);
+                                let move_played = parse_move::<S>(&move_string);
                                 board.do_move(move_played.clone());
                                 moves.push((move_played, "0.0".to_string()));
                                 break;
@@ -445,7 +445,7 @@ impl PlaytakSession {
         let mut move_list = vec![];
 
         for (mv, _) in moves {
-            move_list.push(mv.to_string());
+            move_list.push(mv.to_string::<S>());
         }
 
         info!("Move list: {}", move_list.join(" "));
@@ -473,10 +473,10 @@ use taik::board::{Direction, Move, Movement, Role, StackMovement};
 #[cfg(not(feature = "aws-lambda"))]
 use taik::search;
 
-pub fn parse_move(input: &str) -> board::Move {
+pub fn parse_move<const S: usize>(input: &str) -> board::Move {
     let words: Vec<&str> = input.split_whitespace().collect();
     if words[0] == "P" {
-        let square = board::Square::parse_square(&words[1].to_lowercase()).unwrap();
+        let square = board::Square::parse_square::<S>(&words[1].to_lowercase()).unwrap();
         let role = match words.get(2) {
             Some(&"C") => Role::Cap,
             Some(&"W") => Role::Wall,
@@ -485,8 +485,8 @@ pub fn parse_move(input: &str) -> board::Move {
         };
         board::Move::Place(role, square)
     } else if words[0] == "M" {
-        let start_square = board::Square::parse_square(&words[1].to_lowercase()).unwrap();
-        let end_square = board::Square::parse_square(&words[2].to_lowercase()).unwrap();
+        let start_square = board::Square::parse_square::<S>(&words[1].to_lowercase()).unwrap();
+        let end_square = board::Square::parse_square::<S>(&words[2].to_lowercase()).unwrap();
         let pieces_dropped: ArrayVec<[u8; board::BOARD_SIZE - 1]> = words
             .iter()
             .skip(3)
@@ -511,8 +511,8 @@ pub fn parse_move(input: &str) -> board::Move {
             .collect();
 
         let direction = match (
-            start_square.rank().cmp(&end_square.rank()),
-            start_square.file().cmp(&end_square.file()),
+            start_square.rank::<S>().cmp(&end_square.rank::<S>()),
+            start_square.file::<S>().cmp(&end_square.file::<S>()),
         ) {
             (Ordering::Equal, Ordering::Less) => Direction::East,
             (Ordering::Equal, Ordering::Greater) => Direction::West,
@@ -533,7 +533,7 @@ pub fn parse_move(input: &str) -> board::Move {
     }
 }
 
-pub fn write_move(mv: board::Move, w: &mut String) {
+pub fn write_move<const S: usize>(mv: board::Move, w: &mut String) {
     match mv {
         board::Move::Place(role, square) => {
             let role_string = match role {
@@ -541,7 +541,7 @@ pub fn write_move(mv: board::Move, w: &mut String) {
                 Role::Wall => " W",
                 Role::Cap => " C",
             };
-            let square_string = square.to_string().to_uppercase();
+            let square_string = square.to_string::<S>().to_uppercase();
             write!(w, "P {}{}", square_string, role_string).unwrap();
         }
         Move::Move(start_square, direction, stack_movement) => {
@@ -552,20 +552,20 @@ pub fn write_move(mv: board::Move, w: &mut String) {
                 .iter()
                 .skip(1)
                 .map(|Movement { pieces_to_take }| {
-                    end_square = end_square.go_direction(direction).unwrap();
+                    end_square = end_square.go_direction::<S>(direction).unwrap();
                     let pieces_to_leave = pieces_held - pieces_to_take;
                     pieces_held = *pieces_to_take;
                     pieces_to_leave
                 })
                 .collect();
 
-            end_square = end_square.go_direction(direction).unwrap();
+            end_square = end_square.go_direction::<S>(direction).unwrap();
 
             write!(
                 w,
                 "M {} {} ",
-                start_square.to_string().to_uppercase(),
-                end_square.to_string().to_uppercase()
+                start_square.to_string::<S>().to_uppercase(),
+                end_square.to_string::<S>().to_uppercase()
             )
             .unwrap();
             for num_to_leave in pieces_to_leave {

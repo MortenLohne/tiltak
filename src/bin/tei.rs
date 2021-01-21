@@ -83,7 +83,9 @@ pub fn main() {
                             (score * 200.0 - 100.0) as i64,
                             total_nodes,
                             start_time.elapsed().as_millis(),
-                            tree.pv().map(|mv| mv.to_string() + " ").collect::<String>()
+                            tree.pv()
+                                .map(|mv| mv.to_string::<5>() + " ")
+                                .collect::<String>()
                         );
                         if start_time.elapsed().as_secs_f64() > movetime.as_secs_f64() * 0.7 {
                             println!("bestmove {}", position.move_to_san(&best_move));

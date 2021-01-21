@@ -116,7 +116,7 @@ pub(crate) fn coefficients_for_move_colortr<Us: ColorTr, Them: ColorTr, const S:
                 Cap => 2,
             };
 
-            for &line in BitBoard::lines_for_square(*square).iter() {
+            for &line in BitBoard::lines_for_square::<S>(*square).iter() {
                 let our_line_score = (Us::road_stones(&group_data) & line).count();
                 let their_line_score = (Them::road_stones(&group_data) & line).count();
                 coefficients
@@ -130,7 +130,7 @@ pub(crate) fn coefficients_for_move_colortr<Us: ColorTr, Them: ColorTr, const S:
             // If square is next to a group
             let mut our_unique_neighbour_groups: ArrayVec<[(Square, u8); 4]> = ArrayVec::new();
             let mut their_unique_neighbour_groups: ArrayVec<[(Square, u8); 4]> = ArrayVec::new();
-            for neighbour in square.neighbours().filter(|sq| !board[*sq].is_empty()) {
+            for neighbour in square.neighbours::<S>().filter(|sq| !board[*sq].is_empty()) {
                 let neighbour_group_id = group_data.groups[neighbour];
                 if Us::piece_is_ours(board[neighbour].top_stone().unwrap()) {
                     if our_unique_neighbour_groups
@@ -176,10 +176,11 @@ pub(crate) fn coefficients_for_move_colortr<Us: ColorTr, Them: ColorTr, const S:
                     board.moves().get(board.moves().len() - 2)
                 {
                     if *last_role == Flat || *last_role == Cap {
-                        if square.neighbours().any(|neigh| neigh == *last_square) {
+                        if square.neighbours::<S>().any(|neigh| neigh == *last_square) {
                             coefficients[NEXT_TO_OUR_LAST_STONE] = 1.0;
-                        } else if (square.rank() as i8 - last_square.rank() as i8).abs() == 1
-                            && (square.file() as i8 - last_square.file() as i8).abs() == 1
+                        } else if (square.rank::<S>() as i8 - last_square.rank::<S>() as i8).abs()
+                            == 1
+                            && (square.file::<S>() as i8 - last_square.file::<S>() as i8).abs() == 1
                         {
                             coefficients[DIAGONAL_TO_OUR_LAST_STONE] = 1.0;
                         }
@@ -189,10 +190,11 @@ pub(crate) fn coefficients_for_move_colortr<Us: ColorTr, Them: ColorTr, const S:
                 // If square is next to a road stone laid on their last turn
                 if let Some(Move::Place(last_role, last_square)) = board.moves().last() {
                     if *last_role == Flat {
-                        if square.neighbours().any(|neigh| neigh == *last_square) {
+                        if square.neighbours::<S>().any(|neigh| neigh == *last_square) {
                             coefficients[NEXT_TO_THEIR_LAST_STONE] = 1.0;
-                        } else if (square.rank() as i8 - last_square.rank() as i8).abs() == 1
-                            && (square.file() as i8 - last_square.file() as i8).abs() == 1
+                        } else if (square.rank::<S>() as i8 - last_square.rank::<S>() as i8).abs()
+                            == 1
+                            && (square.file::<S>() as i8 - last_square.file::<S>() as i8).abs() == 1
                         {
                             coefficients[DIAGONAL_TO_THEIR_LAST_STONE] = 1.0;
                         }
@@ -200,11 +202,14 @@ pub(crate) fn coefficients_for_move_colortr<Us: ColorTr, Them: ColorTr, const S:
                 }
 
                 // Bonus for attacking a flatstone in a rank/file where we are strong
-                for neighbour in square.neighbours() {
+                for neighbour in square.neighbours::<S>() {
                     if board[neighbour].top_stone() == Some(Them::flat_piece()) {
-                        let our_road_stones =
-                            Us::road_stones(group_data).rank(neighbour.rank()).count()
-                                + Us::road_stones(group_data).file(neighbour.file()).count();
+                        let our_road_stones = Us::road_stones(group_data)
+                            .rank::<S>(neighbour.rank::<S>())
+                            .count()
+                            + Us::road_stones(group_data)
+                                .file::<S>(neighbour.file::<S>())
+                                .count();
                         if our_road_stones >= 2 {
                             coefficients[ATTACK_STRONG_FLATS] += (our_road_stones - 1) as f32;
                         }
@@ -235,14 +240,14 @@ pub(crate) fn coefficients_for_move_colortr<Us: ColorTr, Them: ColorTr, const S:
             }
             if *role == Wall || *role == Cap {
                 // If square has two or more opponent flatstones around it
-                for direction in square.directions() {
-                    let neighbour = square.go_direction(direction).unwrap();
+                for direction in square.directions::<S>() {
+                    let neighbour = square.go_direction::<S>(direction).unwrap();
                     if board[neighbour]
                         .top_stone()
                         .map(Them::is_road_stone)
                         .unwrap_or_default()
                         && neighbour
-                            .go_direction(direction)
+                            .go_direction::<S>(direction)
                             .and_then(|sq| board[sq].top_stone())
                             .map(Them::is_road_stone)
                             .unwrap_or_default()
@@ -264,7 +269,7 @@ pub(crate) fn coefficients_for_move_colortr<Us: ColorTr, Them: ColorTr, const S:
 
             let mut destination_square =
                 if stack_movement.movements[0].pieces_to_take == board[*square].len() {
-                    square.go_direction(*direction).unwrap()
+                    square.go_direction::<S>(*direction).unwrap()
                 } else {
                     *square
                 };
@@ -288,17 +293,22 @@ pub(crate) fn coefficients_for_move_colortr<Us: ColorTr, Them: ColorTr, const S:
                 // Bonus for moving our cap to a strong line
                 // Extra bonus if it lands next to our critical square
                 if piece == Us::cap_piece() {
-                    let destination_line = match direction {
-                        North => Us::road_stones(group_data).rank(destination_square.rank()),
-                        West => Us::road_stones(group_data).file(destination_square.file()),
-                        East => Us::road_stones(group_data).file(destination_square.file()),
-                        South => Us::road_stones(group_data).rank(destination_square.rank()),
-                    };
+                    let destination_line =
+                        match direction {
+                            North => Us::road_stones(group_data)
+                                .rank::<S>(destination_square.rank::<S>()),
+                            West => Us::road_stones(group_data)
+                                .file::<S>(destination_square.file::<S>()),
+                            East => Us::road_stones(group_data)
+                                .file::<S>(destination_square.file::<S>()),
+                            South => Us::road_stones(group_data)
+                                .rank::<S>(destination_square.rank::<S>()),
+                        };
                     let road_piece_count = destination_line.count() as usize;
                     if road_piece_count > 2 {
                         coefficients[MOVE_CAP_ONTO_STRONG_LINE + road_piece_count - 3] += 1.0;
                         if destination_square
-                            .neighbours()
+                            .neighbours::<S>()
                             .any(|n| Us::is_critical_square(group_data, n))
                         {
                             coefficients[MOVE_CAP_ONTO_STRONG_LINE + road_piece_count - 1] += 1.0;
@@ -323,7 +333,7 @@ pub(crate) fn coefficients_for_move_colortr<Us: ColorTr, Them: ColorTr, const S:
                                 destination_stack.len() as f32;
                         }
                     }
-                    for &line in BitBoard::lines_for_square(destination_square).iter() {
+                    for &line in BitBoard::lines_for_square::<S>(destination_square).iter() {
                         let our_road_stones = (line & Us::road_stones(group_data)).count() as usize;
                         let color_factor = if Us::piece_is_ours(piece) { 1.0 } else { -1.0 };
                         if our_road_stones > 2 {
@@ -340,7 +350,7 @@ pub(crate) fn coefficients_for_move_colortr<Us: ColorTr, Them: ColorTr, const S:
                 }
 
                 destination_square = destination_square
-                    .go_direction(*direction)
+                    .go_direction::<S>(*direction)
                     .unwrap_or(destination_square);
             }
 

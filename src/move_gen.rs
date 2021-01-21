@@ -5,10 +5,10 @@ use crate::board::{
 };
 use arrayvec::ArrayVec;
 
-impl<const N: usize> Board<N> {
+impl<const S: usize> Board<S> {
     pub(crate) fn generate_moves_colortr<Us: ColorTr, Them: ColorTr>(
         &self,
-        moves: &mut Vec<<Board<N> as board_game_traits::board::Board>::Move>,
+        moves: &mut Vec<<Board<S> as board_game_traits::board::Board>::Move>,
     ) {
         for square in board::squares_iterator() {
             match self[square].top_stone() {
@@ -22,7 +22,7 @@ impl<const N: usize> Board<N> {
                     }
                 }
                 Some(piece) if Us::piece_is_ours(piece) => {
-                    for direction in square.directions() {
+                    for direction in square.directions::<S>() {
                         let mut movements = vec![];
                         if piece == Us::cap_piece() {
                             self.generate_moving_moves_cap::<Us>(
@@ -64,11 +64,11 @@ impl<const N: usize> Board<N> {
         partial_movement: &ArrayVec<[Movement; MAX_BOARD_SIZE - 1]>,
         movements: &mut Vec<ArrayVec<[Movement; MAX_BOARD_SIZE - 1]>>,
     ) {
-        if let Some(neighbour) = square.go_direction(direction) {
+        if let Some(neighbour) = square.go_direction::<S>(direction) {
             let max_pieces_to_take = if square == origin_square {
-                pieces_carried.min(N as u8)
+                pieces_carried.min(S as u8)
             } else {
-                (pieces_carried - 1).min(N as u8)
+                (pieces_carried - 1).min(S as u8)
             };
             let neighbour_piece = self[neighbour].top_stone();
             if neighbour_piece.map(Piece::role) == Some(Cap) {
@@ -106,17 +106,17 @@ impl<const N: usize> Board<N> {
         partial_movement: &ArrayVec<[Movement; MAX_BOARD_SIZE - 1]>,
         movements: &mut Vec<ArrayVec<[Movement; MAX_BOARD_SIZE - 1]>>,
     ) {
-        if let Some(neighbour) = square.go_direction(direction) {
+        if let Some(neighbour) = square.go_direction::<S>(direction) {
             let neighbour_piece = self[neighbour].top_stone();
             if neighbour_piece.is_some() && neighbour_piece.unwrap().role() != Flat {
                 return;
             }
 
-            let neighbour = square.go_direction(direction).unwrap();
+            let neighbour = square.go_direction::<S>(direction).unwrap();
             let max_pieces_to_take = if square == origin_square {
-                pieces_carried.min(N as u8)
+                pieces_carried.min(S as u8)
             } else {
-                (pieces_carried - 1).min(N as u8)
+                (pieces_carried - 1).min(S as u8)
             };
             for pieces_to_take in 1..=max_pieces_to_take {
                 let mut new_movement = partial_movement.clone();

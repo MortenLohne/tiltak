@@ -145,7 +145,7 @@ fn mcts_selfplay(max_time: time::Duration) {
         moves.push(best_move.clone());
         println!(
             "{:6}: {:.3}, {:.1}s",
-            best_move,
+            best_move.to_string::<5>(),
             score,
             start_time.elapsed().as_secs_f32()
         );
@@ -190,7 +190,7 @@ fn mcts_vs_minmax(minmax_depth: u16, mcts_nodes: u64) {
                 let (best_move, score) = search::mcts::<5>(board.clone(), mcts_nodes);
                 board.do_move(best_move.clone());
                 moves.push(best_move.clone());
-                println!("{:6}: {:.3}", best_move, score);
+                println!("{:6}: {:.3}", best_move.to_string::<5>(), score);
                 io::stdout().flush().unwrap();
             }
 
@@ -198,7 +198,7 @@ fn mcts_vs_minmax(minmax_depth: u16, mcts_nodes: u64) {
                 let (best_move, score) = minmax::minmax(&mut board, minmax_depth);
                 board.do_move(best_move.clone().unwrap());
                 moves.push(best_move.clone().unwrap());
-                print!("{:6}: {:.2}, ", best_move.unwrap(), score);
+                print!("{:6}: {:.2}, ", best_move.unwrap().to_string::<5>(), score);
                 io::stdout().flush().unwrap();
             }
         }
@@ -248,7 +248,7 @@ fn test_position<const S: usize>() {
 
     println!("Top 10 heuristic moves:");
     for (mv, score) in moves.iter().take(10) {
-        println!("{}: {:.3}", mv, score);
+        println!("{}: {:.3}", mv.to_string::<S>(), score);
         let mut coefficients = vec![0.0; <Board<5>>::POLICY_PARAMS.len()];
         board.coefficients_for_move(&mut coefficients, mv, &board.group_data(), moves.len());
         for coefficient in coefficients {
@@ -289,7 +289,7 @@ fn analyze_game<const S: usize>(game: Game<Board<S>>) {
                 ply_number / 2,
                 board.move_to_san(&mv),
                 (1.0 - score) * 100.0,
-                best_move
+                best_move.to_string::<S>()
             );
         } else {
             println!(
@@ -297,7 +297,7 @@ fn analyze_game<const S: usize>(game: Game<Board<S>>) {
                 ply_number / 2,
                 board.move_to_san(&mv),
                 (1.0 - score) * 100.0,
-                best_move
+                best_move.to_string::<S>()
             );
         }
         ply_number += 1;

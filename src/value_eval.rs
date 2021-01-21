@@ -150,7 +150,7 @@ pub(crate) fn static_eval_game_phase<const S: usize>(
             }
 
             // Malus for them having stones next to our stack with flat stones on top
-            for neighbour in square.neighbours() {
+            for neighbour in square.neighbours::<S>() {
                 if let Some(neighbour_top_stone) = board[neighbour].top_stone() {
                     if top_stone.role() == Flat && neighbour_top_stone.color() != controlling_player
                     {
@@ -183,25 +183,25 @@ pub(crate) fn static_eval_game_phase<const S: usize>(
     let mut num_ranks_occupied_black = 0;
     let mut num_files_occupied_black = 0;
 
-    for line in BitBoard::all_lines().iter() {
+    for line in BitBoard::all_lines::<S>().iter() {
         line_score::<WhiteTr, BlackTr, S>(&group_data, *line, coefficients, LINE_CONTROL);
         line_score::<BlackTr, WhiteTr, S>(&group_data, *line, coefficients, LINE_CONTROL);
     }
 
     for i in 0..BOARD_SIZE as u8 {
-        if !WhiteTr::road_stones(&group_data).rank(i).is_empty() {
+        if !WhiteTr::road_stones(&group_data).rank::<S>(i).is_empty() {
             num_ranks_occupied_white += 1;
         }
-        if !BlackTr::road_stones(&group_data).rank(i).is_empty() {
+        if !BlackTr::road_stones(&group_data).rank::<S>(i).is_empty() {
             num_ranks_occupied_black += 1;
         }
     }
 
     for i in 0..BOARD_SIZE as u8 {
-        if !WhiteTr::road_stones(&group_data).file(i).is_empty() {
+        if !WhiteTr::road_stones(&group_data).file::<S>(i).is_empty() {
             num_files_occupied_white += 1;
         }
-        if !BlackTr::road_stones(&group_data).file(i).is_empty() {
+        if !BlackTr::road_stones(&group_data).file::<S>(i).is_empty() {
             num_files_occupied_black += 1;
         }
     }
@@ -217,8 +217,8 @@ pub(crate) fn static_eval_game_phase<const S: usize>(
 }
 
 /// Give bonus for our critical squares
-fn critical_squares_eval<Us: ColorTr, Them: ColorTr, const N: usize>(
-    board: &Board<N>,
+fn critical_squares_eval<Us: ColorTr, Them: ColorTr, const S: usize>(
+    board: &Board<S>,
     critical_square: Square,
     coefficients: &mut [f32],
     critical_squares: usize,
@@ -237,7 +237,7 @@ fn critical_squares_eval<Us: ColorTr, Them: ColorTr, const N: usize>(
     }
 
     // Bonus for having our cap next to our critical square
-    for neighbour in critical_square.neighbours() {
+    for neighbour in critical_square.neighbours::<S>() {
         if board[neighbour].top_stone() == Some(Us::cap_piece()) {
             coefficients[critical_squares + 4] += Us::color().multiplier() as f32;
             // Further bonus for a capped stack next to our critical square

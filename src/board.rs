@@ -34,6 +34,7 @@ use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use std::fmt::Write;
 use std::hash::{Hash, Hasher};
+use std::marker::PhantomData;
 use std::mem;
 use std::ops::{Index, IndexMut};
 use std::str::FromStr;
@@ -565,7 +566,7 @@ pub enum Move {
 }
 
 impl Move {
-    fn to_string<const S: usize>(&self) -> String {
+    pub fn to_string<const S: usize>(&self) -> String {
         let mut string = String::new();
         match self {
             Move::Place(role, square) => match role {
@@ -1476,7 +1477,7 @@ impl<const S: usize> board::Board for Board<S> {
                 let mut pieces_left_behind: ArrayVec<[u8; BOARD_SIZE - 1]> = ArrayVec::new();
                 let mut flattens_stone = false;
 
-                for sq in MoveIterator::new(square, direction, stack_movement.clone()) {
+                for sq in <MoveIterator<S>>::new(square, direction, stack_movement.clone()) {
                     self.hash ^= self.zobrist_hash_for_square(sq);
                 }
 
@@ -1500,7 +1501,7 @@ impl<const S: usize> board::Board for Board<S> {
                     from = to;
                 }
 
-                for sq in MoveIterator::new(square, direction, stack_movement) {
+                for sq in <MoveIterator<S>>::new(square, direction, stack_movement) {
                     self.hash ^= self.zobrist_hash_for_square(sq);
                 }
 
@@ -1560,7 +1561,7 @@ impl<const S: usize> board::Board for Board<S> {
             ReverseMove::Move(from, direction, stack_movement, flattens_wall) => {
                 let mut square = from;
 
-                for square in MoveIterator::new(from, direction, stack_movement.clone()) {
+                for square in <MoveIterator<S>>::new(from, direction, stack_movement.clone()) {
                     self.hash ^= self.zobrist_hash_for_square(square);
                 }
 
@@ -1584,7 +1585,7 @@ impl<const S: usize> board::Board for Board<S> {
                     };
                 };
 
-                for square in MoveIterator::new(from, direction, stack_movement) {
+                for square in <MoveIterator<S>>::new(from, direction, stack_movement) {
                     self.hash ^= self.zobrist_hash_for_square(square);
                 }
             }
@@ -1604,23 +1605,25 @@ impl<const S: usize> board::Board for Board<S> {
     }
 }
 
-pub(crate) struct MoveIterator {
+pub(crate) struct MoveIterator<const S: usize> {
     square: Square,
     direction: Direction,
     squares_left: usize,
+    _size: [(); S],
 }
 
-impl MoveIterator {
+impl<const S: usize> MoveIterator<S> {
     pub fn new(square: Square, direction: Direction, stack_movement: StackMovement) -> Self {
         MoveIterator {
             square,
             direction,
             squares_left: stack_movement.movements.len() + 1,
+            _size: [(); S],
         }
     }
 }
 
-impl Iterator for MoveIterator {
+impl<const S: usize> Iterator for MoveIterator<S> {
     type Item = Square;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -1630,7 +1633,7 @@ impl Iterator for MoveIterator {
             let next_square = self.square;
             self.square = self
                 .square
-                .go_direction(self.direction)
+                .go_direction::<S>(self.direction)
                 .unwrap_or(Square(0));
             self.squares_left -= 1;
             Some(next_square)
@@ -1925,7 +1928,7 @@ impl<const S: usize> pgn_traits::pgn::PgnBoard for Board<S> {
             })?;
         let mut board = Board::default();
         for square in squares_iterator() {
-            let (file, rank) = (square.file(), square.rank());
+            let (file, rank) = (square.file::<S>(), square.rank::<S>());
             let stack = rows[rank as usize][file as usize];
             for piece in stack.into_iter() {
                 match piece {
@@ -2059,17 +2062,15 @@ impl<const S: usize> pgn_traits::pgn::PgnBoard for Board<S> {
     }
 
     fn move_from_san(&self, input: &str) -> Result<Self::Move, pgn::Error> {
-        Self::Move::from_str(input)
+        Self::Move::from_string::<S>(input)
     }
 
     fn move_to_san(&self, mv: &Self::Move) -> String {
-        let mut string = String::new();
-        write!(string, "{}", mv).unwrap();
-        string
+        mv.to_string::<S>()
     }
 
     fn move_from_lan(&self, input: &str) -> Result<Self::Move, pgn::Error> {
-        Self::Move::from_str(input)
+        Self::Move::from_string::<S>(input)
     }
 
     fn move_to_lan(&self, mv: &Self::Move) -> String {
@@ -2126,7 +2127,7 @@ fn connect_component<const S: usize>(
     id: u8,
 ) {
     components[square] = id;
-    for neighbour in square.neighbours() {
+    for neighbour in square.neighbours::<S>() {
         if road_pieces.get(neighbour.0) && components[neighbour] == 0 {
             connect_component(road_pieces, components, neighbour, id);
         }
