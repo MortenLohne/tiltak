@@ -1,7 +1,7 @@
 use crate::bitboard::BitBoard;
 use crate::board::Role::{Cap, Flat, Wall};
 use crate::board::{
-    Board, ColorTr, Direction::*, GroupData, Move, Square, TunableBoard, BOARD_SIZE,
+    Board, ColorTr, Direction::*, GroupData, Move, Square, TunableBoard,
     NUM_SQUARE_SYMMETRIES, SQUARE_SYMMETRIES,
 };
 use crate::search;
@@ -15,33 +15,6 @@ pub fn inverse_sigmoid(x: f32) -> f32 {
     assert!(x > 0.0 && x < 1.0, "Tried to inverse sigmoid {}", x);
     f32::ln(x / (1.0 - x))
 }
-
-const MOVE_COUNT: usize = 0;
-const FLAT_PSQT: usize = MOVE_COUNT + 1;
-const WALL_PSQT: usize = FLAT_PSQT + NUM_SQUARE_SYMMETRIES;
-const CAP_PSQT: usize = WALL_PSQT + NUM_SQUARE_SYMMETRIES;
-const OUR_ROAD_STONES_IN_LINE: usize = CAP_PSQT + NUM_SQUARE_SYMMETRIES;
-const THEIR_ROAD_STONES_IN_LINE: usize = OUR_ROAD_STONES_IN_LINE + BOARD_SIZE * 3;
-const EXTEND_GROUP: usize = THEIR_ROAD_STONES_IN_LINE + BOARD_SIZE * 3;
-const MERGE_TWO_GROUPS: usize = EXTEND_GROUP + 3;
-const BLOCK_MERGER: usize = MERGE_TWO_GROUPS + 3;
-const PLACE_CRITICAL_SQUARE: usize = BLOCK_MERGER + 3;
-const IGNORE_CRITICAL_SQUARE: usize = PLACE_CRITICAL_SQUARE + 5;
-const NEXT_TO_OUR_LAST_STONE: usize = IGNORE_CRITICAL_SQUARE + 2;
-const NEXT_TO_THEIR_LAST_STONE: usize = NEXT_TO_OUR_LAST_STONE + 1;
-const DIAGONAL_TO_OUR_LAST_STONE: usize = NEXT_TO_THEIR_LAST_STONE + 1;
-const DIAGONAL_TO_THEIR_LAST_STONE: usize = DIAGONAL_TO_OUR_LAST_STONE + 1;
-const ATTACK_STRONG_FLATS: usize = DIAGONAL_TO_THEIR_LAST_STONE + 1;
-const BLOCKING_STONE_BLOCKS_EXTENSIONS_OF_TWO_FLATS: usize = ATTACK_STRONG_FLATS + 1;
-
-const MOVE_ROLE_BONUS: usize = BLOCKING_STONE_BLOCKS_EXTENSIONS_OF_TWO_FLATS + 1;
-const STACK_MOVEMENT_THAT_GIVES_US_TOP_PIECES: usize = MOVE_ROLE_BONUS + 3;
-const STACK_CAPTURED_BY_MOVEMENT: usize = STACK_MOVEMENT_THAT_GIVES_US_TOP_PIECES + 6;
-const STACK_CAPTURE_IN_STRONG_LINE: usize = STACK_CAPTURED_BY_MOVEMENT + 1;
-const STACK_CAPTURE_IN_STRONG_LINE_CAP: usize = STACK_CAPTURE_IN_STRONG_LINE + 2;
-const MOVE_CAP_ONTO_STRONG_LINE: usize = STACK_CAPTURE_IN_STRONG_LINE_CAP + 2;
-const MOVE_ONTO_CRITICAL_SQUARE: usize = MOVE_CAP_ONTO_STRONG_LINE + 4;
-const _NEXT_CONST: usize = MOVE_ONTO_CRITICAL_SQUARE + 2;
 
 impl<const S: usize> Board<S> {
     pub(crate) fn generate_moves_with_probabilities_colortr<Us: ColorTr, Them: ColorTr>(
@@ -87,11 +60,38 @@ pub(crate) fn coefficients_for_move_colortr<Us: ColorTr, Them: ColorTr, const S:
     group_data: &GroupData<S>,
     num_legal_moves: usize,
 ) {
-    assert_eq!(coefficients.len(), _NEXT_CONST);
+    let move_count: usize = 0;
+    let flat_psqt: usize = move_count + 1;
+    let wall_psqt: usize = flat_psqt + NUM_SQUARE_SYMMETRIES;
+    let cap_psqt: usize = wall_psqt + NUM_SQUARE_SYMMETRIES;
+    let our_road_stones_in_line: usize = cap_psqt + NUM_SQUARE_SYMMETRIES;
+    let their_road_stones_in_line: usize = our_road_stones_in_line + S * 3;
+    let extend_group: usize = their_road_stones_in_line + S * 3;
+    let merge_two_groups: usize = extend_group + 3;
+    let block_merger: usize = merge_two_groups + 3;
+    let place_critical_square: usize = block_merger + 3;
+    let ignore_critical_square: usize = place_critical_square + 5;
+    let next_to_our_last_stone: usize = ignore_critical_square + 2;
+    let next_to_their_last_stone: usize = next_to_our_last_stone + 1;
+    let diagonal_to_our_last_stone: usize = next_to_their_last_stone + 1;
+    let diagonal_to_their_last_stone: usize = diagonal_to_our_last_stone + 1;
+    let attack_strong_flats: usize = diagonal_to_their_last_stone + 1;
+    let blocking_stone_blocks_extensions_of_two_flats: usize = attack_strong_flats + 1;
+
+    let move_role_bonus: usize = blocking_stone_blocks_extensions_of_two_flats + 1;
+    let stack_movement_that_gives_us_top_pieces: usize = move_role_bonus + 3;
+    let stack_captured_by_movement: usize = stack_movement_that_gives_us_top_pieces + 6;
+    let stack_capture_in_strong_line: usize = stack_captured_by_movement + 1;
+    let stack_capture_in_strong_line_cap: usize = stack_capture_in_strong_line + 2;
+    let move_cap_onto_strong_line: usize = stack_capture_in_strong_line_cap + 2;
+    let move_onto_critical_square: usize = move_cap_onto_strong_line + 4;
+    let _next_const: usize = move_onto_critical_square + 2;
+
+    assert_eq!(coefficients.len(), _next_const);
 
     let initial_move_prob = 1.0 / num_legal_moves.max(2) as f32;
 
-    coefficients[MOVE_COUNT] = inverse_sigmoid(initial_move_prob);
+    coefficients[move_count] = inverse_sigmoid(initial_move_prob);
 
     // If it's the first move, give every move equal probability
     if board.half_moves_played() < 2 {
@@ -105,9 +105,9 @@ pub(crate) fn coefficients_for_move_colortr<Us: ColorTr, Them: ColorTr, const S:
 
             // Apply PSQT
             match role {
-                Flat => coefficients[FLAT_PSQT + SQUARE_SYMMETRIES[square.0 as usize]] = 1.0,
-                Wall => coefficients[WALL_PSQT + SQUARE_SYMMETRIES[square.0 as usize]] = 1.0,
-                Cap => coefficients[CAP_PSQT + SQUARE_SYMMETRIES[square.0 as usize]] = 1.0,
+                Flat => coefficients[flat_psqt + SQUARE_SYMMETRIES[square.0 as usize]] = 1.0,
+                Wall => coefficients[wall_psqt + SQUARE_SYMMETRIES[square.0 as usize]] = 1.0,
+                Cap => coefficients[cap_psqt + SQUARE_SYMMETRIES[square.0 as usize]] = 1.0,
             }
 
             let role_id = match *role {
@@ -120,10 +120,10 @@ pub(crate) fn coefficients_for_move_colortr<Us: ColorTr, Them: ColorTr, const S:
                 let our_line_score = (Us::road_stones(&group_data) & line).count();
                 let their_line_score = (Them::road_stones(&group_data) & line).count();
                 coefficients
-                    [OUR_ROAD_STONES_IN_LINE + BOARD_SIZE * role_id + our_line_score as usize] +=
+                    [our_road_stones_in_line + S * role_id + our_line_score as usize] +=
                     1.0;
-                coefficients[THEIR_ROAD_STONES_IN_LINE
-                    + BOARD_SIZE * role_id
+                coefficients[their_road_stones_in_line
+                    + S * role_id
                     + their_line_score as usize] += 1.0;
             }
 
@@ -148,26 +148,26 @@ pub(crate) fn coefficients_for_move_colortr<Us: ColorTr, Them: ColorTr, const S:
             }
 
             if our_unique_neighbour_groups.len() > 1 {
-                coefficients[MERGE_TWO_GROUPS + role_id] += 1.0;
+                coefficients[merge_two_groups + role_id] += 1.0;
             }
 
             if their_unique_neighbour_groups.len() > 1 {
-                coefficients[BLOCK_MERGER + role_id] += 1.0;
+                coefficients[block_merger + role_id] += 1.0;
             }
 
             for (_, group_id) in our_unique_neighbour_groups {
-                coefficients[EXTEND_GROUP + role_id] +=
+                coefficients[extend_group + role_id] +=
                     group_data.amount_in_group[group_id as usize].0 as f32;
             }
 
             if *role == Flat || *role == Cap {
                 if Us::is_critical_square(&*group_data, *square) {
-                    coefficients[PLACE_CRITICAL_SQUARE] += 1.0;
+                    coefficients[place_critical_square] += 1.0;
                 } else if !their_open_critical_squares.is_empty() {
                     if their_open_critical_squares == BitBoard::empty().set(square.0) {
-                        coefficients[PLACE_CRITICAL_SQUARE + 1] += 1.0;
+                        coefficients[place_critical_square + 1] += 1.0;
                     } else {
-                        coefficients[IGNORE_CRITICAL_SQUARE] += 1.0;
+                        coefficients[ignore_critical_square] += 1.0;
                     }
                 }
 
@@ -177,12 +177,12 @@ pub(crate) fn coefficients_for_move_colortr<Us: ColorTr, Them: ColorTr, const S:
                 {
                     if *last_role == Flat || *last_role == Cap {
                         if square.neighbours::<S>().any(|neigh| neigh == *last_square) {
-                            coefficients[NEXT_TO_OUR_LAST_STONE] = 1.0;
+                            coefficients[next_to_our_last_stone] = 1.0;
                         } else if (square.rank::<S>() as i8 - last_square.rank::<S>() as i8).abs()
                             == 1
                             && (square.file::<S>() as i8 - last_square.file::<S>() as i8).abs() == 1
                         {
-                            coefficients[DIAGONAL_TO_OUR_LAST_STONE] = 1.0;
+                            coefficients[diagonal_to_our_last_stone] = 1.0;
                         }
                     }
                 }
@@ -191,12 +191,12 @@ pub(crate) fn coefficients_for_move_colortr<Us: ColorTr, Them: ColorTr, const S:
                 if let Some(Move::Place(last_role, last_square)) = board.moves().last() {
                     if *last_role == Flat {
                         if square.neighbours::<S>().any(|neigh| neigh == *last_square) {
-                            coefficients[NEXT_TO_THEIR_LAST_STONE] = 1.0;
+                            coefficients[next_to_their_last_stone] = 1.0;
                         } else if (square.rank::<S>() as i8 - last_square.rank::<S>() as i8).abs()
                             == 1
                             && (square.file::<S>() as i8 - last_square.file::<S>() as i8).abs() == 1
                         {
-                            coefficients[DIAGONAL_TO_THEIR_LAST_STONE] = 1.0;
+                            coefficients[diagonal_to_their_last_stone] = 1.0;
                         }
                     }
                 }
@@ -211,30 +211,30 @@ pub(crate) fn coefficients_for_move_colortr<Us: ColorTr, Them: ColorTr, const S:
                                 .file::<S>(neighbour.file::<S>())
                                 .count();
                         if our_road_stones >= 2 {
-                            coefficients[ATTACK_STRONG_FLATS] += (our_road_stones - 1) as f32;
+                            coefficients[attack_strong_flats] += (our_road_stones - 1) as f32;
                         }
                     }
                 }
             }
 
             if *role == Wall {
-                coefficients[WALL_PSQT + SQUARE_SYMMETRIES[square.0 as usize]] = 1.0;
+                coefficients[wall_psqt + SQUARE_SYMMETRIES[square.0 as usize]] = 1.0;
 
                 if !their_open_critical_squares.is_empty() {
                     if their_open_critical_squares == BitBoard::empty().set(square.0) {
-                        coefficients[PLACE_CRITICAL_SQUARE + 2] += 1.0;
+                        coefficients[place_critical_square + 2] += 1.0;
                     } else {
-                        coefficients[IGNORE_CRITICAL_SQUARE] += 1.0;
+                        coefficients[ignore_critical_square] += 1.0;
                     }
                 }
             } else if *role == Cap {
                 if Us::is_critical_square(&*group_data, *square) {
-                    coefficients[PLACE_CRITICAL_SQUARE] += 1.0;
+                    coefficients[place_critical_square] += 1.0;
                 } else if !their_open_critical_squares.is_empty() {
                     if their_open_critical_squares == BitBoard::empty().set(square.0) {
-                        coefficients[PLACE_CRITICAL_SQUARE + 3] += 1.0;
+                        coefficients[place_critical_square + 3] += 1.0;
                     } else {
-                        coefficients[IGNORE_CRITICAL_SQUARE] += 1.0;
+                        coefficients[ignore_critical_square] += 1.0;
                     }
                 }
             }
@@ -252,7 +252,7 @@ pub(crate) fn coefficients_for_move_colortr<Us: ColorTr, Them: ColorTr, const S:
                             .map(Them::is_road_stone)
                             .unwrap_or_default()
                     {
-                        coefficients[BLOCKING_STONE_BLOCKS_EXTENSIONS_OF_TWO_FLATS] += 1.0;
+                        coefficients[blocking_stone_blocks_extensions_of_two_flats] += 1.0;
                     }
                 }
             }
@@ -265,7 +265,7 @@ pub(crate) fn coefficients_for_move_colortr<Us: ColorTr, Them: ColorTr, const S:
                 Cap => 2,
             };
 
-            coefficients[MOVE_ROLE_BONUS + role_id] += 1.0;
+            coefficients[move_role_bonus + role_id] += 1.0;
 
             let mut destination_square =
                 if stack_movement.movements[0].pieces_to_take == board[*square].len() {
@@ -306,12 +306,12 @@ pub(crate) fn coefficients_for_move_colortr<Us: ColorTr, Them: ColorTr, const S:
                         };
                     let road_piece_count = destination_line.count() as usize;
                     if road_piece_count > 2 {
-                        coefficients[MOVE_CAP_ONTO_STRONG_LINE + road_piece_count - 3] += 1.0;
+                        coefficients[move_cap_onto_strong_line + road_piece_count - 3] += 1.0;
                         if destination_square
                             .neighbours::<S>()
                             .any(|n| Us::is_critical_square(group_data, n))
                         {
-                            coefficients[MOVE_CAP_ONTO_STRONG_LINE + road_piece_count - 1] += 1.0;
+                            coefficients[move_cap_onto_strong_line + road_piece_count - 1] += 1.0;
                         }
                     }
                 }
@@ -322,14 +322,14 @@ pub(crate) fn coefficients_for_move_colortr<Us: ColorTr, Them: ColorTr, const S:
                     // whether it's captured by us or them
                     if piece.color() != destination_top_stone.color() {
                         if Us::piece_is_ours(piece) {
-                            coefficients[STACK_CAPTURED_BY_MOVEMENT] +=
+                            coefficients[stack_captured_by_movement] +=
                                 destination_stack.len() as f32;
                             their_pieces_captured += 1;
                             if Us::is_critical_square(&*group_data, destination_square) {
                                 gets_critical_square = true;
                             }
                         } else {
-                            coefficients[STACK_CAPTURED_BY_MOVEMENT] -=
+                            coefficients[stack_captured_by_movement] -=
                                 destination_stack.len() as f32;
                         }
                     }
@@ -339,10 +339,10 @@ pub(crate) fn coefficients_for_move_colortr<Us: ColorTr, Them: ColorTr, const S:
                         if our_road_stones > 2 {
                             if piece.role() == Cap {
                                 coefficients
-                                    [STACK_CAPTURE_IN_STRONG_LINE_CAP + our_road_stones - 3] +=
+                                    [stack_capture_in_strong_line_cap + our_road_stones - 3] +=
                                     color_factor * destination_stack.len() as f32;
                             } else {
-                                coefficients[STACK_CAPTURE_IN_STRONG_LINE + our_road_stones - 3] +=
+                                coefficients[stack_capture_in_strong_line + our_road_stones - 3] +=
                                     color_factor * destination_stack.len() as f32;
                             }
                         }
@@ -355,14 +355,14 @@ pub(crate) fn coefficients_for_move_colortr<Us: ColorTr, Them: ColorTr, const S:
             }
 
             if their_pieces == 0 {
-                coefficients[STACK_MOVEMENT_THAT_GIVES_US_TOP_PIECES] = 1.0;
-                coefficients[STACK_MOVEMENT_THAT_GIVES_US_TOP_PIECES + 1] = our_pieces as f32;
+                coefficients[stack_movement_that_gives_us_top_pieces] = 1.0;
+                coefficients[stack_movement_that_gives_us_top_pieces + 1] = our_pieces as f32;
             } else if their_pieces == 1 {
-                coefficients[STACK_MOVEMENT_THAT_GIVES_US_TOP_PIECES + 2] = 1.0;
-                coefficients[STACK_MOVEMENT_THAT_GIVES_US_TOP_PIECES + 3] = our_pieces as f32;
+                coefficients[stack_movement_that_gives_us_top_pieces + 2] = 1.0;
+                coefficients[stack_movement_that_gives_us_top_pieces + 3] = our_pieces as f32;
             } else {
-                coefficients[STACK_MOVEMENT_THAT_GIVES_US_TOP_PIECES + 4] = 1.0;
-                coefficients[STACK_MOVEMENT_THAT_GIVES_US_TOP_PIECES + 5] = our_pieces as f32;
+                coefficients[stack_movement_that_gives_us_top_pieces + 4] = 1.0;
+                coefficients[stack_movement_that_gives_us_top_pieces + 5] = our_pieces as f32;
             }
 
             let their_open_critical_squares =
@@ -371,10 +371,10 @@ pub(crate) fn coefficients_for_move_colortr<Us: ColorTr, Them: ColorTr, const S:
             if !their_open_critical_squares.is_empty() {
                 if their_pieces_captured == 0 {
                     // Move ignores their critical threat, but might win for us
-                    coefficients[IGNORE_CRITICAL_SQUARE + 1] += 1.0;
+                    coefficients[ignore_critical_square + 1] += 1.0;
                 } else {
                     // Move captures at least one stack, which might save us
-                    coefficients[PLACE_CRITICAL_SQUARE + 4] += their_pieces_captured as f32;
+                    coefficients[place_critical_square + 4] += their_pieces_captured as f32;
                 }
             }
 
@@ -382,9 +382,9 @@ pub(crate) fn coefficients_for_move_colortr<Us: ColorTr, Them: ColorTr, const S:
                 if their_pieces == 0
                     && stack_movement.movements[0].pieces_to_take == board[*square].len()
                 {
-                    coefficients[MOVE_ONTO_CRITICAL_SQUARE] += 1.0;
+                    coefficients[move_onto_critical_square] += 1.0;
                 } else {
-                    coefficients[MOVE_ONTO_CRITICAL_SQUARE + 1] += 1.0;
+                    coefficients[move_onto_critical_square + 1] += 1.0;
                 }
             }
         }
