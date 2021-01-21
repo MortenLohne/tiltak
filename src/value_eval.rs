@@ -1,7 +1,7 @@
 use crate::bitboard::BitBoard;
 use crate::board::{
     squares_iterator, BlackTr, Board, ColorTr, GroupData, Piece::*, Role::*, Square, WhiteTr,
-    BOARD_AREA, BOARD_SIZE, NUM_SQUARE_SYMMETRIES, SQUARE_SYMMETRIES,
+    NUM_SQUARE_SYMMETRIES, SQUARE_SYMMETRIES,
 };
 use board_game_traits::board::{Board as EvalBoard, Color};
 
@@ -10,11 +10,11 @@ pub(crate) fn static_eval_game_phase<const S: usize>(
     group_data: &GroupData<S>,
     coefficients: &mut [f32],
 ) {
-    const FLAT_PSQT: usize = 0;
-    const WALL_PSQT: usize = FLAT_PSQT + NUM_SQUARE_SYMMETRIES;
-    const CAP_PSQT: usize = WALL_PSQT + NUM_SQUARE_SYMMETRIES;
-    const OUR_STACK_PSQT: usize = CAP_PSQT + NUM_SQUARE_SYMMETRIES;
-    const THEIR_STACK_PSQT: usize = OUR_STACK_PSQT + NUM_SQUARE_SYMMETRIES;
+    let flat_psqt: usize = 0;
+    let wall_psqt: usize = flat_psqt + NUM_SQUARE_SYMMETRIES;
+    let cap_psqt: usize = wall_psqt + NUM_SQUARE_SYMMETRIES;
+    let our_stack_psqt: usize = cap_psqt + NUM_SQUARE_SYMMETRIES;
+    let their_stack_psqt: usize = our_stack_psqt + NUM_SQUARE_SYMMETRIES;
 
     let mut white_flat_count = 0;
     let mut black_flat_count = 0;
@@ -25,41 +25,41 @@ pub(crate) fn static_eval_game_phase<const S: usize>(
             let i = square.0 as usize;
             match piece {
                 WhiteFlat => {
-                    coefficients[FLAT_PSQT + SQUARE_SYMMETRIES[i]] += 1.0;
+                    coefficients[flat_psqt + SQUARE_SYMMETRIES[i]] += 1.0;
                     white_flat_count += 1;
                 }
                 BlackFlat => {
-                    coefficients[FLAT_PSQT + SQUARE_SYMMETRIES[i]] -= 1.0;
+                    coefficients[flat_psqt + SQUARE_SYMMETRIES[i]] -= 1.0;
                     black_flat_count += 1;
                 }
-                WhiteWall => coefficients[WALL_PSQT + SQUARE_SYMMETRIES[i]] += 1.0,
-                BlackWall => coefficients[WALL_PSQT + SQUARE_SYMMETRIES[i]] -= 1.0,
-                WhiteCap => coefficients[CAP_PSQT + SQUARE_SYMMETRIES[i]] += 1.0,
-                BlackCap => coefficients[CAP_PSQT + SQUARE_SYMMETRIES[i]] -= 1.0,
+                WhiteWall => coefficients[wall_psqt + SQUARE_SYMMETRIES[i]] += 1.0,
+                BlackWall => coefficients[wall_psqt + SQUARE_SYMMETRIES[i]] -= 1.0,
+                WhiteCap => coefficients[cap_psqt + SQUARE_SYMMETRIES[i]] += 1.0,
+                BlackCap => coefficients[cap_psqt + SQUARE_SYMMETRIES[i]] -= 1.0,
             }
             if stack.height > 1 {
                 let controlling_player = piece.color();
                 let color_factor = piece.color().multiplier() as f32;
                 for piece in stack.clone().into_iter().take(stack.height as usize - 1) {
                     if piece.color() == controlling_player {
-                        coefficients[OUR_STACK_PSQT + SQUARE_SYMMETRIES[i]] += color_factor;
+                        coefficients[our_stack_psqt + SQUARE_SYMMETRIES[i]] += color_factor;
                     } else {
-                        coefficients[THEIR_STACK_PSQT + SQUARE_SYMMETRIES[i]] -= color_factor;
+                        coefficients[their_stack_psqt + SQUARE_SYMMETRIES[i]] -= color_factor;
                     }
                 }
             }
         }
     }
 
-    const SIDE_TO_MOVE: usize = THEIR_STACK_PSQT + NUM_SQUARE_SYMMETRIES;
-    const FLATSTONE_LEAD: usize = SIDE_TO_MOVE + 3;
-    const NUMBER_OF_GROUPS: usize = FLATSTONE_LEAD + 3;
+    let side_to_move: usize = their_stack_psqt + NUM_SQUARE_SYMMETRIES;
+    let flatstone_lead: usize = side_to_move + 3;
+    let i_number_of_groups: usize = flatstone_lead + 3;
 
     // Give the side to move a bonus/malus depending on flatstone lead
     let white_flatstone_lead = white_flat_count - black_flat_count;
 
     // Bonus/malus depending on the number of groups each side has
-    let mut seen_groups = [false; BOARD_AREA + 1];
+    let mut seen_groups = vec![false; S * S + 1]; // TODO: Can be an array with full const-generics
     seen_groups[0] = true;
 
     let number_of_groups = squares_iterator()
@@ -87,28 +87,28 @@ pub(crate) fn static_eval_game_phase<const S: usize>(
     debug_assert!(middlegame_scale_factor <= 1.0);
     debug_assert!(opening_scale_factor == 0.0 || endgame_scale_factor == 0.0);
 
-    coefficients[SIDE_TO_MOVE] = board.side_to_move().multiplier() as f32 * opening_scale_factor;
-    coefficients[FLATSTONE_LEAD] = white_flatstone_lead as f32 * opening_scale_factor;
-    coefficients[NUMBER_OF_GROUPS] = number_of_groups * opening_scale_factor;
+    coefficients[side_to_move] = board.side_to_move().multiplier() as f32 * opening_scale_factor;
+    coefficients[flatstone_lead] = white_flatstone_lead as f32 * opening_scale_factor;
+    coefficients[i_number_of_groups] = number_of_groups * opening_scale_factor;
 
-    coefficients[SIDE_TO_MOVE + 1] =
+    coefficients[side_to_move + 1] =
         board.side_to_move().multiplier() as f32 * middlegame_scale_factor;
-    coefficients[FLATSTONE_LEAD + 1] = white_flatstone_lead as f32 * middlegame_scale_factor;
-    coefficients[NUMBER_OF_GROUPS + 1] = number_of_groups * middlegame_scale_factor;
+    coefficients[flatstone_lead + 1] = white_flatstone_lead as f32 * middlegame_scale_factor;
+    coefficients[i_number_of_groups + 1] = number_of_groups * middlegame_scale_factor;
 
-    coefficients[SIDE_TO_MOVE + 2] =
+    coefficients[side_to_move + 2] =
         board.side_to_move().multiplier() as f32 * endgame_scale_factor;
-    coefficients[FLATSTONE_LEAD + 2] = white_flatstone_lead as f32 * endgame_scale_factor;
-    coefficients[NUMBER_OF_GROUPS + 2] = number_of_groups * endgame_scale_factor;
+    coefficients[flatstone_lead + 2] = white_flatstone_lead as f32 * endgame_scale_factor;
+    coefficients[i_number_of_groups + 2] = number_of_groups * endgame_scale_factor;
 
-    const CRITICAL_SQUARES: usize = NUMBER_OF_GROUPS + 3;
+    let critical_squares: usize = i_number_of_groups + 3;
 
     for critical_square in group_data.critical_squares(Color::White) {
         critical_squares_eval::<WhiteTr, BlackTr, S>(
             board,
             critical_square,
             coefficients,
-            CRITICAL_SQUARES,
+            critical_squares,
         );
     }
 
@@ -117,16 +117,16 @@ pub(crate) fn static_eval_game_phase<const S: usize>(
             board,
             critical_square,
             coefficients,
-            CRITICAL_SQUARES,
+            critical_squares,
         );
     }
 
-    const CAPSTONE_OVER_OWN_PIECE: usize = CRITICAL_SQUARES + 6;
-    const CAPSTONE_ON_STACK: usize = CAPSTONE_OVER_OWN_PIECE + 1;
-    const STANDING_STONE_ON_STACK: usize = CAPSTONE_ON_STACK + 1;
-    const FLAT_STONE_NEXT_TO_OUR_STACK: usize = STANDING_STONE_ON_STACK + 1;
-    const STANDING_STONE_NEXT_TO_OUR_STACK: usize = FLAT_STONE_NEXT_TO_OUR_STACK + 1;
-    const CAPSTONE_NEXT_TO_OUR_STACK: usize = STANDING_STONE_NEXT_TO_OUR_STACK + 1;
+    let capstone_over_own_piece: usize = critical_squares + 6;
+    let capstone_on_stack: usize = capstone_over_own_piece + 1;
+    let standing_stone_on_stack: usize = capstone_on_stack + 1;
+    let flat_stone_next_to_our_stack: usize = standing_stone_on_stack + 1;
+    let standing_stone_next_to_our_stack: usize = flat_stone_next_to_our_stack + 1;
+    let capstone_next_to_our_stack: usize = standing_stone_next_to_our_stack + 1;
 
     squares_iterator()
         .map(|sq| (sq, &board[sq]))
@@ -140,13 +140,13 @@ pub(crate) fn static_eval_game_phase<const S: usize>(
             if top_stone.role() == Cap
                 && stack.get(stack.len() - 2).unwrap().color() == controlling_player
             {
-                coefficients[CAPSTONE_OVER_OWN_PIECE] += color_factor;
+                coefficients[capstone_over_own_piece] += color_factor;
             }
 
             match top_stone.role() {
-                Cap => coefficients[CAPSTONE_ON_STACK] += color_factor,
+                Cap => coefficients[capstone_on_stack] += color_factor,
                 Flat => (),
-                Wall => coefficients[STANDING_STONE_ON_STACK] += color_factor,
+                Wall => coefficients[standing_stone_on_stack] += color_factor,
             }
 
             // Malus for them having stones next to our stack with flat stones on top
@@ -156,15 +156,15 @@ pub(crate) fn static_eval_game_phase<const S: usize>(
                     {
                         match neighbour_top_stone.role() {
                             Flat => {
-                                coefficients[FLAT_STONE_NEXT_TO_OUR_STACK] +=
+                                coefficients[flat_stone_next_to_our_stack] +=
                                     color_factor * stack.len() as f32
                             }
                             Wall => {
-                                coefficients[STANDING_STONE_NEXT_TO_OUR_STACK] +=
+                                coefficients[standing_stone_next_to_our_stack] +=
                                     color_factor * stack.len() as f32
                             }
                             Cap => {
-                                coefficients[CAPSTONE_NEXT_TO_OUR_STACK] +=
+                                coefficients[capstone_next_to_our_stack] +=
                                     color_factor * stack.len() as f32
                             }
                         }
@@ -174,9 +174,9 @@ pub(crate) fn static_eval_game_phase<const S: usize>(
         });
 
     // Number of pieces in each line
-    const NUM_LINES_OCCUPIED: usize = CAPSTONE_NEXT_TO_OUR_STACK + 1;
+    let num_lines_occupied: usize = capstone_next_to_our_stack + 1;
     // Number of lines with at least one road stone
-    const LINE_CONTROL: usize = NUM_LINES_OCCUPIED + BOARD_SIZE + 1;
+    let line_control: usize = num_lines_occupied + S + 1;
 
     let mut num_ranks_occupied_white = 0;
     let mut num_files_occupied_white = 0;
@@ -184,11 +184,11 @@ pub(crate) fn static_eval_game_phase<const S: usize>(
     let mut num_files_occupied_black = 0;
 
     for line in BitBoard::all_lines::<S>().iter() {
-        line_score::<WhiteTr, BlackTr, S>(&group_data, *line, coefficients, LINE_CONTROL);
-        line_score::<BlackTr, WhiteTr, S>(&group_data, *line, coefficients, LINE_CONTROL);
+        line_score::<WhiteTr, BlackTr, S>(&group_data, *line, coefficients, line_control);
+        line_score::<BlackTr, WhiteTr, S>(&group_data, *line, coefficients, line_control);
     }
 
-    for i in 0..BOARD_SIZE as u8 {
+    for i in 0..S as u8 {
         if !WhiteTr::road_stones(&group_data).rank::<S>(i).is_empty() {
             num_ranks_occupied_white += 1;
         }
@@ -197,7 +197,7 @@ pub(crate) fn static_eval_game_phase<const S: usize>(
         }
     }
 
-    for i in 0..BOARD_SIZE as u8 {
+    for i in 0..S as u8 {
         if !WhiteTr::road_stones(&group_data).file::<S>(i).is_empty() {
             num_files_occupied_white += 1;
         }
@@ -206,14 +206,14 @@ pub(crate) fn static_eval_game_phase<const S: usize>(
         }
     }
 
-    coefficients[NUM_LINES_OCCUPIED + num_ranks_occupied_white] += 1.0;
-    coefficients[NUM_LINES_OCCUPIED + num_files_occupied_white] += 1.0;
-    coefficients[NUM_LINES_OCCUPIED + num_ranks_occupied_black] -= 1.0;
-    coefficients[NUM_LINES_OCCUPIED + num_files_occupied_black] -= 1.0;
+    coefficients[num_lines_occupied + num_ranks_occupied_white] += 1.0;
+    coefficients[num_lines_occupied + num_files_occupied_white] += 1.0;
+    coefficients[num_lines_occupied + num_ranks_occupied_black] -= 1.0;
+    coefficients[num_lines_occupied + num_files_occupied_black] -= 1.0;
 
-    const _NEXT_CONST: usize = LINE_CONTROL + 2 * (BOARD_SIZE + 1);
+    let _next_const = line_control + 2 * (S + 1);
 
-    assert_eq!(_NEXT_CONST, coefficients.len());
+    assert_eq!(_next_const, coefficients.len());
 }
 
 /// Give bonus for our critical squares
@@ -260,7 +260,7 @@ fn line_score<Us: ColorTr, Them: ColorTr, const S: usize>(
 
     coefficients[line_control + road_pieces_in_line as usize] += Us::color().multiplier() as f32;
 
-    let block_their_line = line_control + BOARD_SIZE + 1;
+    let block_their_line = line_control + S + 1;
 
     // Bonus for blocking their lines
     if road_pieces_in_line >= 3 {
