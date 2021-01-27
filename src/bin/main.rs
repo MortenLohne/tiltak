@@ -249,7 +249,7 @@ fn test_position<const S: usize>() {
     println!("Top 10 heuristic moves:");
     for (mv, score) in moves.iter().take(10) {
         println!("{}: {:.3}", mv.to_string::<S>(), score);
-        let mut coefficients = vec![0.0; <Board<5>>::POLICY_PARAMS.len()];
+        let mut coefficients = vec![0.0; <Board<5>>::policy_params().len()];
         board.coefficients_for_move(&mut coefficients, mv, &board.group_data(), moves.len());
         for coefficient in coefficients {
             print!("{:.1}, ", coefficient);

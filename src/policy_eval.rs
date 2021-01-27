@@ -1,8 +1,8 @@
 use crate::bitboard::BitBoard;
 use crate::board::Role::{Cap, Flat, Wall};
 use crate::board::{
-    Board, ColorTr, Direction::*, GroupData, Move, Square, TunableBoard,
-    NUM_SQUARE_SYMMETRIES, SQUARE_SYMMETRIES,
+    Board, ColorTr, Direction::*, GroupData, Move, Square, TunableBoard, NUM_SQUARE_SYMMETRIES,
+    SQUARE_SYMMETRIES,
 };
 use crate::search;
 use arrayvec::ArrayVec;
@@ -40,7 +40,7 @@ impl<const S: usize> Board<S> {
         group_data: &GroupData<S>,
         num_moves: usize,
     ) -> f32 {
-        let mut coefficients = vec![0.0; Self::POLICY_PARAMS.len()];
+        let mut coefficients = vec![0.0; Self::policy_params().len()];
         coefficients_for_move_colortr::<Us, Them, S>(
             self,
             &mut coefficients,
@@ -119,12 +119,10 @@ pub(crate) fn coefficients_for_move_colortr<Us: ColorTr, Them: ColorTr, const S:
             for &line in BitBoard::lines_for_square::<S>(*square).iter() {
                 let our_line_score = (Us::road_stones(&group_data) & line).count();
                 let their_line_score = (Them::road_stones(&group_data) & line).count();
-                coefficients
-                    [our_road_stones_in_line + S * role_id + our_line_score as usize] +=
+                coefficients[our_road_stones_in_line + S * role_id + our_line_score as usize] +=
                     1.0;
-                coefficients[their_road_stones_in_line
-                    + S * role_id
-                    + their_line_score as usize] += 1.0;
+                coefficients
+                    [their_road_stones_in_line + S * role_id + their_line_score as usize] += 1.0;
             }
 
             // If square is next to a group

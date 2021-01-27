@@ -1,6 +1,6 @@
 use clap::{App, Arg, SubCommand};
 use std::path::Path;
-use taik::board::{Board, TunableBoard, NUM_POLICY_PARAMS, NUM_VALUE_PARAMS};
+use taik::board::{NUM_POLICY_PARAMS, NUM_VALUE_PARAMS, POLICY_PARAMS_5S, VALUE_PARAMS_5S};
 use taik::tune::{spsa, training};
 
 fn main() {
@@ -46,8 +46,8 @@ fn main() {
                 if !Path::new(&file_name).exists() {
                     training::train_perpetually::<5, 69, 91>(
                         i,
-                        &<Board<5>>::VALUE_PARAMS,
-                        &<Board<5>>::POLICY_PARAMS,
+                        &VALUE_PARAMS_5S,
+                        &POLICY_PARAMS_5S,
                     )
                     .unwrap();
                     break;

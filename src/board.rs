@@ -16,6 +16,176 @@ pub const BOARD_AREA: usize = BOARD_SIZE * BOARD_SIZE;
 pub const STARTING_STONES: u8 = 21;
 pub const STARTING_CAPSTONES: u8 = 1;
 
+pub const NUM_VALUE_PARAMS_5S: usize = 69;
+#[allow(clippy::unreadable_literal)]
+pub const VALUE_PARAMS_5S: [f32; NUM_VALUE_PARAMS_5S] = [
+    -0.00044795033,
+    0.15347332,
+    0.14927012,
+    0.25764394,
+    0.2447137,
+    0.27844432,
+    0.7183903,
+    0.79589164,
+    0.69361377,
+    0.93700093,
+    0.77688575,
+    1.0438795,
+    -0.47725853,
+    0.023881366,
+    0.10956399,
+    0.6041755,
+    0.7021375,
+    0.9956894,
+    1.1578636,
+    1.1255516,
+    1.2779299,
+    1.2831495,
+    1.311057,
+    1.2934446,
+    0.7101744,
+    0.73263896,
+    0.77619076,
+    0.8653954,
+    0.8186914,
+    0.8584326,
+    0.98251414,
+    0.7959507,
+    1.0613332,
+    0.61214393,
+    0.04162296,
+    0.47685462,
+    -0.18535407,
+    -0.175548,
+    0.025191614,
+    0.31633365,
+    0.044689283,
+    0.08818814,
+    -0.04582565,
+    0.036502212,
+    0.11076386,
+    0.12404986,
+    0.60829574,
+    0.35141426,
+    -0.032268483,
+    -0.15010805,
+    -0.15450484,
+    0.7011735,
+    -0.77606714,
+    -0.432654,
+    -0.1280988,
+    0.12062097,
+    0.5066281,
+    -1.0205822,
+    -0.7606904,
+    -0.18055946,
+    0.6164267,
+    1.3433626,
+    0.0029393125,
+    0.012231762,
+    -0.07691176,
+    0.14723985,
+    0.103527844,
+    0.08759902,
+    -0.0380222,
+];
+
+pub const NUM_POLICY_PARAMS_5S: usize = 91;
+#[allow(clippy::unreadable_literal)]
+pub const POLICY_PARAMS_5S: [f32; NUM_POLICY_PARAMS_5S] = [
+    0.9308273,
+    -0.07929533,
+    0.057767794,
+    0.2882359,
+    0.531935,
+    0.21098736,
+    0.04213818,
+    0.09557081,
+    -0.19456874,
+    -0.36536214,
+    -0.11494864,
+    -0.22052413,
+    0.0093151545,
+    -1.3283435,
+    -1.2656128,
+    -0.85109675,
+    -0.40520072,
+    0.5878558,
+    3.4571137,
+    -0.16756311,
+    -0.2252186,
+    0.28233698,
+    0.85837847,
+    1.365391,
+    -0.4172503,
+    -0.4432623,
+    -0.3845675,
+    -0.31344506,
+    -0.004058682,
+    -0.11987572,
+    -0.39426184,
+    0.11714657,
+    0.979083,
+    -0.22664826,
+    0.37094262,
+    -0.0974089,
+    0.16831143,
+    0.7246095,
+    0.9175918,
+    -0.439185,
+    -0.5486194,
+    -0.66271234,
+    -0.14276715,
+    0.21165304,
+    -0.029816588,
+    -0.7650466,
+    -0.39566195,
+    0.7590662,
+    0.81015515,
+    0.034725398,
+    0.010433739,
+    -0.03970129,
+    0.5491879,
+    0.052991133,
+    0.59455854,
+    0.2506343,
+    0.6803255,
+    0.9312398,
+    2.072926,
+    0.4359224,
+    2.7277956,
+    1.893014,
+    0.71989006,
+    -3.5187004,
+    -1.5348065,
+    0.88657194,
+    1.1540254,
+    0.26089153,
+    0.21742074,
+    0.10011237,
+    0.36579394,
+    -0.703495,
+    -1.116258,
+    -0.6946902,
+    -0.17518687,
+    0.3844842,
+    -1.1586666,
+    -1.5351807,
+    -1.1871732,
+    -1.4655167,
+    0.56302536,
+    0.04595746,
+    -0.13931844,
+    -0.07628846,
+    0.060224842,
+    0.28914,
+    0.60682046,
+    -0.054207996,
+    -0.09838614,
+    1.0067077,
+    1.4960983,
+];
+
 use crate::bitboard::BitBoard;
 use crate::board::Direction::*;
 use crate::board::Piece::*;
@@ -39,15 +209,15 @@ use std::ops::{Index, IndexMut};
 use std::{fmt, iter, ops};
 
 /// Extra items for tuning evaluation constants.
-pub trait TunableBoard<const N: usize, const M: usize>: BoardTrait {
-    const VALUE_PARAMS: [f32; N];
-    const POLICY_PARAMS: [f32; M];
+pub trait TunableBoard: BoardTrait {
+    fn value_params() -> &'static [f32];
+    fn policy_params() -> &'static [f32];
     type ExtraData;
 
     fn static_eval_coefficients(&self, coefficients: &mut [f32]);
 
     fn static_eval_with_params(&self, params: &[f32]) -> f32 {
-        let mut coefficients: [f32; N] = [0.0; N];
+        let mut coefficients: Vec<f32> = vec![0.0; Self::value_params().len()];
         self.static_eval_coefficients(&mut coefficients);
         coefficients.iter().zip(params).map(|(a, b)| a * b).sum()
     }
@@ -66,6 +236,19 @@ pub trait TunableBoard<const N: usize, const M: usize>: BoardTrait {
         mv: &Move,
         data: &Self::ExtraData,
         num_legal_moves: usize,
+    );
+
+    /// Move generation that includes a heuristic probability of each move being played.
+    ///
+    /// # Arguments
+    ///
+    /// * `simple_moves` - An empty vector to temporarily store moves without probabilities. The vector will be emptied before the function returns, and only serves to re-use allocated memory.
+    /// * `moves` A vector to place the moves and associated probabilities.
+    fn generate_moves_with_probabilities(
+        &self,
+        group_data: &Self::ExtraData,
+        simple_moves: &mut Vec<Move>,
+        moves: &mut Vec<(Move, search::Score)>,
     );
 }
 
@@ -1188,21 +1371,6 @@ impl<const S: usize> Board<S> {
             .collect()
     }
 
-    /// Move generation that includes a heuristic probability of each move being played.
-    ///
-    /// # Arguments
-    ///
-    /// * `simple_moves` - An empty vector to temporarily store moves without probabilities. The vector will be emptied before the function returns, and only serves to re-use allocated memory.
-    /// * `moves` A vector to place the moves and associated probabilities.
-    pub fn generate_moves_with_probabilities(
-        &self,
-        group_data: &GroupData<S>,
-        simple_moves: &mut Vec<Move>,
-        moves: &mut Vec<(Move, search::Score)>,
-    ) {
-        self.generate_moves_with_params(&<Board<S>>::POLICY_PARAMS, group_data, simple_moves, moves)
-    }
-
     fn count_all_pieces(&self) -> u8 {
         self.cells
             .raw
@@ -1641,7 +1809,7 @@ impl<const S: usize> Iterator for MoveIterator<S> {
 
 impl<const S: usize> EvalBoardTrait for Board<S> {
     fn static_eval(&self) -> f32 {
-        self.static_eval_with_params(&Self::VALUE_PARAMS)
+        self.static_eval_with_params(&Self::value_params())
     }
 }
 
@@ -1658,175 +1826,22 @@ pub(crate) const SQUARE_SYMMETRIES: [usize; BOARD_AREA] = [
 pub const NUM_VALUE_PARAMS: usize = 69;
 pub const NUM_POLICY_PARAMS: usize = 91;
 
-impl<const S: usize> TunableBoard<NUM_VALUE_PARAMS, NUM_POLICY_PARAMS> for Board<S> {
+impl<const S: usize> TunableBoard for Board<S> {
     type ExtraData = GroupData<S>;
 
-    #[allow(clippy::unreadable_literal)]
-    const VALUE_PARAMS: [f32; NUM_VALUE_PARAMS] = [
-        -0.00044795033,
-        0.15347332,
-        0.14927012,
-        0.25764394,
-        0.2447137,
-        0.27844432,
-        0.7183903,
-        0.79589164,
-        0.69361377,
-        0.93700093,
-        0.77688575,
-        1.0438795,
-        -0.47725853,
-        0.023881366,
-        0.10956399,
-        0.6041755,
-        0.7021375,
-        0.9956894,
-        1.1578636,
-        1.1255516,
-        1.2779299,
-        1.2831495,
-        1.311057,
-        1.2934446,
-        0.7101744,
-        0.73263896,
-        0.77619076,
-        0.8653954,
-        0.8186914,
-        0.8584326,
-        0.98251414,
-        0.7959507,
-        1.0613332,
-        0.61214393,
-        0.04162296,
-        0.47685462,
-        -0.18535407,
-        -0.175548,
-        0.025191614,
-        0.31633365,
-        0.044689283,
-        0.08818814,
-        -0.04582565,
-        0.036502212,
-        0.11076386,
-        0.12404986,
-        0.60829574,
-        0.35141426,
-        -0.032268483,
-        -0.15010805,
-        -0.15450484,
-        0.7011735,
-        -0.77606714,
-        -0.432654,
-        -0.1280988,
-        0.12062097,
-        0.5066281,
-        -1.0205822,
-        -0.7606904,
-        -0.18055946,
-        0.6164267,
-        1.3433626,
-        0.0029393125,
-        0.012231762,
-        -0.07691176,
-        0.14723985,
-        0.103527844,
-        0.08759902,
-        -0.0380222,
-    ];
-    #[allow(clippy::unreadable_literal)]
-    const POLICY_PARAMS: [f32; NUM_POLICY_PARAMS] = [
-        0.9308273,
-        -0.07929533,
-        0.057767794,
-        0.2882359,
-        0.531935,
-        0.21098736,
-        0.04213818,
-        0.09557081,
-        -0.19456874,
-        -0.36536214,
-        -0.11494864,
-        -0.22052413,
-        0.0093151545,
-        -1.3283435,
-        -1.2656128,
-        -0.85109675,
-        -0.40520072,
-        0.5878558,
-        3.4571137,
-        -0.16756311,
-        -0.2252186,
-        0.28233698,
-        0.85837847,
-        1.365391,
-        -0.4172503,
-        -0.4432623,
-        -0.3845675,
-        -0.31344506,
-        -0.004058682,
-        -0.11987572,
-        -0.39426184,
-        0.11714657,
-        0.979083,
-        -0.22664826,
-        0.37094262,
-        -0.0974089,
-        0.16831143,
-        0.7246095,
-        0.9175918,
-        -0.439185,
-        -0.5486194,
-        -0.66271234,
-        -0.14276715,
-        0.21165304,
-        -0.029816588,
-        -0.7650466,
-        -0.39566195,
-        0.7590662,
-        0.81015515,
-        0.034725398,
-        0.010433739,
-        -0.03970129,
-        0.5491879,
-        0.052991133,
-        0.59455854,
-        0.2506343,
-        0.6803255,
-        0.9312398,
-        2.072926,
-        0.4359224,
-        2.7277956,
-        1.893014,
-        0.71989006,
-        -3.5187004,
-        -1.5348065,
-        0.88657194,
-        1.1540254,
-        0.26089153,
-        0.21742074,
-        0.10011237,
-        0.36579394,
-        -0.703495,
-        -1.116258,
-        -0.6946902,
-        -0.17518687,
-        0.3844842,
-        -1.1586666,
-        -1.5351807,
-        -1.1871732,
-        -1.4655167,
-        0.56302536,
-        0.04595746,
-        -0.13931844,
-        -0.07628846,
-        0.060224842,
-        0.28914,
-        0.60682046,
-        -0.054207996,
-        -0.09838614,
-        1.0067077,
-        1.4960983,
-    ];
+    fn value_params() -> &'static [f32] {
+        match S {
+            5 => &VALUE_PARAMS_5S,
+            _ => &[],
+        }
+    }
+
+    fn policy_params() -> &'static [f32] {
+        match S {
+            5 => &POLICY_PARAMS_5S,
+            _ => &[],
+        }
+    }
 
     fn static_eval_coefficients(&self, coefficients: &mut [f32]) {
         debug_assert!(self.game_result().is_none());
@@ -1883,6 +1898,20 @@ impl<const S: usize> TunableBoard<NUM_VALUE_PARAMS, NUM_POLICY_PARAMS> for Board
                 num_legal_moves,
             ),
         }
+    }
+    /// Move generation that includes a heuristic probability of each move being played.
+    ///
+    /// # Arguments
+    ///
+    /// * `simple_moves` - An empty vector to temporarily store moves without probabilities. The vector will be emptied before the function returns, and only serves to re-use allocated memory.
+    /// * `moves` A vector to place the moves and associated probabilities.
+    fn generate_moves_with_probabilities(
+        &self,
+        group_data: &GroupData<S>,
+        simple_moves: &mut Vec<Move>,
+        moves: &mut Vec<(Move, search::Score)>,
+    ) {
+        self.generate_moves_with_params(Self::policy_params(), group_data, simple_moves, moves)
     }
 }
 

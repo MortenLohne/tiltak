@@ -22,8 +22,8 @@ pub struct MctsSetting<const S: usize> {
 impl<const S: usize> Default for MctsSetting<S> {
     fn default() -> Self {
         MctsSetting {
-            value_params: Vec::from(<Board<S>>::VALUE_PARAMS),
-            policy_params: Vec::from(<Board<S>>::POLICY_PARAMS),
+            value_params: Vec::from(<Board<S>>::value_params()),
+            policy_params: Vec::from(<Board<S>>::policy_params()),
             search_params: vec![1.2, 3500.0],
             #[cfg(feature = "constant-tuning")]
             dirichlet: None,
