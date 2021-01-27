@@ -36,6 +36,15 @@ pub fn main() -> Result<()> {
                 .takes_value(true),
         )
         .arg(
+            Arg::with_name("size")
+                .short("s")
+                .long("size")
+                .help("Board size")
+                .takes_value(true)
+                .default_value("5")
+                .possible_values(&["4", "5"]),
+        )
+        .arg(
             Arg::with_name("logfile")
                 .short("l")
                 .long("logfile")
@@ -96,6 +105,8 @@ pub fn main() -> Result<()> {
             .unwrap()
     }
 
+    let size: usize = matches.value_of("size").unwrap().parse().unwrap();
+
     loop {
         let mut session = if let Some(aws_function_name) = matches.value_of("aws-function-name") {
             PlaytakSession::with_aws(aws_function_name.to_string())
@@ -111,10 +122,15 @@ pub fn main() -> Result<()> {
             warn!("No username/password provided, logging in as guest");
             session.login_guest()?;
         }
-        let result = if let Some(name) = matches.value_of("playBot") {
-            session.seek_game::<5>(SeekMode::PlayOtherBot(name.to_string()))
-        } else {
-            session.seek_game::<5>(SeekMode::OpenSeek)
+        let seekmode = match matches.value_of("playBot") {
+            Some(name) => SeekMode::PlayOtherBot(name.to_string()),
+            None => SeekMode::OpenSeek,
+        };
+
+        let result = match size {
+            4 => session.seek_game::<4>(seekmode),
+            5 => session.seek_game::<5>(seekmode),
+            s => panic!("Unsupported size {}", s),
         };
 
         match result {
@@ -248,7 +264,8 @@ impl PlaytakSession {
 
         if seek_mode == SeekMode::OpenSeek {
             self.send_line(&format!(
-                "Seek 5 {} {}",
+                "Seek {} {} {}",
+                S,
                 time_for_game.as_secs(),
                 increment.as_secs()
             ))?;
@@ -341,6 +358,7 @@ impl PlaytakSession {
                 let (best_move, score) = {
                     let aws_function_name = self.aws_function_name.as_ref().unwrap();
                     let event = aws::Event {
+                        size: S,
                         moves: moves.iter().map(|(mv, _): &(Move, _)| mv.clone()).collect(),
                         time_left: our_time_left,
                         increment,
