@@ -13,6 +13,24 @@ pub const MAX_BOARD_SIZE: usize = 8;
 pub const STARTING_STONES: u8 = 21;
 pub const STARTING_CAPSTONES: u8 = 1;
 
+pub(crate) const fn num_square_symmetries<const S: usize>() -> usize {
+    match S {
+        4 => 3,
+        5 => 6,
+        _ => 0,
+    }
+}
+
+pub(crate) const fn square_symmetries<const S: usize>() -> &'static [usize] {
+    match S {
+        4 => &[0, 1, 1, 0, 1, 2, 2, 1, 1, 2, 2, 1, 0, 1, 1, 0],
+        5 => &[
+            0, 1, 2, 1, 0, 1, 3, 4, 3, 1, 2, 4, 5, 4, 2, 1, 3, 4, 3, 1, 0, 1, 2, 1, 0,
+        ],
+        _ => &[],
+    }
+}
+
 pub const NUM_VALUE_PARAMS_5S: usize = 69;
 #[allow(clippy::unreadable_literal)]
 pub const VALUE_PARAMS_5S: [f32; NUM_VALUE_PARAMS_5S] = [
@@ -1809,12 +1827,6 @@ impl<const S: usize> EvalBoardTrait for Board<S> {
         self.static_eval_with_params(&Self::value_params())
     }
 }
-
-pub(crate) const NUM_SQUARE_SYMMETRIES: usize = 6;
-
-pub(crate) const SQUARE_SYMMETRIES: [usize; 25] = [
-    0, 1, 2, 1, 0, 1, 3, 4, 3, 1, 2, 4, 5, 4, 2, 1, 3, 4, 3, 1, 0, 1, 2, 1, 0,
-];
 
 impl<const S: usize> TunableBoard for Board<S> {
     type ExtraData = GroupData<S>;

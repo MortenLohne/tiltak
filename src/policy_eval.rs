@@ -1,8 +1,8 @@
 use crate::bitboard::BitBoard;
 use crate::board::Role::{Cap, Flat, Wall};
 use crate::board::{
-    Board, ColorTr, Direction::*, GroupData, Move, Square, TunableBoard, NUM_SQUARE_SYMMETRIES,
-    SQUARE_SYMMETRIES,
+    num_square_symmetries, square_symmetries, Board, ColorTr, Direction::*, GroupData, Move,
+    Square, TunableBoard,
 };
 use crate::search;
 use arrayvec::ArrayVec;
@@ -62,9 +62,9 @@ pub(crate) fn coefficients_for_move_colortr<Us: ColorTr, Them: ColorTr, const S:
 ) {
     let move_count: usize = 0;
     let flat_psqt: usize = move_count + 1;
-    let wall_psqt: usize = flat_psqt + NUM_SQUARE_SYMMETRIES;
-    let cap_psqt: usize = wall_psqt + NUM_SQUARE_SYMMETRIES;
-    let our_road_stones_in_line: usize = cap_psqt + NUM_SQUARE_SYMMETRIES;
+    let wall_psqt: usize = flat_psqt + num_square_symmetries::<S>();
+    let cap_psqt: usize = wall_psqt + num_square_symmetries::<S>();
+    let our_road_stones_in_line: usize = cap_psqt + num_square_symmetries::<S>();
     let their_road_stones_in_line: usize = our_road_stones_in_line + S * 3;
     let extend_group: usize = their_road_stones_in_line + S * 3;
     let merge_two_groups: usize = extend_group + 3;
@@ -105,9 +105,9 @@ pub(crate) fn coefficients_for_move_colortr<Us: ColorTr, Them: ColorTr, const S:
 
             // Apply PSQT
             match role {
-                Flat => coefficients[flat_psqt + SQUARE_SYMMETRIES[square.0 as usize]] = 1.0,
-                Wall => coefficients[wall_psqt + SQUARE_SYMMETRIES[square.0 as usize]] = 1.0,
-                Cap => coefficients[cap_psqt + SQUARE_SYMMETRIES[square.0 as usize]] = 1.0,
+                Flat => coefficients[flat_psqt + square_symmetries::<S>()[square.0 as usize]] = 1.0,
+                Wall => coefficients[wall_psqt + square_symmetries::<S>()[square.0 as usize]] = 1.0,
+                Cap => coefficients[cap_psqt + square_symmetries::<S>()[square.0 as usize]] = 1.0,
             }
 
             let role_id = match *role {
@@ -216,7 +216,7 @@ pub(crate) fn coefficients_for_move_colortr<Us: ColorTr, Them: ColorTr, const S:
             }
 
             if *role == Wall {
-                coefficients[wall_psqt + SQUARE_SYMMETRIES[square.0 as usize]] = 1.0;
+                coefficients[wall_psqt + square_symmetries::<S>()[square.0 as usize]] = 1.0;
 
                 if !their_open_critical_squares.is_empty() {
                     if their_open_critical_squares == BitBoard::empty().set(square.0) {

@@ -1,7 +1,7 @@
 use crate::bitboard::BitBoard;
 use crate::board::{
-    squares_iterator, BlackTr, Board, ColorTr, GroupData, Piece::*, Role::*, Square, WhiteTr,
-    NUM_SQUARE_SYMMETRIES, SQUARE_SYMMETRIES,
+    num_square_symmetries, square_symmetries, squares_iterator, BlackTr, Board, ColorTr, GroupData,
+    Piece::*, Role::*, Square, WhiteTr,
 };
 use board_game_traits::board::{Board as EvalBoard, Color};
 
@@ -11,10 +11,10 @@ pub(crate) fn static_eval_game_phase<const S: usize>(
     coefficients: &mut [f32],
 ) {
     let flat_psqt: usize = 0;
-    let wall_psqt: usize = flat_psqt + NUM_SQUARE_SYMMETRIES;
-    let cap_psqt: usize = wall_psqt + NUM_SQUARE_SYMMETRIES;
-    let our_stack_psqt: usize = cap_psqt + NUM_SQUARE_SYMMETRIES;
-    let their_stack_psqt: usize = our_stack_psqt + NUM_SQUARE_SYMMETRIES;
+    let wall_psqt: usize = flat_psqt + num_square_symmetries::<S>();
+    let cap_psqt: usize = wall_psqt + num_square_symmetries::<S>();
+    let our_stack_psqt: usize = cap_psqt + num_square_symmetries::<S>();
+    let their_stack_psqt: usize = our_stack_psqt + num_square_symmetries::<S>();
 
     let mut white_flat_count = 0;
     let mut black_flat_count = 0;
@@ -25,33 +25,34 @@ pub(crate) fn static_eval_game_phase<const S: usize>(
             let i = square.0 as usize;
             match piece {
                 WhiteFlat => {
-                    coefficients[flat_psqt + SQUARE_SYMMETRIES[i]] += 1.0;
+                    coefficients[flat_psqt + square_symmetries::<S>()[i]] += 1.0;
                     white_flat_count += 1;
                 }
                 BlackFlat => {
-                    coefficients[flat_psqt + SQUARE_SYMMETRIES[i]] -= 1.0;
+                    coefficients[flat_psqt + square_symmetries::<S>()[i]] -= 1.0;
                     black_flat_count += 1;
                 }
-                WhiteWall => coefficients[wall_psqt + SQUARE_SYMMETRIES[i]] += 1.0,
-                BlackWall => coefficients[wall_psqt + SQUARE_SYMMETRIES[i]] -= 1.0,
-                WhiteCap => coefficients[cap_psqt + SQUARE_SYMMETRIES[i]] += 1.0,
-                BlackCap => coefficients[cap_psqt + SQUARE_SYMMETRIES[i]] -= 1.0,
+                WhiteWall => coefficients[wall_psqt + square_symmetries::<S>()[i]] += 1.0,
+                BlackWall => coefficients[wall_psqt + square_symmetries::<S>()[i]] -= 1.0,
+                WhiteCap => coefficients[cap_psqt + square_symmetries::<S>()[i]] += 1.0,
+                BlackCap => coefficients[cap_psqt + square_symmetries::<S>()[i]] -= 1.0,
             }
             if stack.height > 1 {
                 let controlling_player = piece.color();
                 let color_factor = piece.color().multiplier() as f32;
                 for piece in stack.clone().into_iter().take(stack.height as usize - 1) {
                     if piece.color() == controlling_player {
-                        coefficients[our_stack_psqt + SQUARE_SYMMETRIES[i]] += color_factor;
+                        coefficients[our_stack_psqt + square_symmetries::<S>()[i]] += color_factor;
                     } else {
-                        coefficients[their_stack_psqt + SQUARE_SYMMETRIES[i]] -= color_factor;
+                        coefficients[their_stack_psqt + square_symmetries::<S>()[i]] -=
+                            color_factor;
                     }
                 }
             }
         }
     }
 
-    let side_to_move: usize = their_stack_psqt + NUM_SQUARE_SYMMETRIES;
+    let side_to_move: usize = their_stack_psqt + num_square_symmetries::<S>();
     let flatstone_lead: usize = side_to_move + 3;
     let i_number_of_groups: usize = flatstone_lead + 3;
 
