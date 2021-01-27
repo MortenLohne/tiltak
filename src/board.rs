@@ -1224,41 +1224,40 @@ pub struct ZobristKeys<const S: usize> {
     to_move: [u64; 2],
 }
 
-pub fn zobrist_top_stones(s: usize, square: Square, piece: Piece) -> u64 {
-    match s {
+pub fn zobrist_top_stones<const S: usize>(square: Square, piece: Piece) -> u64 {
+    match S {
         4 => ZOBRIST_KEYS_4S.top_stones[square][piece as u16 as usize],
         5 => ZOBRIST_KEYS_5S.top_stones[square][piece as u16 as usize],
         6 => ZOBRIST_KEYS_6S.top_stones[square][piece as u16 as usize],
         7 => ZOBRIST_KEYS_7S.top_stones[square][piece as u16 as usize],
         8 => ZOBRIST_KEYS_8S.top_stones[square][piece as u16 as usize],
-        _ => panic!("No zobrist keys for size {}. Size not supported.", s),
+        _ => panic!("No zobrist keys for size {}. Size not supported.", S),
     }
 }
 
-pub fn zobrist_stones_in_stack(
-    s: usize,
+pub fn zobrist_stones_in_stack<const S: usize>(
     square: Square,
     place_in_stack: usize,
     stack_slice: usize,
 ) -> u64 {
-    match s {
+    match S {
         4 => ZOBRIST_KEYS_4S.stones_in_stack[place_in_stack][square][stack_slice],
         5 => ZOBRIST_KEYS_5S.stones_in_stack[place_in_stack][square][stack_slice],
         6 => ZOBRIST_KEYS_6S.stones_in_stack[place_in_stack][square][stack_slice],
-        7 => ZOBRIST_KEYS_6S.stones_in_stack[place_in_stack][square][stack_slice],
-        8 => ZOBRIST_KEYS_6S.stones_in_stack[place_in_stack][square][stack_slice],
-        _ => panic!("No zobrist keys for size {}. Size not supported.", s),
+        7 => ZOBRIST_KEYS_7S.stones_in_stack[place_in_stack][square][stack_slice],
+        8 => ZOBRIST_KEYS_8S.stones_in_stack[place_in_stack][square][stack_slice],
+        _ => panic!("No zobrist keys for size {}. Size not supported.", S),
     }
 }
 
-pub fn zobrist_to_move(s: usize, color: Color) -> u64 {
-    match s {
+pub fn zobrist_to_move<const S: usize>(color: Color) -> u64 {
+    match S {
         4 => ZOBRIST_KEYS_4S.to_move[color.disc()],
         5 => ZOBRIST_KEYS_5S.to_move[color.disc()],
         6 => ZOBRIST_KEYS_6S.to_move[color.disc()],
         7 => ZOBRIST_KEYS_7S.to_move[color.disc()],
         8 => ZOBRIST_KEYS_8S.to_move[color.disc()],
-        _ => panic!("No zobrist keys for size {}. Size not supported.", s),
+        _ => panic!("No zobrist keys for size {}. Size not supported.", S),
     }
 }
 
@@ -1345,7 +1344,7 @@ impl<const S: usize> Default for Board<S> {
             black_caps_left: STARTING_CAPSTONES,
             half_moves_played: 0,
             moves: vec![],
-            hash: zobrist_to_move(S, Color::White),
+            hash: zobrist_to_move::<S>(Color::White),
             hash_history: vec![],
         }
     }
@@ -1414,7 +1413,7 @@ impl<const S: usize> Board<S> {
 
     pub(crate) fn zobrist_hash_from_scratch(&self) -> u64 {
         let mut hash = 0;
-        hash ^= zobrist_to_move(S, self.to_move);
+        hash ^= zobrist_to_move::<S>(self.to_move);
 
         for square in squares_iterator::<S>() {
             hash ^= self.zobrist_hash_for_square(square);
@@ -1426,10 +1425,9 @@ impl<const S: usize> Board<S> {
         let mut hash = 0;
         let stack = &self[square];
         if let Some(top_stone) = stack.top_stone {
-            hash ^= zobrist_top_stones(S, square, top_stone);
+            hash ^= zobrist_top_stones::<S>(square, top_stone);
             for i in 0..(stack.len() as usize - 1) / 8 {
-                hash ^= zobrist_stones_in_stack(
-                    S,
+                hash ^= zobrist_stones_in_stack::<S>(
                     square,
                     i as usize,
                     stack.bitboard.board as usize >> (i * 8) & 255,
@@ -1793,7 +1791,7 @@ impl<const S: usize> board::Board for Board<S> {
                     (Color::Black, Cap) => self.black_caps_left -= 1,
                 }
 
-                self.hash ^= zobrist_top_stones(S, to, piece);
+                self.hash ^= zobrist_top_stones::<S>(to, piece);
                 self.hash_history.clear(); // This move is irreversible, so previous position are never repeated from here
 
                 ReverseMove::Place(to)
@@ -1861,9 +1859,9 @@ impl<const S: usize> board::Board for Board<S> {
         self.moves.push(mv);
         self.half_moves_played += 1;
 
-        self.hash ^= zobrist_to_move(S, self.to_move);
+        self.hash ^= zobrist_to_move::<S>(self.to_move);
         self.to_move = !self.to_move;
-        self.hash ^= zobrist_to_move(S, self.to_move);
+        self.hash ^= zobrist_to_move::<S>(self.to_move);
 
         reverse_move
     }
@@ -1873,7 +1871,7 @@ impl<const S: usize> board::Board for Board<S> {
             ReverseMove::Place(square) => {
                 let piece = self[square].pop().unwrap();
 
-                self.hash ^= zobrist_top_stones(S, square, piece);
+                self.hash ^= zobrist_top_stones::<S>(square, piece);
 
                 debug_assert!(piece.color() != self.side_to_move() || self.half_moves_played() < 3);
 
@@ -1922,9 +1920,9 @@ impl<const S: usize> board::Board for Board<S> {
         self.hash_history.pop();
         self.half_moves_played -= 1;
 
-        self.hash ^= zobrist_to_move(S, self.to_move);
+        self.hash ^= zobrist_to_move::<S>(self.to_move);
         self.to_move = !self.to_move;
-        self.hash ^= zobrist_to_move(S, self.to_move);
+        self.hash ^= zobrist_to_move::<S>(self.to_move);
     }
 
     fn game_result(&self) -> Option<GameResult> {
