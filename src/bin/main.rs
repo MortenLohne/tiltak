@@ -41,7 +41,15 @@ fn main() {
                     mcts_vs_minmax(3, 50000 * i);
                 }
             }
-            "analyze" => test_position::<6>(),
+            "analyze" => {
+                match words.get(1) {
+                    Some(&"4") => test_position::<4>(),
+                    Some(&"5") => test_position::<5>(),
+                    Some(&"6") => test_position::<6>(),
+                    _ => test_position::<5>(),
+                }
+
+            },
             #[cfg(feature = "constant-tuning")]
             "openings" => {
                 let depth = 4;
@@ -249,7 +257,7 @@ fn test_position<const S: usize>() {
     println!("Top 10 heuristic moves:");
     for (mv, score) in moves.iter().take(10) {
         println!("{}: {:.3}", mv.to_string::<S>(), score);
-        let mut coefficients = vec![0.0; <Board<5>>::policy_params().len()];
+        let mut coefficients = vec![0.0; <Board<S>>::policy_params().len()];
         board.coefficients_for_move(&mut coefficients, mv, &board.group_data(), moves.len());
         for coefficient in coefficients {
             print!("{:.1}, ", coefficient);
