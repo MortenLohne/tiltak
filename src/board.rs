@@ -6,6 +6,8 @@ lazy_static! {
     pub(crate) static ref ZOBRIST_KEYS_4S: Box<ZobristKeys<4>> = ZobristKeys::new();
     pub(crate) static ref ZOBRIST_KEYS_5S: Box<ZobristKeys<5>> = ZobristKeys::new();
     pub(crate) static ref ZOBRIST_KEYS_6S: Box<ZobristKeys<6>> = ZobristKeys::new();
+    pub(crate) static ref ZOBRIST_KEYS_7S: Box<ZobristKeys<7>> = ZobristKeys::new();
+    pub(crate) static ref ZOBRIST_KEYS_8S: Box<ZobristKeys<8>> = ZobristKeys::new();
 }
 
 pub const MAX_BOARD_SIZE: usize = 8;
@@ -1227,6 +1229,8 @@ pub fn zobrist_top_stones(s: usize, square: Square, piece: Piece) -> u64 {
         4 => ZOBRIST_KEYS_4S.top_stones[square][piece as u16 as usize],
         5 => ZOBRIST_KEYS_5S.top_stones[square][piece as u16 as usize],
         6 => ZOBRIST_KEYS_6S.top_stones[square][piece as u16 as usize],
+        7 => ZOBRIST_KEYS_7S.top_stones[square][piece as u16 as usize],
+        8 => ZOBRIST_KEYS_8S.top_stones[square][piece as u16 as usize],
         _ => panic!("No zobrist keys for size {}. Size not supported.", s),
     }
 }
@@ -1241,6 +1245,8 @@ pub fn zobrist_stones_in_stack(
         4 => ZOBRIST_KEYS_4S.stones_in_stack[place_in_stack][square][stack_slice],
         5 => ZOBRIST_KEYS_5S.stones_in_stack[place_in_stack][square][stack_slice],
         6 => ZOBRIST_KEYS_6S.stones_in_stack[place_in_stack][square][stack_slice],
+        7 => ZOBRIST_KEYS_6S.stones_in_stack[place_in_stack][square][stack_slice],
+        8 => ZOBRIST_KEYS_6S.stones_in_stack[place_in_stack][square][stack_slice],
         _ => panic!("No zobrist keys for size {}. Size not supported.", s),
     }
 }
@@ -1250,6 +1256,8 @@ pub fn zobrist_to_move(s: usize, color: Color) -> u64 {
         4 => ZOBRIST_KEYS_4S.to_move[color.disc()],
         5 => ZOBRIST_KEYS_5S.to_move[color.disc()],
         6 => ZOBRIST_KEYS_6S.to_move[color.disc()],
+        7 => ZOBRIST_KEYS_7S.to_move[color.disc()],
+        8 => ZOBRIST_KEYS_8S.to_move[color.disc()],
         _ => panic!("No zobrist keys for size {}. Size not supported.", s),
     }
 }
