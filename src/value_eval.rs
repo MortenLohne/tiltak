@@ -19,7 +19,7 @@ pub(crate) fn static_eval_game_phase<const S: usize>(
     let mut white_flat_count = 0;
     let mut black_flat_count = 0;
 
-    for square in squares_iterator() {
+    for square in squares_iterator::<S>() {
         let stack = &board[square];
         if let Some(piece) = board[square].top_stone() {
             let i = square.0 as usize;
@@ -62,7 +62,7 @@ pub(crate) fn static_eval_game_phase<const S: usize>(
     let mut seen_groups = vec![false; S * S + 1]; // TODO: Can be an array with full const-generics
     seen_groups[0] = true;
 
-    let number_of_groups = squares_iterator()
+    let number_of_groups = squares_iterator::<S>()
         .map(|square| {
             let group_id = group_data.groups[square] as usize;
             if !seen_groups[group_id] {
@@ -128,7 +128,7 @@ pub(crate) fn static_eval_game_phase<const S: usize>(
     let standing_stone_next_to_our_stack: usize = flat_stone_next_to_our_stack + 1;
     let capstone_next_to_our_stack: usize = standing_stone_next_to_our_stack + 1;
 
-    squares_iterator()
+    squares_iterator::<S>()
         .map(|sq| (sq, &board[sq]))
         .filter(|(_, stack)| stack.len() > 1)
         .for_each(|(square, stack)| {

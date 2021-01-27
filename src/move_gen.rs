@@ -10,7 +10,7 @@ impl<const S: usize> Board<S> {
         &self,
         moves: &mut Vec<<Board<S> as board_game_traits::board::Board>::Move>,
     ) {
-        for square in board::squares_iterator() {
+        for square in board::squares_iterator::<S>() {
             match self[square].top_stone() {
                 None => {
                     if Us::stones_left(&self) > 0 {

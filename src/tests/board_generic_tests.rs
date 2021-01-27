@@ -133,7 +133,7 @@ fn go_in_directions_6s_test() {
 }
 
 fn go_in_directions_prop<const S: usize>() {
-    for square in squares_iterator() {
+    for square in squares_iterator::<S>() {
         assert_eq!(
             square.directions::<S>().count(),
             square.neighbours::<S>().count()
@@ -193,7 +193,9 @@ fn bitboard_full_board_file_rank_6s_test() {
 
 fn bitboard_full_board_file_rank_prop<const S: usize>() {
     let mut board = <Board<S>>::start_board();
-    let move_strings: Vec<String> = squares_iterator().map(|sq| sq.to_string::<5>()).collect();
+    let move_strings: Vec<String> = squares_iterator::<S>()
+        .map(|sq| sq.to_string::<S>())
+        .collect();
     do_moves_and_check_validity(
         &mut board,
         &(move_strings.iter().map(AsRef::as_ref).collect::<Vec<_>>()),

@@ -9,11 +9,11 @@ use pgn_traits::pgn::PgnBoard;
 #[test]
 fn default_board_test() {
     let board = <Board<5>>::default();
-    for square in squares_iterator() {
+    for square in squares_iterator::<5>() {
         assert!(board[square].is_empty());
     }
     let board = <Board<6>>::default();
-    for square in squares_iterator() {
+    for square in squares_iterator::<6>() {
         assert!(board[square].is_empty());
     }
 }
@@ -70,7 +70,7 @@ fn flatten_stack_test() {
 #[test]
 fn correct_number_of_directions_5s_test() {
     assert_eq!(
-        squares_iterator()
+        squares_iterator::<5>()
             .flat_map(|square| square.directions::<5>())
             .count(),
         4 * 2 + 12 * 3 + 9 * 4
@@ -80,7 +80,7 @@ fn correct_number_of_directions_5s_test() {
 #[test]
 fn correct_number_of_neighbours_test() {
     assert_eq!(
-        squares_iterator()
+        squares_iterator::<5>()
             .flat_map(|square| square.neighbours::<5>())
             .count(),
         4 * 2 + 12 * 3 + 9 * 4
@@ -90,7 +90,7 @@ fn correct_number_of_neighbours_test() {
 #[test]
 fn correct_number_of_legal_directions_test() {
     assert_eq!(
-        squares_iterator()
+        squares_iterator::<5>()
             .flat_map(|square| [North, South, East, West]
                 .iter()
                 .filter_map(move |&direction| square.go_direction::<5>(direction)))
@@ -292,7 +292,7 @@ fn suicide_into_road_loss_test() {
 #[test]
 fn games_ends_when_board_is_full_test() {
     let mut board = <Board<5>>::start_board();
-    let move_strings: Vec<String> = squares_iterator()
+    let move_strings: Vec<String> = squares_iterator::<5>()
         .skip(1)
         .map(|sq| sq.to_string::<5>())
         .collect();
