@@ -41,14 +41,13 @@ fn main() {
                     mcts_vs_minmax(3, 50000 * i);
                 }
             }
-            "analyze" => {
-                match words.get(1) {
-                    Some(&"4") => test_position::<4>(),
-                    Some(&"5") => test_position::<5>(),
-                    Some(&"6") => test_position::<6>(),
-                    _ => test_position::<5>(),
-                }
-
+            "analyze" => match words.get(1) {
+                Some(&"4") => test_position::<4>(),
+                Some(&"5") => test_position::<5>(),
+                Some(&"6") => test_position::<6>(),
+                Some(&"7") => test_position::<7>(),
+                Some(&"8") => test_position::<8>(),
+                _ => test_position::<5>(),
             },
             #[cfg(feature = "constant-tuning")]
             "openings" => {
