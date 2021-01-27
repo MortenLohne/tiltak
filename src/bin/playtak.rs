@@ -487,7 +487,7 @@ pub fn parse_move<const S: usize>(input: &str) -> board::Move {
     } else if words[0] == "M" {
         let start_square = board::Square::parse_square::<S>(&words[1].to_lowercase()).unwrap();
         let end_square = board::Square::parse_square::<S>(&words[2].to_lowercase()).unwrap();
-        let pieces_dropped: ArrayVec<[u8; board::BOARD_SIZE - 1]> = words
+        let pieces_dropped: ArrayVec<[u8; board::MAX_BOARD_SIZE - 1]> = words
             .iter()
             .skip(3)
             .map(|s| u8::from_str(s).unwrap())

@@ -1,4 +1,3 @@
-use crate::board::BOARD_SIZE;
 use board_game_traits::board::Board as BoardTrait;
 use board_game_traits::board::{Color, GameResult};
 use pgn_traits::pgn::PgnBoard;
@@ -32,7 +31,7 @@ pub fn game_to_pgn<W: Write, B: PgnBoard>(
     writeln!(f, "[Round \"{}\"]", round)?;
     writeln!(f, "[White \"{}\"]", white)?;
     writeln!(f, "[Black \"{}\"]", black)?;
-    writeln!(f, "[Size \"{}\"]", BOARD_SIZE)?;
+    writeln!(f, "[Size \"{}\"]", 5)?; // TODO: Support other sizes
     writeln!(
         f,
         "[Result \"{}\"]",

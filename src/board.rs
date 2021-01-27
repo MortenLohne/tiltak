@@ -8,11 +8,7 @@ lazy_static! {
     pub(crate) static ref ZOBRIST_KEYS_6S: Box<ZobristKeys<6>> = ZobristKeys::new();
 }
 
-/// The size of the board. Only 5 works correctly for now.
-pub const BOARD_SIZE: usize = 5;
 pub const MAX_BOARD_SIZE: usize = 8;
-
-pub const BOARD_AREA: usize = BOARD_SIZE * BOARD_SIZE;
 
 pub const STARTING_STONES: u8 = 21;
 pub const STARTING_CAPSTONES: u8 = 1;
@@ -1193,9 +1189,9 @@ impl<const S: usize> Default for Board<S> {
 
 impl<const S: usize> fmt::Debug for Board<S> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
-        for y in 0..BOARD_SIZE {
+        for y in 0..S {
             for print_row in 0..3 {
-                for x in 0..BOARD_SIZE {
+                for x in 0..S {
                     for print_column in 0..3 {
                         match self.cells.raw[x][y].get(print_column * 3 + print_row) {
                             None => write!(f, "[.]")?,
@@ -1300,10 +1296,9 @@ impl<const S: usize> Board<S> {
 
     pub fn flip_board_y(&self) -> Board<S> {
         let mut new_board = self.clone();
-        for x in 0..BOARD_SIZE as u8 {
-            for y in 0..BOARD_SIZE as u8 {
-                new_board[Square(y * BOARD_SIZE as u8 + x)] =
-                    self[Square((BOARD_SIZE as u8 - y - 1) * BOARD_SIZE as u8 + x)];
+        for x in 0..S as u8 {
+            for y in 0..S as u8 {
+                new_board[Square(y * S as u8 + x)] = self[Square((S as u8 - y - 1) * S as u8 + x)];
             }
         }
         new_board
@@ -1311,10 +1306,9 @@ impl<const S: usize> Board<S> {
 
     pub fn flip_board_x(&self) -> Board<S> {
         let mut new_board = self.clone();
-        for x in 0..BOARD_SIZE as u8 {
-            for y in 0..BOARD_SIZE as u8 {
-                new_board[Square(y * BOARD_SIZE as u8 + x)] =
-                    self[Square(y * BOARD_SIZE as u8 + (BOARD_SIZE as u8 - x - 1))];
+        for x in 0..S as u8 {
+            for y in 0..S as u8 {
+                new_board[Square(y * S as u8 + x)] = self[Square(y * S as u8 + (S as u8 - x - 1))];
             }
         }
         new_board
@@ -1322,12 +1316,11 @@ impl<const S: usize> Board<S> {
 
     pub fn rotate_board(&self) -> Board<S> {
         let mut new_board = self.clone();
-        for x in 0..BOARD_SIZE as u8 {
-            for y in 0..BOARD_SIZE as u8 {
+        for x in 0..S as u8 {
+            for y in 0..S as u8 {
                 let new_x = y;
-                let new_y = BOARD_SIZE as u8 - x - 1;
-                new_board[Square(y * BOARD_SIZE as u8 + x)] =
-                    self[Square(new_y * BOARD_SIZE as u8 + new_x)];
+                let new_y = S as u8 - x - 1;
+                new_board[Square(y * S as u8 + x)] = self[Square(new_y * S as u8 + new_x)];
             }
         }
         new_board
@@ -1644,7 +1637,7 @@ impl<const S: usize> board::Board for Board<S> {
             Move::Move(square, direction, stack_movement) => {
                 let mut from = square;
 
-                let mut pieces_left_behind: ArrayVec<[u8; BOARD_SIZE - 1]> = ArrayVec::new();
+                let mut pieces_left_behind: ArrayVec<[u8; MAX_BOARD_SIZE - 1]> = ArrayVec::new();
                 let mut flattens_stone = false;
 
                 for sq in <MoveIterator<S>>::new(square, direction, stack_movement.clone()) {
@@ -1817,13 +1810,9 @@ impl<const S: usize> EvalBoardTrait for Board<S> {
     }
 }
 
-pub(crate) const NUM_SQUARE_SYMMETRIES: usize = match BOARD_SIZE {
-    4 => 3,
-    5 => 6,
-    _ => 0,
-};
+pub(crate) const NUM_SQUARE_SYMMETRIES: usize = 6;
 
-pub(crate) const SQUARE_SYMMETRIES: [usize; BOARD_AREA] = [
+pub(crate) const SQUARE_SYMMETRIES: [usize; 25] = [
     0, 1, 2, 1, 0, 1, 3, 4, 3, 1, 2, 4, 5, 4, 2, 1, 3, 4, 3, 1, 0, 1, 2, 1, 0,
 ];
 
@@ -1937,16 +1926,16 @@ impl<const S: usize> pgn_traits::pgn::PgnBoard for Board<S> {
         }
 
         let fen_rows: Vec<&str> = fen_words[0].split('/').collect();
-        if fen_rows.len() != BOARD_SIZE {
+        if fen_rows.len() != S {
             return Err(pgn::Error::new_parse_error(format!(
                 "Couldn't parse TPS string \"{}\", had {} rows instead of {}.",
                 fen,
                 fen_rows.len(),
-                BOARD_SIZE
+                S
             )));
         }
 
-        let rows: Vec<[Stack; BOARD_SIZE]> = fen_rows
+        let rows: Vec<[Stack; S]> = fen_rows
             .into_iter()
             .map(parse_row)
             .collect::<Result<_, _>>()
@@ -2004,11 +1993,11 @@ impl<const S: usize> pgn_traits::pgn::PgnBoard for Board<S> {
 
         return Ok(board);
 
-        fn parse_row(row_str: &str) -> Result<[Stack; BOARD_SIZE], pgn::Error> {
+        fn parse_row<const S: usize>(row_str: &str) -> Result<[Stack; S], pgn::Error> {
             let mut column_id = 0;
-            let mut row = [Stack::default(); BOARD_SIZE];
+            let mut row = [Stack::default(); S];
             let mut row_str_iter = row_str.chars().peekable();
-            while column_id < BOARD_SIZE as u8 {
+            while column_id < S as u8 {
                 match row_str_iter.peek() {
                     None => {
                         return Err(pgn::Error::new_parse_error(format!(

@@ -5,8 +5,8 @@ use board_game_traits::board::GameResult;
 use rand::prelude::*;
 use rayon::prelude::*;
 
+use crate::board::TunableBoard;
 use crate::board::{Board, Move};
-use crate::board::{TunableBoard, BOARD_SIZE};
 use crate::pgn_parser;
 use crate::pgn_writer::Game;
 use crate::search::MctsSetting;
@@ -86,7 +86,7 @@ pub fn train_perpetually<const S: usize, const N: usize, const M: usize>(
         all_move_scores.extend_from_slice(&move_scores[..]);
         all_games.extend_from_slice(&games[..]);
 
-        let file_name = format!("games{}_{}s_batch{}.ptn", training_id, BOARD_SIZE, batch_id);
+        let file_name = format!("games{}_{}s_batch{}.ptn", training_id, S, batch_id);
 
         let outfile = fs::OpenOptions::new()
             .create(true)
@@ -105,7 +105,7 @@ pub fn train_perpetually<const S: usize, const N: usize, const M: usize>(
             .append(true)
             .open(format!(
                 "move_scores{}_{}s_batch{}.ptn",
-                training_id, BOARD_SIZE, batch_id
+                training_id, S, batch_id
             ))
             .unwrap();
 
