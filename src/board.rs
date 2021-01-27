@@ -229,7 +229,7 @@ pub const POLICY_PARAMS_5S: [f32; NUM_POLICY_PARAMS_5S] = [
 ];
 
 #[allow(clippy::unreadable_literal)]
-const VALUE_PARAMS_4S: [f32; NUM_VALUE_PARAMS_4S] = [
+pub const VALUE_PARAMS_4S: [f32; NUM_VALUE_PARAMS_4S] = [
     0.40710354,
     0.54004306,
     0.7314182,
@@ -283,7 +283,7 @@ const VALUE_PARAMS_4S: [f32; NUM_VALUE_PARAMS_4S] = [
     0.003347816,
 ];
 #[allow(clippy::unreadable_literal)]
-const POLICY_PARAMS_4S: [f32; NUM_POLICY_PARAMS_4S] = [
+pub const POLICY_PARAMS_4S: [f32; NUM_POLICY_PARAMS_4S] = [
     0.9593912,
     0.051811166,
     0.33085102,
@@ -696,8 +696,8 @@ impl Square {
             .0;
         if file >= S as u8 || rank >= S as u8 {
             Err(pgn::Error::new_parse_error(format!(
-                "Couldn't parse square \"{}\"",
-                input
+                "Couldn't parse square \"{}\" at size {}",
+                input, S
             )))
         } else {
             Ok(Square(file + rank * S as u8))

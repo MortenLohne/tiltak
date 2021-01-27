@@ -1,12 +1,25 @@
 use clap::{App, Arg, SubCommand};
 use std::path::Path;
-use taik::board::{NUM_POLICY_PARAMS_5S, NUM_VALUE_PARAMS_5S, POLICY_PARAMS_5S, VALUE_PARAMS_5S};
+use taik::board::{
+    NUM_POLICY_PARAMS_4S, NUM_POLICY_PARAMS_5S, NUM_VALUE_PARAMS_4S, NUM_VALUE_PARAMS_5S,
+    POLICY_PARAMS_4S, POLICY_PARAMS_5S, VALUE_PARAMS_4S, VALUE_PARAMS_5S,
+};
 use taik::tune::{spsa, training};
 
 fn main() {
     let app = App::new("Taik variable tuning")
         .version("0.1")
         .author("Morten Lohne")
+        .arg(
+            Arg::with_name("size")
+                .global(true)
+                .short("s")
+                .long("size")
+                .help("Board size")
+                .takes_value(true)
+                .default_value("5")
+                .possible_values(&["4", "5", "6"]),
+        )
         .subcommand(SubCommand::with_name("selfplay")
             .about("Tune value and policy constants by playing against itself. Will write the games to text files in the working directory."))
         .subcommand(SubCommand::with_name("selfplay-from-scratch")
@@ -39,17 +52,28 @@ fn main() {
             ));
 
     let matches = app.get_matches();
+    let size: usize = matches.value_of("size").unwrap().parse().unwrap();
+
     match matches.subcommand() {
         ("selfplay", _) => {
             for i in 0.. {
-                let file_name = format!("games{}_batch0.ptn", i);
+                let file_name = format!("games{}_s{}_batch0.ptn", i, size);
                 if !Path::new(&file_name).exists() {
-                    training::train_perpetually::<5, 69, 91>(
-                        i,
-                        &VALUE_PARAMS_5S,
-                        &POLICY_PARAMS_5S,
-                    )
-                    .unwrap();
+                    match size {
+                        4 => training::train_perpetually::<
+                            4,
+                            NUM_VALUE_PARAMS_4S,
+                            NUM_POLICY_PARAMS_4S,
+                        >(i, &VALUE_PARAMS_4S, &POLICY_PARAMS_4S)
+                        .unwrap(),
+                        5 => training::train_perpetually::<
+                            5,
+                            NUM_VALUE_PARAMS_5S,
+                            NUM_POLICY_PARAMS_5S,
+                        >(i, &VALUE_PARAMS_5S, &POLICY_PARAMS_5S)
+                        .unwrap(),
+                        _ => panic!("Size {} not supported.", size),
+                    }
                     break;
                 } else {
                     println!("File {} already exists, trying next.", file_name);
@@ -58,10 +82,23 @@ fn main() {
         }
         ("selfplay-from-scratch", _) => {
             for i in 0.. {
-                let file_name = format!("games{}_batch0.ptn", i);
+                let file_name = format!("games{}_s{}_batch0.ptn", i, size);
                 if !Path::new(&file_name).exists() {
-                    training::train_from_scratch::<5, NUM_VALUE_PARAMS_5S, NUM_POLICY_PARAMS_5S>(i)
-                        .unwrap();
+                    match size {
+                        4 => training::train_from_scratch::<
+                            5,
+                            NUM_VALUE_PARAMS_4S,
+                            NUM_POLICY_PARAMS_4S,
+                        >(i)
+                        .unwrap(),
+                        5 => training::train_from_scratch::<
+                            5,
+                            NUM_VALUE_PARAMS_5S,
+                            NUM_POLICY_PARAMS_5S,
+                        >(i)
+                        .unwrap(),
+                        _ => panic!("Size {} not supported.", size),
+                    }
                     break;
                 } else {
                     println!("File {} already exists, trying next.", file_name);
@@ -70,21 +107,50 @@ fn main() {
         }
         ("value-from-file", Some(arg)) => {
             let file_name = arg.value_of("file-name").unwrap();
-            let value_params =
-                training::tune_value_from_file::<5, NUM_VALUE_PARAMS_5S>(file_name).unwrap();
-            println!("{:?}", value_params);
+            match size {
+                4 => {
+                    let value_params =
+                        training::tune_value_from_file::<4, NUM_VALUE_PARAMS_4S>(file_name)
+                            .unwrap();
+                    println!("{:?}", value_params);
+                }
+                5 => {
+                    let value_params =
+                        training::tune_value_from_file::<5, NUM_VALUE_PARAMS_5S>(file_name)
+                            .unwrap();
+                    println!("{:?}", value_params);
+                }
+                _ => panic!("Size {} not supported.", size),
+            }
         }
         ("both-from-file", Some(arg)) => {
             let value_file_name = arg.value_of("value-file-name").unwrap();
             let policy_file_name = arg.value_of("policy-file-name").unwrap();
-            let (value_params, policy_params) = training::tune_value_and_policy_from_file::<
-                5,
-                NUM_VALUE_PARAMS_5S,
-                NUM_POLICY_PARAMS_5S,
-            >(value_file_name, policy_file_name)
-            .unwrap();
-            println!("Value: {:?}", value_params);
-            println!("Policy: {:?}", policy_params);
+            match size {
+                4 => {
+                    let (value_params, policy_params) =
+                        training::tune_value_and_policy_from_file::<
+                            4,
+                            NUM_VALUE_PARAMS_4S,
+                            NUM_POLICY_PARAMS_4S,
+                        >(value_file_name, policy_file_name)
+                        .unwrap();
+                    println!("Value: {:?}", value_params);
+                    println!("Policy: {:?}", policy_params);
+                }
+                5 => {
+                    let (value_params, policy_params) =
+                        training::tune_value_and_policy_from_file::<
+                            5,
+                            NUM_VALUE_PARAMS_5S,
+                            NUM_POLICY_PARAMS_5S,
+                        >(value_file_name, policy_file_name)
+                        .unwrap();
+                    println!("Value: {:?}", value_params);
+                    println!("Policy: {:?}", policy_params);
+                }
+                _ => panic!("Size {} not supported.", size),
+            }
         }
         ("spsa", Some(arg)) => {
             let mut variables = vec![
@@ -99,7 +165,11 @@ fn main() {
                     apply_factor: 0.002,
                 },
             ];
-            spsa::tune::<5>(&mut variables, arg.value_of("book"));
+            match size {
+                4 => spsa::tune::<4>(&mut variables, arg.value_of("book")),
+                5 => spsa::tune::<5>(&mut variables, arg.value_of("book")),
+                _ => panic!("Size {} not supported.", size),
+            }
         }
         ("", None) => {
             println!("Error: No subcommand selected. Try the 'help' subcommand for a list.");

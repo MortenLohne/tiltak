@@ -249,9 +249,9 @@ impl GameStats {
     }
 }
 
-pub fn read_games_from_file<const N: usize>(
+pub fn read_games_from_file<const S: usize>(
     file_name: &str,
-) -> Result<Vec<Game<Board<N>>>, Box<dyn error::Error>> {
+) -> Result<Vec<Game<Board<S>>>, Box<dyn error::Error>> {
     let mut file = fs::File::open(file_name)?;
     let mut input = String::new();
     file.read_to_string(&mut input)?;
@@ -261,7 +261,7 @@ pub fn read_games_from_file<const N: usize>(
 pub fn tune_value_from_file<const S: usize, const N: usize>(
     file_name: &str,
 ) -> Result<[f32; N], Box<dyn error::Error>> {
-    let games = read_games_from_file::<N>(file_name)?;
+    let games = read_games_from_file::<S>(file_name)?;
 
     let (positions, results) = positions_and_results_from_games(games);
 
