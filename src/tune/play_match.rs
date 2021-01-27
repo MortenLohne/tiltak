@@ -1,11 +1,10 @@
 use crate::board::{Board, Move, Role};
 use crate::pgn_writer::Game;
+use crate::search;
 use crate::search::{MctsSetting, Score};
-use crate::{pgn_writer, search};
 use board_game_traits::board::{Board as BoardTrait, Color};
 use rand::seq::SliceRandom;
 use rand::Rng;
-use std::io;
 
 /// Play a single training game between two parameter sets
 pub fn play_game<const S: usize>(
@@ -90,38 +89,4 @@ pub fn best_move(temperature: f64, move_scores: &[(Move, Score)]) -> Move {
         }
     }
     unreachable!()
-}
-
-/// Write a single game in ptn format with the given writer
-pub fn game_to_ptn<W: io::Write, const N: usize>(
-    game: &Game<Board<N>>,
-    writer: &mut W,
-) -> Result<(), io::Error> {
-    let Game {
-        start_board,
-        moves,
-        game_result,
-        tags,
-    } = game;
-    pgn_writer::game_to_pgn(
-        &mut start_board.clone(),
-        &moves,
-        "",
-        "",
-        "",
-        "",
-        tags.iter()
-            .find_map(|(tag, val)| {
-                if &tag.to_lowercase() == "white" {
-                    Some(val)
-                } else {
-                    None
-                }
-            })
-            .unwrap_or(&String::new()),
-        "",
-        *game_result,
-        &[],
-        writer,
-    )
 }

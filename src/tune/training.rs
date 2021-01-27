@@ -1,5 +1,5 @@
+use crate::tune::gradient_descent;
 use crate::tune::play_match::play_game;
-use crate::tune::{gradient_descent, play_match};
 use board_game_traits::board::Board as BoardTrait;
 use board_game_traits::board::GameResult;
 use rand::prelude::*;
@@ -97,7 +97,7 @@ pub fn train_perpetually<const S: usize, const N: usize, const M: usize>(
         let mut writer = io::BufWriter::new(outfile);
 
         for game in games.iter() {
-            play_match::game_to_ptn(game, &mut writer)?;
+            game.game_to_pgn(&mut writer)?;
         }
 
         let games_and_move_scores_outfile = fs::OpenOptions::new()

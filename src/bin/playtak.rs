@@ -441,21 +441,30 @@ impl PlaytakSession {
         {
             info!("Game finished. Pgn: ");
 
+            let date = Local::today();
+
+            let tags = vec![
+                ("Event".to_string(), "Playtak challenge".to_string()),
+                ("Site".to_string(), "playtak.com".to_string()),
+                ("Player1".to_string(), white_player.to_string()),
+                ("Player2".to_string(), black_player.to_string()),
+                ("Size".to_string(), S.to_string()),
+                (
+                    "Date".to_string(),
+                    format!("{}.{:0>2}.{:0>2}", date.year(), date.month(), date.day()),
+                ),
+            ];
+
+            let game = Game {
+                start_board: <Board<S>>::start_board(),
+                moves: moves.clone(),
+                game_result: board.game_result(),
+                tags,
+            };
+
             let mut pgn = Vec::new();
 
-            taik::pgn_writer::game_to_pgn(
-                &mut <Board<5>>::start_board(),
-                &moves,
-                "Playtak challenge",
-                "playtak.com",
-                "",
-                "",
-                white_player,
-                black_player,
-                board.game_result(),
-                &[],
-                &mut pgn,
-            )?;
+            game.game_to_pgn(&mut pgn)?;
 
             info!("{}", String::from_utf8(pgn).unwrap());
         }
@@ -485,9 +494,11 @@ use std::cmp::Ordering;
 use std::iter;
 
 use arrayvec::ArrayVec;
+use chrono::{Datelike, Local};
 use std::convert::Infallible;
 use taik::board;
 use taik::board::{Direction, Move, Movement, Role, StackMovement};
+use taik::pgn_writer::Game;
 #[cfg(not(feature = "aws-lambda"))]
 use taik::search;
 
