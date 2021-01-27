@@ -14,7 +14,7 @@ fn parse_place_move_test() {
 
     for (playtak_move_string, san_move_string) in move_strings.iter() {
         assert_eq!(
-            playtak::parse_move(playtak_move_string).to_string(),
+            playtak::parse_move::<5>(playtak_move_string).to_string::<5>(),
             *san_move_string
         );
     }
@@ -26,7 +26,7 @@ fn parse_move_move_test() {
 
     for (playtak_move_string, san_move_string) in move_strings.iter() {
         assert_eq!(
-            playtak::parse_move(playtak_move_string).to_string(),
+            playtak::parse_move::<5>(playtak_move_string).to_string::<5>(),
             *san_move_string
         );
     }
@@ -44,7 +44,7 @@ fn write_place_move_5s_test() {
     for (playtak_move_string, san_move_string) in move_strings.iter() {
         let board = <Board<5>>::start_board();
         let mut sink = String::new();
-        playtak::write_move(board.move_from_san(san_move_string).unwrap(), &mut sink);
+        playtak::write_move::<5>(board.move_from_san(san_move_string).unwrap(), &mut sink);
         assert_eq!(sink, *playtak_move_string);
     }
 }
@@ -56,7 +56,7 @@ fn write_move_move_5s_test() {
     for (playtak_move_string, san_move_string) in move_strings.iter() {
         let board = <Board<5>>::start_board();
         let mut sink = String::new();
-        playtak::write_move(board.move_from_san(san_move_string).unwrap(), &mut sink);
+        playtak::write_move::<5>(board.move_from_san(san_move_string).unwrap(), &mut sink);
         assert_eq!(sink, *playtak_move_string);
     }
 }

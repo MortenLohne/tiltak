@@ -3,6 +3,7 @@
 use lazy_static::lazy_static;
 
 lazy_static! {
+    pub(crate) static ref ZOBRIST_KEYS_4S: Box<ZobristKeys<4>> = ZobristKeys::new();
     pub(crate) static ref ZOBRIST_KEYS_5S: Box<ZobristKeys<5>> = ZobristKeys::new();
     pub(crate) static ref ZOBRIST_KEYS_6S: Box<ZobristKeys<6>> = ZobristKeys::new();
 }
@@ -1092,9 +1093,10 @@ pub fn zobrist_stones_in_stack(
 
 pub fn zobrist_to_move(s: usize, color: Color) -> u64 {
     match s {
+        4 => ZOBRIST_KEYS_4S.to_move[color.disc()],
         5 => ZOBRIST_KEYS_5S.to_move[color.disc()],
         6 => ZOBRIST_KEYS_6S.to_move[color.disc()],
-        _ => panic!(),
+        _ => panic!("No zobrist keys for size {}. Size not supported.", s),
     }
 }
 

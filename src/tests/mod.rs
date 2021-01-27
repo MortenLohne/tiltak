@@ -1,4 +1,6 @@
 #[cfg(test)]
+mod board_generic_tests;
+#[cfg(test)]
 mod board_tests;
 #[cfg(test)]
 mod mcts_tests;
