@@ -798,11 +798,11 @@ impl Move {
         }
         let first_char = input.chars().next().unwrap();
         match first_char {
-            'a'..='e' if input.len() == 2 => {
+            'a'..='h' if input.len() == 2 => {
                 let square = Square::parse_square::<S>(input)?;
                 Ok(Move::Place(Flat, square))
             }
-            'a'..='g' if input.len() == 3 => {
+            'a'..='h' if input.len() == 3 => {
                 let square = Square::parse_square::<S>(&input[0..2])?;
                 let direction = Direction::parse(input.chars().nth(2).unwrap());
                 // Moves in the simplified move notation always move one piece
@@ -1494,7 +1494,7 @@ impl<const S: usize> Board<S> {
                 .skip(1)
                 .find(|(_i, v)| (**v).0 == 0)
                 .map(|(i, _v)| i)
-                .unwrap_or(BOARD_AREA + 1) as u8;
+                .unwrap_or(S * S + 1) as u8;
 
             if let Some(square) = self.is_win_by_road(&group_data.groups, highest_component_id) {
                 debug_assert!(self[square].top_stone().unwrap().is_road_piece());
@@ -1548,11 +1548,9 @@ impl<const S: usize> Board<S> {
         // TODO: Include highest id?
         for id in 1..highest_component_id {
             if (components.raw[0].iter().any(|&cell| cell == id)
-                && components.raw[BOARD_SIZE - 1]
-                    .iter()
-                    .any(|&cell| cell == id))
-                || ((0..BOARD_SIZE).any(|y| components.raw[y][0] == id)
-                    && (0..BOARD_SIZE).any(|y| components.raw[y][BOARD_SIZE - 1] == id))
+                && components.raw[S - 1].iter().any(|&cell| cell == id))
+                || ((0..S).any(|y| components.raw[y][0] == id)
+                    && (0..S).any(|y| components.raw[y][S - 1] == id))
             {
                 let square = squares_iterator::<S>()
                     .find(|&sq| components[sq] == id)
