@@ -1,6 +1,6 @@
 use clap::{App, Arg, SubCommand};
 use std::path::Path;
-use taik::board::{NUM_POLICY_PARAMS, NUM_VALUE_PARAMS, POLICY_PARAMS_5S, VALUE_PARAMS_5S};
+use taik::board::{NUM_POLICY_PARAMS_5S, NUM_VALUE_PARAMS_5S, POLICY_PARAMS_5S, VALUE_PARAMS_5S};
 use taik::tune::{spsa, training};
 
 fn main() {
@@ -60,7 +60,8 @@ fn main() {
             for i in 0.. {
                 let file_name = format!("games{}_batch0.ptn", i);
                 if !Path::new(&file_name).exists() {
-                    training::train_from_scratch::<5, NUM_VALUE_PARAMS, 91>(i).unwrap();
+                    training::train_from_scratch::<5, NUM_VALUE_PARAMS_5S, NUM_POLICY_PARAMS_5S>(i)
+                        .unwrap();
                     break;
                 } else {
                     println!("File {} already exists, trying next.", file_name);
@@ -70,7 +71,7 @@ fn main() {
         ("value-from-file", Some(arg)) => {
             let file_name = arg.value_of("file-name").unwrap();
             let value_params =
-                training::tune_value_from_file::<5, NUM_VALUE_PARAMS>(file_name).unwrap();
+                training::tune_value_from_file::<5, NUM_VALUE_PARAMS_5S>(file_name).unwrap();
             println!("{:?}", value_params);
         }
         ("both-from-file", Some(arg)) => {
@@ -78,8 +79,8 @@ fn main() {
             let policy_file_name = arg.value_of("policy-file-name").unwrap();
             let (value_params, policy_params) = training::tune_value_and_policy_from_file::<
                 5,
-                NUM_VALUE_PARAMS,
-                NUM_POLICY_PARAMS,
+                NUM_VALUE_PARAMS_5S,
+                NUM_POLICY_PARAMS_5S,
             >(value_file_name, policy_file_name)
             .unwrap();
             println!("Value: {:?}", value_params);

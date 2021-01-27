@@ -1563,7 +1563,7 @@ impl<const S: usize> Board<S> {
         group_data: &GroupData<S>,
         params: &[f32],
     ) -> f32 {
-        let mut coefficients = vec![0.0; NUM_VALUE_PARAMS];
+        let mut coefficients = vec![0.0; Self::value_params().len()];
         value_eval::static_eval_game_phase(&self, group_data, &mut coefficients);
         coefficients.iter().zip(params).map(|(a, b)| a * b).sum()
     }
@@ -1815,9 +1815,6 @@ pub(crate) const NUM_SQUARE_SYMMETRIES: usize = 6;
 pub(crate) const SQUARE_SYMMETRIES: [usize; 25] = [
     0, 1, 2, 1, 0, 1, 3, 4, 3, 1, 2, 4, 5, 4, 2, 1, 3, 4, 3, 1, 0, 1, 2, 1, 0,
 ];
-
-pub const NUM_VALUE_PARAMS: usize = 69;
-pub const NUM_POLICY_PARAMS: usize = 91;
 
 impl<const S: usize> TunableBoard for Board<S> {
     type ExtraData = GroupData<S>;
