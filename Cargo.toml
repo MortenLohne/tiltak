@@ -13,11 +13,12 @@ debug = true
 
 [features]
 constant-tuning = ["rayon", "rand_distr"]
-aws-lambda = ["lambda_runtime", "serde", "serde_json", "arrayvec/serde", "rusoto_core", "rusoto_lambda", "bytes", "tokio"]
+aws-lambda-runtime = ["lambda_runtime", "serde", "serde_json", "arrayvec/serde"]
+aws-lambda-client = ["serde", "serde_json", "arrayvec/serde", "rusoto_core", "rusoto_lambda", "bytes", "tokio"]
 
 [[bin]]
 name = "bootstrap"
-required-features = ["aws-lambda"]
+required-features = ["aws-lambda-runtime"]
 
 [[bin]]
 name = "tune"

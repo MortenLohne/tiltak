@@ -29,7 +29,7 @@ extern crate arrayvec;
 extern crate board_game_traits;
 extern crate pgn_traits;
 
-#[cfg(feature = "aws-lambda")]
+#[cfg(any(feature = "aws-lambda-runtime", feature = "aws-lambda-client"))]
 pub mod aws;
 mod bitboard;
 pub mod board;

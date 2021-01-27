@@ -8,7 +8,7 @@ use std::net::TcpStream;
 use std::str::FromStr;
 use std::time::Duration;
 use std::{io, net, thread};
-#[cfg(feature = "aws-lambda")]
+#[cfg(feature = "aws-lambda-client")]
 use taik::aws;
 use taik::board::{Board, MAX_BOARD_SIZE};
 
@@ -59,7 +59,7 @@ pub fn main() -> Result<()> {
                 .help("Instead of seeking any game, accept any seek from the specified bot")
                 .takes_value(true),
         );
-    if cfg!(feature = "aws-lambda") {
+    if cfg!(feature = "aws-lambda-client") {
         app = app.arg(
             Arg::with_name("aws-function-name")
                 .long("aws-function-name")
@@ -354,7 +354,7 @@ impl PlaytakSession {
                 break;
             }
             if board.side_to_move() == our_color {
-                #[cfg(feature = "aws-lambda")]
+                #[cfg(feature = "aws-lambda-client")]
                 let (best_move, score) = {
                     let aws_function_name = self.aws_function_name.as_ref().unwrap();
                     let event = aws::Event {
@@ -364,11 +364,11 @@ impl PlaytakSession {
                         increment,
                     };
                     let aws::Output { best_move, score } =
-                        aws::best_move_aws(aws_function_name, &event)?;
+                        aws::client::best_move_aws(aws_function_name, &event)?;
                     (best_move, score)
                 };
 
-                #[cfg(not(feature = "aws-lambda"))]
+                #[cfg(not(feature = "aws-lambda-client"))]
                 let (best_move, score) = {
                     let maximum_time = our_time_left / 5 + increment;
                     search::play_move_time(board.clone(), maximum_time)
@@ -499,7 +499,7 @@ use std::convert::Infallible;
 use taik::board;
 use taik::board::{Direction, Move, Movement, Role, StackMovement};
 use taik::pgn_writer::Game;
-#[cfg(not(feature = "aws-lambda"))]
+#[cfg(not(feature = "aws-lambda-client"))]
 use taik::search;
 
 pub fn parse_move<const S: usize>(input: &str) -> board::Move {
