@@ -14,6 +14,7 @@ use std::time::Duration;
 
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct Event {
+    pub size: usize,
     pub moves: Vec<Move>,
     pub time_left: Duration,
     pub increment: Duration,
@@ -26,8 +27,19 @@ pub struct Output {
 }
 
 /// AWS serverside handler
-pub fn handle_aws_event(e: Event, _c: Context) -> Result<Output, HandlerError> {
-    let mut board = <Board<5>>::default();
+pub fn handle_aws_event(e: Event, c: Context) -> Result<Output, HandlerError> {
+    match e.size {
+        4 => handle_aws_event_generic::<4>(e, c),
+        5 => handle_aws_event_generic::<5>(e, c),
+        s => panic!("Unsupported board size {}", s),
+    }
+}
+
+pub fn handle_aws_event_generic<const S: usize>(
+    e: Event,
+    _c: Context,
+) -> Result<Output, HandlerError> {
+    let mut board = <Board<S>>::default();
     for mv in e.moves {
         board.do_move(mv);
     }
