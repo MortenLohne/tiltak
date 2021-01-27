@@ -1168,7 +1168,6 @@ impl ops::BitOr for GroupEdgeConnection {
     }
 }
 #[derive(Clone, PartialEq, Eq, Debug)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct GroupData<const S: usize> {
     pub(crate) groups: AbstractBoard<u8, S>,
     pub(crate) amount_in_group: Box<[(u8, GroupEdgeConnection)]>,
@@ -1298,10 +1297,8 @@ impl<const S: usize> ZobristKeys<S> {
 
 /// Complete representation of a Tak position
 #[derive(Clone)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Board<const S: usize> {
     cells: AbstractBoard<Stack, S>,
-    #[cfg_attr(feature = "serde", serde(with = "ColorDef"))]
     to_move: Color,
     white_stones_left: u8,
     black_stones_left: u8,
@@ -2275,7 +2272,6 @@ impl<const S: usize> pgn_traits::pgn::PgnBoard for Board<S> {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub(crate) struct AbstractBoard<T, const S: usize> {
     raw: [[T; S]; S],
 }
