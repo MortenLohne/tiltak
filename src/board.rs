@@ -12,8 +12,29 @@ lazy_static! {
 
 pub const MAX_BOARD_SIZE: usize = 8;
 
-pub const STARTING_STONES: u8 = 21;
-pub const STARTING_CAPSTONES: u8 = 1;
+pub const fn starting_stones<const S: usize>() -> u8 {
+    match S {
+        3 => 10,
+        4 => 16,
+        5 => 21,
+        6 => 30,
+        7 => 40,
+        8 => 50,
+        _ => 0,
+    }
+}
+
+pub const fn starting_capstones<const S: usize>() -> u8 {
+    match S {
+        3 => 0,
+        4 => 0,
+        5 => 1,
+        6 => 1,
+        7 => 2,
+        8 => 2,
+        _ => 0,
+    }
+}
 
 pub(crate) const fn num_square_symmetries<const S: usize>() -> usize {
     match S {
@@ -1338,10 +1359,10 @@ impl<const S: usize> Default for Board<S> {
         Board {
             cells: Default::default(),
             to_move: Color::White,
-            white_stones_left: STARTING_STONES,
-            black_stones_left: STARTING_STONES,
-            white_caps_left: STARTING_CAPSTONES,
-            black_caps_left: STARTING_CAPSTONES,
+            white_stones_left: starting_stones::<S>(),
+            black_stones_left: starting_stones::<S>(),
+            white_caps_left: starting_capstones::<S>(),
+            black_caps_left: starting_capstones::<S>(),
             half_moves_played: 0,
             moves: vec![],
             hash: zobrist_to_move::<S>(Color::White),
@@ -1846,7 +1867,7 @@ impl<const S: usize> board::Board for Board<S> {
         };
 
         debug_assert_eq!(
-            2 * (STARTING_STONES + STARTING_CAPSTONES)
+            2 * (starting_stones::<S>() + starting_capstones::<S>())
                 - self.white_stones_left
                 - self.black_stones_left
                 - self.white_caps_left
