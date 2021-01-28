@@ -26,7 +26,7 @@ fn play_random_games_prop<const S: usize>() {
     let mut duration = 0;
 
     let mut rng = rand::thread_rng();
-    for _ in 0..5_000 {
+    for _ in 0..1_000 {
         let mut board = <Board<S>>::default();
         let mut moves = vec![];
         for i in 0.. {
