@@ -10,6 +10,7 @@ pub fn handle_aws_event(e: Event, c: Context) -> Result<Output, HandlerError> {
     match e.size {
         4 => handle_aws_event_generic::<4>(e, c),
         5 => handle_aws_event_generic::<5>(e, c),
+        6 => handle_aws_event_generic::<6>(e, c),
         s => panic!("Unsupported board size {}", s),
     }
 }

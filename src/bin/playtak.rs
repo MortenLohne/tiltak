@@ -130,6 +130,7 @@ pub fn main() -> Result<()> {
         let result = match size {
             4 => session.seek_game::<4>(seekmode),
             5 => session.seek_game::<5>(seekmode),
+            6 => session.seek_game::<6>(seekmode),
             s => panic!("Unsupported size {}", s),
         };
 
