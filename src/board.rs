@@ -2465,9 +2465,8 @@ pub(crate) struct AbstractBoard<T, const S: usize> {
 
 impl<T: Default + Copy, const S: usize> Default for AbstractBoard<T, S> {
     fn default() -> Self {
-        let default = T::default();
         AbstractBoard {
-            raw: [[default.clone(); S]; S],
+            raw: [[T::default(); S]; S],
         }
     }
 }
