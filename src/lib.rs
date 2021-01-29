@@ -8,7 +8,7 @@
 //! use taik::board::Board;
 //! use board_game_traits::board::Board as BoardTrait;
 //!
-//! let board = Board::start_board();
+//! let board = <Board<5>>::start_board();
 //! let mut moves = vec![];
 //! board.generate_moves(&mut moves);
 //! assert_eq!(moves.len(), 25);
@@ -19,10 +19,11 @@
 //! ```rust,no_run
 //! use taik::board::Board;
 //! use taik::mcts;
+//! use pgn_traits::pgn::PgnBoard;
 //!
-//! let board = Board::default();
-//! let (best_move, score) = mcts(board, 100_000);
-//! println!("Played {} with score {}", best_move, score);
+//! let board = <Board<5>>::default();
+//! let (best_move, score) = mcts(board.clone(), 100_000);
+//! println!("Played {} with score {}", board.move_to_san(&best_move), score);
 //! ```
 
 extern crate arrayvec;
