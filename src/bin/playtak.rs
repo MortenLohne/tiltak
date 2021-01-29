@@ -42,7 +42,7 @@ pub fn main() -> Result<()> {
                 .help("Board size")
                 .takes_value(true)
                 .default_value("5")
-                .possible_values(&["4", "5"]),
+                .possible_values(&["4", "5", "6"]),
         )
         .arg(
             Arg::with_name("logfile")
