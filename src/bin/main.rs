@@ -53,13 +53,13 @@ fn main() {
             "openings" => {
                 let depth = 4;
                 let mut positions = HashSet::new();
-                let openings = generate_openings::<5>(Board::start_board(), &mut positions, depth);
+                let openings = generate_openings::<6>(Board::start_board(), &mut positions, depth);
 
                 let mut evaled_openings: Vec<_> = openings
                     .into_par_iter()
                     .filter(|position| position.len() == depth as usize)
                     .map(|position| {
-                        let mut board = <Board<5>>::start_board();
+                        let mut board = <Board<6>>::start_board();
                         for mv in position.iter() {
                             board.do_move(mv.clone());
                         }
@@ -70,9 +70,16 @@ fn main() {
                 evaled_openings.sort_by(|(_, (_, score1)), (_, (_, score2))| {
                     score1.partial_cmp(score2).unwrap()
                 });
-                for (p, s) in evaled_openings {
-                    println!("{:?}: {:?}", p, s);
+                for (p, (mv, s)) in evaled_openings {
+                    let mut board = <Board<6>>::start_board();
+                    for mv in p {
+                        print!("{} ", board.move_to_san(&mv));
+                        board.do_move(mv);
+                    }
+                    print!(": ");
+                    println!("{}, {}", board.move_to_san(&mv), s);
                 }
+                return;
             }
             "game" => {
                 let mut input = String::new();
