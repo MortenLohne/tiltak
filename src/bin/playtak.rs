@@ -136,8 +136,8 @@ pub fn main() -> Result<()> {
 
         match result {
             Err(err) => match err.kind() {
-                io::ErrorKind::ConnectionAborted => {
-                    warn!("Server connection aborted, attempting to reconnect")
+                io::ErrorKind::ConnectionAborted | io::ErrorKind::ConnectionReset => {
+                    warn!("Server connection interrupted, caused by \"{}\". This may be due to a server restart, attempting to reconnect.", err)
                 }
                 _ => {
                     error!("Fatal error: {}", err);
