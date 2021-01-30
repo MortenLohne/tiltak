@@ -261,7 +261,7 @@ impl PlaytakSession {
         seek_mode: SeekMode,
     ) -> io::Result<std::convert::Infallible> {
         let mut time_for_game = Duration::from_secs(900);
-        let mut increment = Duration::from_secs(10);
+        let mut increment = Duration::from_secs(30);
 
         if seek_mode == SeekMode::OpenSeek {
             self.send_line(&format!(

@@ -24,7 +24,7 @@ pub fn handle_aws_event_generic<const S: usize>(
         board.do_move(mv);
     }
 
-    let max_time = Duration::min(e.time_left / 40 + e.increment, Duration::from_secs(30));
+    let max_time = Duration::min(e.time_left / 40 + e.increment / 2, Duration::from_secs(30));
 
     let (best_move, score) = search::play_move_time(board, max_time);
 
