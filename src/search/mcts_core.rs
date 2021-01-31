@@ -2,7 +2,6 @@
 use crate::board::{Board, GroupData, Move, TunableBoard};
 use crate::search::{cp_to_win_percentage, MctsSetting, Score};
 use board_game_traits::board::{Board as BoardTrait, Color, GameResult};
-#[cfg(feature = "constant-tuning")]
 use rand::distributions::Distribution;
 use std::ops;
 
@@ -184,7 +183,6 @@ impl Tree {
         }
     }
 
-    #[cfg(feature = "constant-tuning")]
     /// Apply Dirichlet noise to the heuristic scores of the child node
     /// The noise is given `epsilon` weight.
     /// `alpha` is used to generate the noise, lower values generate more varied noise.

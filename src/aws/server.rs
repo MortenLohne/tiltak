@@ -1,6 +1,7 @@
 use crate::aws::{Event, Output};
 use crate::board::Board;
 use crate::search;
+use crate::search::MctsSetting;
 use board_game_traits::board::Board as EvalBoard;
 use lambda_runtime::{error::HandlerError, Context};
 use std::time::Duration;
@@ -26,7 +27,9 @@ pub fn handle_aws_event_generic<const S: usize>(
 
     let max_time = Duration::min(e.time_left / 40 + e.increment / 2, Duration::from_secs(30));
 
-    let (best_move, score) = search::play_move_time(board, max_time);
+    let settings = MctsSetting::default().add_dirichlet(0.1);
+
+    let (best_move, score) = search::play_move_time(board, max_time, settings);
 
     Ok(Output { best_move, score })
 }

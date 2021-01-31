@@ -15,7 +15,6 @@ pub struct MctsSetting<const S: usize> {
     value_params: Vec<f32>,
     policy_params: Vec<f32>,
     search_params: Vec<Score>,
-    #[cfg(feature = "constant-tuning")]
     dirichlet: Option<f32>,
 }
 
@@ -25,7 +24,6 @@ impl<const S: usize> Default for MctsSetting<S> {
             value_params: Vec::from(<Board<S>>::value_params()),
             policy_params: Vec::from(<Board<S>>::policy_params()),
             search_params: vec![1.2, 3500.0],
-            #[cfg(feature = "constant-tuning")]
             dirichlet: None,
         }
     }
@@ -47,7 +45,6 @@ impl<const N: usize> MctsSetting<N> {
         self
     }
 
-    #[cfg(feature = "constant-tuning")]
     pub fn add_dirichlet(mut self, alpha: f32) -> Self {
         self.dirichlet = Some(alpha);
         self
@@ -109,7 +106,6 @@ impl<const S: usize> MonteCarloTree<S> {
             moves: vec![],
         };
 
-        #[cfg(feature = "constant-tuning")]
         if let Some(alpha) = tree.settings.dirichlet {
             tree.select();
             tree.select();
@@ -195,8 +191,12 @@ pub fn mcts<const S: usize>(board: Board<S>, nodes: u64) -> (Move, Score) {
 /// Play a move, calculating for a maximum duration.
 /// It will usually spend much less time, especially if the move is obvious.
 /// On average, it will spend around 20% of `max_time`, and rarely more than 50%.
-pub fn play_move_time<const S: usize>(board: Board<S>, max_time: time::Duration) -> (Move, Score) {
-    let mut tree = MonteCarloTree::new(board);
+pub fn play_move_time<const S: usize>(
+    board: Board<S>,
+    max_time: time::Duration,
+    settings: MctsSetting<S>,
+) -> (Move, Score) {
+    let mut tree = MonteCarloTree::with_settings(board, settings);
     let start_time = time::Instant::now();
 
     for i in 1.. {

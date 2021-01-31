@@ -8,6 +8,7 @@ use taik::board::Board;
 
 use std::any::Any;
 use taik::search;
+use taik::search::MctsSetting;
 
 pub fn main() {
     loop {
@@ -160,7 +161,8 @@ fn parse_go_string<const S: usize>(line: &str, position: &Board<S>) {
             };
 
             let start_time = Instant::now();
-            let (best_move, score) = search::play_move_time::<S>(position.clone(), max_time);
+            let (best_move, score) =
+                search::play_move_time::<S>(position.clone(), max_time, MctsSetting::default());
 
             println!(
                 "info score cp {} time {} pv {}",

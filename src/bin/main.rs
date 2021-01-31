@@ -21,6 +21,7 @@ use taik::board::TunableBoard;
 use taik::board::{Move, Role};
 use taik::minmax;
 use taik::pgn_writer::Game;
+use taik::search::MctsSetting;
 use taik::{board, search};
 
 fn main() {
@@ -148,7 +149,8 @@ fn mcts_selfplay(max_time: time::Duration) {
 
     while board.game_result().is_none() {
         let start_time = time::Instant::now();
-        let (best_move, score) = search::play_move_time::<5>(board.clone(), max_time);
+        let (best_move, score) =
+            search::play_move_time::<5>(board.clone(), max_time, MctsSetting::default());
 
         match board.side_to_move() {
             Color::White => white_elapsed += start_time.elapsed(),

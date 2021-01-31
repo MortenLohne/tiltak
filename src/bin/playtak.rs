@@ -372,7 +372,8 @@ impl PlaytakSession {
                 #[cfg(not(feature = "aws-lambda-client"))]
                 let (best_move, score) = {
                     let maximum_time = our_time_left / 5 + increment;
-                    search::play_move_time(board.clone(), maximum_time)
+                    let settings = MctsSetting::default().add_dirichlet(0.1);
+                    search::play_move_time(board.clone(), maximum_time, settings)
                 };
 
                 board.do_move(best_move.clone());
@@ -502,6 +503,8 @@ use taik::board::{Direction, Move, Movement, Role, StackMovement};
 use taik::pgn_writer::Game;
 #[cfg(not(feature = "aws-lambda-client"))]
 use taik::search;
+#[cfg(not(feature = "aws-lambda-client"))]
+use taik::search::MctsSetting;
 
 pub fn parse_move<const S: usize>(input: &str) -> board::Move {
     let words: Vec<&str> = input.split_whitespace().collect();
