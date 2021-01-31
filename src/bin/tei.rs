@@ -35,9 +35,11 @@ pub fn main() {
             "teinewgame" => {
                 let size_string = words.next();
                 size = size_string.and_then(|s| usize::from_str(s).ok());
+                position = None;
 
-                if size.is_none() {
-                    panic!("Error: Unsupported size {}", size.unwrap_or_default());
+                match size {
+                    Some(4) | Some(5) | Some(6) => (),
+                    _ => panic!("Error: Unsupported size {}", size.unwrap_or_default()),
                 }
             }
             "position" => {
