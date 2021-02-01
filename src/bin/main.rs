@@ -86,12 +86,24 @@ fn main() {
                 let mut input = String::new();
                 io::stdin().read_to_string(&mut input).unwrap();
 
-                let games = taik::pgn_parser::parse_pgn(&input).unwrap();
-                if games.is_empty() {
-                    println!("Couldn't parse any games")
-                }
+                match words.get(1) {
+                    Some(&"6") => {
+                        let games = taik::pgn_parser::parse_pgn(&input).unwrap();
+                        if games.is_empty() {
+                            println!("Couldn't parse any games")
+                        }
 
-                analyze_game::<5>(games[0].clone());
+                        analyze_game::<6>(games[0].clone());
+                    }
+                    None | Some(&"5") | _ => {
+                        let games = taik::pgn_parser::parse_pgn(&input).unwrap();
+                        if games.is_empty() {
+                            println!("Couldn't parse any games")
+                        }
+
+                        analyze_game::<5>(games[0].clone());
+                    }
+                }
             }
             "mem_usage" => mem_usage(),
             "bench" => bench(),
