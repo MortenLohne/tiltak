@@ -1,5 +1,6 @@
 use crate::board::Board;
 use crate::search;
+use crate::search::MctsSetting;
 use crate::tests::do_moves_and_check_validity;
 use board_game_traits::board::Board as BoardTrait;
 use pgn_traits::pgn::PgnBoard;
@@ -10,7 +11,7 @@ use std::time::Duration;
 fn play_on_low_time() {
     let time = Duration::from_millis(5);
     let board = <Board<5>>::default();
-    search::play_move_time(board, time);
+    search::play_move_time(board, time, MctsSetting::default());
 }
 
 #[test]
@@ -136,7 +137,11 @@ fn do_not_instamove_into_loss() {
 
     do_moves_and_check_validity(&mut board, &move_strings);
 
-    let (best_move, _) = search::play_move_time(board.clone(), time::Duration::from_secs(1));
+    let (best_move, _) = search::play_move_time(
+        board.clone(),
+        time::Duration::from_secs(1),
+        MctsSetting::default(),
+    );
 
     for move_string in ["b2", "c5", "b4", "d4"].iter() {
         assert_ne!(best_move, board.move_from_san(move_string).unwrap());
