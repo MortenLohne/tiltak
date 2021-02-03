@@ -55,6 +55,7 @@ fn main() {
                 let depth = 4;
                 let mut positions = HashSet::new();
                 let openings = generate_openings::<6>(Board::start_board(), &mut positions, depth);
+                println!("{} openings generated, evaluating...", openings.len());
 
                 let mut evaled_openings: Vec<_> = openings
                     .into_par_iter()
@@ -129,19 +130,19 @@ fn generate_openings<const S: usize>(
         .into_iter()
         .flat_map(|mv| {
             let reverse_move = board.do_move(mv.clone());
-            let mut child_lines = if depth > 1 {
-                if board
-                    .symmetries()
-                    .iter()
-                    .all(|board_symmetry| !positions.contains(board_symmetry))
-                {
-                    positions.insert(board.clone());
+            let mut child_lines = if board
+                .symmetries()
+                .iter()
+                .all(|board_symmetry| !positions.contains(board_symmetry))
+            {
+                positions.insert(board.clone());
+                if depth > 1 {
                     generate_openings(board.clone(), positions, depth - 1)
                 } else {
                     vec![vec![]]
                 }
             } else {
-                vec![vec![]]
+                vec![]
             };
             board.reverse_move(reverse_move);
             for child_line in child_lines.iter_mut() {
