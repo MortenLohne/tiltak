@@ -1503,7 +1503,6 @@ impl<const S: usize> PartialEq for Board<S> {
             && self.black_stones_left == other.black_stones_left
             && self.white_caps_left == other.white_caps_left
             && self.black_caps_left == other.black_caps_left
-            && self.hash == other.hash
             && self.half_moves_played == other.half_moves_played
     }
 }
