@@ -108,11 +108,21 @@ pub fn main() -> Result<()> {
     let size: usize = matches.value_of("size").unwrap().parse().unwrap();
 
     loop {
-        let mut session = if let Some(aws_function_name) = matches.value_of("aws-function-name") {
-            PlaytakSession::with_aws(aws_function_name.to_string())
-        } else {
-            PlaytakSession::new()
-        }?;
+        let connection_result =
+            if let Some(aws_function_name) = matches.value_of("aws-function-name") {
+                PlaytakSession::with_aws(aws_function_name.to_string())
+            } else {
+                PlaytakSession::new()
+            };
+
+        let mut session = match connection_result {
+            Ok(ok) => ok,
+            Err(err) => {
+                warn!("Failed to connect due to \"{}\", retrying...", err);
+                thread::sleep(Duration::from_secs(2));
+                continue;
+            }
+        };
 
         if let (Some(user), Some(pwd)) =
             (matches.value_of("username"), matches.value_of("password"))
