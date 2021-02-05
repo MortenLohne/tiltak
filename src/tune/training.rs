@@ -432,19 +432,24 @@ pub fn games_and_move_scoress_from_file<const S: usize>(
     move_scoress.reverse();
     games.reverse();
 
-    move_scoress.truncate(4000);
-    games.truncate(4000);
+    move_scoress.truncate(3000);
+    games.truncate(3000);
 
-    for (game, move_scores) in games.iter().zip(&move_scoress) {
+    for ((i, game), move_scores) in games.iter().enumerate().zip(&move_scoress) {
         let mut board = game.start_board.clone();
         for (mv, move_score) in game.moves.iter().map(|(mv, _)| mv).zip(move_scores) {
             assert!(
                 move_score
                     .iter()
                     .any(|(scored_move, _score)| *mv == *scored_move),
-                "Played move {} not among move scores {:?}\nBoard:\n{:?}",
+                "Played move {} in game {} not among move scores {:?}\nGame: {:?}\nBoard:\n{:?}",
                 mv.to_string::<S>(),
+                i,
                 move_score,
+                game.moves
+                    .iter()
+                    .map(|(mv, _)| mv.to_string::<S>())
+                    .collect::<Vec<_>>(),
                 board
             );
             board.do_move(mv.clone());
