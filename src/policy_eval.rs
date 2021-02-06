@@ -85,7 +85,7 @@ pub(crate) fn coefficients_for_move_colortr<Us: ColorTr, Them: ColorTr, const S:
     let stack_capture_in_strong_line_cap: usize = stack_capture_in_strong_line + 2;
     let move_cap_onto_strong_line: usize = stack_capture_in_strong_line_cap + 2;
     let move_onto_critical_square: usize = move_cap_onto_strong_line + 4;
-    let _next_const: usize = move_onto_critical_square + 2;
+    let _next_const: usize = move_onto_critical_square + 4;
 
     assert_eq!(coefficients.len(), _next_const);
 
@@ -323,14 +323,15 @@ pub(crate) fn coefficients_for_move_colortr<Us: ColorTr, Them: ColorTr, const S:
                             coefficients[stack_captured_by_movement] +=
                                 destination_stack.len() as f32;
                             their_pieces_captured += 1;
-                            if Us::is_critical_square(&*group_data, destination_square) {
-                                gets_critical_square = true;
-                            }
                         } else {
                             coefficients[stack_captured_by_movement] -=
                                 destination_stack.len() as f32;
                         }
                     }
+                    if Us::is_critical_square(&*group_data, destination_square) {
+                        gets_critical_square = true;
+                    }
+
                     for &line in BitBoard::lines_for_square::<S>(destination_square).iter() {
                         let our_road_stones = (line & Us::road_stones(group_data)).count() as usize;
                         let color_factor = if Us::piece_is_ours(piece) { 1.0 } else { -1.0 };
@@ -376,13 +377,17 @@ pub(crate) fn coefficients_for_move_colortr<Us: ColorTr, Them: ColorTr, const S:
                 }
             }
 
+            // Bonus for moving onto a critical square
             if gets_critical_square {
-                if their_pieces == 0
-                    && stack_movement.movements[0].pieces_to_take == board[*square].len()
-                {
-                    coefficients[move_onto_critical_square] += 1.0;
-                } else {
-                    coefficients[move_onto_critical_square + 1] += 1.0;
+                let moves_our_whole_stack =
+                    stack_movement.movements[0].pieces_to_take == board[*square].len();
+
+                match (their_pieces == 0, moves_our_whole_stack) {
+                    (false, false) => coefficients[move_onto_critical_square] += 1.0,
+                    (false, true) => coefficients[move_onto_critical_square + 1] += 1.0,
+                    // Only this option is a guaranteed win:
+                    (true, false) => coefficients[move_onto_critical_square + 2] += 1.0,
+                    (true, true) => coefficients[move_onto_critical_square + 3] += 1.0,
                 }
             }
         }

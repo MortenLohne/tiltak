@@ -17,7 +17,7 @@ pub fn gradient_descent<const N: usize>(
     let beta = 0.95;
 
     // If error is not reduced this number of times, reduce eta, or abort if eta is already low
-    const MAX_TRIES: usize = 25;
+    const MAX_TRIES: usize = 100;
 
     let initial_error = average_error(test_coefficient_sets, test_results, params);
     println!(

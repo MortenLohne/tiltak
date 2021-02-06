@@ -432,8 +432,17 @@ pub fn games_and_move_scoress_from_file<const S: usize>(
     move_scoress.reverse();
     games.reverse();
 
-    move_scoress.truncate(3000);
-    games.truncate(3000);
+    match S {
+        5 => {
+            move_scoress.truncate(4000);
+            games.truncate(4000);
+        }
+        6 => {
+            move_scoress.truncate(3000);
+            games.truncate(3000);
+        }
+        _ => (),
+    }
 
     for ((i, game), move_scores) in games.iter().enumerate().zip(&move_scoress) {
         let mut board = game.start_board.clone();
