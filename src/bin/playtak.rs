@@ -108,12 +108,15 @@ pub fn main() -> Result<()> {
     let size: usize = matches.value_of("size").unwrap().parse().unwrap();
 
     loop {
+        #[cfg(feature = "aws-lambda-client")]
         let connection_result =
             if let Some(aws_function_name) = matches.value_of("aws-function-name") {
                 PlaytakSession::with_aws(aws_function_name.to_string())
             } else {
                 PlaytakSession::new()
             };
+        #[cfg(not(feature = "aws-lambda-client"))]
+        let connection_result = PlaytakSession::new();
 
         let mut session = match connection_result {
             Ok(ok) => ok,
@@ -160,6 +163,7 @@ pub fn main() -> Result<()> {
 }
 
 struct PlaytakSession {
+    #[cfg(feature = "aws-lambda-client")]
     aws_function_name: Option<String>,
     connection: BufStream<TcpStream>,
     // The server requires regular pings, to not kick the user
@@ -184,12 +188,14 @@ impl PlaytakSession {
             ping_thread_connection.flush()?;
         }));
         Ok(PlaytakSession {
+            #[cfg(feature = "aws-lambda-client")]
             aws_function_name: None,
             connection,
             ping_thread,
         })
     }
 
+    #[cfg(feature = "aws-lambda-client")]
     fn with_aws(aws_function_name: String) -> Result<Self> {
         let mut session = Self::new()?;
         session.aws_function_name = Some(aws_function_name);
