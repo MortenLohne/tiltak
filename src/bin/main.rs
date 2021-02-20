@@ -85,10 +85,10 @@ fn main() {
             }
             "game" => {
                 let mut input = String::new();
-                io::stdin().read_to_string(&mut input).unwrap();
 
                 match words.get(1) {
                     Some(&"6") => {
+                        io::stdin().read_to_string(&mut input).unwrap();
                         let games = tiltak::pgn_parser::parse_pgn(&input).unwrap();
                         if games.is_empty() {
                             println!("Couldn't parse any games")
@@ -96,7 +96,8 @@ fn main() {
 
                         analyze_game::<6>(games[0].clone());
                     }
-                    None | Some(&"5") | _ => {
+                    None | Some(&"5") => {
+                        io::stdin().read_to_string(&mut input).unwrap();
                         let games = tiltak::pgn_parser::parse_pgn(&input).unwrap();
                         if games.is_empty() {
                             println!("Couldn't parse any games")
@@ -104,6 +105,7 @@ fn main() {
 
                         analyze_game::<5>(games[0].clone());
                     }
+                    Some(s) => println!("Game analysis at size {} not available", s),
                 }
             }
             "mem_usage" => mem_usage(),
