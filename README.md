@@ -1,6 +1,8 @@
 # Taik
 
-Taik is a simple AI for the board game [Tak](https://en.wikipedia.org/wiki/Tak_(game)). The project can be used as an analysis tool, or connect as a bot to the playtak.com server. 
+Taik is an AI for the board game [Tak](https://en.wikipedia.org/wiki/Tak_(game)). The project can be used as an analysis tool, or connect as a playable bot to the playtak.com server. 
+
+It is most likely the strongest bot available. In a 2000-game match against [Taktician](https://github.com/nelhage/taktician), which was previously regarded as the strongest, it won 1276 games and lost 684.
 
 The core engine is built using [Monte Carlo Tree Search](https://en.wikipedia.org/wiki/Monte_Carlo_tree_search), but without full simulation rollouts. This is similar to the implementation in AlphaZero or Leela Zero. 
 
