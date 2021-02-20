@@ -1,14 +1,14 @@
 use clap::{App, Arg, SubCommand};
 use std::path::Path;
-use taik::board::{
+use tiltak::board::{
     NUM_POLICY_PARAMS_4S, NUM_POLICY_PARAMS_5S, NUM_POLICY_PARAMS_6S, NUM_VALUE_PARAMS_4S,
     NUM_VALUE_PARAMS_5S, NUM_VALUE_PARAMS_6S, POLICY_PARAMS_4S, POLICY_PARAMS_5S, POLICY_PARAMS_6S,
     VALUE_PARAMS_4S, VALUE_PARAMS_5S, VALUE_PARAMS_6S,
 };
-use taik::tune::{spsa, training};
+use tiltak::tune::{spsa, training};
 
 fn main() {
-    let app = App::new("Taik variable tuning")
+    let app = App::new("Tiltak variable tuning")
         .version("0.1")
         .author("Morten Lohne")
         .arg(

@@ -5,7 +5,7 @@
 //! Generate legal moves for the start position
 //!
 //! ```
-//! use taik::board::Board;
+//! use tiltak::board::Board;
 //! use board_game_traits::board::Board as BoardTrait;
 //!
 //! let board = <Board<5>>::start_board();
@@ -17,8 +17,8 @@
 //! Run Monte Carlo Tree Search for the start position
 //!
 //! ```rust,no_run
-//! use taik::board::Board;
-//! use taik::mcts;
+//! use tiltak::board::Board;
+//! use tiltak::mcts;
 //! use pgn_traits::pgn::PgnBoard;
 //!
 //! let board = <Board<5>>::default();

@@ -1,6 +1,6 @@
-# Taik
+# Tiltak
 
-Taik is an AI for the board game [Tak](https://en.wikipedia.org/wiki/Tak_(game)). The project can be used as an analysis tool, or connect as a playable bot to the playtak.com server. 
+Tiltak is an AI for the board game [Tak](https://en.wikipedia.org/wiki/Tak_(game)). The project can be used as an analysis tool, or connect as a playable bot to the playtak.com server. 
 
 It is most likely the strongest bot available. In a 2000-game match against [Taktician](https://github.com/nelhage/taktician), which was previously regarded as the strongest, it won 1276 games and lost 684.
 
@@ -92,7 +92,7 @@ cargo run --release
 ```
 
 
-This command will automatically fetch and build dependencies. The resulting binaries are written to `taik/target/release`.
+This command will automatically fetch and build dependencies. The resulting binaries are written to `tiltak/target/release`.
 
 To build and run a specific command, run `cargo run --release --bin playtak` or similar.
 

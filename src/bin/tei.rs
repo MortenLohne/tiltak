@@ -4,11 +4,11 @@ use std::io;
 use std::io::{BufRead, BufReader};
 use std::str::FromStr;
 use std::time::{Duration, Instant};
-use taik::board::Board;
+use tiltak::board::Board;
 
 use std::any::Any;
-use taik::search;
-use taik::search::MctsSetting;
+use tiltak::search;
+use tiltak::search::MctsSetting;
 
 pub fn main() {
     loop {
@@ -19,7 +19,7 @@ pub fn main() {
         }
     }
 
-    println!("id name taik");
+    println!("id name tiltak");
     println!("id author Morten Lohne");
     println!("teiok");
 

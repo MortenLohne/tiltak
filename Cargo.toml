@@ -1,9 +1,9 @@
 [package]
-name = "taik"
+name = "tiltak"
 version = "0.1.0"
 authors = ["Morten Lohne <lohnemorten@gmail.com>"]
 edition = "2018"
-repository = "https://github.com/MortenLohne/taik/"
+repository = "https://github.com/MortenLohne/tiltak/"
 readme = "README.md"
 license = "GPL-3.0-or-later"
 default-run = "main"

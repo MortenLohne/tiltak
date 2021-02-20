@@ -1,5 +1,5 @@
 use lambda_runtime::lambda;
-use taik::aws;
+use tiltak::aws;
 
 fn main() {
     lambda!(aws::server::handle_aws_event);

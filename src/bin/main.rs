@@ -15,14 +15,14 @@ use pgn_traits::pgn::PgnBoard;
 use rayon::prelude::*;
 #[cfg(feature = "constant-tuning")]
 use std::collections::HashSet;
-use taik::board::Board;
-use taik::board::TunableBoard;
+use tiltak::board::Board;
+use tiltak::board::TunableBoard;
 #[cfg(feature = "constant-tuning")]
-use taik::board::{Move, Role};
-use taik::minmax;
-use taik::pgn_writer::Game;
-use taik::search::MctsSetting;
-use taik::{board, search};
+use tiltak::board::{Move, Role};
+use tiltak::minmax;
+use tiltak::pgn_writer::Game;
+use tiltak::search::MctsSetting;
+use tiltak::{board, search};
 
 fn main() {
     println!("play: Play against the engine through the command line");
@@ -89,7 +89,7 @@ fn main() {
 
                 match words.get(1) {
                     Some(&"6") => {
-                        let games = taik::pgn_parser::parse_pgn(&input).unwrap();
+                        let games = tiltak::pgn_parser::parse_pgn(&input).unwrap();
                         if games.is_empty() {
                             println!("Couldn't parse any games")
                         }
@@ -97,7 +97,7 @@ fn main() {
                         analyze_game::<6>(games[0].clone());
                     }
                     None | Some(&"5") | _ => {
-                        let games = taik::pgn_parser::parse_pgn(&input).unwrap();
+                        let games = tiltak::pgn_parser::parse_pgn(&input).unwrap();
                         if games.is_empty() {
                             println!("Couldn't parse any games")
                         }

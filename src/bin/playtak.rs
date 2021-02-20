@@ -9,13 +9,13 @@ use std::str::FromStr;
 use std::time::Duration;
 use std::{io, net, thread};
 #[cfg(feature = "aws-lambda-client")]
-use taik::aws;
-use taik::board::{Board, MAX_BOARD_SIZE};
+use tiltak::aws;
+use tiltak::board::{Board, MAX_BOARD_SIZE};
 
 use log::{debug, info, warn};
 
 pub fn main() -> Result<()> {
-    let mut app = App::new("Taik playtak client")
+    let mut app = App::new("Tiltak playtak client")
         .version("0.1")
         .author("Morten Lohne")
         .arg(
@@ -48,7 +48,7 @@ pub fn main() -> Result<()> {
             Arg::with_name("logfile")
                 .short("l")
                 .long("logfile")
-                .value_name("taik.log")
+                .value_name("tiltak.log")
                 .help("Name of debug logfile")
                 .takes_value(true),
         )
@@ -63,7 +63,7 @@ pub fn main() -> Result<()> {
         app = app.arg(
             Arg::with_name("aws-function-name")
                 .long("aws-function-name")
-                .value_name("taik")
+                .value_name("tiltak")
                 .required(true)
                 .help(
                     "Run the engine on AWS instead of locally. Requires aws cli installed locally.",
@@ -127,7 +127,7 @@ pub fn main() -> Result<()> {
         if let (Some(user), Some(pwd)) =
             (matches.value_of("username"), matches.value_of("password"))
         {
-            session.login("Taik", &user, &pwd)?;
+            session.login("Tiltak", &user, &pwd)?;
         } else {
             warn!("No username/password provided, logging in as guest");
             session.login_guest()?;
@@ -508,13 +508,13 @@ use std::iter;
 use arrayvec::ArrayVec;
 use chrono::{Datelike, Local};
 use std::convert::Infallible;
-use taik::board;
-use taik::board::{Direction, Move, Movement, Role, StackMovement};
-use taik::pgn_writer::Game;
+use tiltak::board;
+use tiltak::board::{Direction, Move, Movement, Role, StackMovement};
+use tiltak::pgn_writer::Game;
 #[cfg(not(feature = "aws-lambda-client"))]
-use taik::search;
+use tiltak::search;
 #[cfg(not(feature = "aws-lambda-client"))]
-use taik::search::MctsSetting;
+use tiltak::search::MctsSetting;
 
 pub fn parse_move<const S: usize>(input: &str) -> board::Move {
     let words: Vec<&str> = input.split_whitespace().collect();
