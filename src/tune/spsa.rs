@@ -18,7 +18,7 @@ pub struct Variable {
 
 /// In each iteration of SPSA, each variable can be increased, decreased or left unchanged.
 #[derive(Clone, Copy, Debug, PartialEq)]
-enum SPSADirection {
+enum SpsaDirection {
     Increase,
     Decrease,
     NoChange,
@@ -43,13 +43,13 @@ pub fn tune<const S: usize>(variables: &mut [Variable], book_path: Option<&str>)
             let mut mut_variables = mutex_variables.lock().unwrap();
             for (variable, result) in (*mut_variables).iter_mut().zip(&result) {
                 match result {
-                    SPSADirection::Increase => {
+                    SpsaDirection::Increase => {
                         variable.value += variable.value * variable.apply_factor
                     }
-                    SPSADirection::Decrease => {
+                    SpsaDirection::Decrease => {
                         variable.value -= variable.value * variable.apply_factor
                     }
-                    SPSADirection::NoChange => (),
+                    SpsaDirection::NoChange => (),
                 }
             }
         }
@@ -74,16 +74,16 @@ fn tuning_iteration<R: rand::Rng, const S: usize>(
     variables: &[Variable],
     rng: &mut R,
     opening: &[Move],
-) -> Vec<SPSADirection> {
+) -> Vec<SpsaDirection> {
     let (player1_variables, player2_variables): (
-        Vec<(SPSADirection, f32)>,
-        Vec<(SPSADirection, f32)>,
+        Vec<(SpsaDirection, f32)>,
+        Vec<(SpsaDirection, f32)>,
     ) = variables
         .iter()
         .map(|variable| {
             (
-                (SPSADirection::Increase, variable.value + variable.delta),
-                (SPSADirection::Decrease, variable.value - variable.delta),
+                (SpsaDirection::Increase, variable.value + variable.delta),
+                (SpsaDirection::Decrease, variable.value - variable.delta),
             )
         })
         .map(|(a, b)| if rng.gen() { (a, b) } else { (b, a) })
@@ -98,6 +98,6 @@ fn tuning_iteration<R: rand::Rng, const S: usize>(
     match game.game_result {
         Some(GameResult::WhiteWin) => player1_variables.iter().map(|(a, _)| *a).collect(),
         Some(GameResult::BlackWin) => player2_variables.iter().map(|(a, _)| *a).collect(),
-        None | Some(GameResult::Draw) => vec![SPSADirection::NoChange; variables.len()],
+        None | Some(GameResult::Draw) => vec![SpsaDirection::NoChange; variables.len()],
     }
 }

@@ -6,7 +6,7 @@
 /// The implementation itself in in mcts_core.
 mod mcts_core;
 
-use self::mcts_core::{TreeEdge, PV};
+use self::mcts_core::{Pv, TreeEdge};
 use crate::board::{Board, Move, Role, Square, TunableBoard};
 use std::time;
 
@@ -143,7 +143,7 @@ impl<const S: usize> MonteCarloTree<S> {
     }
 
     pub fn pv(&self) -> impl Iterator<Item = Move> + '_ {
-        PV::new(self.edge.child.as_ref().unwrap())
+        Pv::new(self.edge.child.as_ref().unwrap())
     }
 
     /// Print human-readable information of the search's progress.
@@ -163,7 +163,7 @@ impl<const S: usize> MonteCarloTree<S> {
                 "Move {}: {} visits, {:.2}% mean action value, {:.2}% static score, {:.3} exploration value, pv {}",
                 edge.mv.to_string::<S>(), edge.visits, edge.mean_action_value * 100.0, edge.heuristic_score * 100.0,
                 edge.exploration_value((self.visits() as Score).sqrt(), dynamic_cpuct),
-                PV::new(edge.child.as_ref().unwrap()).map(|mv| mv.to_string::<S>() + " ").collect::<String>()
+                Pv::new(edge.child.as_ref().unwrap()).map(|mv| mv.to_string::<S>() + " ").collect::<String>()
             )
         });
     }

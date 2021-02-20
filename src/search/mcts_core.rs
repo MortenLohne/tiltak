@@ -232,17 +232,17 @@ impl GameResultForUs {
     }
 }
 
-pub struct PV<'a> {
+pub struct Pv<'a> {
     tree: &'a Tree,
 }
 
-impl<'a> PV<'a> {
-    pub fn new(tree: &'a Tree) -> PV<'a> {
-        PV { tree }
+impl<'a> Pv<'a> {
+    pub fn new(tree: &'a Tree) -> Pv<'a> {
+        Pv { tree }
     }
 }
 
-impl<'a> Iterator for PV<'a> {
+impl<'a> Iterator for Pv<'a> {
     type Item = Move;
 
     fn next(&mut self) -> Option<Self::Item> {
