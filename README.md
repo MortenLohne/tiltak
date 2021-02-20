@@ -46,6 +46,8 @@ Run the engine through Tak Engine Interface, a [uci-like](https://en.wikipedia.o
 Only a small subset of uci works. To analyze a position for 1 second, run the tei binary and enter:
 
 ````
+tei
+teinewgame 5
 position startpos moves e1 a1
 go movetime 1000
 ````
