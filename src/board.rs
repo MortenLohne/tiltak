@@ -1421,7 +1421,7 @@ impl<const S: usize> GroupData<S> {
         }
     }
 
-    pub fn critical_squares<'a>(&'a self, color: Color) -> impl Iterator<Item = Square> + 'a {
+    pub fn critical_squares(&self, color: Color) -> impl Iterator<Item = Square> {
         match color {
             Color::White => self.white_critical_squares.into_iter(),
             Color::Black => self.black_critical_squares.into_iter(),

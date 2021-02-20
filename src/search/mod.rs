@@ -142,7 +142,7 @@ impl<const S: usize> MonteCarloTree<S> {
         &self.edge.child.as_ref().unwrap().children
     }
 
-    pub fn pv<'a>(&'a self) -> impl Iterator<Item = Move> + 'a {
+    pub fn pv(&self) -> impl Iterator<Item = Move> + '_ {
         PV::new(self.edge.child.as_ref().unwrap())
     }
 
