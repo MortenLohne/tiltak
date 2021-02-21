@@ -177,6 +177,17 @@ enum SeekMode {
     PlayOtherBot(String),
 }
 
+#[derive(Debug, PartialEq, Eq)]
+struct PlaytakGame<'a> {
+    game_no: u64,
+    _board_size: usize,
+    white_player: &'a str,
+    black_player: &'a str,
+    our_color: Color,
+    time_left: Duration,
+    increment: Duration,
+}
+
 impl PlaytakSession {
     /// Initialize a connection to playtak.com. Does not log in or play games.
     fn new() -> Result<Self> {
@@ -296,25 +307,20 @@ impl PlaytakSession {
             }
             match words[0] {
                 "Game" => {
-                    let game_no: u64 = u64::from_str(words[2]).unwrap();
-                    let board_size = usize::from_str(words[3]).unwrap();
-                    let white_player = words[4];
-                    let black_player = words[6];
-                    let color = match words[7] {
-                        "white" => Color::White,
-                        "black" => Color::Black,
-                        color => panic!("Bad color \"{}\"", color),
-                    };
-                    self.play_game::<S>(
-                        seek_mode,
-                        game_no,
-                        board_size,
-                        white_player,
-                        black_player,
-                        color,
-                        time_for_game,
+                    let playtak_game = PlaytakGame {
+                        game_no: u64::from_str(words[2]).unwrap(),
+                        _board_size: usize::from_str(words[3]).unwrap(),
+                        white_player: words[4],
+                        black_player: words[6],
+                        our_color: match words[7] {
+                            "white" => Color::White,
+                            "black" => Color::Black,
+                            color => panic!("Bad color \"{}\"", color),
+                        },
+                        time_left: time_for_game,
                         increment,
-                    )?;
+                    };
+                    self.play_game::<S>(seek_mode, playtak_game)?;
                     unreachable!()
                 }
 
@@ -346,31 +352,25 @@ impl PlaytakSession {
     fn play_game<const S: usize>(
         &mut self,
         seek_mode: SeekMode,
-        game_no: u64,
-        _board_size: usize,
-        white_player: &str,
-        black_player: &str,
-        our_color: Color,
-        time_left: Duration,
-        increment: Duration,
+        game: PlaytakGame,
     ) -> io::Result<Infallible> {
         info!(
             "Starting game #{}, {} vs {} as {}, {}+{:.1}",
-            game_no,
-            white_player,
-            black_player,
-            our_color,
-            time_left.as_secs(),
-            increment.as_secs_f32()
+            game.game_no,
+            game.white_player,
+            game.black_player,
+            game.our_color,
+            game.time_left.as_secs(),
+            game.increment.as_secs_f32()
         );
         let mut board = <Board<S>>::start_board();
         let mut moves = vec![];
-        let mut our_time_left = time_left;
+        let mut our_time_left = game.time_left;
         'gameloop: loop {
             if board.game_result().is_some() {
                 break;
             }
-            if board.side_to_move() == our_color {
+            if board.side_to_move() == game.our_color {
                 #[cfg(feature = "aws-lambda-client")]
                 let (best_move, score) = {
                     let aws_function_name = self.aws_function_name.as_ref().unwrap();
@@ -378,7 +378,7 @@ impl PlaytakSession {
                         size: S,
                         moves: moves.iter().map(|(mv, _): &(Move, _)| mv.clone()).collect(),
                         time_left: our_time_left,
-                        increment,
+                        increment: game.increment,
                     };
                     let aws::Output { best_move, score } =
                         aws::client::best_move_aws(aws_function_name, &event)?;
@@ -387,7 +387,7 @@ impl PlaytakSession {
 
                 #[cfg(not(feature = "aws-lambda-client"))]
                 let (best_move, score) = {
-                    let maximum_time = our_time_left / 5 + increment;
+                    let maximum_time = our_time_left / 5 + game.increment;
                     let settings = MctsSetting::default().add_dirichlet(0.1);
                     search::play_move_time(board.clone(), maximum_time, settings)
                 };
@@ -395,13 +395,13 @@ impl PlaytakSession {
                 board.do_move(best_move.clone());
                 moves.push((best_move.clone(), score.to_string()));
 
-                let mut output_string = format!("Game#{} ", game_no);
+                let mut output_string = format!("Game#{} ", game.game_no);
                 write_move::<S>(best_move, &mut output_string);
                 self.send_line(&output_string)?;
 
                 // Say "Tak" whenever there is a threat to win
                 // Only do this vs Shigewara
-                if white_player == "shigewara" || black_player == "shigewara" {
+                if game.white_player == "shigewara" || game.black_player == "shigewara" {
                     let mut board_clone = board.clone();
                     board_clone.null_move();
                     let mut moves = vec![];
@@ -427,7 +427,7 @@ impl PlaytakSession {
                     if words.is_empty() {
                         continue;
                     }
-                    if words[0] == format!("Game#{}", game_no) {
+                    if words[0] == format!("Game#{}", game.game_no) {
                         match words[1] {
                             "P" | "M" => {
                                 let move_string = words[1..].join(" ");
@@ -441,7 +441,7 @@ impl PlaytakSession {
                                     Duration::from_secs(u64::from_str(&words[2]).unwrap());
                                 let black_time_left =
                                     Duration::from_secs(u64::from_str(&words[3]).unwrap());
-                                our_time_left = match our_color {
+                                our_time_left = match game.our_color {
                                     Color::White => white_time_left,
                                     Color::Black => black_time_left,
                                 };
@@ -464,8 +464,8 @@ impl PlaytakSession {
             let tags = vec![
                 ("Event".to_string(), "Playtak challenge".to_string()),
                 ("Site".to_string(), "playtak.com".to_string()),
-                ("Player1".to_string(), white_player.to_string()),
-                ("Player2".to_string(), black_player.to_string()),
+                ("Player1".to_string(), game.white_player.to_string()),
+                ("Player2".to_string(), game.black_player.to_string()),
                 ("Size".to_string(), S.to_string()),
                 (
                     "Date".to_string(),
