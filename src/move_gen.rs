@@ -8,7 +8,7 @@ use arrayvec::ArrayVec;
 impl<const S: usize> Board<S> {
     pub(crate) fn generate_moves_colortr<Us: ColorTr, Them: ColorTr>(
         &self,
-        moves: &mut Vec<<Board<S> as board_game_traits::board::Board>::Move>,
+        moves: &mut Vec<<Board<S> as board_game_traits::Position>::Move>,
     ) {
         for square in board::squares_iterator::<S>() {
             match self[square].top_stone() {

@@ -7,9 +7,9 @@ pub mod tei;
 use std::io::{Read, Write};
 use std::{io, time};
 
-use board_game_traits::board::{Board as BoardTrait, EvalBoard};
-use board_game_traits::board::{Color, GameResult};
-use pgn_traits::pgn::PgnBoard;
+use board_game_traits::{Color, GameResult};
+use board_game_traits::{EvalPosition, Position as PositionTrait};
+use pgn_traits::PgnPosition;
 
 #[cfg(feature = "constant-tuning")]
 use rayon::prelude::*;
@@ -54,14 +54,15 @@ fn main() {
             "openings" => {
                 let depth = 4;
                 let mut positions = HashSet::new();
-                let openings = generate_openings::<6>(Board::start_board(), &mut positions, depth);
+                let openings =
+                    generate_openings::<6>(Board::start_position(), &mut positions, depth);
                 println!("{} openings generated, evaluating...", openings.len());
 
                 let mut evaled_openings: Vec<_> = openings
                     .into_par_iter()
                     .filter(|position| position.len() == depth as usize)
                     .map(|position| {
-                        let mut board = <Board<6>>::start_board();
+                        let mut board = <Board<6>>::start_position();
                         for mv in position.iter() {
                             board.do_move(mv.clone());
                         }
@@ -73,7 +74,7 @@ fn main() {
                     score1.partial_cmp(score2).unwrap()
                 });
                 for (p, (mv, s)) in evaled_openings {
-                    let mut board = <Board<6>>::start_board();
+                    let mut board = <Board<6>>::start_position();
                     for mv in p {
                         print!("{} ", board.move_to_san(&mv));
                         board.do_move(mv);
@@ -306,7 +307,7 @@ fn test_position<const S: usize>() {
 }
 
 fn analyze_game<const S: usize>(game: Game<Board<S>>) {
-    let mut board = game.start_board.clone();
+    let mut board = game.start_position.clone();
     let mut ply_number = 2;
     for (mv, _) in game.moves {
         board.do_move(mv.clone());
@@ -339,7 +340,7 @@ fn analyze_game<const S: usize>(game: Game<Board<S>>) {
 fn play_human(mut board: Board<5>) {
     match board.game_result() {
         None => {
-            use board_game_traits::board::Color::*;
+            use board_game_traits::Color::*;
             println!("Board:\n{:?}", board);
             // If black, play as human
             if board.side_to_move() == Black {

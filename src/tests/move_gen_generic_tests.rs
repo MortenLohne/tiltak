@@ -1,13 +1,13 @@
 use crate::board::Board;
-use board_game_traits::board::Board as EvalBoard;
+use board_game_traits::Position as PositionTrait;
 
 #[test]
-fn start_board_move_gen_test() {
-    start_board_move_gen_prop::<4>();
-    start_board_move_gen_prop::<5>();
-    start_board_move_gen_prop::<6>();
-    start_board_move_gen_prop::<7>();
-    start_board_move_gen_prop::<8>();
+fn start_position_move_gen_test() {
+    start_position_move_gen_prop::<4>();
+    start_position_move_gen_prop::<5>();
+    start_position_move_gen_prop::<6>();
+    start_position_move_gen_prop::<7>();
+    start_position_move_gen_prop::<8>();
 }
 
 pub fn perft<const S: usize>(board: &mut Board<S>, depth: u16) -> u64 {
@@ -85,7 +85,7 @@ pub fn perft_check_answers<const S: usize>(board: &mut Board<S>, answers: &[u64]
     }
 }
 
-fn start_board_move_gen_prop<const S: usize>() {
+fn start_position_move_gen_prop<const S: usize>() {
     let mut board = <Board<S>>::default();
     let mut moves = vec![];
     board.generate_moves(&mut moves);

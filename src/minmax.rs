@@ -1,11 +1,11 @@
 //! A very simple implementation of the minmax search algorithm.
 //! This is not used in the core engine at all, it is just here for fun/testing.
 
-use board_game_traits::board::EvalBoard;
-use board_game_traits::board::{Color, GameResult};
+use board_game_traits::EvalPosition;
+use board_game_traits::{Color, GameResult};
 
 /// A very simple implementation of the minmax search algorithm. Returns the best move and a centipawn evaluation, calculating up to `depth` plies deep.
-pub fn minmax<B: EvalBoard>(board: &mut B, depth: u16) -> (Option<B::Move>, f32) {
+pub fn minmax<B: EvalPosition>(board: &mut B, depth: u16) -> (Option<B::Move>, f32) {
     match board.game_result() {
         Some(GameResult::WhiteWin) => return (None, 100.0),
         Some(GameResult::BlackWin) => return (None, -100.0),

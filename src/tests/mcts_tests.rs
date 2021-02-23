@@ -2,8 +2,8 @@ use crate::board::Board;
 use crate::search;
 use crate::search::MctsSetting;
 use crate::tests::do_moves_and_check_validity;
-use board_game_traits::board::Board as BoardTrait;
-use pgn_traits::pgn::PgnBoard;
+use board_game_traits::Position as PositionTrait;
+use pgn_traits::PgnPosition;
 use std::time;
 use std::time::Duration;
 
@@ -128,7 +128,7 @@ fn do_not_play_suicide_move_as_black_test2() {
 
 #[test]
 fn do_not_instamove_into_loss() {
-    let mut board = <Board<5>>::start_board();
+    let mut board = <Board<5>>::start_position();
     let move_strings = [
         "e1", "a5", "Cc3", "d1", "c1", "b1", "c2", "1b1>1", "b1", "2c1<2", "c1", "Ca1", "c4",
         "3b1>3", "1c2-1", "1d1<1", "Sd1", "1a1>1", "b3", "a1", "1d1<1", "1b1>1", "d3", "2c1>2",

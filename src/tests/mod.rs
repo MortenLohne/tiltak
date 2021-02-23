@@ -14,9 +14,9 @@ mod tactics_test;
 #[cfg(test)]
 use crate::board::Board;
 #[cfg(test)]
-use board_game_traits::board::Board as BoardTrait;
+use board_game_traits::Position as PositionTrait;
 #[cfg(test)]
-use pgn_traits::pgn::PgnBoard;
+use pgn_traits::PgnPosition;
 
 #[cfg(test)]
 fn do_moves_and_check_validity<const S: usize>(board: &mut Board<S>, move_strings: &[&str]) {

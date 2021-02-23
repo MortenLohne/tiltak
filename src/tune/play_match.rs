@@ -2,7 +2,7 @@ use crate::board::{Board, Move, Role};
 use crate::pgn_writer::Game;
 use crate::search;
 use crate::search::{MctsSetting, Score};
-use board_game_traits::board::{Board as BoardTrait, Color};
+use board_game_traits::{Color, Position as PositionTrait};
 use rand::seq::SliceRandom;
 use rand::Rng;
 
@@ -15,7 +15,7 @@ pub fn play_game<const S: usize>(
 ) -> (Game<Board<S>>, Vec<Vec<(Move, Score)>>) {
     const MCTS_NODES: u64 = 100_000;
 
-    let mut board = Board::start_board();
+    let mut board = Board::start_position();
     let mut game_moves = opening.to_vec();
     let mut move_scores = vec![vec![]; opening.len()];
     for mv in opening {
@@ -60,7 +60,7 @@ pub fn play_game<const S: usize>(
     }
     (
         Game {
-            start_board: Board::default(),
+            start_position: Board::default(),
             moves: game_moves
                 .into_iter()
                 .map(|mv| (mv, String::new()))

@@ -1,18 +1,18 @@
-use board_game_traits::board::Board as BoardTrait;
-use board_game_traits::board::{Color, GameResult};
-use pgn_traits::pgn::PgnBoard;
+use board_game_traits::Position as PositionTrait;
+use board_game_traits::{Color, GameResult};
+use pgn_traits::PgnPosition;
 use std::io;
 use std::io::Write;
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct Game<B: BoardTrait> {
-    pub start_board: B,
+pub struct Game<B: PositionTrait> {
+    pub start_position: B,
     pub moves: Vec<(B::Move, String)>,
     pub game_result: Option<GameResult>,
     pub tags: Vec<(String, String)>,
 }
 
-impl<B: PgnBoard + Clone> Game<B> {
+impl<B: PgnPosition + Clone> Game<B> {
     pub fn game_to_pgn<W: Write>(&self, f: &mut W) -> Result<(), io::Error> {
         // Write the 7 required tags first, in the correct order
         // Fill in default value if they are not available
@@ -52,13 +52,13 @@ impl<B: PgnBoard + Clone> Game<B> {
             }
         )?;
 
-        if self.start_board != B::start_board()
+        if self.start_position != B::start_position()
             && tags
                 .iter()
                 .find(|(tag, _)| tag.eq_ignore_ascii_case("FEN"))
                 .is_none()
         {
-            writeln!(f, "[FEN \"{}\"", self.start_board.to_fen())?;
+            writeln!(f, "[FEN \"{}\"", self.start_position.to_fen())?;
         }
 
         // Write any remaining tags
@@ -66,7 +66,7 @@ impl<B: PgnBoard + Clone> Game<B> {
             writeln!(f, "[{} \"{}\"]", tag, value)?;
         }
 
-        let mut board = self.start_board.clone();
+        let mut board = self.start_position.clone();
 
         for (i, (mv, comment)) in self.moves.iter().enumerate() {
             if i % 12 == 0 {

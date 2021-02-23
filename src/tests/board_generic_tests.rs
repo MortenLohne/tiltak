@@ -1,7 +1,7 @@
 use crate::board::{squares_iterator, Board, GroupEdgeConnection, Move, Role, Square};
 use crate::tests::do_moves_and_check_validity;
-use board_game_traits::board::{Board as BoardTrait, EvalBoard, GameResult::*};
-use pgn_traits::pgn::PgnBoard;
+use board_game_traits::{EvalPosition, GameResult::*, Position as PositionTrait};
+use pgn_traits::PgnPosition;
 use rand::seq::SliceRandom;
 
 #[test]
@@ -192,7 +192,7 @@ fn bitboard_full_board_file_rank_6s_test() {
 }
 
 fn bitboard_full_board_file_rank_prop<const S: usize>() {
-    let mut board = <Board<S>>::start_board();
+    let mut board = <Board<S>>::start_position();
     let move_strings: Vec<String> = squares_iterator::<S>()
         .map(|sq| sq.to_string::<S>())
         .collect();
@@ -234,7 +234,7 @@ fn square_rank_file_test() {
 }
 
 fn square_rank_file_prop<const S: usize>() {
-    let mut board = <Board<S>>::start_board();
+    let mut board = <Board<S>>::start_position();
     for rank_id in 0..S as u8 {
         for file_id in 0..S as u8 {
             let square = Square::from_rank_file::<S>(rank_id, file_id);

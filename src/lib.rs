@@ -6,9 +6,9 @@
 //!
 //! ```
 //! use tiltak::board::Board;
-//! use board_game_traits::board::Board as BoardTrait;
+//! use board_game_traits::Position as PositionTrait;
 //!
-//! let board = <Board<5>>::start_board();
+//! let board = <Board<5>>::start_position();
 //! let mut moves = vec![];
 //! board.generate_moves(&mut moves);
 //! assert_eq!(moves.len(), 25);
@@ -19,7 +19,7 @@
 //! ```rust,no_run
 //! use tiltak::board::Board;
 //! use tiltak::mcts;
-//! use pgn_traits::pgn::PgnBoard;
+//! use pgn_traits::PgnPosition;
 //!
 //! let board = <Board<5>>::default();
 //! let (best_move, score) = mcts(board.clone(), 100_000);

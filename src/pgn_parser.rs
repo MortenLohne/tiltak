@@ -1,16 +1,16 @@
 use crate::pgn_writer::Game;
-use board_game_traits::board::GameResult;
+use board_game_traits::GameResult;
 use nom::{
     alt, char, complete, dbg, do_parse, many0, many1, many_till, named, opt, return_error, tag,
     take_until, take_until_and_consume,
 };
-use pgn_traits::pgn::PgnBoard;
+use pgn_traits::PgnPosition;
 use std::error;
 use std::fmt::Debug;
 use std::io;
 use std::io::Write;
 
-pub fn parse_pgn<B: PgnBoard + Debug + Clone>(
+pub fn parse_pgn<B: PgnPosition + Debug + Clone>(
     mut input: &str,
 ) -> Result<Vec<Game<B>>, Box<dyn error::Error>> {
     let mut games = vec![];
@@ -19,7 +19,7 @@ pub fn parse_pgn<B: PgnBoard + Debug + Clone>(
         let result = parse_game(input);
         match result {
             Ok((rem_input, (tag_pairs, move_texts))) => {
-                let mut board = B::start_board();
+                let mut board = B::start_position();
                 let mut moves = vec![];
                 for (ref move_text, ref comment) in move_texts.iter() {
                     let mv = board.move_from_san(move_text);
@@ -61,14 +61,14 @@ pub fn parse_pgn<B: PgnBoard + Debug + Clone>(
                     })
                     .flatten();
 
-                let start_board = tags
+                let start_position = tags
                     .iter()
                     .find(|(name, _)| name == "TPS")
                     .map(|(_, result)| B::from_fen(result))
-                    .unwrap_or_else(|| Ok(B::start_board()))?;
+                    .unwrap_or_else(|| Ok(B::start_position()))?;
 
                 let game = Game {
-                    start_board,
+                    start_position,
                     moves,
                     game_result,
                     tags,

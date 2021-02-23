@@ -4,7 +4,7 @@ use crate::tune::openings::openings_from_file;
 /// Tune search variable using a version of SPSA (Simultaneous perturbation stochastic approximation),
 /// similar to [Stockfish's tuning method](https://www.chessprogramming.org/Stockfish%27s_Tuning_Method)
 use crate::tune::play_match::play_game;
-use board_game_traits::board::GameResult;
+use board_game_traits::GameResult;
 use rand::SeedableRng;
 use rayon::prelude::*;
 use std::sync::Mutex;

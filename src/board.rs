@@ -560,11 +560,9 @@ use crate::board::Role::Flat;
 use crate::board::Role::*;
 use crate::{policy_eval, search, value_eval};
 use arrayvec::ArrayVec;
-use board_game_traits::board;
-use board_game_traits::board::GameResult::{BlackWin, Draw, WhiteWin};
-use board_game_traits::board::{Board as BoardTrait, EvalBoard as EvalBoardTrait};
-use board_game_traits::board::{Color, GameResult};
-use pgn_traits::pgn;
+use board_game_traits::GameResult::{BlackWin, Draw, WhiteWin};
+use board_game_traits::{Color, GameResult};
+use board_game_traits::{EvalPosition as EvalPositionTrait, Position as PositionTrait};
 use rand::{Rng, SeedableRng};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
@@ -576,7 +574,7 @@ use std::ops::{Index, IndexMut};
 use std::{fmt, iter, ops};
 
 /// Extra items for tuning evaluation constants.
-pub trait TunableBoard: BoardTrait {
+pub trait TunableBoard: PositionTrait {
     fn value_params() -> &'static [f32];
     fn policy_params() -> &'static [f32];
     type ExtraData;
@@ -593,8 +591,8 @@ pub trait TunableBoard: BoardTrait {
         &self,
         params: &[f32],
         data: &Self::ExtraData,
-        simple_moves: &mut Vec<<Self as BoardTrait>::Move>,
-        moves: &mut Vec<(<Self as BoardTrait>::Move, search::Score)>,
+        simple_moves: &mut Vec<<Self as PositionTrait>::Move>,
+        moves: &mut Vec<(<Self as PositionTrait>::Move, search::Score)>,
     );
 
     fn coefficients_for_move(
@@ -873,9 +871,9 @@ impl Square {
         }
     }
 
-    pub fn parse_square<const S: usize>(input: &str) -> Result<Square, pgn::Error> {
+    pub fn parse_square<const S: usize>(input: &str) -> Result<Square, pgn_traits::Error> {
         if input.len() != 2 {
-            return Err(pgn::Error::new_parse_error(format!(
+            return Err(pgn_traits::Error::new_parse_error(format!(
                 "Couldn't parse square \"{}\"",
                 input
             )));
@@ -886,7 +884,7 @@ impl Square {
             .overflowing_sub(chars.next().unwrap() as u8)
             .0;
         if file >= S as u8 || rank >= S as u8 {
-            Err(pgn::Error::new_parse_error(format!(
+            Err(pgn_traits::Error::new_parse_error(format!(
                 "Couldn't parse square \"{}\" at size {}",
                 input, S
             )))
@@ -1149,16 +1147,16 @@ impl Move {
         string
     }
 
-    fn from_string<const S: usize>(input: &str) -> Result<Self, pgn::Error> {
+    fn from_string<const S: usize>(input: &str) -> Result<Self, pgn_traits::Error> {
         if input.len() < 2 {
-            return Err(pgn::Error::new(
-                pgn::ErrorKind::ParseError,
+            return Err(pgn_traits::Error::new(
+                pgn_traits::ErrorKind::ParseError,
                 "Input move too short.",
             ));
         }
         if !input.is_ascii() {
-            return Err(pgn::Error::new(
-                pgn::ErrorKind::ParseError,
+            return Err(pgn_traits::Error::new(
+                pgn_traits::ErrorKind::ParseError,
                 "Input move contained non-ascii characters.",
             ));
         }
@@ -1207,8 +1205,8 @@ impl Move {
                 }
                 Ok(Move::Move(square, direction, StackMovement { movements }))
             }
-            _ => Err(pgn::Error::new(
-                pgn::ErrorKind::ParseError,
+            _ => Err(pgn_traits::Error::new(
+                pgn_traits::ErrorKind::ParseError,
                 format!(
                     "Couldn't parse move \"{}\". Moves cannot start with {} and have length {}.",
                     input,
@@ -1939,11 +1937,11 @@ impl<const S: usize> Board<S> {
     }
 }
 
-impl<const S: usize> board::Board for Board<S> {
+impl<const S: usize> PositionTrait for Board<S> {
     type Move = Move;
     type ReverseMove = ReverseMove;
 
-    fn start_board() -> Self {
+    fn start_position() -> Self {
         Self::default()
     }
 
@@ -2173,7 +2171,7 @@ impl<const S: usize> Iterator for MoveIterator<S> {
     }
 }
 
-impl<const S: usize> EvalBoardTrait for Board<S> {
+impl<const S: usize> EvalPositionTrait for Board<S> {
     fn static_eval(&self) -> f32 {
         self.static_eval_with_params(&Self::value_params())
     }
@@ -2272,18 +2270,36 @@ impl<const S: usize> TunableBoard for Board<S> {
     }
 }
 
-impl<const S: usize> pgn_traits::pgn::PgnBoard for Board<S> {
-    fn from_fen(fen: &str) -> Result<Self, pgn::Error> {
+impl<const S: usize> pgn_traits::PgnPosition for Board<S> {
+    const REQUIRED_TAGS: &'static [(&'static str, &'static str)] = &[
+        ("Player1", "?"),
+        ("Player2", "?"),
+        ("Date", "??.??.????"),
+        ("Size", "5"),
+        ("Result", "*"),
+    ];
+    const POSSIBLE_GAME_RESULTS: &'static [(&'static str, Option<GameResult>)] = &[
+        ("*", None),
+        ("1-0", Some(GameResult::WhiteWin)),
+        ("R-0", Some(GameResult::WhiteWin)),
+        ("F-0", Some(GameResult::WhiteWin)),
+        ("0-1", Some(GameResult::BlackWin)),
+        ("0-R", Some(GameResult::BlackWin)),
+        ("0-F", Some(GameResult::BlackWin)),
+        ("1/2-1/2", Some(GameResult::Draw)),
+    ];
+
+    fn from_fen(fen: &str) -> Result<Self, pgn_traits::Error> {
         let fen_words: Vec<&str> = fen.split_whitespace().collect();
 
         if fen_words.len() < 3 {
-            return Err(pgn::Error::new_parse_error(format!(
+            return Err(pgn_traits::Error::new_parse_error(format!(
                 "Couldn't parse TPS string \"{}\", missing move counter.",
                 fen
             )));
         }
         if fen_words.len() > 3 {
-            return Err(pgn::Error::new_parse_error(format!(
+            return Err(pgn_traits::Error::new_parse_error(format!(
                 "Couldn't parse TPS string \"{}\", unexpected \"{}\"",
                 fen, fen_words[3]
             )));
@@ -2291,7 +2307,7 @@ impl<const S: usize> pgn_traits::pgn::PgnBoard for Board<S> {
 
         let fen_rows: Vec<&str> = fen_words[0].split('/').collect();
         if fen_rows.len() != S {
-            return Err(pgn::Error::new_parse_error(format!(
+            return Err(pgn_traits::Error::new_parse_error(format!(
                 "Couldn't parse TPS string \"{}\", had {} rows instead of {}.",
                 fen,
                 fen_rows.len(),
@@ -2304,8 +2320,8 @@ impl<const S: usize> pgn_traits::pgn::PgnBoard for Board<S> {
             .map(parse_row)
             .collect::<Result<_, _>>()
             .map_err(|e| {
-                pgn::Error::new_caused_by(
-                    pgn::ErrorKind::ParseError,
+                pgn_traits::Error::new_caused_by(
+                    pgn_traits::ErrorKind::ParseError,
                     format!("Couldn't parse TPS string \"{}\"", fen),
                     e,
                 )
@@ -2329,7 +2345,7 @@ impl<const S: usize> pgn_traits::pgn::PgnBoard for Board<S> {
             "1" => board.to_move = Color::White,
             "2" => board.to_move = Color::Black,
             s => {
-                return Err(pgn::Error::new_parse_error(format!(
+                return Err(pgn_traits::Error::new_parse_error(format!(
                     "Error parsing TPS \"{}\": Got bad side to move \"{}\"",
                     fen, s
                 )))
@@ -2342,8 +2358,8 @@ impl<const S: usize> pgn_traits::pgn::PgnBoard for Board<S> {
                 Color::Black => board.half_moves_played = (n - 1) * 2 + 1,
             },
             Err(e) => {
-                return Err(pgn::Error::new_caused_by(
-                    pgn::ErrorKind::ParseError,
+                return Err(pgn_traits::Error::new_caused_by(
+                    pgn_traits::ErrorKind::ParseError,
                     format!(
                         "Error parsing TPS \"{}\": Got bad move number \"{}\"",
                         fen, fen_words[2]
@@ -2357,14 +2373,14 @@ impl<const S: usize> pgn_traits::pgn::PgnBoard for Board<S> {
 
         return Ok(board);
 
-        fn parse_row<const S: usize>(row_str: &str) -> Result<[Stack; S], pgn::Error> {
+        fn parse_row<const S: usize>(row_str: &str) -> Result<[Stack; S], pgn_traits::Error> {
             let mut column_id = 0;
             let mut row = [Stack::default(); S];
             let mut row_str_iter = row_str.chars().peekable();
             while column_id < S as u8 {
                 match row_str_iter.peek() {
                     None => {
-                        return Err(pgn::Error::new_parse_error(format!(
+                        return Err(pgn_traits::Error::new_parse_error(format!(
                             "Couldn't parse row \"{}\": not enough pieces",
                             row_str
                         )))
@@ -2380,7 +2396,7 @@ impl<const S: usize> pgn_traits::pgn::PgnBoard for Board<S> {
                         if let Some(',') | None = row_str_iter.peek() {
                             row_str_iter.next();
                         } else {
-                            return Err(pgn::Error::new_parse_error(format!(
+                            return Err(pgn_traits::Error::new_parse_error(format!(
                                 "Expected ',' on row \"{}\", found {:?}",
                                 row_str,
                                 row_str_iter.next()
@@ -2406,7 +2422,7 @@ impl<const S: usize> pgn_traits::pgn::PgnBoard for Board<S> {
                                     break;
                                 }
                                 Some(ch) => {
-                                    return Err(pgn::Error::new_parse_error(format!(
+                                    return Err(pgn_traits::Error::new_parse_error(format!(
                                         "Expected '1', '2', 'S' or 'C' on row \"{}\", found {}",
                                         row_str, ch
                                     )))
@@ -2415,7 +2431,7 @@ impl<const S: usize> pgn_traits::pgn::PgnBoard for Board<S> {
                         }
                     }
                     Some(x) => {
-                        return Err(pgn::Error::new_parse_error(format!(
+                        return Err(pgn_traits::Error::new_parse_error(format!(
                             "Unexpected '{}' in row \"{}\".",
                             x, row_str
                         )))
@@ -2445,7 +2461,7 @@ impl<const S: usize> pgn_traits::pgn::PgnBoard for Board<S> {
         f
     }
 
-    fn move_from_san(&self, input: &str) -> Result<Self::Move, pgn::Error> {
+    fn move_from_san(&self, input: &str) -> Result<Self::Move, pgn_traits::Error> {
         Self::Move::from_string::<S>(input)
     }
 
@@ -2453,7 +2469,7 @@ impl<const S: usize> pgn_traits::pgn::PgnBoard for Board<S> {
         mv.to_string::<S>()
     }
 
-    fn move_from_lan(&self, input: &str) -> Result<Self::Move, pgn::Error> {
+    fn move_from_lan(&self, input: &str) -> Result<Self::Move, pgn_traits::Error> {
         Self::Move::from_string::<S>(input)
     }
 

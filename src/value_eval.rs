@@ -3,7 +3,7 @@ use crate::board::{
     num_square_symmetries, square_symmetries, squares_iterator, BlackTr, Board, ColorTr, GroupData,
     Piece::*, Role::*, Square, WhiteTr,
 };
-use board_game_traits::board::{Board as EvalBoard, Color};
+use board_game_traits::{Color, Position as EvalPosition};
 
 pub(crate) fn static_eval_game_phase<const S: usize>(
     board: &Board<S>,

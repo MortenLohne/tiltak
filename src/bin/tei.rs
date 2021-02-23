@@ -1,5 +1,5 @@
-use board_game_traits::board::{Board as BoardTrait, Color};
-use pgn_traits::pgn::PgnBoard;
+use board_game_traits::{Color, Position as PositionTrait};
+use pgn_traits::PgnPosition;
 use std::io;
 use std::io::{BufRead, BufReader};
 use std::str::FromStr;

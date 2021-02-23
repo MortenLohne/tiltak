@@ -2,9 +2,9 @@ use crate::board::Piece::{BlackCap, BlackFlat, WhiteFlat, WhiteWall};
 use crate::board::{squares_iterator, Board, Direction::*, Move, Piece, Role, Square};
 use crate::tests::do_moves_and_check_validity;
 use crate::{board as board_mod, board};
-use board_game_traits::board::{Board as BoardTrait, Color};
-use board_game_traits::board::{GameResult, GameResult::*};
-use pgn_traits::pgn::PgnBoard;
+use board_game_traits::{Color, Position as PositionTrait};
+use board_game_traits::{GameResult, GameResult::*};
+use pgn_traits::PgnPosition;
 
 #[test]
 fn default_board_test() {
@@ -228,7 +228,7 @@ fn double_road_wins_test() {
 // Check that placing it as a wall is suicide, but placing it flat is not
 #[test]
 fn suicide_into_points_loss_test() {
-    let mut board = <Board<5>>::start_board();
+    let mut board = <Board<5>>::start_position();
     let move_strings = [
         "a1", "e5", "e3", "Cc3", "e4", "e2", "d3", "c3>", "d4", "b2", "c3", "c2", "c4", "d2",
         "c3-", "a2", "c3", "c1", "2c2<", "c2", "c3-", "b1", "e3-", "e1", "2e2-", "d1", "2c2-",
@@ -276,7 +276,7 @@ fn suicide_into_road_loss_test() {
         "b4", "2a4>", "2b2>11", "d3>", "2c4-", "c4", "d4", "4e3+13", "a3", "3b4-", "3c3+12",
     ];
 
-    let mut board = <Board<5>>::start_board();
+    let mut board = <Board<5>>::start_position();
 
     do_moves_and_check_validity(&mut board, &move_strings);
 
@@ -291,7 +291,7 @@ fn suicide_into_road_loss_test() {
 
 #[test]
 fn games_ends_when_board_is_full_test() {
-    let mut board = <Board<5>>::start_board();
+    let mut board = <Board<5>>::start_position();
     let move_strings: Vec<String> = squares_iterator::<5>()
         .skip(1)
         .map(|sq| sq.to_string::<5>())
@@ -312,7 +312,7 @@ fn games_ends_when_board_is_full_test() {
 
 #[test]
 fn every_move_is_suicide_test() {
-    let mut board = <Board<5>>::start_board();
+    let mut board = <Board<5>>::start_position();
 
     do_moves_and_check_validity(&mut board, &["b3", "c4", "c4-", "b3>"]);
 
@@ -363,7 +363,7 @@ fn critical_square_test() {
 
 #[test]
 fn move_iterator_test() {
-    let mut board = <Board<5>>::start_board();
+    let mut board = <Board<5>>::start_position();
     do_moves_and_check_validity(&mut board, &["a1", "e5"]);
     let mv = board.move_from_san("e5-").unwrap();
     match mv {
@@ -379,7 +379,7 @@ fn move_iterator_test() {
 
 #[test]
 fn repetitions_are_draws_test() {
-    let mut board = <Board<5>>::start_board();
+    let mut board = <Board<5>>::start_position();
     do_moves_and_check_validity(&mut board, &["a1", "e5"]);
 
     let cycle_move_strings = ["e5-", "a1+", "e4+", "a2-"];
@@ -397,7 +397,7 @@ fn repetitions_are_draws_test() {
 fn parse_tps_test() {
     let tps_string = "x4,1/x5/x5/x5/2,x4 1 2";
 
-    let mut board = <Board<5>>::start_board();
+    let mut board = <Board<5>>::start_position();
     do_moves_and_check_validity(&mut board, &["a1", "e5"]);
     assert_eq!(<Board<5>>::from_fen(tps_string).unwrap(), board);
 

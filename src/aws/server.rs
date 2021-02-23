@@ -2,7 +2,7 @@ use crate::aws::{Event, Output};
 use crate::board::Board;
 use crate::search;
 use crate::search::MctsSetting;
-use board_game_traits::board::Board as EvalBoard;
+use board_game_traits::Position as EvalPosition;
 use lambda_runtime::{error::HandlerError, Context};
 use std::time::Duration;
 

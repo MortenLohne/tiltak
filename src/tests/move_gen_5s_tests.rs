@@ -2,8 +2,8 @@ use crate::board::Board;
 use crate::board::Move;
 use crate::tests::do_moves_and_check_validity;
 use crate::tests::move_gen_generic_tests::perft_check_answers;
-use board_game_traits::board::Board as BoardTrait;
-use pgn_traits::pgn::PgnBoard;
+use board_game_traits::Position as PositionTrait;
+use pgn_traits::PgnPosition;
 
 #[test]
 fn move_stack_test() {

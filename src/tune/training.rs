@@ -1,7 +1,7 @@
 use crate::tune::gradient_descent;
 use crate::tune::play_match::play_game;
-use board_game_traits::board::Board as BoardTrait;
-use board_game_traits::board::GameResult;
+use board_game_traits::GameResult;
+use board_game_traits::Position as PositionTrait;
 use rand::prelude::*;
 use rayon::prelude::*;
 
@@ -10,7 +10,7 @@ use crate::board::{Board, Move};
 use crate::pgn_parser;
 use crate::pgn_writer::Game;
 use crate::search::MctsSetting;
-use pgn_traits::pgn::PgnBoard;
+use pgn_traits::PgnPosition;
 use std::io::Read;
 use std::io::Write;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -348,7 +348,7 @@ pub fn tune_value_and_policy<const S: usize, const N: usize, const M: usize>(
     let mut policy_results: Vec<f32> = Vec::with_capacity(number_of_coefficient_sets);
 
     for (game, move_scores) in games.iter().zip(move_scoress) {
-        let mut board = game.start_board.clone();
+        let mut board = game.start_position.clone();
 
         for (mv, move_scores) in game.moves.iter().map(|(mv, _)| mv).zip(move_scores) {
             let group_data = board.group_data();
@@ -445,7 +445,7 @@ pub fn games_and_move_scoress_from_file<const S: usize>(
     }
 
     for ((i, game), move_scores) in games.iter().enumerate().zip(&move_scoress) {
-        let mut board = game.start_board.clone();
+        let mut board = game.start_position.clone();
         for (mv, move_score) in game.moves.iter().map(|(mv, _)| mv).zip(move_scores) {
             assert!(
                 move_score
@@ -474,7 +474,7 @@ pub fn read_move_scores_from_file<const S: usize>(
     let mut input = String::new();
     file.read_to_string(&mut input)?;
 
-    let board = <Board<S>>::start_board();
+    let board = <Board<S>>::start_position();
 
     // Move scores grouped by the game they were played
     let mut move_scoress: Vec<Vec<Vec<(Move, f32)>>> = vec![vec![]];
@@ -507,7 +507,7 @@ pub fn positions_and_results_from_games<const S: usize>(
     let mut positions = vec![];
     let mut results = vec![];
     for game in games.into_iter() {
-        let mut board = game.start_board;
+        let mut board = game.start_position;
         for (mv, _) in game.moves {
             if board.game_result().is_some() {
                 break;

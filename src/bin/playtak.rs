@@ -1,4 +1,4 @@
-use board_game_traits::board::{Board as BoardTrait, Color, GameResult};
+use board_game_traits::{Color, GameResult, Position as PositionTrait};
 use bufstream::BufStream;
 use clap::{App, Arg};
 use log::error;
@@ -363,7 +363,7 @@ impl PlaytakSession {
             game.time_left.as_secs(),
             game.increment.as_secs_f32()
         );
-        let mut board = <Board<S>>::start_board();
+        let mut board = <Board<S>>::start_position();
         let mut moves = vec![];
         let mut our_time_left = game.time_left;
         'gameloop: loop {
@@ -474,7 +474,7 @@ impl PlaytakSession {
             ];
 
             let game = Game {
-                start_board: <Board<S>>::start_board(),
+                start_position: <Board<S>>::start_position(),
                 moves: moves.clone(),
                 game_result: board.game_result(),
                 tags,
