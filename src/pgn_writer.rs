@@ -14,21 +14,12 @@ pub struct Game<B: PositionTrait> {
 
 impl<B: PgnPosition + Clone> Game<B> {
     pub fn game_to_pgn<W: Write>(&self, f: &mut W) -> Result<(), io::Error> {
-        // Write the 7 required tags first, in the correct order
+        // Write the required tags first, in the correct order
         // Fill in default value if they are not available
-        let required_tag_pairs = [
-            ("Event", "?"),
-            ("Site", "?"),
-            ("Date", "????.??.??"),
-            ("Round", "?"),
-            ("Player1", "?"),
-            ("Player2", "?"),
-        ];
-
         // We must ensure that all required tags are included, and written in the correct order
         let mut tags = self.tags.clone();
 
-        for (required_tag, default_value) in required_tag_pairs.iter() {
+        for (required_tag, default_value) in B::REQUIRED_TAGS.iter() {
             let position = tags
                 .iter()
                 .position(|(tag, _value)| tag.eq_ignore_ascii_case(required_tag));

@@ -2274,10 +2274,11 @@ impl<const S: usize> pgn_traits::PgnPosition for Board<S> {
     const REQUIRED_TAGS: &'static [(&'static str, &'static str)] = &[
         ("Player1", "?"),
         ("Player2", "?"),
-        ("Date", "??.??.????"),
+        ("Date", "????.??.??"),
         ("Size", "5"),
         ("Result", "*"),
     ];
+
     const POSSIBLE_GAME_RESULTS: &'static [(&'static str, Option<GameResult>)] = &[
         ("*", None),
         ("1-0", Some(GameResult::WhiteWin)),
