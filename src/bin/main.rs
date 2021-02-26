@@ -92,7 +92,8 @@ fn main() {
                         io::stdin().read_to_string(&mut input).unwrap();
                         let games = tiltak::pgn_parser::parse_pgn(&input).unwrap();
                         if games.is_empty() {
-                            println!("Couldn't parse any games")
+                            println!("Couldn't parse any games");
+                            continue;
                         }
 
                         analyze_game::<6>(games[0].clone());
@@ -101,7 +102,8 @@ fn main() {
                         io::stdin().read_to_string(&mut input).unwrap();
                         let games = tiltak::pgn_parser::parse_pgn(&input).unwrap();
                         if games.is_empty() {
-                            println!("Couldn't parse any games")
+                            println!("Couldn't parse any games");
+                            continue;
                         }
 
                         analyze_game::<5>(games[0].clone());
