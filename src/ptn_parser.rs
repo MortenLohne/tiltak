@@ -1,4 +1,4 @@
-use crate::pgn_writer::Game;
+use crate::ptn_writer::Game;
 use board_game_traits::GameResult;
 use pgn_traits::PgnPosition;
 use std::error;
@@ -6,7 +6,7 @@ use std::error::Error;
 use std::fmt::Debug;
 use std::str::FromStr;
 
-pub fn parse_pgn<B: PgnPosition + Debug + Clone>(
+pub fn parse_ptn<B: PgnPosition + Debug + Clone>(
     input: &str,
 ) -> Result<Vec<Game<B>>, Box<dyn error::Error>> {
     let mut parser = ParserData { input };

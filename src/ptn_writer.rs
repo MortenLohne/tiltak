@@ -13,7 +13,7 @@ pub struct Game<B: PositionTrait> {
 }
 
 impl<B: PgnPosition + Clone> Game<B> {
-    pub fn game_to_pgn<W: Write>(&self, f: &mut W) -> Result<(), io::Error> {
+    pub fn game_to_ptn<W: Write>(&self, f: &mut W) -> Result<(), io::Error> {
         // Write the required tags first, in the correct order
         // Fill in default value if they are not available
         // We must ensure that all required tags are included, and written in the correct order

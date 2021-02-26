@@ -43,7 +43,7 @@ pub mod tune;
 
 pub use search::mcts;
 
-pub mod pgn_parser;
-pub mod pgn_writer;
 mod policy_eval;
+pub mod ptn_parser;
+pub mod ptn_writer;
 mod value_eval;

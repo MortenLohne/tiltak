@@ -20,7 +20,7 @@ use tiltak::board::TunableBoard;
 #[cfg(feature = "constant-tuning")]
 use tiltak::board::{Move, Role};
 use tiltak::minmax;
-use tiltak::pgn_writer::Game;
+use tiltak::ptn_writer::Game;
 use tiltak::search::MctsSetting;
 use tiltak::{board, search};
 
@@ -90,7 +90,7 @@ fn main() {
                 match words.get(1) {
                     Some(&"6") => {
                         io::stdin().read_to_string(&mut input).unwrap();
-                        let games = tiltak::pgn_parser::parse_pgn(&input).unwrap();
+                        let games = tiltak::ptn_parser::parse_ptn(&input).unwrap();
                         if games.is_empty() {
                             println!("Couldn't parse any games");
                             continue;
@@ -100,7 +100,7 @@ fn main() {
                     }
                     None | Some(&"5") => {
                         io::stdin().read_to_string(&mut input).unwrap();
-                        let games = tiltak::pgn_parser::parse_pgn(&input).unwrap();
+                        let games = tiltak::ptn_parser::parse_ptn(&input).unwrap();
                         if games.is_empty() {
                             println!("Couldn't parse any games");
                             continue;

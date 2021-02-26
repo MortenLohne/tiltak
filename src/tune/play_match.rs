@@ -1,5 +1,5 @@
 use crate::board::{Board, Move, Role};
-use crate::pgn_writer::Game;
+use crate::ptn_writer::Game;
 use crate::search;
 use crate::search::{MctsSetting, Score};
 use board_game_traits::{Color, Position as PositionTrait};

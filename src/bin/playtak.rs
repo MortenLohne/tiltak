@@ -480,11 +480,11 @@ impl PlaytakSession {
                 tags,
             };
 
-            let mut pgn = Vec::new();
+            let mut ptn = Vec::new();
 
-            game.game_to_pgn(&mut pgn)?;
+            game.game_to_ptn(&mut ptn)?;
 
-            info!("{}", String::from_utf8(pgn).unwrap());
+            info!("{}", String::from_utf8(ptn).unwrap());
         }
 
         let mut move_list = vec![];
@@ -516,7 +516,7 @@ use chrono::{Datelike, Local};
 use std::convert::Infallible;
 use tiltak::board;
 use tiltak::board::{Direction, Move, Movement, Role, StackMovement};
-use tiltak::pgn_writer::Game;
+use tiltak::ptn_writer::Game;
 #[cfg(not(feature = "aws-lambda-client"))]
 use tiltak::search;
 #[cfg(not(feature = "aws-lambda-client"))]

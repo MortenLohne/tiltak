@@ -7,8 +7,8 @@ use rayon::prelude::*;
 
 use crate::board::TunableBoard;
 use crate::board::{Board, Move};
-use crate::pgn_parser;
-use crate::pgn_writer::Game;
+use crate::ptn_parser;
+use crate::ptn_writer::Game;
 use crate::search::MctsSetting;
 use pgn_traits::PgnPosition;
 use std::io::Read;
@@ -97,7 +97,7 @@ pub fn train_perpetually<const S: usize, const N: usize, const M: usize>(
         let mut writer = io::BufWriter::new(outfile);
 
         for game in games.iter() {
-            game.game_to_pgn(&mut writer)?;
+            game.game_to_ptn(&mut writer)?;
         }
 
         let games_and_move_scores_outfile = fs::OpenOptions::new()
@@ -255,7 +255,7 @@ pub fn read_games_from_file<const S: usize>(
     let mut file = fs::File::open(file_name)?;
     let mut input = String::new();
     file.read_to_string(&mut input)?;
-    pgn_parser::parse_pgn(&input)
+    ptn_parser::parse_ptn(&input)
 }
 
 pub fn tune_value_from_file<const S: usize, const N: usize>(
