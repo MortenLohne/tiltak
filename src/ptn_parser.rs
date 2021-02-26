@@ -111,6 +111,14 @@ fn parse_moves<B: PgnPosition + Debug + Clone>(
         {
             return Ok((moves, *result));
         } else if let Ok(mv) = position.move_from_san(&word) {
+            let mut legal_moves = vec![];
+            position.generate_moves(&mut legal_moves);
+            if !legal_moves.contains(&mv) {
+                return Err(Box::new(pgn_traits::Error::new(
+                    pgn_traits::ErrorKind::IllegalMove,
+                    word,
+                )));
+            }
             position.do_move(mv.clone());
             input.skip_whitespaces();
             if input.peek() == Some('{') {
