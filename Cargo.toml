@@ -44,7 +44,3 @@ chrono = "0.4"
 bufstream = "0.1"
 clap = "2.33"
 lazy_static = "1.4"
-
-[dependencies.nom]
-version = "4.2"
-features = ["verbose-errors"]
