@@ -1,164 +1,143 @@
 use crate::pgn_writer::Game;
 use board_game_traits::GameResult;
-use nom::{
-    alt, char, complete, dbg, do_parse, many0, many1, many_till, named, opt, return_error, tag,
-    take_until, take_until_and_consume,
-};
 use pgn_traits::PgnPosition;
 use std::error;
 use std::fmt::Debug;
-use std::io;
-use std::io::Write;
+use std::str::FromStr;
 
 pub fn parse_pgn<B: PgnPosition + Debug + Clone>(
-    mut input: &str,
+    input: &str,
 ) -> Result<Vec<Game<B>>, Box<dyn error::Error>> {
+    let mut parser = ParserData { input };
     let mut games = vec![];
-
-    loop {
-        let result = parse_game(input);
-        match result {
-            Ok((rem_input, (tag_pairs, move_texts))) => {
-                let mut board = B::start_position();
-                let mut moves = vec![];
-                for (ref move_text, ref comment) in move_texts.iter() {
-                    let mv = board.move_from_san(move_text);
-                    match mv {
-                        Err(err) => {
-                            println!(
-                                "Failed to parse move text \"{}\" on board\n{:?}\n{}",
-                                move_text, board, err
-                            );
-                            return Err(err.into());
-                        }
-                        Ok(mv) => {
-                            // Checking for move legality is too expensive for release builds
-                            let mut legal_moves = vec![];
-                            board.generate_moves(&mut legal_moves);
-                            debug_assert!(legal_moves.contains(&mv));
-                            board.do_move(mv.clone());
-                            moves.push((mv, comment.unwrap_or("").to_string()));
-                        }
-                    }
-                }
-
-                input = rem_input;
-
-                let tags: Vec<(String, String)> = tag_pairs
-                    .iter()
-                    .map(|(a, b)| ((*a).to_string(), (*b).to_string()))
-                    .collect();
-
-                let game_result = tags
-                    .iter()
-                    .find(|(name, _)| name == "Result")
-                    .map(|(_, result)| match result.as_ref() {
-                        "1-0" => Some(GameResult::WhiteWin),
-                        "1/2-1/2" => Some(GameResult::Draw),
-                        "0-1" => Some(GameResult::BlackWin),
-                        "*" => None,
-                        _ => panic!("No result for game."), // TODO: Failure to read a single game should be recoverable
-                    })
-                    .flatten();
-
-                let start_position = tags
-                    .iter()
-                    .find(|(name, _)| name == "TPS")
-                    .map(|(_, result)| B::from_fen(result))
-                    .unwrap_or_else(|| Ok(B::start_position()))?;
-
-                let game = Game {
-                    start_position,
-                    moves,
-                    game_result,
-                    tags,
-                };
-
-                games.push(game);
-            }
-            Err(err) => {
-                match err {
-                    nom::Err::Incomplete(i) => {
-                        writeln!(io::stderr(), "Couldn't parse incomplete game: {:?}", i)?
-                    }
-                    nom::Err::Error(nom::Context::Code(i, error_kind)) => writeln!(
-                        io::stderr(),
-                        "Parse error of kind {:?} around {}",
-                        error_kind,
-                        &i[0..100]
-                    )?,
-                    nom::Err::Error(nom::Context::List(errs)) => {
-                        writeln!(io::stderr(), "Parse error: {:?}", errs)?
-                    }
-                    nom::Err::Failure(nom::Context::Code(i, error_kind)) => writeln!(
-                        io::stderr(),
-                        "Parse failure of kind {:?} around {}",
-                        error_kind,
-                        i
-                    )?,
-                    nom::Err::Failure(nom::Context::List(errs)) => {
-                        writeln!(io::stderr(), "Parse failure: {:?}", errs)?
-                    }
-                }
-                break;
-            }
-        }
+    while let Some(game) = parse_game(&mut parser) {
+        games.push(game);
     }
-
     Ok(games)
 }
 
-named!(parse_game<&str, (Vec<(&str, &str)>, Vec<(&str, Option<&str>)>)>,
-    do_parse!(
-        tag_pairs: parse_tag_pairs >>
-        many0!(alt!(tag!(" ") | tag!("\n"))) >>
-        moves: parse_game_movetext >>
-        many0!(alt!(tag!(" ") | tag!("\n"))) >>
-        ((tag_pairs, moves))
-    )
-);
+fn parse_game<B: PgnPosition + Debug + Clone>(input: &mut ParserData) -> Option<Game<B>> {
+    let mut tags = vec![];
+    input.skip_whitespaces();
+    while input.peek()? == '[' {
+        let (tag, value) = parse_tag(input)?;
+        tags.push((tag.to_string(), value));
+    }
+    let position = B::start_position();
 
-named!(parse_game_movetext<&str, Vec<(&str, Option<&str>)>>,
-    do_parse!(
-        result: complete!(dbg!(
-        many_till!(parse_move_text,
-            alt!(tag!("0-1") | tag!("1-0") | tag!("1/2-1/2") | tag!("*"))
-        ))) >>
-        (result.0)
-    )
-);
+    let (moves, game_result) = parse_moves(input, position.clone())?;
 
-named!(parse_move_text<&str, (&str, Option<&str>)>,
-    do_parse!(
-        dbg!(opt!(complete!(many_till!(nom::digit, alt!(tag!("... ") | tag!(". ")))))) >>
-        movetext: return_error!(dbg!(complete!(take_until!(" ")))) >>
-        comment: opt!(complete!(do_parse!(
-                many1!(alt!(tag!(" ") | tag!("\n"))) >>
-                char!('{') >>
-                comment: take_until!("}") >>
-                char!('}') >>
-                (comment)
-            ))
-        ) >>
-        many1!(complete!(alt!(tag!(" ") | tag!("\n")))) >>
-        (movetext, comment)
-    )
-);
+    Some(Game {
+        start_position: position,
+        moves,
+        game_result,
+        tags,
+    })
+}
 
-named!(parse_tag_pairs<&str, Vec<(&str, &str)>>,
-    many0!(do_parse!(
-        tag: parse_tag_pair >>
-        tag!("\n") >>
-        (tag)
-    ))
-);
+fn parse_tag<'a>(input: &mut ParserData<'a>) -> Option<(&'a str, String)> {
+    assert_eq!(input.take(), Some('['));
+    let tag: &'a str = input.take_while(|ch| !ch.is_whitespace());
 
-named!(parse_tag_pair<&str, (&str, &str)>,
-    do_parse!(
-        char!('[') >>
-        name: take_until_and_consume!(" ") >>
-        char!('"') >>
-        value: take_until_and_consume!("\"]") >>
-        ((name, value))
-    )
-);
+    input.skip_whitespaces();
+    if input.take() != Some('"') {
+        return None;
+    }
+
+    let mut value = String::new();
+    loop {
+        match input.take()? {
+            '"' => break,
+            '\\' => match input.take()? {
+                '"' => value.push('"'),
+                '\\' => value.push('\\'),
+                ch => {
+                    value.push('\\');
+                    value.push(ch);
+                }
+            },
+            ch => value.push(ch),
+        }
+    }
+    input.skip_whitespaces();
+    if input.take()? == ']' {
+        Some((tag, value))
+    }
+    else {
+        None
+    }
+}
+
+fn parse_moves<B: PgnPosition + Debug + Clone>(
+    input: &mut ParserData,
+    mut position: B,
+) -> Option<(Vec<(B::Move, String)>, Option<GameResult>)> {
+    let mut moves: Vec<(B::Move, String)> = vec![];
+    let mut _ply_counter = 0; // Last ply seen
+    loop {
+        let word = input.take_word();
+        if word.ends_with("...") {
+            let _num = u64::from_str(&word[..word.len() - 4]).ok()?;
+            _ply_counter = _num * 2 - 1;
+        } else if word.ends_with('.') {
+            let _num = u64::from_str(&word[..word.len() - 2]).ok()?;
+            _ply_counter = _num * 2 - 2;
+        } else if let Some((_, result)) = B::POSSIBLE_GAME_RESULTS
+            .iter()
+            .find(|(s, _result)| *s == word)
+        {
+            return Some((moves, *result));
+        } else if let Ok(mv) = position.move_from_san(&word) {
+            position.do_move(mv.clone());
+            input.skip_whitespaces();
+            if input.peek() == Some('{') {
+                input.take();
+                let comment = input.take_while(|ch| ch != '}');
+                moves.push((mv, comment.to_string()))
+            } else {
+                moves.push((mv, String::new()));
+            }
+        } else {
+            return None;
+        }
+    }
+}
+
+struct ParserData<'a> {
+    input: &'a str,
+}
+
+impl<'a> ParserData<'a> {
+    fn skip_whitespaces(&mut self) {
+        self.input = self.input.trim_start_matches(char::is_whitespace);
+    }
+
+    fn take_word(&mut self) -> &'a str {
+        self.skip_whitespaces();
+        self.take_while(|ch| !ch.is_whitespace())
+    }
+
+    fn take_while<F: Fn(char) -> bool>(&mut self, f: F) -> &'a str {
+        for (i, ch) in self.input.char_indices() {
+            if !f(ch) {
+                self.input = &self.input[i + ch.len_utf8()..];
+                return &self.input[0..i];
+            }
+        }
+        self.input = &self.input[self.input.len()..];
+        self.input
+    }
+
+    fn peek(&mut self) -> Option<char> {
+        self.input.chars().next()
+    }
+
+    fn take(&mut self) -> Option<char> {
+        if let Some(ch) = self.input.chars().next() {
+            self.input = &self.input[ch.len_utf8()..];
+            Some(ch)
+        } else {
+            None
+        }
+    }
+}
