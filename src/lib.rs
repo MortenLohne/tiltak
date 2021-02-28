@@ -37,6 +37,7 @@ pub mod board;
 pub mod minmax;
 pub mod move_gen;
 pub mod search;
+#[cfg(test)]
 mod tests;
 #[cfg(feature = "constant-tuning")]
 pub mod tune;
