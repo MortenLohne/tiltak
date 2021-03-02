@@ -32,6 +32,9 @@ fn main() {
         let mut input = String::new();
         io::stdin().read_line(&mut input).unwrap();
         let words = input.split_whitespace().collect::<Vec<_>>();
+        if words.is_empty() {
+            continue;
+        }
         match words[0] {
             "play" => {
                 let board = Board::default();
@@ -85,6 +88,7 @@ fn main() {
                 return;
             }
             "game" => {
+                println!("Enter a full game PTN, then press enter followed by CTRL+D:");
                 let mut input = String::new();
 
                 match words.get(1) {
@@ -92,9 +96,9 @@ fn main() {
                         io::stdin().read_to_string(&mut input).unwrap();
                         let games = tiltak::ptn_parser::parse_ptn(&input).unwrap();
                         if games.is_empty() {
-                            println!("Couldn't parse any games");
                             continue;
                         }
+                        println!("Analyzing 1 game: ");
 
                         analyze_game::<6>(games[0].clone());
                     }
@@ -105,6 +109,7 @@ fn main() {
                             println!("Couldn't parse any games");
                             continue;
                         }
+                        println!("Analyzing 1 game: ");
 
                         analyze_game::<5>(games[0].clone());
                     }

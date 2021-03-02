@@ -12,14 +12,16 @@ pub fn parse_ptn<B: PgnPosition + Debug + Clone>(
     let mut parser = ParserData { input };
     let mut games = vec![];
     loop {
-        match parse_game(&mut parser) {
-            Ok(game) => games.push(game),
-            Err(err) => {
-                if !parser.input.is_empty() {
+        if parser.input.chars().any(|ch| !ch.is_whitespace()) {
+            match parse_game(&mut parser) {
+                Ok(game) => games.push(game),
+                Err(err) => {
                     eprintln!("Couldn't parse game: {}", err);
+                    return Ok(games);
                 }
-                return Ok(games);
             }
+        } else {
+            return Ok(games);
         }
     }
 }
@@ -99,7 +101,12 @@ fn parse_moves<B: PgnPosition + Debug + Clone>(
     loop {
         input.skip_whitespaces();
         let word = input.take_word();
-        if let Some(num_string) = word.strip_suffix("...") {
+
+        if word.is_empty() {
+            return Err(Box::new(pgn_traits::Error::new_parse_error(
+                "Unexpected EOF, expected a move or a game result.".to_string(),
+            )));
+        } else if let Some(num_string) = word.strip_suffix("...") {
             let _num = u64::from_str(num_string)?;
             _ply_counter = _num * 2 - 1;
         } else if let Some(num_string) = word.strip_suffix('.') {
