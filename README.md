@@ -28,7 +28,8 @@ Three experimental commands entered through stdin:
 
 * play: Play against the engine through the command line.
 * aimatch: Watch the engine play against a very simple minmax implementation.
-* analyze: Analyze a given position, provided from a simple move list.
+* analyze \<size\>: Analyze a given position, provided from a simple move list
+* game \<size\>: Analyze a whole game, provided from a PTN
 
 ## playtak
 

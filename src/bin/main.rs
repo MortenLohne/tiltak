@@ -27,7 +27,8 @@ use tiltak::{board, search};
 fn main() {
     println!("play: Play against the engine through the command line");
     println!("aimatch: Watch the engine play against a very simple minmax implementation");
-    println!("analyze: Analyze a given position, provided from a simple move list");
+    println!("analyze <size>: Analyze a given position, provided from a simple move list");
+    println!("game <size>: Analyze a whole game, provided from a PTN");
     loop {
         let mut input = String::new();
         io::stdin().read_line(&mut input).unwrap();
