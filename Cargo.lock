@@ -1155,9 +1155,9 @@ checksum = "d4fd5641d01c8f18a23da7b6fe29298ff4b55afcccdf78973b24cf3175fee32e"
 
 [[package]]
 name = "pgn-traits"
-version = "0.2.1"
+version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "48fcb6c62f408cadff11e45ba1bf9aaca14155c243b53fd8f621179f9bf4e6ab"
+checksum = "6323ec81aab968b56d11ccb229ae2bf25c981007de7e4b72ead97b983847d858"
 dependencies = [
  "board-game-traits",
 ]

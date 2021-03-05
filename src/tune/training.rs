@@ -112,7 +112,12 @@ pub fn train_perpetually<const S: usize, const N: usize, const M: usize>(
         let mut writer = io::BufWriter::new(games_and_move_scores_outfile);
 
         for (game, move_scores) in games.iter().zip(move_scores) {
-            for (mv, move_scores) in game.moves.iter().map(|(mv, _comment)| mv).zip(move_scores) {
+            for (mv, move_scores) in game
+                .moves
+                .iter()
+                .map(|(mv, _annotation, _comment)| mv)
+                .zip(move_scores)
+            {
                 write!(writer, "{}: ", mv.to_string::<S>())?;
                 for (mv, score) in move_scores {
                     write!(writer, "{} {}, ", mv.to_string::<S>(), score)?;
@@ -350,7 +355,7 @@ pub fn tune_value_and_policy<const S: usize, const N: usize, const M: usize>(
     for (game, move_scores) in games.iter().zip(move_scoress) {
         let mut board = game.start_position.clone();
 
-        for (mv, move_scores) in game.moves.iter().map(|(mv, _)| mv).zip(move_scores) {
+        for (mv, move_scores) in game.moves.iter().map(|(mv, _, _)| mv).zip(move_scores) {
             let group_data = board.group_data();
             for (possible_move, score) in move_scores {
                 let mut coefficients = [0.0; M];
@@ -446,7 +451,7 @@ pub fn games_and_move_scoress_from_file<const S: usize>(
 
     for ((i, game), move_scores) in games.iter().enumerate().zip(&move_scoress) {
         let mut board = game.start_position.clone();
-        for (mv, move_score) in game.moves.iter().map(|(mv, _)| mv).zip(move_scores) {
+        for (mv, move_score) in game.moves.iter().map(|(mv, _, _)| mv).zip(move_scores) {
             assert!(
                 move_score
                     .iter()
@@ -457,7 +462,7 @@ pub fn games_and_move_scoress_from_file<const S: usize>(
                 move_score,
                 game.moves
                     .iter()
-                    .map(|(mv, _)| mv.to_string::<S>())
+                    .map(|(mv, _, _)| mv.to_string::<S>())
                     .collect::<Vec<_>>(),
                 board
             );
@@ -508,7 +513,7 @@ pub fn positions_and_results_from_games<const S: usize>(
     let mut results = vec![];
     for game in games.into_iter() {
         let mut board = game.start_position;
-        for (mv, _) in game.moves {
+        for (mv, _, _) in game.moves {
             if board.game_result().is_some() {
                 break;
             }

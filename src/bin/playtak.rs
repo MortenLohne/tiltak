@@ -376,7 +376,10 @@ impl PlaytakSession {
                     let aws_function_name = self.aws_function_name.as_ref().unwrap();
                     let event = aws::Event {
                         size: S,
-                        moves: moves.iter().map(|(mv, _): &(Move, _)| mv.clone()).collect(),
+                        moves: moves
+                            .iter()
+                            .map(|(mv, _, _): &(Move, _, _)| mv.clone())
+                            .collect(),
                         time_left: our_time_left,
                         increment: game.increment,
                     };
@@ -393,7 +396,7 @@ impl PlaytakSession {
                 };
 
                 board.do_move(best_move.clone());
-                moves.push((best_move.clone(), score.to_string()));
+                moves.push((best_move.clone(), vec![], score.to_string()));
 
                 let mut output_string = format!("Game#{} ", game.game_no);
                 write_move::<S>(best_move, &mut output_string);
@@ -433,7 +436,7 @@ impl PlaytakSession {
                                 let move_string = words[1..].join(" ");
                                 let move_played = parse_move::<S>(&move_string);
                                 board.do_move(move_played.clone());
-                                moves.push((move_played, "0.0".to_string()));
+                                moves.push((move_played, vec![], "0.0".to_string()));
                                 break;
                             }
                             "Time" => {
@@ -489,7 +492,7 @@ impl PlaytakSession {
 
         let mut move_list = vec![];
 
-        for (mv, _) in moves {
+        for (mv, _, _) in moves {
             move_list.push(mv.to_string::<S>());
         }
 

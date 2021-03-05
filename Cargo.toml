@@ -26,7 +26,7 @@ required-features = ["constant-tuning"]
 
 [dependencies]
 board-game-traits = "0.2"
-pgn-traits = "0.2.1"
+pgn-traits = "0.2.2"
 arrayvec = "0.5.1"
 rand = "0.7"
 rayon = { version = "1.3.*", optional = true }

@@ -95,8 +95,14 @@ fn parse_tag<'a>(input: &mut ParserData<'a>) -> Result<(&'a str, String), pgn_tr
 fn parse_moves<B: PgnPosition + Debug + Clone>(
     input: &mut ParserData,
     mut position: B,
-) -> Result<(Vec<(B::Move, String)>, Option<GameResult>), Box<dyn Error>> {
-    let mut moves: Vec<(B::Move, String)> = vec![];
+) -> Result<
+    (
+        Vec<(B::Move, Vec<&'static str>, String)>,
+        Option<GameResult>,
+    ),
+    Box<dyn Error>,
+> {
+    let mut moves: Vec<(B::Move, Vec<&'static str>, String)> = vec![];
     let mut _ply_counter = 0; // Last ply seen
     loop {
         input.skip_whitespaces();
@@ -117,30 +123,45 @@ fn parse_moves<B: PgnPosition + Debug + Clone>(
             .find(|(s, _result)| *s == word)
         {
             return Ok((moves, *result));
-        } else if let Ok(mv) = position.move_from_san(&word) {
-            let mut legal_moves = vec![];
-            position.generate_moves(&mut legal_moves);
-            if !legal_moves.contains(&mv) {
-                return Err(Box::new(pgn_traits::Error::new(
-                    pgn_traits::ErrorKind::IllegalMove,
-                    word,
-                )));
-            }
-            position.do_move(mv.clone());
-            input.skip_whitespaces();
-            if input.peek() == Some('{') {
-                input.take();
-                let comment = input.take_while(|ch| ch != '}');
-                input.take();
-                moves.push((mv, comment.to_string()))
-            } else {
-                moves.push((mv, String::new()));
-            }
         } else {
-            return Err(Box::new(pgn_traits::Error::new_parse_error(format!(
-                "Couldn't parse move {}",
-                word
-            ))));
+            let mut move_string = word;
+            let mut annotations = vec![];
+            while let Some(annotation) = B::POSSIBLE_MOVE_ANNOTATIONS
+                .iter()
+                .find(|annotation| move_string.strip_suffix(*annotation).is_some())
+            {
+                move_string = move_string.strip_suffix(*annotation).unwrap();
+                annotations.insert(0, *annotation);
+            }
+
+            match position.move_from_san(&move_string) {
+                Ok(mv) => {
+                    let mut legal_moves = vec![];
+                    position.generate_moves(&mut legal_moves);
+                    if !legal_moves.contains(&mv) {
+                        return Err(Box::new(pgn_traits::Error::new(
+                            pgn_traits::ErrorKind::IllegalMove,
+                            word,
+                        )));
+                    }
+                    position.do_move(mv.clone());
+                    input.skip_whitespaces();
+                    if input.peek() == Some('{') {
+                        input.take();
+                        let comment = input.take_while(|ch| ch != '}');
+                        input.take();
+                        moves.push((mv, annotations, comment.to_string()))
+                    } else {
+                        moves.push((mv, annotations, String::new()));
+                    }
+                }
+                Err(err) => {
+                    return Err(Box::new(pgn_traits::Error::new_parse_error(format!(
+                        "Couldn't parse move {}: {}",
+                        word, err
+                    ))));
+                }
+            }
         }
     }
 }

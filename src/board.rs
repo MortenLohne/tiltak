@@ -2290,6 +2290,8 @@ impl<const S: usize> pgn_traits::PgnPosition for Board<S> {
         ("1/2-1/2", Some(GameResult::Draw)),
     ];
 
+    const POSSIBLE_MOVE_ANNOTATIONS: &'static [&'static str] = &["''", "'", "*", "!", "?"];
+
     fn from_fen(fen: &str) -> Result<Self, pgn_traits::Error> {
         let fen_words: Vec<&str> = fen.split_whitespace().collect();
 

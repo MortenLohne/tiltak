@@ -63,7 +63,7 @@ pub fn play_game<const S: usize>(
             start_position: Board::default(),
             moves: game_moves
                 .into_iter()
-                .map(|mv| (mv, String::new()))
+                .map(|mv| (mv, vec![], String::new()))
                 .collect::<Vec<_>>(),
             game_result: board.game_result(),
             tags: vec![],

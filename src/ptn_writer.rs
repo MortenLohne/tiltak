@@ -7,7 +7,7 @@ use std::io::Write;
 #[derive(Debug, Clone, PartialEq)]
 pub struct Game<B: PositionTrait> {
     pub start_position: B,
-    pub moves: Vec<(B::Move, String)>,
+    pub moves: Vec<(B::Move, Vec<&'static str>, String)>,
     pub game_result: Option<GameResult>,
     pub tags: Vec<(String, String)>,
 }
@@ -59,7 +59,7 @@ impl<B: PgnPosition + Clone> Game<B> {
 
         let mut board = self.start_position.clone();
 
-        for (i, (mv, comment)) in self.moves.iter().enumerate() {
+        for (i, (mv, _annotation, comment)) in self.moves.iter().enumerate() {
             if i % 12 == 0 {
                 writeln!(f)?;
             }
