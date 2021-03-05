@@ -1,8 +1,8 @@
+use crate::ptn::{Game, PtnMove};
 use board_game_traits::{Color, GameResult};
 use pgn_traits::PgnPosition;
 use std::io;
 use std::io::Write;
-use crate::ptn::Game;
 
 impl<B: PgnPosition + Clone> Game<B> {
     pub fn game_to_ptn<W: Write>(&self, f: &mut W) -> Result<(), io::Error> {
@@ -51,7 +51,7 @@ impl<B: PgnPosition + Clone> Game<B> {
 
         let mut board = self.start_position.clone();
 
-        for (i, (mv, _annotation, comment)) in self.moves.iter().enumerate() {
+        for (i, PtnMove { mv, comment, .. }) in self.moves.iter().enumerate() {
             if i % 12 == 0 {
                 writeln!(f)?;
             }

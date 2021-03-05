@@ -1,4 +1,4 @@
-use crate::ptn::Game;
+use crate::ptn::{Game, PtnMove};
 use board_game_traits::GameResult;
 use pgn_traits::PgnPosition;
 use std::error;
@@ -95,14 +95,8 @@ fn parse_tag<'a>(input: &mut ParserData<'a>) -> Result<(&'a str, String), pgn_tr
 fn parse_moves<B: PgnPosition + Debug + Clone>(
     input: &mut ParserData,
     mut position: B,
-) -> Result<
-    (
-        Vec<(B::Move, Vec<&'static str>, String)>,
-        Option<GameResult>,
-    ),
-    Box<dyn Error>,
-> {
-    let mut moves: Vec<(B::Move, Vec<&'static str>, String)> = vec![];
+) -> Result<(Vec<PtnMove<B::Move>>, Option<GameResult>), Box<dyn Error>> {
+    let mut moves: Vec<PtnMove<B::Move>> = vec![];
     let mut _ply_counter = 0; // Last ply seen
     loop {
         input.skip_whitespaces();
@@ -150,9 +144,17 @@ fn parse_moves<B: PgnPosition + Debug + Clone>(
                         input.take();
                         let comment = input.take_while(|ch| ch != '}');
                         input.take();
-                        moves.push((mv, annotations, comment.to_string()))
+                        moves.push(PtnMove {
+                            mv,
+                            annotations,
+                            comment: comment.to_string(),
+                        })
                     } else {
-                        moves.push((mv, annotations, String::new()));
+                        moves.push(PtnMove {
+                            mv,
+                            annotations,
+                            comment: String::new(),
+                        });
                     }
                 }
                 Err(err) => {

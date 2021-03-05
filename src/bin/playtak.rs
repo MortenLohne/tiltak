@@ -378,7 +378,7 @@ impl PlaytakSession {
                         size: S,
                         moves: moves
                             .iter()
-                            .map(|(mv, _, _): &(Move, _, _)| mv.clone())
+                            .map(|PtnMove { mv, .. }: &PtnMove<Move>| mv.clone())
                             .collect(),
                         time_left: our_time_left,
                         increment: game.increment,
@@ -396,7 +396,11 @@ impl PlaytakSession {
                 };
 
                 board.do_move(best_move.clone());
-                moves.push((best_move.clone(), vec![], score.to_string()));
+                moves.push(PtnMove {
+                    mv: best_move.clone(),
+                    annotations: vec![],
+                    comment: score.to_string(),
+                });
 
                 let mut output_string = format!("Game#{} ", game.game_no);
                 write_move::<S>(best_move, &mut output_string);
@@ -436,7 +440,11 @@ impl PlaytakSession {
                                 let move_string = words[1..].join(" ");
                                 let move_played = parse_move::<S>(&move_string);
                                 board.do_move(move_played.clone());
-                                moves.push((move_played, vec![], "0.0".to_string()));
+                                moves.push(PtnMove {
+                                    mv: move_played,
+                                    annotations: vec![],
+                                    comment: "0.0".to_string(),
+                                });
                                 break;
                             }
                             "Time" => {
@@ -492,7 +500,7 @@ impl PlaytakSession {
 
         let mut move_list = vec![];
 
-        for (mv, _, _) in moves {
+        for PtnMove { mv, .. } in moves {
             move_list.push(mv.to_string::<S>());
         }
 
@@ -519,7 +527,7 @@ use chrono::{Datelike, Local};
 use std::convert::Infallible;
 use tiltak::board;
 use tiltak::board::{Direction, Move, Movement, Role, StackMovement};
-use tiltak::ptn::Game;
+use tiltak::ptn::{Game, PtnMove};
 #[cfg(not(feature = "aws-lambda-client"))]
 use tiltak::search;
 #[cfg(not(feature = "aws-lambda-client"))]

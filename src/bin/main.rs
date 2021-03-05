@@ -20,7 +20,7 @@ use tiltak::board::TunableBoard;
 #[cfg(feature = "constant-tuning")]
 use tiltak::board::{Move, Role};
 use tiltak::minmax;
-use tiltak::ptn::Game;
+use tiltak::ptn::{Game, PtnMove};
 use tiltak::search::MctsSetting;
 use tiltak::{board, search};
 
@@ -317,7 +317,7 @@ fn test_position<const S: usize>() {
 fn analyze_game<const S: usize>(game: Game<Board<S>>) {
     let mut board = game.start_position.clone();
     let mut ply_number = 2;
-    for (mv, _, _) in game.moves {
+    for PtnMove { mv, .. } in game.moves {
         board.do_move(mv.clone());
         if board.game_result().is_some() {
             break;

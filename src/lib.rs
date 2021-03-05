@@ -45,5 +45,5 @@ mod tests;
 pub mod tune;
 
 mod policy_eval;
-mod value_eval;
 pub mod ptn;
+mod value_eval;
