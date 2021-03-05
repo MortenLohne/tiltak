@@ -1,4 +1,4 @@
-use crate::ptn_writer::Game;
+use crate::ptn::Game;
 use board_game_traits::GameResult;
 use pgn_traits::PgnPosition;
 use std::error;

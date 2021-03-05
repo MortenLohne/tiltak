@@ -1,16 +1,8 @@
-use board_game_traits::Position as PositionTrait;
 use board_game_traits::{Color, GameResult};
 use pgn_traits::PgnPosition;
 use std::io;
 use std::io::Write;
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct Game<B: PositionTrait> {
-    pub start_position: B,
-    pub moves: Vec<(B::Move, Vec<&'static str>, String)>,
-    pub game_result: Option<GameResult>,
-    pub tags: Vec<(String, String)>,
-}
+use crate::ptn::Game;
 
 impl<B: PgnPosition + Clone> Game<B> {
     pub fn game_to_ptn<W: Write>(&self, f: &mut W) -> Result<(), io::Error> {

@@ -30,6 +30,8 @@ extern crate arrayvec;
 extern crate board_game_traits;
 extern crate pgn_traits;
 
+pub use search::mcts;
+
 #[cfg(any(feature = "aws-lambda-runtime", feature = "aws-lambda-client"))]
 pub mod aws;
 mod bitboard;
@@ -42,9 +44,6 @@ mod tests;
 #[cfg(feature = "constant-tuning")]
 pub mod tune;
 
-pub use search::mcts;
-
 mod policy_eval;
-pub mod ptn_parser;
-pub mod ptn_writer;
 mod value_eval;
+pub mod ptn;

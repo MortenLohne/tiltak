@@ -7,8 +7,8 @@ use rayon::prelude::*;
 
 use crate::board::TunableBoard;
 use crate::board::{Board, Move};
-use crate::ptn_parser;
-use crate::ptn_writer::Game;
+use crate::ptn::ptn_parser;
+use crate::ptn::Game;
 use crate::search::MctsSetting;
 use pgn_traits::PgnPosition;
 use std::io::Read;

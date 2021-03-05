@@ -519,7 +519,7 @@ use chrono::{Datelike, Local};
 use std::convert::Infallible;
 use tiltak::board;
 use tiltak::board::{Direction, Move, Movement, Role, StackMovement};
-use tiltak::ptn_writer::Game;
+use tiltak::ptn::Game;
 #[cfg(not(feature = "aws-lambda-client"))]
 use tiltak::search;
 #[cfg(not(feature = "aws-lambda-client"))]
