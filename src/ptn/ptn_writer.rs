@@ -4,6 +4,8 @@ use pgn_traits::PgnPosition;
 use std::io;
 use std::io::Write;
 
+const LINE_WIDTH: usize = 80;
+
 impl<B: PgnPosition + Clone> Game<B> {
     pub fn game_to_ptn<W: Write>(&self, f: &mut W) -> Result<(), io::Error> {
         // Write the required tags first, in the correct order
@@ -49,44 +51,48 @@ impl<B: PgnPosition + Clone> Game<B> {
             writeln!(f, "[{} \"{}\"]", tag, value)?;
         }
 
+        writeln!(f)?;
+
         let mut board = self.start_position.clone();
+        let mut column_position = 0;
+        let mut buffer = String::new();
 
         for (i, PtnMove { mv, comment, .. }) in self.moves.iter().enumerate() {
-            if i % 12 == 0 {
-                writeln!(f)?;
-            }
             if i == 0 && board.side_to_move() == Color::Black {
-                write!(f, "1... {} {{{}}} ", board.move_to_san(&mv), comment)?;
+                buffer.push_str(&format!("1... {}", board.move_to_san(&mv)));
             } else if board.side_to_move() == Color::White {
-                write!(
-                    f,
-                    "{}. {} {}",
-                    (i + 1) / 2 + 1,
-                    board.move_to_san(&mv),
-                    if comment.is_empty() {
-                        "".to_string()
-                    } else {
-                        "{".to_string() + comment + "} "
-                    }
-                )?;
+                buffer.push_str(&format!("{}. {}", (i + 1) / 2 + 1, board.move_to_san(&mv),));
             } else {
-                write!(
-                    f,
-                    "{} {}",
-                    board.move_to_san(&mv),
-                    if comment.is_empty() {
-                        "".to_string()
-                    } else {
-                        "{".to_string() + comment + "} "
-                    }
-                )?;
+                buffer.push_str(&format!("{}", board.move_to_san(&mv)));
             }
+
+            if !comment.is_empty() {
+                buffer.push_str(" {");
+                buffer.push_str(&comment);
+                buffer.push('}');
+            }
+            if board.side_to_move() == Color::Black {
+                if column_position == 0 {
+                    write!(f, "{}", buffer)?;
+                    column_position = buffer.len();
+                } else if column_position + buffer.len() + 1 <= LINE_WIDTH {
+                    write!(f, " {}", buffer)?;
+                    column_position += buffer.len() + 1;
+                } else {
+                    write!(f, "\n{}", buffer)?;
+                    column_position = buffer.len();
+                }
+                buffer.clear();
+            } else {
+                buffer.push(' ');
+            }
+
             board.do_move(mv.clone());
         }
 
         write!(
             f,
-            "{}",
+            " {}",
             match self.game_result {
                 None => "*",
                 Some(GameResult::WhiteWin) => "1-0",
