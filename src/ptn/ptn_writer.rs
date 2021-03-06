@@ -22,20 +22,22 @@ impl<B: PgnPosition + Clone> Game<B> {
                 // Write the tag with correct capitalization
                 writeln!(f, "[{} \"{}\"]", required_tag, value)?;
             } else {
-                writeln!(f, "[{} \"{}\"]", required_tag, default_value)?;
+                // If the result tag is required, but not provided, manually write it
+                if required_tag.eq_ignore_ascii_case("Result") {
+                    let result_string = match self.game_result {
+                        Some(GameResult::WhiteWin) => "1-0",
+                        Some(GameResult::BlackWin) => "0-1",
+                        Some(GameResult::Draw) => "1/2-1/2",
+                        None => "*",
+                    }
+                    .to_string();
+
+                    writeln!(f, "[{} \"{}\"]", required_tag, result_string)?;
+                } else {
+                    writeln!(f, "[{} \"{}\"]", required_tag, default_value)?;
+                }
             }
         }
-
-        writeln!(
-            f,
-            "[Result \"{}\"]",
-            match self.game_result {
-                None => "*",
-                Some(GameResult::WhiteWin) => "1-0",
-                Some(GameResult::BlackWin) => "0-1",
-                Some(GameResult::Draw) => "1/2-1/2",
-            }
-        )?;
 
         if self.start_position != B::start_position()
             && tags
