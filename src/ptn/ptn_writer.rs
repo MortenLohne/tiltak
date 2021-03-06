@@ -65,7 +65,7 @@ impl<B: PgnPosition + Clone> Game<B> {
             } else if board.side_to_move() == Color::White {
                 buffer.push_str(&format!("{}. {}", (i + 1) / 2 + 1, board.move_to_san(&mv),));
             } else {
-                buffer.push_str(&format!("{}", board.move_to_san(&mv)));
+                buffer.push_str(&board.move_to_san(&mv));
             }
 
             if !comment.is_empty() {
@@ -77,7 +77,7 @@ impl<B: PgnPosition + Clone> Game<B> {
                 if column_position == 0 {
                     write!(f, "{}", buffer)?;
                     column_position = buffer.len();
-                } else if column_position + buffer.len() + 1 <= LINE_WIDTH {
+                } else if column_position + buffer.len() < LINE_WIDTH {
                     write!(f, " {}", buffer)?;
                     column_position += buffer.len() + 1;
                 } else {
