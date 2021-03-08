@@ -33,3 +33,22 @@ fn tinue_7ply_test() {
 
     plays_correct_hard_move_property::<6>(&move_strings, &["4b5<"]);
 }
+
+#[test]
+fn tinue_3ply_test() {
+    // b6 a6 a5 b3 b5 c3 c5 d3 e5 d5 f5 d4 d6 d5> e6 Cd5 c6 b6> Cc4 d2 c5+ d1 c4> a3 f6 d5+ d5 Sc5 c2 e1 f1 f2 2d4- e2 f3 b1 f4 c1 f3- 2e5> f4+ Sf4 b2 e3 f3 f4+ d4 5f5-122 3d3>12 3f2- 3f3- e3> f4- e3> e3 5f3<32 Sf3 2d6> f5 a1 f4
+    // Requires spread that gives us a hard cap next to our critical square
+    let move_strings = [
+        "b6", "a6", "a5", "b3", "b5", "c3", "c5", "d3", "e5", "d5", "f5", "d4", "d6", "d5>", "e6",
+        "Cd5", "c6", "b6>", "Cc4", "d2", "c5+", "d1", "c4>", "a3", "f6", "d5+", "d5", "Sc5", "c2",
+        "e1", "f1", "f2", "2d4-", "e2", "f3", "b1", "f4", "c1", "f3-", "2e5>", "f4+", "Sf4", "b2",
+        "e3", "f3", "f4+", "d4", "5f5-122", "3d3>12", "3f2-", "3f3-", "e3>", "f4-", "e3>", "e3",
+        "5f3<32", "Sf3", "2d6>", "f5", "a1", "f4",
+    ];
+
+    let mut board = <Board<6>>::start_position();
+
+    do_moves_and_check_validity(&mut board, &move_strings);
+
+    plays_correct_hard_move_property::<6>(&move_strings, &["3e6-111"]);
+}
