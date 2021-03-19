@@ -394,6 +394,20 @@ fn repetitions_are_draws_test() {
 }
 
 #[test]
+fn fake_repetitions_are_not_draws_test() {
+    let mut board = <Board<6>>::start_position();
+    let move_strings = [
+        "a1", "f1", "d3", "d4", "c3", "c4", "e3", "b4", "e4", "b3", "e5", "Ce2", "Cc5", "b5", "a4",
+        "b2", "c5-", "a2", "2c4<", "c4", "a3", "c2", "d2", "c5", "d1", "e2<", "e2", "b6", "a3>",
+        "2d2+", "3b4>", "f3", "f2", "f3<", "f3", "d5", "4c4>", "2d3<11", "Sb4", "3b3>12", "Sc4",
+        "d2", "f4", "e6", "f5", "f6", "d6", "2e3>", "e3", "3d3>", "f4-", "e6-", "c4-", "4e3<31",
+        "Sc4", "5c3>32", "d4-", "4d4>31", "6d3+15", "2e3<", "3f3+12", "e4>", "2f5-", "e4>",
+    ];
+    do_moves_and_check_validity(&mut board, &move_strings);
+    assert_eq!(board.game_result(), None);
+}
+
+#[test]
 fn parse_tps_test() {
     let tps_string = "x4,1/x5/x5/x5/2,x4 1 2";
 
