@@ -1185,11 +1185,16 @@ impl Move {
                 let pieces_taken = first_char.to_digit(10).unwrap() as u8;
                 let mut pieces_held = pieces_taken;
 
-                let mut amounts_to_drop = input
+                let mut amounts_to_drop: Vec<u8> = input
                     .chars()
                     .skip(4)
-                    .map(|ch| ch.to_digit(10).unwrap() as u8)
-                    .collect::<Vec<u8>>();
+                    .map(|ch| ch.to_digit(10).map(|i| i as u8))
+                    .collect::<Option<Vec<u8>>>()
+                    .ok_or_else(|| {
+                        pgn_traits::Error::new_parse_error(
+                            format!("Couldn't parse move \"{}\": found non-integer when expecting number of pieces to drop", input
+                        ))
+                    })?;
                 amounts_to_drop.pop(); //
 
                 let mut movements = ArrayVec::new();
