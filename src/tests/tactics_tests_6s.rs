@@ -52,3 +52,20 @@ fn tinue_3ply_test() {
 
     plays_correct_hard_move_property::<6>(&move_strings, &["3e6-111"]);
 }
+
+#[test]
+fn tinue_3ply_test2() {
+    // a6 f1 d3 b6 d4 c6 e6 d6 Cd5 d2 e5 e2 c3 Cc2 f2 f3 e3 c2+ e1 f3< e4 f3 d3> e2+ e2 d3 d5> 4e3-22 Se3 c4 e3- c5 d4< Se3 3e2- b3 2e5-11* d6> 2e4+11 Se4
+    // Requires spreading our cap, flattening our wall, which creates two orthogonal road threats
+    let move_strings = [
+        "a6", "f1", "d3", "b6", "d4", "c6", "e6", "d6", "Cd5", "d2", "e5", "e2", "c3", "Cc2", "f2",
+        "f3", "e3", "c2+", "e1", "f3<", "e4", "f3", "d3>", "e2+", "e2", "d3", "d5>", "4e3-22",
+        "Se3", "c4", "e3-", "c5", "d4<", "Se3", "3e2-", "b3", "2e5-11", "d6>", "2e4+11", "Se4",
+    ];
+
+    let mut board = <Board<6>>::start_position();
+
+    do_moves_and_check_validity(&mut board, &move_strings);
+
+    plays_correct_hard_move_property::<6>(&move_strings, &["2e3-11"]);
+}
