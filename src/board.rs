@@ -1603,6 +1603,22 @@ impl<const S: usize> fmt::Debug for Board<S> {
 }
 
 impl<const S: usize> Board<S> {
+    pub fn white_reserves_left(&self) -> u8 {
+        self.white_stones_left
+    }
+
+    pub fn black_reserves_left(&self) -> u8 {
+        self.black_stones_left
+    }
+
+    pub fn white_caps_left(&self) -> u8 {
+        self.white_caps_left
+    }
+
+    pub fn black_caps_left(&self) -> u8 {
+        self.black_caps_left
+    }
+
     #[cfg(test)]
     pub fn zobrist_hash(&self) -> u64 {
         self.hash
