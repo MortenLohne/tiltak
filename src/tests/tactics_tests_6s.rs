@@ -69,3 +69,21 @@ fn tinue_3ply_test2() {
 
     plays_correct_hard_move_property::<6>(&move_strings, &["2e3-11"]);
 }
+
+#[test]
+fn tinue_nply_test() {
+    // e6 f6 f5 e5 f4 e4 f3 Ce3 f2 e3> e2 e3 d2 c2 d3 d4 Cc3 d1 b3 c2> d3- d1+ e2< e1 e2 2f3- e2+ 3f2<12 d1 d5 b2
+    // Requires centralizing our cap, making the vertical threats unstoppable
+    // White can delay for 5+ moves
+    let move_strings = [
+        "e6", "f6", "f5", "e5", "f4", "e4", "f3", "Ce3", "f2", "e3>", "e2", "e3", "d2", "c2", "d3",
+        "d4", "Cc3", "d1", "b3", "c2>", "d3-", "d1+", "e2<", "e1", "e2", "2f3-", "e2+", "3f2<12",
+        "d1", "d5", "b2",
+    ];
+
+    let mut board = <Board<6>>::start_position();
+
+    do_moves_and_check_validity(&mut board, &move_strings);
+
+    plays_correct_hard_move_property::<6>(&move_strings, &["5d2>"]);
+}
