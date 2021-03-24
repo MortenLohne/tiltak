@@ -8,7 +8,8 @@ mod mcts_core;
 
 use self::mcts_core::{Pv, TreeEdge};
 use crate::board::{Board, Move, Role, Square, TunableBoard};
-use std::time;
+use crate::search::mcts_core::Tree;
+use std::{mem, time};
 
 #[derive(Clone, PartialEq, Debug)]
 pub struct MctsSetting<const S: usize> {
@@ -257,4 +258,14 @@ pub fn mcts_training<const S: usize>(
 /// Convert a static evaluation in centipawns to a winning probability between 0.0 and 1.0.
 pub fn cp_to_win_percentage(cp: f32) -> Score {
     1.0 / (1.0 + Score::exp(-cp as Score))
+}
+
+// Utility for testing
+pub fn edge_mem_usage() -> usize {
+    mem::size_of::<TreeEdge>()
+}
+
+// Utility for testing
+pub fn node_mem_usage() -> usize {
+    mem::size_of::<Tree>()
 }

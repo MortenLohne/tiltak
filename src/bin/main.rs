@@ -444,7 +444,16 @@ fn mem_usage() {
     println!("Tak board: {} bytes", mem::size_of::<board::Board<5>>());
     println!("Tak board cell: {} bytes", mem::size_of::<board::Stack>());
     println!("Tak move: {} bytes", mem::size_of::<board::Move>());
-    println!("Zobrist keys: {}", mem::size_of::<board::ZobristKeys<5>>())
+    println!("MCTS edge 6s: {} bytes", search::edge_mem_usage());
+    println!("MCTS node 6s: {} bytes", search::node_mem_usage());
+    println!(
+        "Zobrist keys 5s: {} bytes",
+        mem::size_of::<board::ZobristKeys<5>>()
+    );
+    println!(
+        "Zobrist keys 6s: {} bytes",
+        mem::size_of::<board::ZobristKeys<6>>()
+    );
 }
 
 fn do_moves_and_check_validity(board: &mut Board<5>, move_strings: &[&str]) {
