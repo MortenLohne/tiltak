@@ -1,9 +1,6 @@
 use crate::board;
 use crate::board::Role::*;
-use crate::board::{
-    Board, ColorTr, Direction, Move, Movement, Piece, Square, StackMovement, MAX_BOARD_SIZE,
-};
-use arrayvec::ArrayVec;
+use crate::board::{Board, ColorTr, Direction, Move, Movement, Piece, Square, StackMovement};
 
 impl<const S: usize> Board<S> {
     pub(crate) fn generate_moves_colortr<Us: ColorTr, Them: ColorTr>(
@@ -30,7 +27,7 @@ impl<const S: usize> Board<S> {
                                 square,
                                 square,
                                 self[square].len() as u8,
-                                &ArrayVec::new(),
+                                StackMovement::new(),
                                 &mut movements,
                             );
                         } else if Us::piece_is_ours(piece) {
@@ -39,13 +36,12 @@ impl<const S: usize> Board<S> {
                                 square,
                                 square,
                                 self[square].len() as u8,
-                                &ArrayVec::new(),
+                                StackMovement::new(),
                                 &mut movements,
                             );
                         }
                         for movements in movements.into_iter().filter(|mv| !mv.is_empty()) {
-                            let stack_movement = StackMovement { movements };
-                            let mv = Move::Move(square, direction, stack_movement.clone());
+                            let mv = Move::Move(square, direction, movements);
                             moves.push(mv);
                         }
                     }
@@ -61,8 +57,8 @@ impl<const S: usize> Board<S> {
         origin_square: Square,
         square: Square,
         pieces_carried: u8,
-        partial_movement: &ArrayVec<[Movement; MAX_BOARD_SIZE - 1]>,
-        movements: &mut Vec<ArrayVec<[Movement; MAX_BOARD_SIZE - 1]>>,
+        partial_movement: StackMovement,
+        movements: &mut Vec<StackMovement>,
     ) {
         if let Some(neighbour) = square.go_direction::<S>(direction) {
             let max_pieces_to_take = if square == origin_square {
@@ -75,12 +71,12 @@ impl<const S: usize> Board<S> {
                 return;
             }
             if neighbour_piece.map(Piece::role) == Some(Wall) && max_pieces_to_take > 0 {
-                let mut new_movement = partial_movement.clone();
+                let mut new_movement = partial_movement;
                 new_movement.push(Movement { pieces_to_take: 1 });
                 movements.push(new_movement);
             } else {
                 for pieces_to_take in 1..=max_pieces_to_take {
-                    let mut new_movement = partial_movement.clone();
+                    let mut new_movement = partial_movement;
                     new_movement.push(Movement { pieces_to_take });
 
                     self.generate_moving_moves_cap::<Colorr>(
@@ -88,7 +84,7 @@ impl<const S: usize> Board<S> {
                         origin_square,
                         neighbour,
                         pieces_to_take,
-                        &new_movement,
+                        new_movement,
                         movements,
                     );
                     movements.push(new_movement);
@@ -103,8 +99,8 @@ impl<const S: usize> Board<S> {
         origin_square: Square,
         square: Square,
         pieces_carried: u8,
-        partial_movement: &ArrayVec<[Movement; MAX_BOARD_SIZE - 1]>,
-        movements: &mut Vec<ArrayVec<[Movement; MAX_BOARD_SIZE - 1]>>,
+        partial_movement: StackMovement,
+        movements: &mut Vec<StackMovement>,
     ) {
         if let Some(neighbour) = square.go_direction::<S>(direction) {
             let neighbour_piece = self[neighbour].top_stone();
@@ -119,7 +115,7 @@ impl<const S: usize> Board<S> {
                 (pieces_carried - 1).min(S as u8)
             };
             for pieces_to_take in 1..=max_pieces_to_take {
-                let mut new_movement = partial_movement.clone();
+                let mut new_movement = partial_movement;
                 new_movement.push(Movement { pieces_to_take });
 
                 self.generate_moving_moves_non_cap::<Colorr>(
@@ -127,7 +123,7 @@ impl<const S: usize> Board<S> {
                     origin_square,
                     neighbour,
                     pieces_to_take,
-                    &new_movement,
+                    new_movement,
                     movements,
                 );
                 movements.push(new_movement);

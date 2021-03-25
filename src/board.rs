@@ -559,7 +559,6 @@ use crate::board::Piece::*;
 use crate::board::Role::Flat;
 use crate::board::Role::*;
 use crate::{policy_eval, search, value_eval};
-use arrayvec::ArrayVec;
 use board_game_traits::GameResult::{BlackWin, Draw, WhiteWin};
 use board_game_traits::{Color, GameResult};
 use board_game_traits::{EvalPosition as EvalPositionTrait, Position as PositionTrait};
@@ -569,9 +568,10 @@ use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use std::fmt::Write;
 use std::hash::{Hash, Hasher};
+use std::iter::FromIterator;
 use std::mem;
 use std::ops::{Index, IndexMut};
-use std::{fmt, iter, ops};
+use std::{fmt, ops};
 
 /// Extra items for tuning evaluation constants.
 pub trait TunableBoard: PositionTrait {
@@ -1121,7 +1121,7 @@ impl Move {
                 Wall => write!(string, "S{}", square.to_string::<S>()).unwrap(),
             },
             Move::Move(square, direction, stack_movements) => {
-                let mut pieces_held = stack_movements.movements[0].pieces_to_take;
+                let mut pieces_held = stack_movements.get(0).pieces_to_take;
                 if pieces_held == 1 {
                     write!(string, "{}", square.to_string::<S>()).unwrap();
                 } else {
@@ -1134,8 +1134,8 @@ impl Move {
                     South => string.push('-'),
                 }
                 // Omit number of pieces dropped, if all stones are dropped immediately
-                if stack_movements.movements.len() > 1 {
-                    for movement in stack_movements.movements.iter().skip(1) {
+                if stack_movements.len() > 1 {
+                    for movement in stack_movements.into_iter().skip(1) {
                         let pieces_to_drop = pieces_held - movement.pieces_to_take;
                         write!(string, "{}", pieces_to_drop).unwrap();
                         pieces_held -= pieces_to_drop;
@@ -1170,8 +1170,9 @@ impl Move {
                 let square = Square::parse_square::<S>(&input[0..2])?;
                 let direction = Direction::parse(input.chars().nth(2).unwrap());
                 // Moves in the simplified move notation always move one piece
-                let movements = iter::once(Movement { pieces_to_take: 1 }).collect();
-                Ok(Move::Move(square, direction, StackMovement { movements }))
+                let mut movement = StackMovement::new();
+                movement.push(Movement { pieces_to_take: 1 });
+                Ok(Move::Move(square, direction, movement))
             }
             'C' if input.len() == 3 => {
                 Ok(Move::Place(Cap, Square::parse_square::<S>(&input[1..])?))
@@ -1197,7 +1198,7 @@ impl Move {
                     })?;
                 amounts_to_drop.pop(); //
 
-                let mut movements = ArrayVec::new();
+                let mut movements = StackMovement::new();
                 movements.push(Movement {
                     pieces_to_take: pieces_taken,
                 });
@@ -1208,7 +1209,7 @@ impl Move {
                     });
                     pieces_held -= amount_to_drop;
                 }
-                Ok(Move::Move(square, direction, StackMovement { movements }))
+                Ok(Move::Move(square, direction, movements))
             }
             _ => Err(pgn_traits::Error::new(
                 pgn_traits::ErrorKind::ParseError,
@@ -1262,10 +1263,90 @@ impl Direction {
 }
 
 /// One or more `Movement`s, storing how many pieces are dropped off at each step
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Copy, Clone, Default, PartialEq, Eq, Debug)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[repr(C)]
 pub struct StackMovement {
-    pub movements: ArrayVec<[Movement; MAX_BOARD_SIZE - 1]>,
+    movements: u32,
+}
+
+impl StackMovement {
+    pub fn new() -> Self {
+        StackMovement { movements: 0 }
+    }
+
+    pub fn get(&self, index: u8) -> Movement {
+        assert!(index < self.len() as u8);
+        let movement_in_place = self.movements & 0b1111 << (index * 4);
+        Movement {
+            pieces_to_take: (movement_in_place >> (index * 4)) as u8,
+        }
+    }
+
+    pub fn push(&mut self, movement: Movement) {
+        let length = self.len() as u32;
+        debug_assert!(
+            length < 7,
+            "Stack movement cannot grow any more: {:#b}",
+            self.movements
+        );
+        debug_assert!(movement.pieces_to_take < 8);
+        self.movements |= (movement.pieces_to_take as u32) << (length * 4);
+        self.movements &= (1_u32 << 28).overflowing_sub(1).0;
+        self.movements |= (length + 1) << 28;
+    }
+
+    pub fn len(&self) -> usize {
+        (self.movements >> (28_u32)) as usize
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+}
+
+impl FromIterator<Movement> for StackMovement {
+    fn from_iter<T: IntoIterator<Item = Movement>>(iter: T) -> Self {
+        let mut result = StackMovement::new();
+        for movement in iter {
+            result.push(movement)
+        }
+        result
+    }
+}
+
+impl IntoIterator for StackMovement {
+    type Item = Movement;
+    type IntoIter = StackMovementIterator;
+
+    fn into_iter(self) -> Self::IntoIter {
+        StackMovementIterator {
+            num_left: self.len() as u8,
+            _movements: self.movements,
+        }
+    }
+}
+
+pub struct StackMovementIterator {
+    num_left: u8,
+    _movements: u32,
+}
+
+impl Iterator for StackMovementIterator {
+    type Item = Movement;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.num_left == 0 {
+            None
+        } else {
+            self.num_left -= 1;
+            let result = self._movements & 0b1111;
+            self._movements >>= 4;
+            Some(Movement {
+                pieces_to_take: result as u8,
+            })
+        }
+    }
 }
 
 /// Moving a stack of pieces consists of one or more `Movement`s
@@ -1837,10 +1918,9 @@ impl<const S: usize> Board<S> {
         stack_movement: &'a StackMovement,
     ) -> impl Iterator<Item = Option<Piece>> + 'a {
         stack_movement
-            .movements
-            .iter()
+            .into_iter()
             .map(move |Movement { pieces_to_take }| {
-                let piece_index = self[square].len() - *pieces_to_take;
+                let piece_index = self[square].len() - pieces_to_take;
                 if piece_index == 0 {
                     None
                 } else {
@@ -1996,7 +2076,7 @@ impl<const S: usize> PositionTrait for Board<S> {
 
     fn do_move(&mut self, mv: Self::Move) -> Self::ReverseMove {
         self.hash_history.push(self.hash);
-        let reverse_move = match mv.clone() {
+        let reverse_move = match mv {
             Move::Place(role, to) => {
                 debug_assert!(self[to].is_empty());
                 // On the first move, the players place the opponent's color
@@ -2025,14 +2105,14 @@ impl<const S: usize> PositionTrait for Board<S> {
             Move::Move(square, direction, stack_movement) => {
                 let mut from = square;
 
-                let mut pieces_left_behind: ArrayVec<[u8; MAX_BOARD_SIZE - 1]> = ArrayVec::new();
+                let mut pieces_left_behind = StackMovement::new();
                 let mut flattens_stone = false;
 
-                for sq in <MoveIterator<S>>::new(square, direction, stack_movement.clone()) {
+                for sq in <MoveIterator<S>>::new(square, direction, stack_movement) {
                     self.hash ^= self.zobrist_hash_for_square(sq);
                 }
 
-                for Movement { pieces_to_take } in stack_movement.movements.iter() {
+                for Movement { pieces_to_take } in stack_movement.into_iter() {
                     let to = from.go_direction::<S>(direction).unwrap();
 
                     if self[to].top_stone.map(Piece::role) == Some(Wall) {
@@ -2041,7 +2121,7 @@ impl<const S: usize> PositionTrait for Board<S> {
                     }
 
                     let pieces_to_leave = self[from].len() - pieces_to_take;
-                    pieces_left_behind.push(*pieces_to_take);
+                    pieces_left_behind.push(Movement { pieces_to_take });
 
                     for _ in pieces_to_leave..self[from].len() {
                         let piece = self[from].get(pieces_to_leave).unwrap();
@@ -2056,16 +2136,23 @@ impl<const S: usize> PositionTrait for Board<S> {
                     self.hash ^= self.zobrist_hash_for_square(sq);
                 }
 
-                pieces_left_behind.reverse();
+                let mut movements = StackMovement::new();
+                for left_behind in pieces_left_behind {
+                    movements.push(left_behind)
+                }
+
+                let mut movement_vec: Vec<Movement> = pieces_left_behind.into_iter().collect();
+                movement_vec.reverse();
+
+                pieces_left_behind = StackMovement::new();
+                for movement in movement_vec {
+                    pieces_left_behind.push(movement);
+                }
+
                 ReverseMove::Move(
                     from,
                     direction.reverse(),
-                    StackMovement {
-                        movements: pieces_left_behind
-                            .iter()
-                            .map(|&pieces_to_take| Movement { pieces_to_take })
-                            .collect(),
-                    },
+                    pieces_left_behind,
                     flattens_stone,
                 )
             }
@@ -2112,11 +2199,11 @@ impl<const S: usize> PositionTrait for Board<S> {
             ReverseMove::Move(from, direction, stack_movement, flattens_wall) => {
                 let mut square = from;
 
-                for square in <MoveIterator<S>>::new(from, direction, stack_movement.clone()) {
+                for square in <MoveIterator<S>>::new(from, direction, stack_movement) {
                     self.hash ^= self.zobrist_hash_for_square(square);
                 }
 
-                for Movement { pieces_to_take } in stack_movement.movements.iter() {
+                for Movement { pieces_to_take } in stack_movement.into_iter() {
                     let to = square.go_direction::<S>(direction).unwrap();
 
                     let pieces_to_leave = self[square].len() - pieces_to_take;
@@ -2168,7 +2255,7 @@ impl<const S: usize> MoveIterator<S> {
         MoveIterator {
             square,
             direction,
-            squares_left: stack_movement.movements.len() + 1,
+            squares_left: stack_movement.len() + 1,
             _size: [(); S],
         }
     }

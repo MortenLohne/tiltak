@@ -266,7 +266,7 @@ pub(crate) fn coefficients_for_move_colortr<Us: ColorTr, Them: ColorTr, const S:
             coefficients[move_role_bonus + role_id] += 1.0;
 
             let mut destination_square =
-                if stack_movement.movements[0].pieces_to_take == board[*square].len() {
+                if stack_movement.get(0).pieces_to_take == board[*square].len() {
                     square.go_direction::<S>(*direction).unwrap()
                 } else {
                     *square
@@ -380,7 +380,7 @@ pub(crate) fn coefficients_for_move_colortr<Us: ColorTr, Them: ColorTr, const S:
             // Bonus for moving onto a critical square
             if gets_critical_square {
                 let moves_our_whole_stack =
-                    stack_movement.movements[0].pieces_to_take == board[*square].len();
+                    stack_movement.get(0).pieces_to_take == board[*square].len();
 
                 match (their_pieces == 0, moves_our_whole_stack) {
                     (false, false) => coefficients[move_onto_critical_square] += 1.0,

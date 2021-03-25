@@ -10,7 +10,7 @@ use std::time::Duration;
 use std::{io, net, thread};
 #[cfg(feature = "aws-lambda-client")]
 use tiltak::aws;
-use tiltak::board::{Board, MAX_BOARD_SIZE};
+use tiltak::board::Board;
 
 use log::{debug, info, warn};
 
@@ -522,7 +522,6 @@ fn dial() -> Result<BufStream<TcpStream>> {
 use std::cmp::Ordering;
 use std::iter;
 
-use arrayvec::ArrayVec;
 use chrono::{Datelike, Local};
 use std::convert::Infallible;
 use tiltak::board;
@@ -547,7 +546,7 @@ pub fn parse_move<const S: usize>(input: &str) -> board::Move {
     } else if words[0] == "M" {
         let start_square = board::Square::parse_square::<S>(&words[1].to_lowercase()).unwrap();
         let end_square = board::Square::parse_square::<S>(&words[2].to_lowercase()).unwrap();
-        let pieces_dropped: ArrayVec<[u8; board::MAX_BOARD_SIZE - 1]> = words
+        let pieces_dropped: Vec<u8> = words
             .iter()
             .skip(3)
             .map(|s| u8::from_str(s).unwrap())
@@ -557,7 +556,7 @@ pub fn parse_move<const S: usize>(input: &str) -> board::Move {
 
         let mut pieces_held = num_pieces_taken;
 
-        let pieces_taken: ArrayVec<[Movement; MAX_BOARD_SIZE - 1]> = iter::once(num_pieces_taken)
+        let pieces_taken: StackMovement = iter::once(num_pieces_taken)
             .chain(
                 pieces_dropped
                     .iter()
@@ -581,13 +580,7 @@ pub fn parse_move<const S: usize>(input: &str) -> board::Move {
             _ => panic!("Diagonal move string {}", input),
         };
 
-        board::Move::Move(
-            start_square,
-            direction,
-            StackMovement {
-                movements: pieces_taken,
-            },
-        )
+        board::Move::Move(start_square, direction, pieces_taken)
     } else {
         unreachable!()
     }
@@ -606,15 +599,14 @@ pub fn write_move<const S: usize>(mv: board::Move, w: &mut String) {
         }
         Move::Move(start_square, direction, stack_movement) => {
             let mut end_square = start_square;
-            let mut pieces_held = stack_movement.movements[0].pieces_to_take;
+            let mut pieces_held = stack_movement.get(0).pieces_to_take;
             let pieces_to_leave: Vec<u8> = stack_movement
-                .movements
-                .iter()
+                .into_iter()
                 .skip(1)
                 .map(|Movement { pieces_to_take }| {
                     end_square = end_square.go_direction::<S>(direction).unwrap();
                     let pieces_to_leave = pieces_held - pieces_to_take;
-                    pieces_held = *pieces_to_take;
+                    pieces_held = pieces_to_take;
                     pieces_to_leave
                 })
                 .collect();
