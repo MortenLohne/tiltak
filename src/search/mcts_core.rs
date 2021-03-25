@@ -8,7 +8,7 @@ use std::ops;
 /// A Monte Carlo Search Tree, containing every node that has been seen in search.
 #[derive(Clone, PartialEq, Debug)]
 pub struct Tree {
-    pub children: Vec<TreeEdge>,
+    pub children: Box<[TreeEdge]>,
     pub total_action_value: f64,
     pub is_terminal: bool,
 }
@@ -166,18 +166,18 @@ impl Tree {
         moves: &mut Vec<(Move, Score)>,
     ) {
         board.generate_moves_with_params(policy_params, group_data, simple_moves, moves);
-        self.children.reserve_exact(moves.len());
+        let mut children_vec = Vec::with_capacity(moves.len());
         let policy_sum: f32 = moves.iter().map(|(_, score)| *score).sum();
         let inv_sum = 1.0 / policy_sum;
         for (mv, heuristic_score) in moves.drain(..) {
-            self.children
-                .push(TreeEdge::new(mv.clone(), heuristic_score * inv_sum));
+            children_vec.push(TreeEdge::new(mv.clone(), heuristic_score * inv_sum));
         }
+        self.children = children_vec.into_boxed_slice();
     }
 
     fn new_node() -> Self {
         Tree {
-            children: vec![],
+            children: Box::new([]),
             total_action_value: 0.0,
             is_terminal: false,
         }
