@@ -1265,19 +1265,20 @@ impl Direction {
 /// One or more `Movement`s, storing how many pieces are dropped off at each step
 #[derive(Copy, Clone, Default, PartialEq, Eq, Debug)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[repr(C)]
 pub struct StackMovement {
-    movements: u32,
+    // The first 4 bits is the number of squares moved
+    // The remaining 28 bits are the number of pieces taken, 4 bits per number
+    data: u32,
 }
 
 impl StackMovement {
     pub fn new() -> Self {
-        StackMovement { movements: 0 }
+        StackMovement { data: 0 }
     }
 
-    pub fn get(&self, index: u8) -> Movement {
+    pub fn get(self, index: u8) -> Movement {
         assert!(index < self.len() as u8);
-        let movement_in_place = self.movements & 0b1111 << (index * 4);
+        let movement_in_place = self.data & 0b1111 << (index * 4);
         Movement {
             pieces_to_take: (movement_in_place >> (index * 4)) as u8,
         }
@@ -1288,19 +1289,19 @@ impl StackMovement {
         debug_assert!(
             length < 7,
             "Stack movement cannot grow any more: {:#b}",
-            self.movements
+            self.data
         );
         debug_assert!(movement.pieces_to_take < 8);
-        self.movements |= (movement.pieces_to_take as u32) << (length * 4);
-        self.movements &= (1_u32 << 28).overflowing_sub(1).0;
-        self.movements |= (length + 1) << 28;
+        self.data |= (movement.pieces_to_take as u32) << (length * 4);
+        self.data &= (1_u32 << 28).overflowing_sub(1).0;
+        self.data |= (length + 1) << 28;
     }
 
-    pub fn len(&self) -> usize {
-        (self.movements >> (28_u32)) as usize
+    pub fn len(self) -> usize {
+        (self.data >> (28_u32)) as usize
     }
 
-    pub fn is_empty(&self) -> bool {
+    pub fn is_empty(self) -> bool {
         self.len() == 0
     }
 }
@@ -1322,7 +1323,7 @@ impl IntoIterator for StackMovement {
     fn into_iter(self) -> Self::IntoIter {
         StackMovementIterator {
             num_left: self.len() as u8,
-            _movements: self.movements,
+            _movements: self.data,
         }
     }
 }
