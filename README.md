@@ -24,7 +24,7 @@ The project consists of 5 different binaries, that use the core engine in variou
 
 ## main
 
-Three experimental commands entered through stdin:
+Four experimental commands entered through stdin:
 
 * play: Play against the engine through the command line.
 * aimatch: Watch the engine play against a very simple minmax implementation.
@@ -77,14 +77,7 @@ This is otherwise undocumented.
 
 Building the project from source requires the Rust compiler and Cargo (Rust's package manager) installed, both included in the [Rust downloads.](https://www.rust-lang.org/tools/install)
 
-Currently, the **nightly compiler** is required. This is to make use of the `minimum const generics` feature, which will be stabilized on March 25th 2021 in Rust version 1.51, at which point the nightly compiler will no longer be required. 
-
-If using `rustup` (recommended), the nightly compiler can be installed and used with: 
-
-````
-rustup install nightly
-rustup default nightly
-````
+The minimum required Rust version is 1.51, released March 25th 2021.
 
 To build and run:
 ```
