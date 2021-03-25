@@ -1,5 +1,5 @@
-use crate::bitboard::BitBoard;
-use crate::board::{
+use crate::position::bitboard::BitBoard;
+use crate::position::{
     num_square_symmetries, square_symmetries, squares_iterator, BlackTr, Board, ColorTr, GroupData,
     Piece::*, Role::*, Square, WhiteTr,
 };

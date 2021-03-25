@@ -1,6 +1,6 @@
-use crate::bitboard::BitBoard;
-use crate::board::Role::{Cap, Flat, Wall};
-use crate::board::{
+use crate::position::bitboard::BitBoard;
+use crate::position::Role::{Cap, Flat, Wall};
+use crate::position::{
     num_square_symmetries, square_symmetries, Board, ColorTr, Direction::*, GroupData, Move,
     Square, TunableBoard,
 };

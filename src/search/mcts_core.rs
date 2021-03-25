@@ -1,5 +1,5 @@
 /// This module contains the core of the MCTS search algorithm
-use crate::board::{Board, GroupData, Move, TunableBoard};
+use crate::position::{Board, GroupData, Move, TunableBoard};
 use crate::search::{cp_to_win_percentage, MctsSetting, Score};
 use board_game_traits::{Color, GameResult, Position as PositionTrait};
 use rand::distributions::Distribution;

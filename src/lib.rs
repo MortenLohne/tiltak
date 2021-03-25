@@ -5,7 +5,7 @@
 //! Generate legal moves for the start position
 //!
 //! ```
-//! use tiltak::board::Board;
+//! use tiltak::position::Board;
 //! use board_game_traits::Position as PositionTrait;
 //!
 //! let board = <Board<5>>::start_position();
@@ -17,7 +17,7 @@
 //! Run Monte Carlo Tree Search for the start position
 //!
 //! ```rust,no_run
-//! use tiltak::board::Board;
+//! use tiltak::position::Board;
 //! use tiltak::mcts;
 //! use pgn_traits::PgnPosition;
 //!
@@ -34,10 +34,9 @@ pub use search::mcts;
 
 #[cfg(any(feature = "aws-lambda-runtime", feature = "aws-lambda-client"))]
 pub mod aws;
-mod bitboard;
-pub mod board;
 pub mod minmax;
 pub mod move_gen;
+pub mod position;
 pub mod search;
 #[cfg(test)]
 mod tests;

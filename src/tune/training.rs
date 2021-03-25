@@ -5,8 +5,8 @@ use board_game_traits::Position as PositionTrait;
 use rand::prelude::*;
 use rayon::prelude::*;
 
-use crate::board::TunableBoard;
-use crate::board::{Board, Move};
+use crate::position::TunableBoard;
+use crate::position::{Board, Move};
 use crate::ptn::Game;
 use crate::ptn::{ptn_parser, PtnMove};
 use crate::search::MctsSetting;

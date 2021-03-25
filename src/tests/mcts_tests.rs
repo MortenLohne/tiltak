@@ -1,4 +1,4 @@
-use crate::board::Board;
+use crate::position::Board;
 use crate::search;
 use crate::search::MctsSetting;
 use crate::tests::do_moves_and_check_validity;

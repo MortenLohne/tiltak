@@ -1,5 +1,5 @@
 use crate::aws::{Event, Output};
-use crate::board::Board;
+use crate::position::Board;
 use crate::search;
 use crate::search::MctsSetting;
 use board_game_traits::Position as EvalPosition;

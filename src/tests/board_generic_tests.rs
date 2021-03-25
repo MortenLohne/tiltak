@@ -1,4 +1,4 @@
-use crate::board::{squares_iterator, Board, GroupEdgeConnection, Move, Role, Square};
+use crate::position::{squares_iterator, Board, GroupEdgeConnection, Move, Role, Square};
 use crate::tests::do_moves_and_check_validity;
 use board_game_traits::{EvalPosition, GameResult::*, Position as PositionTrait};
 use pgn_traits::PgnPosition;

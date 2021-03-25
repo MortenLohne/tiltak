@@ -7,7 +7,7 @@
 mod mcts_core;
 
 use self::mcts_core::{Pv, TreeEdge};
-use crate::board::{Board, Move, Role, Square, TunableBoard};
+use crate::position::{Board, Move, Role, Square, TunableBoard};
 use crate::search::mcts_core::Tree;
 use std::{mem, time};
 

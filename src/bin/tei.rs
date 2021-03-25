@@ -4,7 +4,7 @@ use std::io;
 use std::io::{BufRead, BufReader};
 use std::str::FromStr;
 use std::time::{Duration, Instant};
-use tiltak::board::Board;
+use tiltak::position::Board;
 
 use std::any::Any;
 use tiltak::search;

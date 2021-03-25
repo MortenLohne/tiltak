@@ -1,6 +1,28 @@
 //! Tak move generation, along with all required data types.
 
+use std::cmp::Ordering;
+use std::fmt::Write;
+use std::hash::{Hash, Hasher};
+use std::iter::FromIterator;
+use std::mem;
+use std::ops::{Index, IndexMut};
+use std::{fmt, ops};
+
+use board_game_traits::GameResult::{BlackWin, Draw, WhiteWin};
+use board_game_traits::{Color, GameResult};
+use board_game_traits::{EvalPosition as EvalPositionTrait, Position as PositionTrait};
 use lazy_static::lazy_static;
+use rand::{Rng, SeedableRng};
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
+
+use bitboard::BitBoard;
+
+use crate::position::Direction::*;
+use crate::position::Piece::*;
+use crate::position::Role::Flat;
+use crate::position::Role::*;
+use crate::{policy_eval, search, value_eval};
 
 lazy_static! {
     pub(crate) static ref ZOBRIST_KEYS_4S: Box<ZobristKeys<4>> = ZobristKeys::new();
@@ -553,25 +575,7 @@ pub const POLICY_PARAMS_6S: [f32; NUM_POLICY_PARAMS_6S] = [
     0.9176952,
 ];
 
-use crate::bitboard::BitBoard;
-use crate::board::Direction::*;
-use crate::board::Piece::*;
-use crate::board::Role::Flat;
-use crate::board::Role::*;
-use crate::{policy_eval, search, value_eval};
-use board_game_traits::GameResult::{BlackWin, Draw, WhiteWin};
-use board_game_traits::{Color, GameResult};
-use board_game_traits::{EvalPosition as EvalPositionTrait, Position as PositionTrait};
-use rand::{Rng, SeedableRng};
-#[cfg(feature = "serde")]
-use serde::{Deserialize, Serialize};
-use std::cmp::Ordering;
-use std::fmt::Write;
-use std::hash::{Hash, Hasher};
-use std::iter::FromIterator;
-use std::mem;
-use std::ops::{Index, IndexMut};
-use std::{fmt, ops};
+pub mod bitboard;
 
 /// Extra items for tuning evaluation constants.
 pub trait TunableBoard: PositionTrait {

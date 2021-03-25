@@ -1,4 +1,4 @@
-use crate::board::Board;
+use crate::position::Board;
 use crate::tests::{do_moves_and_check_validity, plays_correct_hard_move_property};
 use board_game_traits::Position as PositionTrait;
 

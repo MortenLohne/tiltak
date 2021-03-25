@@ -1,4 +1,4 @@
-use crate::board::{Board, Move, Role};
+use crate::position::{Board, Move, Role};
 use crate::ptn::{Game, PtnMove};
 use crate::search;
 use crate::search::{MctsSetting, Score};

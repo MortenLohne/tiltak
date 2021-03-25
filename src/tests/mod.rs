@@ -6,7 +6,7 @@ mod move_gen_generic_tests;
 mod tactics_tests_5s;
 mod tactics_tests_6s;
 
-use crate::board::Board;
+use crate::position::Board;
 use crate::search;
 use board_game_traits::Position as PositionTrait;
 use pgn_traits::PgnPosition;

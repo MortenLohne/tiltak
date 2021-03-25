@@ -15,14 +15,14 @@ use pgn_traits::PgnPosition;
 use rayon::prelude::*;
 #[cfg(feature = "constant-tuning")]
 use std::collections::HashSet;
-use tiltak::board::Board;
-use tiltak::board::TunableBoard;
-#[cfg(feature = "constant-tuning")]
-use tiltak::board::{Move, Role};
 use tiltak::minmax;
+use tiltak::position::Board;
+use tiltak::position::TunableBoard;
+#[cfg(feature = "constant-tuning")]
+use tiltak::position::{Move, Role};
 use tiltak::ptn::{Game, PtnMove};
 use tiltak::search::MctsSetting;
-use tiltak::{board, search};
+use tiltak::{position, search};
 
 fn main() {
     println!("play: Play against the engine through the command line");
@@ -441,18 +441,21 @@ fn bench() {
 /// Print memory usage of various data types in the project, for debugging purposes
 fn mem_usage() {
     use std::mem;
-    println!("Tak board: {} bytes", mem::size_of::<board::Board<5>>());
-    println!("Tak board cell: {} bytes", mem::size_of::<board::Stack>());
-    println!("Tak move: {} bytes", mem::size_of::<board::Move>());
+    println!("Tak board: {} bytes", mem::size_of::<position::Board<5>>());
+    println!(
+        "Tak board cell: {} bytes",
+        mem::size_of::<position::Stack>()
+    );
+    println!("Tak move: {} bytes", mem::size_of::<position::Move>());
     println!("MCTS edge 6s: {} bytes", search::edge_mem_usage());
     println!("MCTS node 6s: {} bytes", search::node_mem_usage());
     println!(
         "Zobrist keys 5s: {} bytes",
-        mem::size_of::<board::ZobristKeys<5>>()
+        mem::size_of::<position::ZobristKeys<5>>()
     );
     println!(
         "Zobrist keys 6s: {} bytes",
-        mem::size_of::<board::ZobristKeys<6>>()
+        mem::size_of::<position::ZobristKeys<6>>()
     );
 }
 

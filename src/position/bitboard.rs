@@ -1,4 +1,4 @@
-use crate::board::Square;
+use crate::position::Square;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 use std::{fmt, ops};

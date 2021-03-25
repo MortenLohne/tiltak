@@ -1,4 +1,4 @@
-use crate::board::Board;
+use crate::position::Board;
 use board_game_traits::Position as PositionTrait;
 
 #[test]

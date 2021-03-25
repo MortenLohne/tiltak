@@ -1,4 +1,4 @@
-use crate::board::{Board, Move};
+use crate::position::{Board, Move};
 use board_game_traits::Position as PositionTrait;
 use pgn_traits::PgnPosition;
 use std::fs;

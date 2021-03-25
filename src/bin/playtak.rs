@@ -10,7 +10,7 @@ use std::time::Duration;
 use std::{io, net, thread};
 #[cfg(feature = "aws-lambda-client")]
 use tiltak::aws;
-use tiltak::board::Board;
+use tiltak::position::Board;
 
 use log::{debug, info, warn};
 
@@ -524,28 +524,28 @@ use std::iter;
 
 use chrono::{Datelike, Local};
 use std::convert::Infallible;
-use tiltak::board;
-use tiltak::board::{Direction, Move, Movement, Role, StackMovement};
+use tiltak::position;
+use tiltak::position::{Direction, Move, Movement, Role, StackMovement};
 use tiltak::ptn::{Game, PtnMove};
 #[cfg(not(feature = "aws-lambda-client"))]
 use tiltak::search;
 #[cfg(not(feature = "aws-lambda-client"))]
 use tiltak::search::MctsSetting;
 
-pub fn parse_move<const S: usize>(input: &str) -> board::Move {
+pub fn parse_move<const S: usize>(input: &str) -> position::Move {
     let words: Vec<&str> = input.split_whitespace().collect();
     if words[0] == "P" {
-        let square = board::Square::parse_square::<S>(&words[1].to_lowercase()).unwrap();
+        let square = position::Square::parse_square::<S>(&words[1].to_lowercase()).unwrap();
         let role = match words.get(2) {
             Some(&"C") => Role::Cap,
             Some(&"W") => Role::Wall,
             None => Role::Flat,
             Some(s) => panic!("Unknown role {} for move {}", s, input),
         };
-        board::Move::Place(role, square)
+        position::Move::Place(role, square)
     } else if words[0] == "M" {
-        let start_square = board::Square::parse_square::<S>(&words[1].to_lowercase()).unwrap();
-        let end_square = board::Square::parse_square::<S>(&words[2].to_lowercase()).unwrap();
+        let start_square = position::Square::parse_square::<S>(&words[1].to_lowercase()).unwrap();
+        let end_square = position::Square::parse_square::<S>(&words[2].to_lowercase()).unwrap();
         let pieces_dropped: Vec<u8> = words
             .iter()
             .skip(3)
@@ -580,15 +580,15 @@ pub fn parse_move<const S: usize>(input: &str) -> board::Move {
             _ => panic!("Diagonal move string {}", input),
         };
 
-        board::Move::Move(start_square, direction, pieces_taken)
+        position::Move::Move(start_square, direction, pieces_taken)
     } else {
         unreachable!()
     }
 }
 
-pub fn write_move<const S: usize>(mv: board::Move, w: &mut String) {
+pub fn write_move<const S: usize>(mv: position::Move, w: &mut String) {
     match mv {
-        board::Move::Place(role, square) => {
+        position::Move::Place(role, square) => {
             let role_string = match role {
                 Role::Flat => "",
                 Role::Wall => " W",
