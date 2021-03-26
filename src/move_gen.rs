@@ -1,8 +1,8 @@
+use crate::position::{Board, utils};
 use crate::position::color_trait::ColorTr;
 use crate::position::mv::Move;
+use crate::position::utils::{Direction, Movement, Piece, Square, StackMovement};
 use crate::position::utils::Role::*;
-use crate::position::utils::{Piece, Square};
-use crate::position::{utils, Board, Direction, Movement, StackMovement};
 
 impl<const S: usize> Board<S> {
     pub(crate) fn generate_moves_colortr<Us: ColorTr, Them: ColorTr>(

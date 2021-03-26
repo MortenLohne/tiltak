@@ -2,12 +2,13 @@ use board_game_traits::{Color, Position as PositionTrait};
 use board_game_traits::{GameResult, GameResult::*};
 use pgn_traits::PgnPosition;
 
-use crate::position::mv::Move;
-use crate::position::utils::Piece::{BlackCap, BlackFlat, WhiteFlat, WhiteWall};
-use crate::position::utils::{squares_iterator, Piece, Role, Square};
-use crate::position::{Board, Direction::*};
-use crate::tests::do_moves_and_check_validity;
 use crate::{position as board_mod, position};
+use crate::position::{Board, utils};
+use crate::position::mv::Move;
+use crate::position::utils::{Piece, Role, Square, squares_iterator};
+use crate::position::utils::Direction::*;
+use crate::position::utils::Piece::{BlackCap, BlackFlat, WhiteFlat, WhiteWall};
+use crate::tests::do_moves_and_check_validity;
 
 #[test]
 fn default_board_test() {
@@ -62,7 +63,7 @@ fn get_set_test() {
 
 #[test]
 fn flatten_stack_test() {
-    let mut stack = position::Stack::default();
+    let mut stack = utils::Stack::default();
     stack.push(WhiteWall);
     stack.push(BlackCap);
     assert_eq!(stack.get(0), Some(WhiteFlat));

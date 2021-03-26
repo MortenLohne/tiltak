@@ -1,3 +1,4 @@
+use std::{io, net, thread};
 use std::cmp::Ordering;
 use std::convert::Infallible;
 use std::fmt::Write as FmtWrite;
@@ -6,21 +7,19 @@ use std::iter;
 use std::net::TcpStream;
 use std::str::FromStr;
 use std::time::Duration;
-use std::{io, net, thread};
 
 use board_game_traits::{Color, GameResult, Position as PositionTrait};
 use bufstream::BufStream;
 use chrono::{Datelike, Local};
 use clap::{App, Arg};
-use log::error;
 use log::{debug, info, warn};
+use log::error;
 
 #[cfg(feature = "aws-lambda-client")]
 use tiltak::aws;
+use tiltak::position::{Board, mv, utils};
 use tiltak::position::mv::Move;
-use tiltak::position::utils::Role;
-use tiltak::position::{mv, utils, Board};
-use tiltak::position::{Direction, Movement, StackMovement};
+use tiltak::position::utils::{Direction, Movement, Role, StackMovement};
 use tiltak::ptn::{Game, PtnMove};
 #[cfg(not(feature = "aws-lambda-client"))]
 use tiltak::search;

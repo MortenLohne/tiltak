@@ -1,11 +1,11 @@
-#[cfg(feature = "serde")]
-use serde::{Deserialize, Serialize};
 use std::fmt::Write;
 
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
+
+use crate::position::utils::{Direction, Movement, Role, Square, StackMovement};
+use crate::position::utils::Direction::{East, North, South, West};
 use crate::position::utils::Role::{Cap, Flat, Wall};
-use crate::position::utils::{Role, Square};
-use crate::position::Direction::{East, North, South, West};
-use crate::position::{Direction, Movement, StackMovement};
 
 /// A legal move for a position.
 #[derive(Clone, PartialEq, Eq, Debug)]
