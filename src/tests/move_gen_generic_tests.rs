@@ -10,23 +10,23 @@ fn start_position_move_gen_test() {
     start_position_move_gen_prop::<8>();
 }
 
-pub fn perft<const S: usize>(board: &mut Position<S>, depth: u16) -> u64 {
-    if depth == 0 || board.game_result().is_some() {
+pub fn perft<const S: usize>(position: &mut Position<S>, depth: u16) -> u64 {
+    if depth == 0 || position.game_result().is_some() {
         1
     } else {
         let mut moves = vec![];
-        board.generate_moves(&mut moves);
+        position.generate_moves(&mut moves);
         moves
             .into_iter()
             .map(|mv| {
-                let old_board = board.clone();
-                let reverse_move = board.do_move(mv.clone());
-                let num_moves = perft(board, depth - 1);
-                board.reverse_move(reverse_move);
+                let old_position = position.clone();
+                let reverse_move = position.do_move(mv.clone());
+                let num_moves = perft(position, depth - 1);
+                position.reverse_move(reverse_move);
                 debug_assert_eq!(
-                    *board, old_board,
+                    *position, old_position,
                     "Failed to restore old board after {:?} on\n{:?}",
-                    mv, old_board
+                    mv, old_position
                 );
                 num_moves
             })
@@ -35,66 +35,66 @@ pub fn perft<const S: usize>(board: &mut Position<S>, depth: u16) -> u64 {
 }
 
 /// Verifies the perft result of a position against a known answer
-pub fn perft_check_answers<const S: usize>(board: &mut Position<S>, answers: &[u64]) {
+pub fn perft_check_answers<const S: usize>(position: &mut Position<S>, answers: &[u64]) {
     for (depth, &answer) in answers.iter().enumerate() {
         assert_eq!(
-            perft(board, depth as u16),
+            perft(position, depth as u16),
             answer,
             "Wrong perft result on\n{:?}",
-            board
+            position
         );
         assert_eq!(
-            perft(&mut board.flip_board_x(), depth as u16),
+            perft(&mut position.flip_board_x(), depth as u16),
             answer,
             "Wrong perft result on\n{:?}",
-            board
+            position
         );
         assert_eq!(
-            perft(&mut board.flip_board_y(), depth as u16),
+            perft(&mut position.flip_board_y(), depth as u16),
             answer,
             "Wrong perft result on\n{:?}",
-            board
+            position
         );
         assert_eq!(
-            perft(&mut board.flip_colors(), depth as u16),
+            perft(&mut position.flip_colors(), depth as u16),
             answer,
             "Wrong perft result on\n{:?}",
-            board
+            position
         );
         assert_eq!(
-            perft(&mut board.rotate_board(), depth as u16),
+            perft(&mut position.rotate_board(), depth as u16),
             answer,
             "Wrong perft result on\n{:?}",
-            board
+            position
         );
         assert_eq!(
-            perft(&mut board.rotate_board().rotate_board(), depth as u16),
+            perft(&mut position.rotate_board().rotate_board(), depth as u16),
             answer,
             "Wrong perft result on\n{:?}",
-            board
+            position
         );
         assert_eq!(
             perft(
-                &mut board.rotate_board().rotate_board().rotate_board(),
+                &mut position.rotate_board().rotate_board().rotate_board(),
                 depth as u16
             ),
             answer,
             "Wrong perft result on\n{:?}",
-            board
+            position
         );
     }
 }
 
 fn start_position_move_gen_prop<const S: usize>() {
-    let mut board = <Position<S>>::default();
+    let mut position = <Position<S>>::default();
     let mut moves = vec![];
-    board.generate_moves(&mut moves);
+    position.generate_moves(&mut moves);
     assert_eq!(moves.len(), S * S);
     for mv in moves {
-        let reverse_move = board.do_move(mv);
+        let reverse_move = position.do_move(mv);
         let mut moves = vec![];
-        board.generate_moves(&mut moves);
+        position.generate_moves(&mut moves);
         assert_eq!(moves.len(), S * S - 1);
-        board.reverse_move(reverse_move);
+        position.reverse_move(reverse_move);
     }
 }

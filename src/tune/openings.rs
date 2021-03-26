@@ -13,21 +13,21 @@ pub fn openings_from_file<const S: usize>(path: &str) -> io::Result<Vec<Vec<Move
     let mut openings = vec![];
 
     for line in reader.lines() {
-        let mut board = <Position<S>>::start_position();
+        let mut position = <Position<S>>::start_position();
         let mut moves = vec![];
         for mv_string in line?.split_whitespace() {
-            let mv = board
+            let mv = position
                 .move_from_san(&mv_string)
                 .map_err(|err| io::Error::new(io::ErrorKind::InvalidData, err))?;
             let mut legal_moves = vec![];
-            board.generate_moves(&mut legal_moves);
+            position.generate_moves(&mut legal_moves);
             if !legal_moves.contains(&mv) {
                 return Err(io::Error::new(
                     io::ErrorKind::InvalidData,
                     format!("Illegal move {}", mv_string),
                 ));
             }
-            board.do_move(mv.clone());
+            position.do_move(mv.clone());
             moves.push(mv);
         }
         openings.push(moves);

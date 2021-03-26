@@ -55,17 +55,21 @@ impl<B: PgnPosition + Clone> Game<B> {
 
         writeln!(f)?;
 
-        let mut board = self.start_position.clone();
+        let mut position = self.start_position.clone();
         let mut column_position = 0;
         let mut buffer = String::new();
 
         for (i, PtnMove { mv, comment, .. }) in self.moves.iter().enumerate() {
-            if i == 0 && board.side_to_move() == Color::Black {
-                buffer.push_str(&format!("1... {}", board.move_to_san(&mv)));
-            } else if board.side_to_move() == Color::White {
-                buffer.push_str(&format!("{}. {}", (i + 1) / 2 + 1, board.move_to_san(&mv),));
+            if i == 0 && position.side_to_move() == Color::Black {
+                buffer.push_str(&format!("1... {}", position.move_to_san(&mv)));
+            } else if position.side_to_move() == Color::White {
+                buffer.push_str(&format!(
+                    "{}. {}",
+                    (i + 1) / 2 + 1,
+                    position.move_to_san(&mv),
+                ));
             } else {
-                buffer.push_str(&board.move_to_san(&mv));
+                buffer.push_str(&position.move_to_san(&mv));
             }
 
             if !comment.is_empty() {
@@ -73,7 +77,7 @@ impl<B: PgnPosition + Clone> Game<B> {
                 buffer.push_str(&comment);
                 buffer.push('}');
             }
-            if board.side_to_move() == Color::Black {
+            if position.side_to_move() == Color::Black {
                 if column_position == 0 {
                     write!(f, "{}", buffer)?;
                     column_position = buffer.len();
@@ -89,7 +93,7 @@ impl<B: PgnPosition + Clone> Game<B> {
                 buffer.push(' ');
             }
 
-            board.do_move(mv.clone());
+            position.do_move(mv.clone());
         }
 
         write!(

@@ -20,16 +20,16 @@ pub fn handle_aws_event_generic<const S: usize>(
     e: Event,
     _c: Context,
 ) -> Result<Output, HandlerError> {
-    let mut board = <Position<S>>::default();
+    let mut position = <Position<S>>::default();
     for mv in e.moves {
-        board.do_move(mv);
+        position.do_move(mv);
     }
 
     let max_time = Duration::min(e.time_left / 40 + e.increment / 2, Duration::from_secs(30));
 
     let settings = MctsSetting::default().add_dirichlet(0.1);
 
-    let (best_move, score) = search::play_move_time(board, max_time, settings);
+    let (best_move, score) = search::play_move_time(position, max_time, settings);
 
     Ok(Output { best_move, score })
 }

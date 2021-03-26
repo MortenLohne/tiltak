@@ -10,8 +10,8 @@ use std::time::Duration;
 #[test]
 fn play_on_low_time() {
     let time = Duration::from_millis(5);
-    let board = <Position<5>>::default();
-    search::play_move_time(board, time, MctsSetting::default());
+    let position = <Position<5>>::default();
+    search::play_move_time(position, time, MctsSetting::default());
 }
 
 #[test]
@@ -99,13 +99,13 @@ fn do_not_play_suicide_move_as_black_test() {
         "e5", "e2",
     ];
 
-    let mut board = <Position<5>>::default();
-    do_moves_and_check_validity(&mut board, &move_strings);
+    let mut position = <Position<5>>::default();
+    do_moves_and_check_validity(&mut position, &move_strings);
 
     let mut moves = vec![];
-    board.generate_moves(&mut moves);
-    assert!(moves.contains(&board.move_from_san("2a3-11").unwrap()));
-    assert!(search::mcts(board.clone(), 10_000).0 != board.move_from_san("2a3-11").unwrap());
+    position.generate_moves(&mut moves);
+    assert!(moves.contains(&position.move_from_san("2a3-11").unwrap()));
+    assert!(search::mcts(position.clone(), 10_000).0 != position.move_from_san("2a3-11").unwrap());
 }
 
 #[test]
@@ -117,34 +117,34 @@ fn do_not_play_suicide_move_as_black_test2() {
         "d2", "3b2<", "d2<", "2b2>", "d4", "d2", "5d3-14",
     ];
 
-    let mut board = <Position<5>>::default();
-    do_moves_and_check_validity(&mut board, &move_strings);
+    let mut position = <Position<5>>::default();
+    do_moves_and_check_validity(&mut position, &move_strings);
 
     let mut moves = vec![];
-    board.generate_moves(&mut moves);
-    assert!(moves.contains(&board.move_from_san("2c5>11").unwrap()));
-    assert!(search::mcts(board.clone(), 10_000).0 != board.move_from_san("2c5>11").unwrap());
+    position.generate_moves(&mut moves);
+    assert!(moves.contains(&position.move_from_san("2c5>11").unwrap()));
+    assert!(search::mcts(position.clone(), 10_000).0 != position.move_from_san("2c5>11").unwrap());
 }
 
 #[test]
 fn do_not_instamove_into_loss() {
-    let mut board = <Position<5>>::start_position();
+    let mut position = <Position<5>>::start_position();
     let move_strings = [
         "e1", "a5", "Cc3", "d1", "c1", "b1", "c2", "1b1>1", "b1", "2c1<2", "c1", "Ca1", "c4",
         "3b1>3", "1c2-1", "1d1<1", "Sd1", "1a1>1", "b3", "a1", "1d1<1", "1b1>1", "d3", "2c1>2",
         "Sb1", "1d1<1", "d2", "1e1<1", "c2", "e1", "1d2-1", "1e1<1",
     ];
 
-    do_moves_and_check_validity(&mut board, &move_strings);
+    do_moves_and_check_validity(&mut position, &move_strings);
 
     let (best_move, _) = search::play_move_time(
-        board.clone(),
+        position.clone(),
         time::Duration::from_secs(1),
         MctsSetting::default(),
     );
 
     for move_string in ["b2", "c5", "b4", "d4"].iter() {
-        assert_ne!(best_move, board.move_from_san(move_string).unwrap());
+        assert_ne!(best_move, position.move_from_san(move_string).unwrap());
     }
 }
 
@@ -156,35 +156,35 @@ fn do_not_play_suicide_move_as_black_test3() {
         "b5", "b4+", "d3+",
     ];
 
-    let mut board = <Position<5>>::default();
-    do_moves_and_check_validity(&mut board, &move_strings);
+    let mut position = <Position<5>>::default();
+    do_moves_and_check_validity(&mut position, &move_strings);
 
     let mut moves = vec![];
-    board.generate_moves(&mut moves);
-    assert!(moves.contains(&board.move_from_san("2b5>11").unwrap()));
-    assert!(search::mcts(board.clone(), 10_000).0 != board.move_from_san("2b5>11").unwrap());
+    position.generate_moves(&mut moves);
+    assert!(moves.contains(&position.move_from_san("2b5>11").unwrap()));
+    assert!(search::mcts(position.clone(), 10_000).0 != position.move_from_san("2b5>11").unwrap());
 }
 
 fn plays_correct_move_property(move_strings: &[&str], correct_moves: &[&str]) {
-    let mut board = <Position<5>>::default();
+    let mut position = <Position<5>>::default();
     let mut moves = vec![];
 
-    do_moves_and_check_validity(&mut board, move_strings);
+    do_moves_and_check_validity(&mut position, move_strings);
 
-    board.generate_moves(&mut moves);
-    let mut mcts = search::MonteCarloTree::new(board.clone());
+    position.generate_moves(&mut moves);
+    let mut mcts = search::MonteCarloTree::new(position.clone());
 
     for move_string in correct_moves {
         assert_eq!(
             *move_string,
-            board.move_to_san(&board.move_from_san(move_string).unwrap())
+            position.move_to_san(&position.move_from_san(move_string).unwrap())
         );
         assert!(
-            moves.contains(&board.move_from_san(move_string).unwrap()),
+            moves.contains(&position.move_from_san(move_string).unwrap()),
             "Candidate move {} was not among legal moves {:?} on board\n{:?}",
             move_string,
             moves,
-            board
+            position
         );
     }
 
@@ -194,9 +194,9 @@ fn plays_correct_move_property(move_strings: &[&str], correct_moves: &[&str]) {
             let (best_move, _score) = mcts.best_move();
             assert!(correct_moves
                                 .iter()
-                                .any(|mv| best_move == board.move_from_san(mv).unwrap()),
-                            "{} didn't play one of the correct moves {:?}, {} played instead after {} iterations on board:\n{:?}",
-                            board.side_to_move(), correct_moves, board.move_to_san(&best_move), i, board);
+                                .any(|mv| best_move == position.move_from_san(mv).unwrap()),
+                    "{} didn't play one of the correct moves {:?}, {} played instead after {} iterations on board:\n{:?}",
+                    position.side_to_move(), correct_moves, position.move_to_san(&best_move), i, position);
         }
     }
 }

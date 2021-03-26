@@ -1211,24 +1211,24 @@ impl<const S: usize> pgn_traits::PgnPosition for Position<S> {
                     e,
                 )
             })?;
-        let mut board = Position::default();
+        let mut position = Position::default();
         for square in utils::squares_iterator::<S>() {
             let (file, rank) = (square.file::<S>(), square.rank::<S>());
             let stack = rows[rank as usize][file as usize];
             for piece in stack.into_iter() {
                 match piece {
-                    WhiteFlat | WhiteWall => board.white_stones_left -= 1,
-                    WhiteCap => board.white_caps_left -= 1,
-                    BlackFlat | BlackWall => board.black_stones_left -= 1,
-                    BlackCap => board.black_caps_left -= 1,
+                    WhiteFlat | WhiteWall => position.white_stones_left -= 1,
+                    WhiteCap => position.white_caps_left -= 1,
+                    BlackFlat | BlackWall => position.black_stones_left -= 1,
+                    BlackCap => position.black_caps_left -= 1,
                 }
             }
-            board[square] = stack;
+            position[square] = stack;
         }
 
         match fen_words[1] {
-            "1" => board.to_move = Color::White,
-            "2" => board.to_move = Color::Black,
+            "1" => position.to_move = Color::White,
+            "2" => position.to_move = Color::Black,
             s => {
                 return Err(pgn_traits::Error::new_parse_error(format!(
                     "Error parsing TPS \"{}\": Got bad side to move \"{}\"",
@@ -1238,9 +1238,9 @@ impl<const S: usize> pgn_traits::PgnPosition for Position<S> {
         }
 
         match fen_words[2].parse::<usize>() {
-            Ok(n) => match board.side_to_move() {
-                Color::White => board.half_moves_played = (n - 1) * 2,
-                Color::Black => board.half_moves_played = (n - 1) * 2 + 1,
+            Ok(n) => match position.side_to_move() {
+                Color::White => position.half_moves_played = (n - 1) * 2,
+                Color::Black => position.half_moves_played = (n - 1) * 2 + 1,
             },
             Err(e) => {
                 return Err(pgn_traits::Error::new_caused_by(
@@ -1254,9 +1254,9 @@ impl<const S: usize> pgn_traits::PgnPosition for Position<S> {
             }
         }
 
-        board.hash = board.zobrist_hash_from_scratch();
+        position.hash = position.zobrist_hash_from_scratch();
 
-        return Ok(board);
+        return Ok(position);
 
         fn parse_row<const S: usize>(row_str: &str) -> Result<[Stack; S], pgn_traits::Error> {
             let mut column_id = 0;

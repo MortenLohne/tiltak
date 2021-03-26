@@ -42,9 +42,9 @@ fn write_place_move_5s_test() {
     ];
 
     for (playtak_move_string, san_move_string) in move_strings.iter() {
-        let board = <Position<5>>::start_position();
+        let position = <Position<5>>::start_position();
         assert_eq!(
-            Move::to_string_playtak::<5>(&board.move_from_san(san_move_string).unwrap()),
+            Move::to_string_playtak::<5>(&position.move_from_san(san_move_string).unwrap()),
             *playtak_move_string
         );
     }
@@ -55,9 +55,9 @@ fn write_move_move_5s_test() {
     let move_strings = [("M A1 C1 1 2", "3a1>12"), ("M C2 C3 1", "c2+")];
 
     for (playtak_move_string, san_move_string) in move_strings.iter() {
-        let board = <Position<5>>::start_position();
+        let position = <Position<5>>::start_position();
         assert_eq!(
-            Move::to_string_playtak::<5>(&board.move_from_san(san_move_string).unwrap()),
+            Move::to_string_playtak::<5>(&position.move_from_san(san_move_string).unwrap()),
             *playtak_move_string
         );
     }

@@ -5,23 +5,23 @@ use board_game_traits::EvalPosition;
 use board_game_traits::{Color, GameResult};
 
 /// A very simple implementation of the minmax search algorithm. Returns the best move and a centipawn evaluation, calculating up to `depth` plies deep.
-pub fn minmax<B: EvalPosition>(board: &mut B, depth: u16) -> (Option<B::Move>, f32) {
-    match board.game_result() {
+pub fn minmax<B: EvalPosition>(position: &mut B, depth: u16) -> (Option<B::Move>, f32) {
+    match position.game_result() {
         Some(GameResult::WhiteWin) => return (None, 100.0),
         Some(GameResult::BlackWin) => return (None, -100.0),
         Some(GameResult::Draw) => return (None, 0.0),
         None => (),
     }
     if depth == 0 {
-        (None, board.static_eval())
+        (None, position.static_eval())
     } else {
-        let side_to_move = board.side_to_move();
+        let side_to_move = position.side_to_move();
         let mut moves = vec![];
-        board.generate_moves(&mut moves);
+        position.generate_moves(&mut moves);
         let child_evaluations = moves.into_iter().map(|mv| {
-            let reverse_move = board.do_move(mv.clone());
-            let (_, eval) = minmax(board, depth - 1);
-            board.reverse_move(reverse_move);
+            let reverse_move = position.do_move(mv.clone());
+            let (_, eval) = minmax(position, depth - 1);
+            position.reverse_move(reverse_move);
             (Some(mv), eval)
         });
         match side_to_move {

@@ -8,7 +8,7 @@ use crate::position::utils::{squares_iterator, Square};
 use crate::position::{num_square_symmetries, square_symmetries, GroupData, Position};
 
 pub(crate) fn static_eval_game_phase<const S: usize>(
-    board: &Position<S>,
+    position: &Position<S>,
     group_data: &GroupData<S>,
     coefficients: &mut [f32],
 ) {
@@ -22,8 +22,8 @@ pub(crate) fn static_eval_game_phase<const S: usize>(
     let mut black_flat_count = 0;
 
     for square in squares_iterator::<S>() {
-        let stack = &board[square];
-        if let Some(piece) = board[square].top_stone() {
+        let stack = &position[square];
+        if let Some(piece) = position[square].top_stone() {
             let i = square.0 as usize;
             match piece {
                 WhiteFlat => {
@@ -70,7 +70,7 @@ pub(crate) fn static_eval_game_phase<const S: usize>(
             let group_id = group_data.groups[square] as usize;
             if !seen_groups[group_id] {
                 seen_groups[group_id] = true;
-                board[square].top_stone().unwrap().color().multiplier()
+                position[square].top_stone().unwrap().color().multiplier()
             } else {
                 0
             }
@@ -78,11 +78,11 @@ pub(crate) fn static_eval_game_phase<const S: usize>(
         .sum::<isize>() as f32;
 
     let opening_scale_factor = f32::min(
-        f32::max((24.0 - board.half_moves_played() as f32) / 12.0, 0.0),
+        f32::max((24.0 - position.half_moves_played() as f32) / 12.0, 0.0),
         1.0,
     );
     let endgame_scale_factor = f32::min(
-        f32::max((board.half_moves_played() as f32 - 24.0) / 24.0, 0.0),
+        f32::max((position.half_moves_played() as f32 - 24.0) / 24.0, 0.0),
         1.0,
     );
     let middlegame_scale_factor = 1.0 - opening_scale_factor - endgame_scale_factor;
@@ -90,17 +90,17 @@ pub(crate) fn static_eval_game_phase<const S: usize>(
     debug_assert!(middlegame_scale_factor <= 1.0);
     debug_assert!(opening_scale_factor == 0.0 || endgame_scale_factor == 0.0);
 
-    coefficients[side_to_move] = board.side_to_move().multiplier() as f32 * opening_scale_factor;
+    coefficients[side_to_move] = position.side_to_move().multiplier() as f32 * opening_scale_factor;
     coefficients[flatstone_lead] = white_flatstone_lead as f32 * opening_scale_factor;
     coefficients[i_number_of_groups] = number_of_groups * opening_scale_factor;
 
     coefficients[side_to_move + 1] =
-        board.side_to_move().multiplier() as f32 * middlegame_scale_factor;
+        position.side_to_move().multiplier() as f32 * middlegame_scale_factor;
     coefficients[flatstone_lead + 1] = white_flatstone_lead as f32 * middlegame_scale_factor;
     coefficients[i_number_of_groups + 1] = number_of_groups * middlegame_scale_factor;
 
     coefficients[side_to_move + 2] =
-        board.side_to_move().multiplier() as f32 * endgame_scale_factor;
+        position.side_to_move().multiplier() as f32 * endgame_scale_factor;
     coefficients[flatstone_lead + 2] = white_flatstone_lead as f32 * endgame_scale_factor;
     coefficients[i_number_of_groups + 2] = number_of_groups * endgame_scale_factor;
 
@@ -108,7 +108,7 @@ pub(crate) fn static_eval_game_phase<const S: usize>(
 
     for critical_square in group_data.critical_squares(Color::White) {
         critical_squares_eval::<WhiteTr, BlackTr, S>(
-            board,
+            position,
             critical_square,
             coefficients,
             critical_squares,
@@ -117,7 +117,7 @@ pub(crate) fn static_eval_game_phase<const S: usize>(
 
     for critical_square in group_data.critical_squares(Color::Black) {
         critical_squares_eval::<BlackTr, WhiteTr, S>(
-            board,
+            position,
             critical_square,
             coefficients,
             critical_squares,
@@ -132,7 +132,7 @@ pub(crate) fn static_eval_game_phase<const S: usize>(
     let capstone_next_to_our_stack: usize = standing_stone_next_to_our_stack + 1;
 
     squares_iterator::<S>()
-        .map(|sq| (sq, &board[sq]))
+        .map(|sq| (sq, &position[sq]))
         .filter(|(_, stack)| stack.len() > 1)
         .for_each(|(square, stack)| {
             let top_stone = stack.top_stone().unwrap();
@@ -154,7 +154,7 @@ pub(crate) fn static_eval_game_phase<const S: usize>(
 
             // Malus for them having stones next to our stack with flat stones on top
             for neighbour in square.neighbours::<S>() {
-                if let Some(neighbour_top_stone) = board[neighbour].top_stone() {
+                if let Some(neighbour_top_stone) = position[neighbour].top_stone() {
                     if top_stone.role() == Flat && neighbour_top_stone.color() != controlling_player
                     {
                         match neighbour_top_stone.role() {
@@ -221,12 +221,12 @@ pub(crate) fn static_eval_game_phase<const S: usize>(
 
 /// Give bonus for our critical squares
 fn critical_squares_eval<Us: ColorTr, Them: ColorTr, const S: usize>(
-    board: &Position<S>,
+    position: &Position<S>,
     critical_square: Square,
     coefficients: &mut [f32],
     critical_squares: usize,
 ) {
-    let top_stone = board[critical_square].top_stone;
+    let top_stone = position[critical_square].top_stone;
     if top_stone.is_none() {
         coefficients[critical_squares] += Us::color().multiplier() as f32;
     } else if top_stone == Some(Us::wall_piece()) {
@@ -241,10 +241,10 @@ fn critical_squares_eval<Us: ColorTr, Them: ColorTr, const S: usize>(
 
     // Bonus for having our cap next to our critical square
     for neighbour in critical_square.neighbours::<S>() {
-        if board[neighbour].top_stone() == Some(Us::cap_piece()) {
+        if position[neighbour].top_stone() == Some(Us::cap_piece()) {
             coefficients[critical_squares + 4] += Us::color().multiplier() as f32;
             // Further bonus for a capped stack next to our critical square
-            for piece in board[neighbour].clone().into_iter() {
+            for piece in position[neighbour].clone().into_iter() {
                 if piece == Us::flat_piece() {
                     coefficients[critical_squares + 5] += Us::color().multiplier() as f32;
                 }

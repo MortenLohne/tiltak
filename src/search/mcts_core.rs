@@ -41,13 +41,13 @@ impl TreeEdge {
     /// Moves done on the board are not reversed.
     pub fn select<const S: usize>(
         &mut self,
-        board: &mut Position<S>,
+        position: &mut Position<S>,
         settings: &MctsSetting<S>,
         simple_moves: &mut Vec<Move>,
         moves: &mut Vec<(Move, Score)>,
     ) -> Score {
         if self.visits == 0 {
-            self.expand(board, &settings.value_params)
+            self.expand(position, &settings.value_params)
         } else if self.child.as_ref().unwrap().is_terminal {
             self.visits += 1;
             self.child.as_mut().unwrap().total_action_value += self.mean_action_value as f64;
@@ -64,9 +64,9 @@ impl TreeEdge {
             );
             // Only generate child moves on the 2nd visit
             if self.visits == 1 {
-                let group_data = board.group_data();
+                let group_data = position.group_data();
                 node.init_children(
-                    &board,
+                    &position,
                     &group_data,
                     simple_moves,
                     &settings.policy_params,
@@ -83,8 +83,8 @@ impl TreeEdge {
             assert_ne!(
                 node.children.len(),
                 0,
-                "No legal moves on board\n{:?}",
-                board
+                "No legal moves in position\n{:?}",
+                position
             );
 
             let mut best_exploration_value = 0.0;
@@ -100,8 +100,8 @@ impl TreeEdge {
 
             let child_edge = node.children.get_mut(best_child_node_index).unwrap();
 
-            board.do_move(child_edge.mv.clone());
-            let result = 1.0 - child_edge.select::<S>(board, settings, simple_moves, moves);
+            position.do_move(child_edge.mv.clone());
+            let result = 1.0 - child_edge.select::<S>(position, settings, simple_moves, moves);
             self.visits += 1;
 
             node.total_action_value += result as f64;
@@ -113,15 +113,15 @@ impl TreeEdge {
 
     // Never inline, for profiling purposes
     #[inline(never)]
-    fn expand<const S: usize>(&mut self, board: &Position<S>, params: &[f32]) -> Score {
+    fn expand<const S: usize>(&mut self, position: &Position<S>, params: &[f32]) -> Score {
         debug_assert!(self.child.is_none());
         self.child = Some(Box::new(Tree::new_node()));
         let child = self.child.as_mut().unwrap();
 
-        let group_data = board.group_data();
+        let group_data = position.group_data();
 
-        if let Some(game_result) = board.game_result_with_group_data(&group_data) {
-            let game_result_for_us = match (game_result, board.side_to_move()) {
+        if let Some(game_result) = position.game_result_with_group_data(&group_data) {
+            let game_result_for_us = match (game_result, position.side_to_move()) {
                 (GameResult::Draw, _) => GameResultForUs::Draw,
                 (GameResult::WhiteWin, Color::Black) => GameResultForUs::Loss, // The side to move has lost
                 (GameResult::BlackWin, Color::White) => GameResultForUs::Loss, // The side to move has lost
@@ -139,8 +139,8 @@ impl TreeEdge {
         }
 
         let mut static_eval =
-            cp_to_win_percentage(board.static_eval_with_params_and_data(&group_data, params));
-        if board.side_to_move() == Color::Black {
+            cp_to_win_percentage(position.static_eval_with_params_and_data(&group_data, params));
+        if position.side_to_move() == Color::Black {
             static_eval = 1.0 - static_eval;
         }
         self.visits = 1;
@@ -162,13 +162,13 @@ impl Tree {
     #[inline(never)]
     fn init_children<const S: usize>(
         &mut self,
-        board: &Position<S>,
+        position: &Position<S>,
         group_data: &GroupData<S>,
         simple_moves: &mut Vec<Move>,
         policy_params: &[f32],
         moves: &mut Vec<(Move, Score)>,
     ) {
-        board.generate_moves_with_params(policy_params, group_data, simple_moves, moves);
+        position.generate_moves_with_params(policy_params, group_data, simple_moves, moves);
         let mut children_vec = Vec::with_capacity(moves.len());
         let policy_sum: f32 = moves.iter().map(|(_, score)| *score).sum();
         let inv_sum = 1.0 / policy_sum;

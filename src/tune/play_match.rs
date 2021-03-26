@@ -18,32 +18,32 @@ pub fn play_game<const S: usize>(
 ) -> (Game<Position<S>>, Vec<Vec<(Move, Score)>>) {
     const MCTS_NODES: u64 = 100_000;
 
-    let mut board = Position::start_position();
+    let mut position = Position::start_position();
     let mut game_moves = opening.to_vec();
     let mut move_scores = vec![vec![]; opening.len()];
     for mv in opening {
-        board.do_move(mv.clone());
+        position.do_move(mv.clone());
     }
     let mut rng = rand::thread_rng();
 
-    while board.game_result().is_none() {
+    while position.game_result().is_none() {
         let num_plies = game_moves.len();
         if num_plies > 200 {
             break;
         }
 
-        let moves_scores = match board.side_to_move() {
+        let moves_scores = match position.side_to_move() {
             Color::White => {
-                search::mcts_training::<S>(board.clone(), MCTS_NODES, white_settings.clone())
+                search::mcts_training::<S>(position.clone(), MCTS_NODES, white_settings.clone())
             }
             Color::Black => {
-                search::mcts_training::<S>(board.clone(), MCTS_NODES, black_settings.clone())
+                search::mcts_training::<S>(position.clone(), MCTS_NODES, black_settings.clone())
             }
         };
 
         // For the first regular move (White's move #2), choose a random flatstone move
         // This reduces white's first move advantage, and prevents white from always playing 2.Cc3
-        let best_move = if board.half_moves_played() == 2 {
+        let best_move = if position.half_moves_played() == 2 {
             let flat_moves = moves_scores
                 .iter()
                 .map(|(mv, _)| mv)
@@ -52,12 +52,12 @@ pub fn play_game<const S: usize>(
             (*flat_moves.choose(&mut rng).unwrap()).clone()
         }
         // Turn off temperature in the middle-game, when all games are expected to be unique
-        else if board.half_moves_played() < 20 {
+        else if position.half_moves_played() < 20 {
             best_move(temperature, &moves_scores[..])
         } else {
             best_move(0.1, &moves_scores[..])
         };
-        board.do_move(best_move.clone());
+        position.do_move(best_move.clone());
         game_moves.push(best_move);
         move_scores.push(moves_scores);
     }
@@ -72,7 +72,7 @@ pub fn play_game<const S: usize>(
                     comment: String::new(),
                 })
                 .collect::<Vec<_>>(),
-            game_result: board.game_result(),
+            game_result: position.game_result(),
             tags: vec![],
         },
         move_scores,

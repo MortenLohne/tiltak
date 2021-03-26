@@ -72,14 +72,14 @@ pub type Score = f32;
 #[derive(Clone, PartialEq, Debug)]
 pub struct MonteCarloTree<const S: usize> {
     edge: TreeEdge, // A virtual edge to the first node, with fake move and heuristic score
-    board: Position<S>,
+    position: Position<S>,
     settings: MctsSetting<S>,
     simple_moves: Vec<Move>,
     moves: Vec<(Move, f32)>,
 }
 
 impl<const S: usize> MonteCarloTree<S> {
-    pub fn new(board: Position<S>) -> Self {
+    pub fn new(position: Position<S>) -> Self {
         MonteCarloTree {
             edge: TreeEdge {
                 child: None,
@@ -88,14 +88,14 @@ impl<const S: usize> MonteCarloTree<S> {
                 visits: 0,
                 heuristic_score: 0.0,
             },
-            board,
+            position,
             settings: MctsSetting::default(),
             simple_moves: vec![],
             moves: vec![],
         }
     }
 
-    pub fn with_settings(board: Position<S>, settings: MctsSetting<S>) -> Self {
+    pub fn with_settings(position: Position<S>, settings: MctsSetting<S>) -> Self {
         #[allow(unused_mut)]
         let mut tree = MonteCarloTree {
             edge: TreeEdge {
@@ -105,7 +105,7 @@ impl<const S: usize> MonteCarloTree<S> {
                 visits: 0,
                 heuristic_score: 0.0,
             },
-            board,
+            position,
             settings,
             simple_moves: vec![],
             moves: vec![],
@@ -122,7 +122,7 @@ impl<const S: usize> MonteCarloTree<S> {
     /// Run one iteration of MCTS
     pub fn select(&mut self) -> f32 {
         self.edge.select::<S>(
-            &mut self.board.clone(),
+            &mut self.position.clone(),
             &self.settings,
             &mut self.simple_moves,
             &mut self.moves,
@@ -183,8 +183,8 @@ impl<const S: usize> MonteCarloTree<S> {
 }
 
 /// The simplest way to use the mcts module. Run Monte Carlo Tree Search for `nodes` nodes, returning the best move, and its estimated winning probability for the side to move.
-pub fn mcts<const S: usize>(board: Position<S>, nodes: u64) -> (Move, Score) {
-    let mut tree = MonteCarloTree::new(board);
+pub fn mcts<const S: usize>(position: Position<S>, nodes: u64) -> (Move, Score) {
+    let mut tree = MonteCarloTree::new(position);
 
     for _ in 0..nodes.max(2) {
         tree.select();
@@ -243,11 +243,11 @@ pub fn play_move_time<const S: usize>(
 /// Run mcts with specific static evaluation parameters, for optimization the parameter set.
 /// Also applies Dirichlet noise to the root node
 pub fn mcts_training<const S: usize>(
-    board: Position<S>,
+    position: Position<S>,
     nodes: u64,
     settings: MctsSetting<S>,
 ) -> Vec<(Move, Score)> {
-    let mut tree = MonteCarloTree::with_settings(board, settings);
+    let mut tree = MonteCarloTree::with_settings(position, settings);
 
     for _ in 0..nodes {
         tree.select();

@@ -40,8 +40,8 @@ fn main() {
         }
         match words[0] {
             "play" => {
-                let board = Position::default();
-                play_human(board);
+                let position = Position::default();
+                play_human(position);
             }
             "aimatch" => {
                 for i in 1..10 {
@@ -66,13 +66,13 @@ fn main() {
 
                 let mut evaled_openings: Vec<_> = openings
                     .into_par_iter()
-                    .filter(|position| position.len() == depth as usize)
-                    .map(|position| {
-                        let mut board = <Position<6>>::start_position();
-                        for mv in position.iter() {
-                            board.do_move(mv.clone());
+                    .filter(|opening| opening.len() == depth as usize)
+                    .map(|opening| {
+                        let mut position = <Position<6>>::start_position();
+                        for mv in opening.iter() {
+                            position.do_move(mv.clone());
                         }
-                        (position, search::mcts(board, 100_000))
+                        (opening, search::mcts(position, 100_000))
                     })
                     .collect();
 
@@ -80,13 +80,13 @@ fn main() {
                     score1.partial_cmp(score2).unwrap()
                 });
                 for (p, (mv, s)) in evaled_openings {
-                    let mut board = <Position<6>>::start_position();
+                    let mut position = <Position<6>>::start_position();
                     for mv in p {
-                        print!("{} ", board.move_to_san(&mv));
-                        board.do_move(mv);
+                        print!("{} ", position.move_to_san(&mv));
+                        position.do_move(mv);
                     }
                     print!(": ");
-                    println!("{}, {}", board.move_to_san(&mv), s);
+                    println!("{}, {}", position.move_to_san(&mv), s);
                 }
                 return;
             }
@@ -129,12 +129,12 @@ fn main() {
 
 #[cfg(feature = "constant-tuning")]
 fn generate_openings<const S: usize>(
-    mut board: Position<S>,
+    mut position: Position<S>,
     positions: &mut HashSet<Position<S>>,
     depth: u8,
 ) -> Vec<Vec<Move>> {
     let mut moves = vec![];
-    board.generate_moves(&mut moves);
+    position.generate_moves(&mut moves);
     moves = moves
         .into_iter()
         .filter(|mv| matches!(mv, Move::Place(Role::Flat, _)))
@@ -142,22 +142,22 @@ fn generate_openings<const S: usize>(
     moves
         .into_iter()
         .flat_map(|mv| {
-            let reverse_move = board.do_move(mv.clone());
-            let mut child_lines = if board
+            let reverse_move = position.do_move(mv.clone());
+            let mut child_lines = if position
                 .symmetries()
                 .iter()
                 .all(|board_symmetry| !positions.contains(board_symmetry))
             {
-                positions.insert(board.clone());
+                positions.insert(position.clone());
                 if depth > 1 {
-                    generate_openings(board.clone(), positions, depth - 1)
+                    generate_openings(position.clone(), positions, depth - 1)
                 } else {
                     vec![vec![]]
                 }
             } else {
                 vec![]
             };
-            board.reverse_move(reverse_move);
+            position.reverse_move(reverse_move);
             for child_line in child_lines.iter_mut() {
                 child_line.insert(0, mv.clone());
             }
@@ -167,23 +167,23 @@ fn generate_openings<const S: usize>(
 }
 
 fn mcts_selfplay(max_time: time::Duration) {
-    let mut board = <Position<5>>::default();
+    let mut position = <Position<5>>::default();
     let mut moves = vec![];
 
     let mut white_elapsed = time::Duration::default();
     let mut black_elapsed = time::Duration::default();
 
-    while board.game_result().is_none() {
+    while position.game_result().is_none() {
         let start_time = time::Instant::now();
         let (best_move, score) =
-            search::play_move_time::<5>(board.clone(), max_time, MctsSetting::default());
+            search::play_move_time::<5>(position.clone(), max_time, MctsSetting::default());
 
-        match board.side_to_move() {
+        match position.side_to_move() {
             Color::White => white_elapsed += start_time.elapsed(),
             Color::Black => black_elapsed += start_time.elapsed(),
         }
 
-        board.do_move(best_move.clone());
+        position.do_move(best_move.clone());
         moves.push(best_move.clone());
         println!(
             "{:6}: {:.3}, {:.1}s",
@@ -215,30 +215,30 @@ fn mcts_selfplay(max_time: time::Duration) {
     }
     println!();
 
-    println!("\n{:?}\nResult: {:?}", board, board.game_result());
+    println!("\n{:?}\nResult: {:?}", position, position.game_result());
 }
 
 fn mcts_vs_minmax(minmax_depth: u16, mcts_nodes: u64) {
     println!("Minmax depth {} vs mcts {} nodes", minmax_depth, mcts_nodes);
-    let mut board = <Position<5>>::default();
+    let mut position = <Position<5>>::default();
     let mut moves = vec![];
-    while board.game_result().is_none() {
+    while position.game_result().is_none() {
         let num_moves = moves.len();
         if num_moves > 10 && (1..5).all(|i| moves[num_moves - i] == moves[num_moves - i - 4]) {
             break;
         }
-        match board.side_to_move() {
+        match position.side_to_move() {
             Color::Black => {
-                let (best_move, score) = search::mcts::<5>(board.clone(), mcts_nodes);
-                board.do_move(best_move.clone());
+                let (best_move, score) = search::mcts::<5>(position.clone(), mcts_nodes);
+                position.do_move(best_move.clone());
                 moves.push(best_move.clone());
                 println!("{:6}: {:.3}", best_move.to_string::<5>(), score);
                 io::stdout().flush().unwrap();
             }
 
             Color::White => {
-                let (best_move, score) = minmax::minmax(&mut board, minmax_depth);
-                board.do_move(best_move.clone().unwrap());
+                let (best_move, score) = minmax::minmax(&mut position, minmax_depth);
+                position.do_move(best_move.clone().unwrap());
                 moves.push(best_move.clone().unwrap());
                 print!("{:6}: {:.2}, ", best_move.unwrap().to_string::<5>(), score);
                 io::stdout().flush().unwrap();
@@ -260,11 +260,11 @@ fn mcts_vs_minmax(minmax_depth: u16, mcts_nodes: u64) {
     }
     println!();
 
-    println!("\n{:?}\nResult: {:?}", board, board.game_result());
+    println!("\n{:?}\nResult: {:?}", position, position.game_result());
 }
 
 fn test_position<const S: usize>() {
-    let mut board = <Position<S>>::default();
+    let mut position = <Position<S>>::default();
     let mut moves = vec![];
 
     println!("Enter moves:");
@@ -273,33 +273,37 @@ fn test_position<const S: usize>() {
     io::stdin().read_line(&mut input).unwrap();
 
     for mv_san in input.split_whitespace() {
-        let mv = board.move_from_san(&mv_san).unwrap();
-        board.generate_moves(&mut moves);
+        let mv = position.move_from_san(&mv_san).unwrap();
+        position.generate_moves(&mut moves);
         assert!(moves.contains(&mv));
-        board.do_move(mv);
+        position.do_move(mv);
         moves.clear();
     }
 
-    println!("{:?}", board);
+    println!("{:?}", position);
 
     let mut simple_moves = vec![];
     let mut moves = vec![];
 
-    board.generate_moves_with_probabilities(&board.group_data(), &mut simple_moves, &mut moves);
+    position.generate_moves_with_probabilities(
+        &position.group_data(),
+        &mut simple_moves,
+        &mut moves,
+    );
     moves.sort_by_key(|(_mv, score)| -(score * 1000.0) as i64);
 
     println!("Top 10 heuristic moves:");
     for (mv, score) in moves.iter().take(10) {
         println!("{}: {:.3}", mv.to_string::<S>(), score);
         let mut coefficients = vec![0.0; <Position<S>>::policy_params().len()];
-        board.coefficients_for_move(&mut coefficients, mv, &board.group_data(), moves.len());
+        position.coefficients_for_move(&mut coefficients, mv, &position.group_data(), moves.len());
         for coefficient in coefficients {
             print!("{:.1}, ", coefficient);
         }
         println!();
     }
 
-    let mut tree = search::MonteCarloTree::new(board.clone());
+    let mut tree = search::MonteCarloTree::new(position.clone());
     for i in 1.. {
         tree.select();
         if i % 100_000 == 0 {
@@ -307,8 +311,8 @@ fn test_position<const S: usize>() {
                 "{} visits, val={:.2}%, static eval={:.4}, static winning probability={:.2}%",
                 tree.visits(),
                 tree.mean_action_value() * 100.0,
-                board.static_eval(),
-                search::cp_to_win_percentage(board.static_eval()) * 100.0
+                position.static_eval(),
+                search::cp_to_win_percentage(position.static_eval()) * 100.0
             );
             tree.print_info();
             println!("Best move: {:?}", tree.best_move())
@@ -317,19 +321,19 @@ fn test_position<const S: usize>() {
 }
 
 fn analyze_game<const S: usize>(game: Game<Position<S>>) {
-    let mut board = game.start_position.clone();
+    let mut position = game.start_position.clone();
     let mut ply_number = 2;
     for PtnMove { mv, .. } in game.moves {
-        board.do_move(mv.clone());
-        if board.game_result().is_some() {
+        position.do_move(mv.clone());
+        if position.game_result().is_some() {
             break;
         }
-        let (best_move, score) = search::mcts::<S>(board.clone(), 1_000_000);
+        let (best_move, score) = search::mcts::<S>(position.clone(), 1_000_000);
         if ply_number % 2 == 0 {
             print!(
                 "{}. {} {{{:.2}%, best reply {}}} ",
                 ply_number / 2,
-                board.move_to_san(&mv),
+                position.move_to_san(&mv),
                 (1.0 - score) * 100.0,
                 best_move.to_string::<S>()
             );
@@ -337,7 +341,7 @@ fn analyze_game<const S: usize>(game: Game<Position<S>>) {
             println!(
                 "{}... {} {{{:.2}%, best reply {}}}",
                 ply_number / 2,
-                board.move_to_san(&mv),
+                position.move_to_san(&mv),
                 (1.0 - score) * 100.0,
                 best_move.to_string::<S>()
             );
@@ -347,19 +351,19 @@ fn analyze_game<const S: usize>(game: Game<Position<S>>) {
 }
 
 /// Play a game against the engine through stdin
-fn play_human(mut board: Position<5>) {
-    match board.game_result() {
+fn play_human(mut position: Position<5>) {
+    match position.game_result() {
         None => {
             use board_game_traits::Color::*;
-            println!("Board:\n{:?}", board);
+            println!("Position:\n{:?}", position);
             // If black, play as human
-            if board.side_to_move() == Black {
+            if position.side_to_move() == Black {
                 println!("Type your move in algebraic notation (c3):");
 
                 let reader = io::stdin();
                 let mut input_str = "".to_string();
                 let mut legal_moves = vec![];
-                board.generate_moves(&mut legal_moves);
+                position.generate_moves(&mut legal_moves);
                 // Loop until user enters a valid move
                 loop {
                     input_str.clear();
@@ -367,7 +371,7 @@ fn play_human(mut board: Position<5>) {
                         .read_line(&mut input_str)
                         .expect("Failed to read line");
 
-                    match board.move_from_san(input_str.trim()) {
+                    match position.move_from_san(input_str.trim()) {
                         Ok(val) => {
                             if legal_moves.contains(&val) {
                                 break;
@@ -381,21 +385,21 @@ fn play_human(mut board: Position<5>) {
                         }
                     }
                 }
-                let c_move = board.move_from_san(input_str.trim()).unwrap();
-                board.do_move(c_move);
-                play_human(board);
+                let c_move = position.move_from_san(input_str.trim()).unwrap();
+                position.do_move(c_move);
+                play_human(position);
             } else {
-                let (best_move, score) = search::mcts::<5>(board.clone(), 1_000_000);
+                let (best_move, score) = search::mcts::<5>(position.clone(), 1_000_000);
 
                 println!("Computer played {:?} with score {}", best_move, score);
-                board.do_move(best_move);
-                play_human(board);
+                position.do_move(best_move);
+                play_human(position);
             }
         }
 
-        Some(GameResult::WhiteWin) => println!("White won! Board:\n{:?}", board),
-        Some(GameResult::BlackWin) => println!("Black won! Board:\n{:?}", board),
-        Some(GameResult::Draw) => println!("The game was drawn! Board:\n{:?}", board),
+        Some(GameResult::WhiteWin) => println!("White won! Board:\n{:?}", position),
+        Some(GameResult::BlackWin) => println!("Black won! Board:\n{:?}", position),
+        Some(GameResult::Draw) => println!("The game was drawn! Board:\n{:?}", position),
     }
 }
 
@@ -403,32 +407,32 @@ fn bench() {
     const NODES: u64 = 1_000_000;
     let start_time = time::Instant::now();
     {
-        let board = <Position<5>>::default();
+        let position = <Position<5>>::default();
 
-        let (_move, score) = search::mcts::<5>(board, NODES);
+        let (_move, score) = search::mcts::<5>(position, NODES);
         print!("{:.3}, ", score);
     }
 
     {
-        let mut board = Position::default();
+        let mut position = Position::default();
 
-        do_moves_and_check_validity(&mut board, &["d3", "c3", "c4", "1d3<", "1c4+", "Sc4"]);
+        do_moves_and_check_validity(&mut position, &["d3", "c3", "c4", "1d3<", "1c4+", "Sc4"]);
 
-        let (_move, score) = search::mcts::<5>(board, NODES);
+        let (_move, score) = search::mcts::<5>(position, NODES);
         print!("{:.3}, ", score);
     }
     {
-        let mut board = Position::default();
+        let mut position = Position::default();
 
         do_moves_and_check_validity(
-            &mut board,
+            &mut position,
             &[
                 "c2", "c3", "d3", "b3", "c4", "1c2-", "1d3<", "1b3>", "1c4+", "Cc2", "a1", "1c2-",
                 "a2",
             ],
         );
 
-        let (_move, score) = search::mcts::<5>(board, NODES);
+        let (_move, score) = search::mcts::<5>(position, NODES);
         println!("{:.3}", score);
     }
     let time_taken = start_time.elapsed();
@@ -462,19 +466,19 @@ fn mem_usage() {
     );
 }
 
-fn do_moves_and_check_validity(board: &mut Position<5>, move_strings: &[&str]) {
+fn do_moves_and_check_validity(position: &mut Position<5>, move_strings: &[&str]) {
     let mut moves = vec![];
     for mv_san in move_strings.iter() {
-        let mv = board.move_from_san(&mv_san).unwrap();
-        board.generate_moves(&mut moves);
+        let mv = position.move_from_san(&mv_san).unwrap();
+        position.generate_moves(&mut moves);
         assert!(
             moves.contains(&mv),
             "Move {} was not among legal moves: {:?}\n{:?}",
-            board.move_to_san(&mv),
+            position.move_to_san(&mv),
             moves,
-            board
+            position
         );
-        board.do_move(mv);
+        position.do_move(mv);
         moves.clear();
     }
 }

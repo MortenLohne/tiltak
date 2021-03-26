@@ -371,14 +371,14 @@ impl PlaytakSession {
             game.time_left.as_secs(),
             game.increment.as_secs_f32()
         );
-        let mut board = <Position<S>>::start_position();
+        let mut position = <Position<S>>::start_position();
         let mut moves = vec![];
         let mut our_time_left = game.time_left;
         'gameloop: loop {
-            if board.game_result().is_some() {
+            if position.game_result().is_some() {
                 break;
             }
-            if board.side_to_move() == game.our_color {
+            if position.side_to_move() == game.our_color {
                 #[cfg(feature = "aws-lambda-client")]
                 let (best_move, score) = {
                     let aws_function_name = self.aws_function_name.as_ref().unwrap();
@@ -400,10 +400,10 @@ impl PlaytakSession {
                 let (best_move, score) = {
                     let maximum_time = our_time_left / 5 + game.increment;
                     let settings = MctsSetting::default().add_dirichlet(0.1);
-                    search::play_move_time(board.clone(), maximum_time, settings)
+                    search::play_move_time(position.clone(), maximum_time, settings)
                 };
 
-                board.do_move(best_move.clone());
+                position.do_move(best_move.clone());
                 moves.push(PtnMove {
                     mv: best_move.clone(),
                     annotations: vec![],
@@ -420,13 +420,13 @@ impl PlaytakSession {
                 // Say "Tak" whenever there is a threat to win
                 // Only do this vs Shigewara
                 if game.white_player == "shigewara" || game.black_player == "shigewara" {
-                    let mut board_clone = board.clone();
-                    board_clone.null_move();
+                    let mut position_clone = position.clone();
+                    position_clone.null_move();
                     let mut moves = vec![];
-                    board_clone.generate_moves(&mut moves);
+                    position_clone.generate_moves(&mut moves);
                     for mv in moves {
-                        let reverse_move = board_clone.do_move(mv);
-                        match (board_clone.side_to_move(), board_clone.game_result()) {
+                        let reverse_move = position_clone.do_move(mv);
+                        match (position_clone.side_to_move(), position_clone.game_result()) {
                             (Color::White, Some(GameResult::BlackWin))
                             | (Color::Black, Some(GameResult::WhiteWin)) => {
                                 self.send_line("Tell shigewara Tak!")?;
@@ -434,7 +434,7 @@ impl PlaytakSession {
                             }
                             _ => (),
                         }
-                        board_clone.reverse_move(reverse_move);
+                        position_clone.reverse_move(reverse_move);
                     }
                 }
             } else {
@@ -450,7 +450,7 @@ impl PlaytakSession {
                             "P" | "M" => {
                                 let move_string = words[1..].join(" ");
                                 let move_played = Move::from_string_playtak::<S>(&move_string);
-                                board.do_move(move_played.clone());
+                                position.do_move(move_played.clone());
                                 moves.push(PtnMove {
                                     mv: move_played,
                                     annotations: vec![],
@@ -498,7 +498,7 @@ impl PlaytakSession {
             let game = Game {
                 start_position: <Position<S>>::start_position(),
                 moves: moves.clone(),
-                game_result: board.game_result(),
+                game_result: position.game_result(),
                 tags,
             };
 

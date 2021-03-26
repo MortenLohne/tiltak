@@ -7,17 +7,17 @@ use pgn_traits::PgnPosition;
 
 #[test]
 fn move_stack_test() {
-    let mut board = <Position<5>>::default();
+    let mut position = <Position<5>>::default();
     let mut moves = vec![];
 
-    do_moves_and_check_validity(&mut board, &["d3", "c3", "c4", "1d3<", "1c4-", "Sc4"]);
+    do_moves_and_check_validity(&mut position, &["d3", "c3", "c4", "1d3<", "1c4-", "Sc4"]);
 
-    board.generate_moves(&mut moves);
+    position.generate_moves(&mut moves);
     assert_eq!(
         moves.len(),
         69 + 18,
         "Generated wrong moves on board:\n{:?}\nExpected moves: {:?}\nExpected move moves:{:?}",
-        board,
+        position,
         moves,
         moves
             .iter()
@@ -31,58 +31,58 @@ fn move_stack_test() {
 
 #[test]
 fn respect_carry_limit_test() {
-    let mut board = <Position<5>>::default();
+    let mut position = <Position<5>>::default();
     let mut moves = vec![];
 
     do_moves_and_check_validity(
-        &mut board,
+        &mut position,
         &[
             "c2", "c3", "d3", "b3", "c4", "1c2+", "1d3<", "1b3>", "1c4+", "Cc2", "a1", "1c2+", "a2",
         ],
     );
-    board.generate_moves(&mut moves);
+    position.generate_moves(&mut moves);
     assert!(
-        moves.contains(&board.move_from_san("5c3>").unwrap()),
+        moves.contains(&position.move_from_san("5c3>").unwrap()),
         "5c3> was not a legal move among {:?} on board\n{:?}",
         moves,
-        board
+        position
     );
 
     assert!(
-        !moves.contains(&board.move_from_san("6c3>").unwrap()),
+        !moves.contains(&position.move_from_san("6c3>").unwrap()),
         "6c3> was a legal move among {:?} on board\n{:?}",
         moves,
-        board
+        position
     );
 }
 
 #[test]
 fn start_pos_perf_test() {
-    let mut board = <Position<5>>::default();
-    perft_check_answers(&mut board, &[1, 25, 600, 43_320, 2_999_784]);
+    let mut position = <Position<5>>::default();
+    perft_check_answers(&mut position, &[1, 25, 600, 43_320, 2_999_784]);
 }
 
 #[test]
 fn perf_test2() {
-    let mut board = <Position<5>>::default();
+    let mut position = <Position<5>>::default();
 
-    do_moves_and_check_validity(&mut board, &["d3", "c3", "c4", "1d3<", "1c4-", "Sc4"]);
+    do_moves_and_check_validity(&mut position, &["d3", "c3", "c4", "1d3<", "1c4-", "Sc4"]);
 
-    perft_check_answers(&mut board, &[1, 87, 6155, 461_800]);
+    perft_check_answers(&mut position, &[1, 87, 6155, 461_800]);
 }
 
 #[test]
 fn perf_test3() {
-    let mut board = <Position<5>>::default();
+    let mut position = <Position<5>>::default();
 
     do_moves_and_check_validity(
-        &mut board,
+        &mut position,
         &[
             "c2", "c3", "d3", "b3", "c4", "1c2+", "1d3<", "1b3>", "1c4-", "Cc2", "a1", "1c2+", "a2",
         ],
     );
 
-    perft_check_answers(&mut board, &[1, 104, 7743, 592_645]);
+    perft_check_answers(&mut position, &[1, 104, 7743, 592_645]);
 }
 
 #[test]
@@ -94,7 +94,7 @@ fn suicide_perf_test() {
         "1c4<", "3c3-", "e5", "e2",
     ];
 
-    let mut board = <Position<5>>::default();
-    do_moves_and_check_validity(&mut board, &move_strings);
-    perft_check_answers(&mut board, &[1, 85, 11_206, 957_000]);
+    let mut position = <Position<5>>::default();
+    do_moves_and_check_validity(&mut position, &move_strings);
+    perft_check_answers(&mut position, &[1, 85, 11_206, 957_000]);
 }

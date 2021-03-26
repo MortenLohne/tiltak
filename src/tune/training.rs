@@ -355,7 +355,7 @@ pub fn tune_value_and_policy<const S: usize, const N: usize, const M: usize>(
     let mut policy_results: Vec<f32> = Vec::with_capacity(number_of_coefficient_sets);
 
     for (game, move_scores) in games.iter().zip(move_scoress) {
-        let mut board = game.start_position.clone();
+        let mut position = game.start_position.clone();
 
         for (mv, move_scores) in game
             .moves
@@ -363,10 +363,10 @@ pub fn tune_value_and_policy<const S: usize, const N: usize, const M: usize>(
             .map(|PtnMove { mv, .. }| mv)
             .zip(move_scores)
         {
-            let group_data = board.group_data();
+            let group_data = position.group_data();
             for (possible_move, score) in move_scores {
                 let mut coefficients = [0.0; M];
-                board.coefficients_for_move(
+                position.coefficients_for_move(
                     &mut coefficients,
                     possible_move,
                     &group_data,
@@ -376,7 +376,7 @@ pub fn tune_value_and_policy<const S: usize, const N: usize, const M: usize>(
                 policy_coefficients_sets.push(coefficients);
                 policy_results.push(*score);
             }
-            board.do_move(mv.clone());
+            position.do_move(mv.clone());
         }
     }
 
@@ -457,7 +457,7 @@ pub fn games_and_move_scoress_from_file<const S: usize>(
     }
 
     for ((i, game), move_scores) in games.iter().enumerate().zip(&move_scoress) {
-        let mut board = game.start_position.clone();
+        let mut position = game.start_position.clone();
         for (mv, move_score) in game
             .moves
             .iter()
@@ -476,9 +476,9 @@ pub fn games_and_move_scoress_from_file<const S: usize>(
                     .iter()
                     .map(|PtnMove { mv, .. }| mv.to_string::<S>())
                     .collect::<Vec<_>>(),
-                board
+                position
             );
-            board.do_move(mv.clone());
+            position.do_move(mv.clone());
         }
     }
     Ok((games, move_scoress))
@@ -491,7 +491,7 @@ pub fn read_move_scores_from_file<const S: usize>(
     let mut input = String::new();
     file.read_to_string(&mut input)?;
 
-    let board = <Position<S>>::start_position();
+    let position = <Position<S>>::start_position();
 
     // Move scores grouped by the game they were played
     let mut move_scoress: Vec<Vec<Vec<(Move, f32)>>> = vec![vec![]];
@@ -509,7 +509,7 @@ pub fn read_move_scores_from_file<const S: usize>(
                 continue;
             }
             let mut words = move_score_string.split_whitespace();
-            let mv = board.move_from_san(words.next().unwrap())?;
+            let mv = position.move_from_san(words.next().unwrap())?;
             let score = str::parse::<f32>(words.next().unwrap())?;
             scores_for_this_move.push((mv, score));
         }
@@ -524,14 +524,14 @@ pub fn positions_and_results_from_games<const S: usize>(
     let mut positions = vec![];
     let mut results = vec![];
     for game in games.into_iter() {
-        let mut board = game.start_position;
+        let mut position = game.start_position;
         for PtnMove { mv, .. } in game.moves {
-            if board.game_result().is_some() {
+            if position.game_result().is_some() {
                 break;
             }
-            positions.push(board.clone());
+            positions.push(position.clone());
             results.push(game.game_result.unwrap_or(GameResult::Draw));
-            board.do_move(mv);
+            position.do_move(mv);
             // Deliberately skip the final position
         }
     }

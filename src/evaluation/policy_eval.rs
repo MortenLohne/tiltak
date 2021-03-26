@@ -58,7 +58,7 @@ impl<const S: usize> Position<S> {
     }
 }
 pub(crate) fn coefficients_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usize>(
-    board: &Position<S>,
+    position: &Position<S>,
     coefficients: &mut [f32],
     mv: &Move,
     group_data: &GroupData<S>,
@@ -98,7 +98,7 @@ pub(crate) fn coefficients_for_move_colortr<Us: ColorTr, Them: ColorTr, const S:
     coefficients[move_count] = inverse_sigmoid(initial_move_prob);
 
     // If it's the first move, give every move equal probability
-    if board.half_moves_played() < 2 {
+    if position.half_moves_played() < 2 {
         return;
     }
 
@@ -132,9 +132,12 @@ pub(crate) fn coefficients_for_move_colortr<Us: ColorTr, Them: ColorTr, const S:
             // If square is next to a group
             let mut our_unique_neighbour_groups: ArrayVec<[(Square, u8); 4]> = ArrayVec::new();
             let mut their_unique_neighbour_groups: ArrayVec<[(Square, u8); 4]> = ArrayVec::new();
-            for neighbour in square.neighbours::<S>().filter(|sq| !board[*sq].is_empty()) {
+            for neighbour in square
+                .neighbours::<S>()
+                .filter(|sq| !position[*sq].is_empty())
+            {
                 let neighbour_group_id = group_data.groups[neighbour];
-                if Us::piece_is_ours(board[neighbour].top_stone().unwrap()) {
+                if Us::piece_is_ours(position[neighbour].top_stone().unwrap()) {
                     if our_unique_neighbour_groups
                         .iter()
                         .all(|(_sq, id)| *id != neighbour_group_id)
@@ -175,7 +178,7 @@ pub(crate) fn coefficients_for_move_colortr<Us: ColorTr, Them: ColorTr, const S:
 
                 // If square is next to a road stone laid on our last turn
                 if let Some(Move::Place(last_role, last_square)) =
-                    board.moves().get(board.moves().len() - 2)
+                    position.moves().get(position.moves().len() - 2)
                 {
                     if *last_role == Flat || *last_role == Cap {
                         if square.neighbours::<S>().any(|neigh| neigh == *last_square) {
@@ -190,7 +193,7 @@ pub(crate) fn coefficients_for_move_colortr<Us: ColorTr, Them: ColorTr, const S:
                 }
 
                 // If square is next to a road stone laid on their last turn
-                if let Some(Move::Place(last_role, last_square)) = board.moves().last() {
+                if let Some(Move::Place(last_role, last_square)) = position.moves().last() {
                     if *last_role == Flat {
                         if square.neighbours::<S>().any(|neigh| neigh == *last_square) {
                             coefficients[next_to_their_last_stone] = 1.0;
@@ -205,7 +208,7 @@ pub(crate) fn coefficients_for_move_colortr<Us: ColorTr, Them: ColorTr, const S:
 
                 // Bonus for attacking a flatstone in a rank/file where we are strong
                 for neighbour in square.neighbours::<S>() {
-                    if board[neighbour].top_stone() == Some(Them::flat_piece()) {
+                    if position[neighbour].top_stone() == Some(Them::flat_piece()) {
                         let our_road_stones = Us::road_stones(group_data)
                             .rank::<S>(neighbour.rank::<S>())
                             .count()
@@ -244,13 +247,13 @@ pub(crate) fn coefficients_for_move_colortr<Us: ColorTr, Them: ColorTr, const S:
                 // If square has two or more opponent flatstones around it
                 for direction in square.directions::<S>() {
                     let neighbour = square.go_direction::<S>(direction).unwrap();
-                    if board[neighbour]
+                    if position[neighbour]
                         .top_stone()
                         .map(Them::is_road_stone)
                         .unwrap_or_default()
                         && neighbour
                             .go_direction::<S>(direction)
-                            .and_then(|sq| board[sq].top_stone())
+                            .and_then(|sq| position[sq].top_stone())
                             .map(Them::is_road_stone)
                             .unwrap_or_default()
                     {
@@ -261,7 +264,7 @@ pub(crate) fn coefficients_for_move_colortr<Us: ColorTr, Them: ColorTr, const S:
         }
 
         Move::Move(square, direction, stack_movement) => {
-            let role_id = match board[*square].top_stone().unwrap().role() {
+            let role_id = match position[*square].top_stone().unwrap().role() {
                 Flat => 0,
                 Wall => 1,
                 Cap => 2,
@@ -270,7 +273,7 @@ pub(crate) fn coefficients_for_move_colortr<Us: ColorTr, Them: ColorTr, const S:
             coefficients[move_role_bonus + role_id] += 1.0;
 
             let mut destination_square =
-                if stack_movement.get(0).pieces_to_take == board[*square].len() {
+                if stack_movement.get(0).pieces_to_take == position[*square].len() {
                     square.go_direction::<S>(*direction).unwrap()
                 } else {
                     *square
@@ -282,7 +285,7 @@ pub(crate) fn coefficients_for_move_colortr<Us: ColorTr, Them: ColorTr, const S:
             let mut their_pieces_captured = 0;
 
             // This iterator skips the first square if we move the whole stack
-            for piece in board
+            for piece in position
                 .top_stones_left_behind_by_move(*square, stack_movement)
                 .flatten()
             {
@@ -318,7 +321,7 @@ pub(crate) fn coefficients_for_move_colortr<Us: ColorTr, Them: ColorTr, const S:
                     }
                 }
 
-                let destination_stack = &board[destination_square];
+                let destination_stack = &position[destination_square];
                 if let Some(destination_top_stone) = destination_stack.top_stone() {
                     // When a stack gets captured, give a linear bonus or malus depending on
                     // whether it's captured by us or them
@@ -384,7 +387,7 @@ pub(crate) fn coefficients_for_move_colortr<Us: ColorTr, Them: ColorTr, const S:
             // Bonus for moving onto a critical square
             if gets_critical_square {
                 let moves_our_whole_stack =
-                    stack_movement.get(0).pieces_to_take == board[*square].len();
+                    stack_movement.get(0).pieces_to_take == position[*square].len();
 
                 match (their_pieces == 0, moves_our_whole_stack) {
                     (false, false) => coefficients[move_onto_critical_square] += 1.0,
