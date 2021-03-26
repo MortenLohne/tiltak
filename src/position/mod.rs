@@ -17,12 +17,19 @@ use rand::{Rng, SeedableRng};
 use serde::{Deserialize, Serialize};
 
 use bitboard::BitBoard;
+use color_trait::{BlackTr, WhiteTr};
+use utils::Piece::*;
+use utils::Role::Flat;
+use utils::Role::*;
+use utils::{Piece, Role, Square};
 
+use crate::position::color_trait::ColorTr;
 use crate::position::Direction::*;
-use crate::position::Piece::*;
-use crate::position::Role::Flat;
-use crate::position::Role::*;
 use crate::{policy_eval, search, value_eval};
+
+pub(crate) mod bitboard;
+pub(crate) mod color_trait;
+pub mod utils;
 
 lazy_static! {
     pub(crate) static ref ZOBRIST_KEYS_4S: Box<ZobristKeys<4>> = ZobristKeys::new();
@@ -575,8 +582,6 @@ pub const POLICY_PARAMS_6S: [f32; NUM_POLICY_PARAMS_6S] = [
     0.9176952,
 ];
 
-pub mod bitboard;
-
 /// Extra items for tuning evaluation constants.
 pub trait TunableBoard: PositionTrait {
     fn value_params() -> &'static [f32];
@@ -619,374 +624,6 @@ pub trait TunableBoard: PositionTrait {
         simple_moves: &mut Vec<Move>,
         moves: &mut Vec<(Move, search::Score)>,
     );
-}
-
-pub(crate) trait ColorTr {
-    fn color() -> Color;
-
-    fn stones_left<const S: usize>(board: &Board<S>) -> u8;
-
-    fn caps_left<const S: usize>(board: &Board<S>) -> u8;
-
-    fn road_stones<const S: usize>(group_data: &GroupData<S>) -> BitBoard;
-
-    fn blocking_stones<const S: usize>(group_data: &GroupData<S>) -> BitBoard;
-
-    fn flats<const S: usize>(group_data: &GroupData<S>) -> BitBoard;
-
-    fn walls<const S: usize>(group_data: &GroupData<S>) -> BitBoard;
-
-    fn caps<const S: usize>(group_data: &GroupData<S>) -> BitBoard;
-
-    fn flat_piece() -> Piece;
-
-    fn wall_piece() -> Piece;
-
-    fn cap_piece() -> Piece;
-
-    fn is_road_stone(piece: Piece) -> bool;
-
-    fn piece_is_ours(piece: Piece) -> bool;
-
-    fn is_critical_square<const S: usize>(group_data: &GroupData<S>, square: Square) -> bool;
-
-    fn critical_squares<const S: usize>(group_data: &GroupData<S>) -> BitBoard;
-}
-
-pub(crate) struct WhiteTr {}
-
-impl ColorTr for WhiteTr {
-    fn color() -> Color {
-        Color::White
-    }
-
-    fn stones_left<const S: usize>(board: &Board<S>) -> u8 {
-        board.white_stones_left
-    }
-
-    fn caps_left<const S: usize>(board: &Board<S>) -> u8 {
-        board.white_caps_left
-    }
-
-    fn road_stones<const S: usize>(group_data: &GroupData<S>) -> BitBoard {
-        group_data.white_road_pieces()
-    }
-
-    fn blocking_stones<const S: usize>(group_data: &GroupData<S>) -> BitBoard {
-        group_data.white_blocking_pieces()
-    }
-
-    fn flats<const S: usize>(group_data: &GroupData<S>) -> BitBoard {
-        group_data.white_flat_stones
-    }
-
-    fn walls<const S: usize>(group_data: &GroupData<S>) -> BitBoard {
-        group_data.white_walls
-    }
-
-    fn caps<const S: usize>(group_data: &GroupData<S>) -> BitBoard {
-        group_data.white_caps
-    }
-
-    fn flat_piece() -> Piece {
-        Piece::WhiteFlat
-    }
-
-    fn wall_piece() -> Piece {
-        Piece::WhiteWall
-    }
-
-    fn cap_piece() -> Piece {
-        Piece::WhiteCap
-    }
-
-    fn is_road_stone(piece: Piece) -> bool {
-        piece == WhiteFlat || piece == WhiteCap
-    }
-
-    fn piece_is_ours(piece: Piece) -> bool {
-        piece == WhiteFlat || piece == WhiteWall || piece == WhiteCap
-    }
-
-    fn is_critical_square<const S: usize>(group_data: &GroupData<S>, square: Square) -> bool {
-        group_data.white_critical_squares.get(square.0)
-    }
-
-    fn critical_squares<const S: usize>(group_data: &GroupData<S>) -> BitBoard {
-        group_data.white_critical_squares
-    }
-}
-
-pub(crate) struct BlackTr {}
-
-impl ColorTr for BlackTr {
-    fn color() -> Color {
-        Color::Black
-    }
-
-    fn stones_left<const S: usize>(board: &Board<S>) -> u8 {
-        board.black_stones_left
-    }
-
-    fn caps_left<const S: usize>(board: &Board<S>) -> u8 {
-        board.black_caps_left
-    }
-
-    fn road_stones<const S: usize>(group_data: &GroupData<S>) -> BitBoard {
-        group_data.black_road_pieces()
-    }
-
-    fn blocking_stones<const S: usize>(group_data: &GroupData<S>) -> BitBoard {
-        group_data.black_blocking_pieces()
-    }
-
-    fn flats<const S: usize>(group_data: &GroupData<S>) -> BitBoard {
-        group_data.black_flat_stones
-    }
-
-    fn walls<const S: usize>(group_data: &GroupData<S>) -> BitBoard {
-        group_data.black_walls
-    }
-
-    fn caps<const S: usize>(group_data: &GroupData<S>) -> BitBoard {
-        group_data.black_caps
-    }
-
-    fn flat_piece() -> Piece {
-        Piece::BlackFlat
-    }
-
-    fn wall_piece() -> Piece {
-        Piece::BlackWall
-    }
-
-    fn cap_piece() -> Piece {
-        Piece::BlackCap
-    }
-
-    fn is_road_stone(piece: Piece) -> bool {
-        piece == BlackFlat || piece == BlackCap
-    }
-
-    fn piece_is_ours(piece: Piece) -> bool {
-        piece == BlackFlat || piece == BlackCap || piece == BlackWall
-    }
-
-    fn is_critical_square<const S: usize>(group_data: &GroupData<S>, square: Square) -> bool {
-        group_data.black_critical_squares.get(square.0)
-    }
-
-    fn critical_squares<const S: usize>(group_data: &GroupData<S>) -> BitBoard {
-        group_data.black_critical_squares
-    }
-}
-
-/// A location on the board. Can be used to index a `Board`.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-pub struct Square(pub u8);
-
-impl Square {
-    pub fn from_rank_file<const S: usize>(rank: u8, file: u8) -> Self {
-        debug_assert!(rank < S as u8 && file < S as u8);
-        Square(rank * S as u8 + file as u8)
-    }
-
-    pub fn rank<const S: usize>(self) -> u8 {
-        self.0 / S as u8
-    }
-
-    pub fn file<const S: usize>(self) -> u8 {
-        self.0 % S as u8
-    }
-
-    pub fn neighbours<const S: usize>(self) -> impl Iterator<Item = Square> {
-        (if self.0 as usize == 0 {
-            [1, S as i8].iter()
-        } else if self.0 as usize == S - 1 {
-            [-1, S as i8].iter()
-        } else if self.0 as usize == S * S - S {
-            [1, -(S as i8)].iter()
-        } else if self.0 as usize == S * S - 1 {
-            [-1, -(S as i8)].iter()
-        } else if self.rank::<S>() == 0 {
-            [-1, 1, S as i8].iter()
-        } else if self.rank::<S>() == S as u8 - 1 {
-            [-(S as i8), -1, 1].iter()
-        } else if self.file::<S>() == 0 {
-            [-(S as i8), 1, S as i8].iter()
-        } else if self.file::<S>() == S as u8 - 1 {
-            [-(S as i8), -1, S as i8].iter()
-        } else {
-            [-(S as i8), -1, 1, S as i8].iter()
-        })
-        .cloned()
-        .map(move |sq| sq + self.0 as i8)
-        .map(|sq| Square(sq as u8))
-    }
-
-    pub fn directions<const S: usize>(self) -> impl Iterator<Item = Direction> {
-        (if self.0 as usize == 0 {
-            [East, South].iter()
-        } else if self.0 as usize == S - 1 {
-            [West, South].iter()
-        } else if self.0 as usize == S * S - S {
-            [East, North].iter()
-        } else if self.0 as usize == S * S - 1 {
-            [West, North].iter()
-        } else if self.rank::<S>() == 0 {
-            [West, East, South].iter()
-        } else if self.rank::<S>() == S as u8 - 1 {
-            [North, West, East].iter()
-        } else if self.file::<S>() == 0 {
-            [North, East, South].iter()
-        } else if self.file::<S>() == S as u8 - 1 {
-            [North, West, South].iter()
-        } else {
-            [North, West, East, South].iter()
-        })
-        .cloned()
-    }
-
-    pub fn go_direction<const S: usize>(self, direction: Direction) -> Option<Self> {
-        match direction {
-            North => self.0.checked_sub(S as u8).map(Square),
-            West => {
-                if self.file::<S>() == 0 {
-                    None
-                } else {
-                    Some(Square(self.0 - 1))
-                }
-            }
-            East => {
-                if self.file::<S>() == S as u8 - 1 {
-                    None
-                } else {
-                    Some(Square(self.0 + 1))
-                }
-            }
-            South => {
-                if self.0 as usize + S >= S * S {
-                    None
-                } else {
-                    Some(Square(self.0 + S as u8))
-                }
-            }
-        }
-    }
-
-    pub fn parse_square<const S: usize>(input: &str) -> Result<Square, pgn_traits::Error> {
-        if input.len() != 2 {
-            return Err(pgn_traits::Error::new_parse_error(format!(
-                "Couldn't parse square \"{}\"",
-                input
-            )));
-        }
-        let mut chars = input.chars();
-        let file = (chars.next().unwrap() as u8).overflowing_sub(b'a').0;
-        let rank = (S as u8 + b'0')
-            .overflowing_sub(chars.next().unwrap() as u8)
-            .0;
-        if file >= S as u8 || rank >= S as u8 {
-            Err(pgn_traits::Error::new_parse_error(format!(
-                "Couldn't parse square \"{}\" at size {}",
-                input, S
-            )))
-        } else {
-            Ok(Square(file + rank * S as u8))
-        }
-    }
-
-    pub fn to_string<const S: usize>(&self) -> String {
-        let mut string = String::new();
-        write!(string, "{}", (self.file::<S>() + b'a') as char).unwrap();
-        write!(string, "{}", S as u8 - self.rank::<S>()).unwrap();
-        string
-    }
-}
-
-/// Iterates over all board squares.
-pub fn squares_iterator<const S: usize>() -> impl Iterator<Item = Square> {
-    (0..(S * S)).map(|i| Square(i as u8))
-}
-
-/// One of the 3 piece roles in Tak. The same as piece, but without different variants for each color.
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-pub enum Role {
-    Flat,
-    Wall,
-    Cap,
-}
-
-/// One of the 6 game pieces in Tak. Each piece has one variant for each color.
-#[derive(Clone, Copy, PartialEq, Eq, Debug, Hash)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-pub enum Piece {
-    WhiteFlat = 0,
-    BlackFlat = 1,
-    WhiteWall = 2,
-    BlackWall = 3,
-    WhiteCap = 4,
-    BlackCap = 5,
-}
-
-impl Piece {
-    pub fn from_role_color(role: Role, color: Color) -> Self {
-        match (role, color) {
-            (Flat, Color::White) => WhiteFlat,
-            (Wall, Color::White) => WhiteWall,
-            (Cap, Color::White) => WhiteCap,
-            (Flat, Color::Black) => BlackFlat,
-            (Wall, Color::Black) => BlackWall,
-            (Cap, Color::Black) => BlackCap,
-        }
-    }
-
-    pub fn role(self) -> Role {
-        match self {
-            WhiteFlat | BlackFlat => Flat,
-            WhiteWall | BlackWall => Wall,
-            WhiteCap | BlackCap => Cap,
-        }
-    }
-
-    pub fn color(self) -> Color {
-        match self {
-            WhiteFlat | WhiteWall | WhiteCap => Color::White,
-            BlackFlat | BlackWall | BlackCap => Color::Black,
-        }
-    }
-
-    pub fn is_road_piece(self) -> bool {
-        WhiteTr::is_road_stone(self) || BlackTr::is_road_stone(self)
-    }
-
-    pub fn flip_color(self) -> Self {
-        match self {
-            WhiteFlat => BlackFlat,
-            BlackFlat => WhiteFlat,
-            WhiteWall => BlackWall,
-            BlackWall => WhiteWall,
-            WhiteCap => BlackCap,
-            BlackCap => WhiteCap,
-        }
-    }
-}
-
-impl ops::Not for Piece {
-    type Output = Self;
-
-    fn not(self) -> Self::Output {
-        match self {
-            WhiteFlat => BlackFlat,
-            BlackFlat => WhiteFlat,
-            WhiteWall => BlackWall,
-            BlackWall => WhiteWall,
-            WhiteCap => BlackCap,
-            BlackCap => WhiteCap,
-        }
-    }
 }
 
 /// The contents of a square on the board, consisting of zero or more pieces
@@ -1728,7 +1365,7 @@ impl<const S: usize> Board<S> {
         let mut hash = 0;
         hash ^= zobrist_to_move::<S>(self.to_move);
 
-        for square in squares_iterator::<S>() {
+        for square in utils::squares_iterator::<S>() {
             hash ^= self.zobrist_hash_for_square(square);
         }
         hash
@@ -1803,7 +1440,7 @@ impl<const S: usize> Board<S> {
 
     pub fn flip_colors(&self) -> Board<S> {
         let mut new_board = self.clone();
-        for square in squares_iterator::<S>() {
+        for square in utils::squares_iterator::<S>() {
             new_board[square] = Stack::default();
             for piece in self[square] {
                 new_board[square].push(piece.flip_color());
@@ -1856,7 +1493,7 @@ impl<const S: usize> Board<S> {
     pub fn group_data(&self) -> GroupData<S> {
         let mut group_data = GroupData::default();
 
-        for square in squares_iterator::<S>() {
+        for square in utils::squares_iterator::<S>() {
             match self[square].top_stone() {
                 Some(WhiteFlat) => {
                     group_data.white_flat_stones = group_data.white_flat_stones.set(square.0)
@@ -1885,7 +1522,7 @@ impl<const S: usize> Board<S> {
             &mut highest_component_id,
         );
 
-        for square in squares_iterator::<S>() {
+        for square in utils::squares_iterator::<S>() {
             group_data.amount_in_group[group_data.groups[square] as usize].0 += 1;
             if self[square].top_stone().map(Piece::is_road_piece) == Some(true) {
                 group_data.amount_in_group[group_data.groups[square] as usize].1 = group_data
@@ -1895,7 +1532,7 @@ impl<const S: usize> Board<S> {
             }
         }
 
-        for square in squares_iterator::<S>() {
+        for square in utils::squares_iterator::<S>() {
             if self.is_critical_square_from_scratch(
                 &group_data.groups,
                 &group_data.amount_in_group,
@@ -1979,12 +1616,12 @@ impl<const S: usize> Board<S> {
 
         if (self.white_stones_left == 0 && self.white_caps_left == 0)
             || (self.black_stones_left == 0 && self.black_caps_left == 0)
-            || squares_iterator::<S>().all(|square| !self[square].is_empty())
+            || utils::squares_iterator::<S>().all(|square| !self[square].is_empty())
         {
             // Count points
             let mut white_points = 0;
             let mut black_points = 0;
-            for square in squares_iterator::<S>() {
+            for square in utils::squares_iterator::<S>() {
                 match self[square].top_stone() {
                     Some(WhiteFlat) => white_points += 1,
                     Some(BlackFlat) => black_points += 1,
@@ -2019,7 +1656,7 @@ impl<const S: usize> Board<S> {
                 || ((0..S).any(|y| components.raw[y][0] == id)
                     && (0..S).any(|y| components.raw[y][S - 1] == id))
             {
-                let square = squares_iterator::<S>()
+                let square = utils::squares_iterator::<S>()
                     .find(|&sq| components[sq] == id)
                     .unwrap();
                 if self[square].top_stone.unwrap().color() == self.side_to_move() {
@@ -2066,7 +1703,7 @@ impl<const S: usize> PositionTrait for Board<S> {
     fn generate_moves(&self, moves: &mut Vec<Self::Move>) {
         match self.half_moves_played() {
             0 | 1 => {
-                for square in squares_iterator::<S>() {
+                for square in utils::squares_iterator::<S>() {
                     if self[square].is_empty() {
                         moves.push(Move::Place(Flat, square));
                     }
@@ -2443,7 +2080,7 @@ impl<const S: usize> pgn_traits::PgnPosition for Board<S> {
                 )
             })?;
         let mut board = Board::default();
-        for square in squares_iterator::<S>() {
+        for square in utils::squares_iterator::<S>() {
             let (file, rank) = (square.file::<S>(), square.rank::<S>());
             let stack = rows[rank as usize][file as usize];
             for piece in stack.into_iter() {
@@ -2560,7 +2197,7 @@ impl<const S: usize> pgn_traits::PgnPosition for Board<S> {
 
     fn to_fen(&self) -> String {
         let mut f = String::new();
-        squares_iterator::<S>()
+        utils::squares_iterator::<S>()
             .map(|square| self[square])
             .for_each(|stack: Stack| {
                 (match stack.top_stone() {
@@ -2626,7 +2263,7 @@ pub(crate) fn connected_components_graph<const S: usize>(
     components: &mut AbstractBoard<u8, S>,
     id: &mut u8,
 ) {
-    for square in squares_iterator::<S>() {
+    for square in utils::squares_iterator::<S>() {
         if components[square] == 0 && road_pieces.get(square.0) {
             connect_component(road_pieces, components, square, *id);
             *id += 1;

@@ -1,10 +1,12 @@
-use crate::position::{Board, Move, Role};
-use crate::ptn::{Game, PtnMove};
-use crate::search;
-use crate::search::{MctsSetting, Score};
 use board_game_traits::{Color, Position as PositionTrait};
 use rand::seq::SliceRandom;
 use rand::Rng;
+
+use crate::position::utils::Role;
+use crate::position::{Board, Move};
+use crate::ptn::{Game, PtnMove};
+use crate::search;
+use crate::search::{MctsSetting, Score};
 
 /// Play a single training game between two parameter sets
 pub fn play_game<const S: usize>(

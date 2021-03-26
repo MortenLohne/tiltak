@@ -1,18 +1,31 @@
-use board_game_traits::{Color, GameResult, Position as PositionTrait};
-use bufstream::BufStream;
-use clap::{App, Arg};
-use log::error;
+use std::cmp::Ordering;
+use std::convert::Infallible;
 use std::fmt::Write as FmtWrite;
 use std::io::{BufRead, Result, Write};
+use std::iter;
 use std::net::TcpStream;
 use std::str::FromStr;
 use std::time::Duration;
 use std::{io, net, thread};
+
+use board_game_traits::{Color, GameResult, Position as PositionTrait};
+use bufstream::BufStream;
+use chrono::{Datelike, Local};
+use clap::{App, Arg};
+use log::error;
+use log::{debug, info, warn};
+
 #[cfg(feature = "aws-lambda-client")]
 use tiltak::aws;
-use tiltak::position::Board;
-
-use log::{debug, info, warn};
+use tiltak::position;
+use tiltak::position::utils::Role;
+use tiltak::position::{utils, Board};
+use tiltak::position::{Direction, Move, Movement, StackMovement};
+use tiltak::ptn::{Game, PtnMove};
+#[cfg(not(feature = "aws-lambda-client"))]
+use tiltak::search;
+#[cfg(not(feature = "aws-lambda-client"))]
+use tiltak::search::MctsSetting;
 
 pub fn main() -> Result<()> {
     let mut app = App::new("Tiltak playtak client")
@@ -519,23 +532,10 @@ fn dial() -> Result<BufStream<TcpStream>> {
     net::TcpStream::connect("playtak.com:10000").map(BufStream::new)
 }
 
-use std::cmp::Ordering;
-use std::iter;
-
-use chrono::{Datelike, Local};
-use std::convert::Infallible;
-use tiltak::position;
-use tiltak::position::{Direction, Move, Movement, Role, StackMovement};
-use tiltak::ptn::{Game, PtnMove};
-#[cfg(not(feature = "aws-lambda-client"))]
-use tiltak::search;
-#[cfg(not(feature = "aws-lambda-client"))]
-use tiltak::search::MctsSetting;
-
 pub fn parse_move<const S: usize>(input: &str) -> position::Move {
     let words: Vec<&str> = input.split_whitespace().collect();
     if words[0] == "P" {
-        let square = position::Square::parse_square::<S>(&words[1].to_lowercase()).unwrap();
+        let square = utils::Square::parse_square::<S>(&words[1].to_lowercase()).unwrap();
         let role = match words.get(2) {
             Some(&"C") => Role::Cap,
             Some(&"W") => Role::Wall,
@@ -544,8 +544,8 @@ pub fn parse_move<const S: usize>(input: &str) -> position::Move {
         };
         position::Move::Place(role, square)
     } else if words[0] == "M" {
-        let start_square = position::Square::parse_square::<S>(&words[1].to_lowercase()).unwrap();
-        let end_square = position::Square::parse_square::<S>(&words[2].to_lowercase()).unwrap();
+        let start_square = utils::Square::parse_square::<S>(&words[1].to_lowercase()).unwrap();
+        let end_square = utils::Square::parse_square::<S>(&words[2].to_lowercase()).unwrap();
         let pieces_dropped: Vec<u8> = words
             .iter()
             .skip(3)

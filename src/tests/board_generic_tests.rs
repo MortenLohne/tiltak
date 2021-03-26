@@ -1,8 +1,10 @@
-use crate::position::{squares_iterator, Board, GroupEdgeConnection, Move, Role, Square};
-use crate::tests::do_moves_and_check_validity;
 use board_game_traits::{EvalPosition, GameResult::*, Position as PositionTrait};
 use pgn_traits::PgnPosition;
 use rand::seq::SliceRandom;
+
+use crate::position::utils::{squares_iterator, Role, Square};
+use crate::position::{Board, GroupEdgeConnection, Move};
+use crate::tests::do_moves_and_check_validity;
 
 #[test]
 fn play_random_4s_games_test() {

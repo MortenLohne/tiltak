@@ -1,4 +1,4 @@
-use crate::position::Square;
+use crate::position::utils::Square;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 use std::{fmt, ops};

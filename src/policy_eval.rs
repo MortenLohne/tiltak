@@ -1,11 +1,13 @@
+use arrayvec::ArrayVec;
+
 use crate::position::bitboard::BitBoard;
-use crate::position::Role::{Cap, Flat, Wall};
+use crate::position::color_trait::ColorTr;
+use crate::position::utils::Role::{Cap, Flat, Wall};
+use crate::position::utils::Square;
 use crate::position::{
-    num_square_symmetries, square_symmetries, Board, ColorTr, Direction::*, GroupData, Move,
-    Square, TunableBoard,
+    num_square_symmetries, square_symmetries, Board, Direction::*, GroupData, Move, TunableBoard,
 };
 use crate::search;
-use arrayvec::ArrayVec;
 
 pub fn sigmoid(x: f32) -> f32 {
     1.0 / (1.0 + f32::exp(-x))

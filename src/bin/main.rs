@@ -1,28 +1,30 @@
-#[cfg(test)]
-mod tests;
-
-pub mod playtak;
-pub mod tei;
-
+#[cfg(feature = "constant-tuning")]
+use std::collections::HashSet;
 use std::io::{Read, Write};
 use std::{io, time};
 
 use board_game_traits::{Color, GameResult};
 use board_game_traits::{EvalPosition, Position as PositionTrait};
 use pgn_traits::PgnPosition;
-
 #[cfg(feature = "constant-tuning")]
 use rayon::prelude::*;
-#[cfg(feature = "constant-tuning")]
-use std::collections::HashSet;
+
 use tiltak::minmax;
-use tiltak::position::Board;
-use tiltak::position::TunableBoard;
 #[cfg(feature = "constant-tuning")]
-use tiltak::position::{Move, Role};
+use tiltak::position::utils::Role;
+use tiltak::position::Board;
+#[cfg(feature = "constant-tuning")]
+use tiltak::position::Move;
+use tiltak::position::TunableBoard;
 use tiltak::ptn::{Game, PtnMove};
 use tiltak::search::MctsSetting;
 use tiltak::{position, search};
+
+#[cfg(test)]
+mod tests;
+
+pub mod playtak;
+pub mod tei;
 
 fn main() {
     println!("play: Play against the engine through the command line");

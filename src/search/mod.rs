@@ -2,14 +2,17 @@
 //!
 //! This implementation does not use full Monte Carlo rollouts, relying on a heuristic evaluation when expanding new nodes instead.
 
+use std::{mem, time};
+
+use crate::position::utils::{Role, Square};
+use crate::position::{Board, Move, TunableBoard};
+use crate::search::mcts_core::Tree;
+
+use self::mcts_core::{Pv, TreeEdge};
+
 /// This module contains the public-facing convenience API for the search.
 /// The implementation itself in in mcts_core.
 mod mcts_core;
-
-use self::mcts_core::{Pv, TreeEdge};
-use crate::position::{Board, Move, Role, Square, TunableBoard};
-use crate::search::mcts_core::Tree;
-use std::{mem, time};
 
 #[derive(Clone, PartialEq, Debug)]
 pub struct MctsSetting<const S: usize> {
