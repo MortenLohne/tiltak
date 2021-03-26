@@ -3,8 +3,8 @@ use board_game_traits::{GameResult, GameResult::*};
 use pgn_traits::PgnPosition;
 
 use crate::position as board_mod;
-use crate::position::Move;
 use crate::position::Direction::*;
+use crate::position::Move;
 use crate::position::Piece::{BlackCap, BlackFlat, WhiteFlat, WhiteWall};
 use crate::position::Position;
 use crate::position::{squares_iterator, Piece, Role, Square, Stack};
