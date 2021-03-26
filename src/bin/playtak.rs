@@ -14,7 +14,7 @@ use log::{debug, info, warn};
 
 #[cfg(feature = "aws-lambda-client")]
 use tiltak::aws;
-use tiltak::position::mv::Move;
+use tiltak::position::Move;
 use tiltak::position::Position;
 use tiltak::ptn::{Game, PtnMove};
 #[cfg(not(feature = "aws-lambda-client"))]

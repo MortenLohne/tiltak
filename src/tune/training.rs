@@ -10,7 +10,7 @@ use pgn_traits::PgnPosition;
 use rand::prelude::*;
 use rayon::prelude::*;
 
-use crate::position::mv::Move;
+use crate::position::Move;
 use crate::position::Position;
 use crate::position::TunableBoard;
 use crate::ptn::Game;

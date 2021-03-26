@@ -17,11 +17,14 @@ use serde::{Deserialize, Serialize};
 
 use bitboard::BitBoard;
 use color_trait::{BlackTr, WhiteTr};
-use mv::{Move, ReverseMove};
-use utils::Piece::*;
-use utils::Role::Flat;
-use utils::Role::*;
-use utils::{AbstractBoard, Direction, Movement, Piece, Role, Square, Stack, StackMovement};
+
+use utils::AbstractBoard;
+pub use utils::{
+    squares_iterator, Direction, Movement, Piece, Piece::*, Role, Role::*, Square, Stack,
+    StackMovement,
+};
+
+pub use mv::{Move, ReverseMove};
 
 use crate::evaluation::parameters::{
     POLICY_PARAMS_4S, POLICY_PARAMS_5S, POLICY_PARAMS_6S, VALUE_PARAMS_4S, VALUE_PARAMS_5S,
@@ -29,13 +32,12 @@ use crate::evaluation::parameters::{
 };
 use crate::evaluation::{policy_eval, value_eval};
 use crate::position::color_trait::ColorTr;
-use crate::position::utils::squares_iterator;
 use crate::search;
 
 pub(crate) mod bitboard;
 pub(crate) mod color_trait;
-pub mod mv;
-pub mod utils;
+mod mv;
+mod utils;
 
 lazy_static! {
     pub(crate) static ref ZOBRIST_KEYS_4S: Box<ZobristKeys<4>> = ZobristKeys::new();

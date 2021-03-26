@@ -465,13 +465,6 @@ pub struct Movement {
     pub pieces_to_take: u8,
 }
 
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "serde", serde(remote = "Color"))]
-pub enum ColorDef {
-    White,
-    Black,
-}
-
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub(crate) struct AbstractBoard<T, const S: usize> {
     pub(crate) raw: [[T; S]; S],

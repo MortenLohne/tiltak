@@ -3,7 +3,7 @@ use std::ops;
 use board_game_traits::{Color, GameResult, Position as PositionTrait};
 use rand::distributions::Distribution;
 
-use crate::position::mv::Move;
+use crate::position::Move;
 /// This module contains the core of the MCTS search algorithm
 use crate::position::{GroupData, Position, TunableBoard};
 use crate::search::{cp_to_win_percentage, MctsSetting, Score};

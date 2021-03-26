@@ -2,10 +2,10 @@ use board_game_traits::{Color, Position as EvalPosition};
 
 use crate::position::bitboard::BitBoard;
 use crate::position::color_trait::{BlackTr, ColorTr, WhiteTr};
-use crate::position::utils::Piece::*;
-use crate::position::utils::Role::*;
-use crate::position::utils::{squares_iterator, Square};
-use crate::position::{num_square_symmetries, square_symmetries, GroupData, Position};
+use crate::position::{
+    num_square_symmetries, square_symmetries, squares_iterator, GroupData, Piece::*, Position,
+    Role::*, Square,
+};
 
 pub(crate) fn static_eval_game_phase<const S: usize>(
     position: &Position<S>,

@@ -1,4 +1,4 @@
-use crate::position::mv::Move;
+use crate::position::Move;
 use crate::position::Position;
 use crate::tests::do_moves_and_check_validity;
 use crate::tests::move_gen_generic_tests::perft_check_answers;

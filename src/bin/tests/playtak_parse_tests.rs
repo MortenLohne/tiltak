@@ -1,7 +1,7 @@
 use crate::position::Position;
 use board_game_traits::Position as PositionTrait;
 use pgn_traits::PgnPosition;
-use tiltak::position::mv::Move;
+use tiltak::position::Move;
 
 #[test]
 fn parse_place_move_test() {

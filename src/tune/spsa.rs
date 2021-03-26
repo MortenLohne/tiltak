@@ -1,4 +1,4 @@
-use crate::position::mv::Move;
+use crate::position::Move;
 use crate::search::MctsSetting;
 use crate::tune::openings::openings_from_file;
 /// Tune search variable using a version of SPSA (Simultaneous perturbation stochastic approximation),

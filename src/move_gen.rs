@@ -1,15 +1,15 @@
 use crate::position::color_trait::ColorTr;
-use crate::position::mv::Move;
-use crate::position::utils::Role::*;
-use crate::position::utils::{Direction, Movement, Piece, Square, StackMovement};
-use crate::position::{utils, Position};
+use crate::position::Move;
+use crate::position::{
+    squares_iterator, Direction, Movement, Piece, Position, Role::*, Square, StackMovement,
+};
 
 impl<const S: usize> Position<S> {
     pub(crate) fn generate_moves_colortr<Us: ColorTr, Them: ColorTr>(
         &self,
         moves: &mut Vec<<Position<S> as board_game_traits::Position>::Move>,
     ) {
-        for square in utils::squares_iterator::<S>() {
+        for square in squares_iterator::<S>() {
             match self[square].top_stone() {
                 None => {
                     if Us::stones_left(&self) > 0 {
