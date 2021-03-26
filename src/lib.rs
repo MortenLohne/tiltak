@@ -43,6 +43,5 @@ mod tests;
 #[cfg(feature = "constant-tuning")]
 pub mod tune;
 
-mod policy_eval;
+pub mod evaluation;
 pub mod ptn;
-mod value_eval;

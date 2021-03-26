@@ -1,6 +1,8 @@
-use clap::{App, Arg, SubCommand};
 use std::path::Path;
-use tiltak::position::{
+
+use clap::{App, Arg, SubCommand};
+
+use tiltak::evaluation::parameters::{
     NUM_POLICY_PARAMS_4S, NUM_POLICY_PARAMS_5S, NUM_POLICY_PARAMS_6S, NUM_VALUE_PARAMS_4S,
     NUM_VALUE_PARAMS_5S, NUM_VALUE_PARAMS_6S, POLICY_PARAMS_4S, POLICY_PARAMS_5S, POLICY_PARAMS_6S,
     VALUE_PARAMS_4S, VALUE_PARAMS_5S, VALUE_PARAMS_6S,
