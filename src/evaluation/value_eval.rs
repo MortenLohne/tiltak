@@ -5,10 +5,10 @@ use crate::position::color_trait::{BlackTr, ColorTr, WhiteTr};
 use crate::position::utils::Piece::*;
 use crate::position::utils::Role::*;
 use crate::position::utils::{squares_iterator, Square};
-use crate::position::{num_square_symmetries, square_symmetries, Board, GroupData};
+use crate::position::{num_square_symmetries, square_symmetries, GroupData, Position};
 
 pub(crate) fn static_eval_game_phase<const S: usize>(
-    board: &Board<S>,
+    board: &Position<S>,
     group_data: &GroupData<S>,
     coefficients: &mut [f32],
 ) {
@@ -221,7 +221,7 @@ pub(crate) fn static_eval_game_phase<const S: usize>(
 
 /// Give bonus for our critical squares
 fn critical_squares_eval<Us: ColorTr, Them: ColorTr, const S: usize>(
-    board: &Board<S>,
+    board: &Position<S>,
     critical_square: Square,
     coefficients: &mut [f32],
     critical_squares: usize,

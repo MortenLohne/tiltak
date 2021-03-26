@@ -4,7 +4,7 @@ use rand::Rng;
 
 use crate::position::mv::Move;
 use crate::position::utils::Role;
-use crate::position::Board;
+use crate::position::Position;
 use crate::ptn::{Game, PtnMove};
 use crate::search;
 use crate::search::{MctsSetting, Score};
@@ -15,10 +15,10 @@ pub fn play_game<const S: usize>(
     black_settings: &MctsSetting<S>,
     opening: &[Move],
     temperature: f64,
-) -> (Game<Board<S>>, Vec<Vec<(Move, Score)>>) {
+) -> (Game<Position<S>>, Vec<Vec<(Move, Score)>>) {
     const MCTS_NODES: u64 = 100_000;
 
-    let mut board = Board::start_position();
+    let mut board = Position::start_position();
     let mut game_moves = opening.to_vec();
     let mut move_scores = vec![vec![]; opening.len()];
     for mv in opening {
@@ -63,7 +63,7 @@ pub fn play_game<const S: usize>(
     }
     (
         Game {
-            start_position: Board::default(),
+            start_position: Position::default(),
             moves: game_moves
                 .into_iter()
                 .map(|mv| PtnMove {

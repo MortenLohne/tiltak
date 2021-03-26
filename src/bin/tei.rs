@@ -4,7 +4,7 @@ use std::io;
 use std::io::{BufRead, BufReader};
 use std::str::FromStr;
 use std::time::{Duration, Instant};
-use tiltak::position::Board;
+use tiltak::position::Position;
 
 use std::any::Any;
 use tiltak::search;
@@ -73,14 +73,14 @@ pub fn main() {
     }
 }
 
-fn parse_position_string<const S: usize>(line: &str) -> Board<S> {
+fn parse_position_string<const S: usize>(line: &str) -> Position<S> {
     let mut words_iter = line.split_whitespace();
     words_iter.next(); // position
     let mut position = match words_iter.next() {
-        Some("startpos") => Board::default(),
+        Some("startpos") => Position::default(),
         Some("tps") => {
             let tps: String = (&mut words_iter).take(3).collect::<Vec<_>>().join(" ");
-            <Board<S>>::from_fen(&tps).unwrap()
+            <Position<S>>::from_fen(&tps).unwrap()
         }
         _ => panic!("Expected \"startpos\" or \"tps\" to specify position."),
     };
@@ -97,7 +97,7 @@ fn parse_position_string<const S: usize>(line: &str) -> Board<S> {
     position
 }
 
-fn parse_go_string<const S: usize>(line: &str, position: &Board<S>) {
+fn parse_go_string<const S: usize>(line: &str, position: &Position<S>) {
     let mut words = line.split_whitespace();
     words.next(); // go
     match words.next() {

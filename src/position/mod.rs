@@ -1,15 +1,15 @@
 //! Tak move generation, along with all required data types.
 
-use std::{fmt, ops};
 use std::cmp::Ordering;
 use std::fmt::Write;
 use std::hash::{Hash, Hasher};
 use std::mem;
 use std::ops::{Index, IndexMut};
+use std::{fmt, ops};
 
+use board_game_traits::GameResult::{BlackWin, Draw, WhiteWin};
 use board_game_traits::{Color, GameResult};
 use board_game_traits::{EvalPosition as EvalPositionTrait, Position as PositionTrait};
-use board_game_traits::GameResult::{BlackWin, Draw, WhiteWin};
 use lazy_static::lazy_static;
 use rand::{Rng, SeedableRng};
 #[cfg(feature = "serde")]
@@ -18,19 +18,19 @@ use serde::{Deserialize, Serialize};
 use bitboard::BitBoard;
 use color_trait::{BlackTr, WhiteTr};
 use mv::{Move, ReverseMove};
-use utils::{AbstractBoard, Direction, Movement, Piece, Role, Square, Stack, StackMovement};
 use utils::Piece::*;
-use utils::Role::*;
 use utils::Role::Flat;
+use utils::Role::*;
+use utils::{AbstractBoard, Direction, Movement, Piece, Role, Square, Stack, StackMovement};
 
-use crate::evaluation::{policy_eval, value_eval};
 use crate::evaluation::parameters::{
     POLICY_PARAMS_4S, POLICY_PARAMS_5S, POLICY_PARAMS_6S, VALUE_PARAMS_4S, VALUE_PARAMS_5S,
     VALUE_PARAMS_6S,
 };
+use crate::evaluation::{policy_eval, value_eval};
 use crate::position::color_trait::ColorTr;
-use crate::search;
 use crate::position::utils::squares_iterator;
+use crate::search;
 
 pub(crate) mod bitboard;
 pub(crate) mod color_trait;
@@ -347,7 +347,7 @@ impl<const S: usize> ZobristKeys<S> {
 
 /// Complete representation of a Tak position
 #[derive(Clone)]
-pub struct Board<const S: usize> {
+pub struct Position<const S: usize> {
     cells: AbstractBoard<Stack, S>,
     to_move: Color,
     white_stones_left: u8,
@@ -360,7 +360,7 @@ pub struct Board<const S: usize> {
     hash_history: Vec<u64>, // Zobrist hashes of previous board states, up to the last irreversible move. Does not include the corrent position
 }
 
-impl<const S: usize> PartialEq for Board<S> {
+impl<const S: usize> PartialEq for Position<S> {
     fn eq(&self, other: &Self) -> bool {
         self.cells == other.cells
             && self.to_move == other.to_move
@@ -372,9 +372,9 @@ impl<const S: usize> PartialEq for Board<S> {
     }
 }
 
-impl<const S: usize> Eq for Board<S> {}
+impl<const S: usize> Eq for Position<S> {}
 
-impl<const S: usize> Hash for Board<S> {
+impl<const S: usize> Hash for Position<S> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.cells.hash(state);
         self.to_move.hash(state);
@@ -386,7 +386,7 @@ impl<const S: usize> Hash for Board<S> {
     }
 }
 
-impl<const S: usize> Index<Square> for Board<S> {
+impl<const S: usize> Index<Square> for Position<S> {
     type Output = Stack;
 
     fn index(&self, square: Square) -> &Self::Output {
@@ -394,15 +394,15 @@ impl<const S: usize> Index<Square> for Board<S> {
     }
 }
 
-impl<const S: usize> IndexMut<Square> for Board<S> {
+impl<const S: usize> IndexMut<Square> for Position<S> {
     fn index_mut(&mut self, square: Square) -> &mut Self::Output {
         &mut self.cells[square]
     }
 }
 
-impl<const S: usize> Default for Board<S> {
+impl<const S: usize> Default for Position<S> {
     fn default() -> Self {
-        Board {
+        Position {
             cells: Default::default(),
             to_move: Color::White,
             white_stones_left: starting_stones::<S>(),
@@ -417,13 +417,15 @@ impl<const S: usize> Default for Board<S> {
     }
 }
 
-impl<const S: usize> fmt::Debug for Board<S> {
+impl<const S: usize> fmt::Debug for Position<S> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
         for y in 0..S {
             for print_row in 0..3 {
                 for x in 0..S {
                     for print_column in 0..3 {
-                        match self.cells[Square::from_rank_file::<S>(x as u8, y as u8)].get(print_column * 3 + print_row) {
+                        match self.cells[Square::from_rank_file::<S>(x as u8, y as u8)]
+                            .get(print_column * 3 + print_row)
+                        {
                             None => write!(f, "[.]")?,
                             Some(WhiteFlat) => write!(f, "[w]")?,
                             Some(WhiteWall) => write!(f, "[W]")?,
@@ -458,7 +460,7 @@ impl<const S: usize> fmt::Debug for Board<S> {
     }
 }
 
-impl<const S: usize> Board<S> {
+impl<const S: usize> Position<S> {
     pub fn white_reserves_left(&self) -> u8 {
         self.white_stones_left
     }
@@ -539,7 +541,7 @@ impl<const S: usize> Board<S> {
         sum_of_connections.is_winning()
     }
 
-    pub fn flip_board_y(&self) -> Board<S> {
+    pub fn flip_board_y(&self) -> Position<S> {
         let mut new_board = self.clone();
         for x in 0..S as u8 {
             for y in 0..S as u8 {
@@ -549,7 +551,7 @@ impl<const S: usize> Board<S> {
         new_board
     }
 
-    pub fn flip_board_x(&self) -> Board<S> {
+    pub fn flip_board_x(&self) -> Position<S> {
         let mut new_board = self.clone();
         for x in 0..S as u8 {
             for y in 0..S as u8 {
@@ -559,7 +561,7 @@ impl<const S: usize> Board<S> {
         new_board
     }
 
-    pub fn rotate_board(&self) -> Board<S> {
+    pub fn rotate_board(&self) -> Position<S> {
         let mut new_board = self.clone();
         for x in 0..S as u8 {
             for y in 0..S as u8 {
@@ -571,7 +573,7 @@ impl<const S: usize> Board<S> {
         new_board
     }
 
-    pub fn flip_colors(&self) -> Board<S> {
+    pub fn flip_colors(&self) -> Position<S> {
         let mut new_board = self.clone();
         for square in utils::squares_iterator::<S>() {
             new_board[square] = Stack::default();
@@ -592,7 +594,7 @@ impl<const S: usize> Board<S> {
     }
 
     /// Returns all 8 symmetries of the board
-    pub fn symmetries(&self) -> Vec<Board<S>> {
+    pub fn symmetries(&self) -> Vec<Position<S>> {
         vec![
             self.clone(),
             self.flip_board_x(),
@@ -606,7 +608,7 @@ impl<const S: usize> Board<S> {
     }
 
     /// Returns all 16 symmetries of the board, where swapping the colors is also a symmetry
-    pub fn symmetries_with_swapped_colors(&self) -> Vec<Board<S>> {
+    pub fn symmetries_with_swapped_colors(&self) -> Vec<Position<S>> {
         self.symmetries()
             .into_iter()
             .flat_map(|board| vec![board.clone(), board.flip_colors()])
@@ -614,7 +616,8 @@ impl<const S: usize> Board<S> {
     }
 
     fn count_all_pieces(&self) -> u8 {
-        squares_iterator::<S>().map(|square| self[square].len())
+        squares_iterator::<S>()
+            .map(|square| self[square].len())
             .sum()
     }
 
@@ -809,7 +812,7 @@ impl<const S: usize> Board<S> {
     }
 }
 
-impl<const S: usize> PositionTrait for Board<S> {
+impl<const S: usize> PositionTrait for Position<S> {
     type Move = Move;
     type ReverseMove = ReverseMove;
 
@@ -1050,13 +1053,13 @@ impl<const S: usize> Iterator for MoveIterator<S> {
     }
 }
 
-impl<const S: usize> EvalPositionTrait for Board<S> {
+impl<const S: usize> EvalPositionTrait for Position<S> {
     fn static_eval(&self) -> f32 {
         self.static_eval_with_params(&Self::value_params())
     }
 }
 
-impl<const S: usize> TunableBoard for Board<S> {
+impl<const S: usize> TunableBoard for Position<S> {
     type ExtraData = GroupData<S>;
 
     fn value_params() -> &'static [f32] {
@@ -1149,7 +1152,7 @@ impl<const S: usize> TunableBoard for Board<S> {
     }
 }
 
-impl<const S: usize> pgn_traits::PgnPosition for Board<S> {
+impl<const S: usize> pgn_traits::PgnPosition for Position<S> {
     const REQUIRED_TAGS: &'static [(&'static str, &'static str)] = &[
         ("Player1", "?"),
         ("Player2", "?"),
@@ -1208,7 +1211,7 @@ impl<const S: usize> pgn_traits::PgnPosition for Board<S> {
                     e,
                 )
             })?;
-        let mut board = Board::default();
+        let mut board = Position::default();
         for square in utils::squares_iterator::<S>() {
             let (file, rank) = (square.file::<S>(), square.rank::<S>());
             let stack = rows[rank as usize][file as usize];

@@ -8,14 +8,14 @@ use crate::position::utils::Piece::{
     BlackCap, BlackFlat, BlackWall, WhiteCap, WhiteFlat, WhiteWall,
 };
 use crate::position::utils::{Piece, Square};
-use crate::position::{Board, GroupData};
+use crate::position::{GroupData, Position};
 
 pub(crate) trait ColorTr {
     fn color() -> Color;
 
-    fn stones_left<const S: usize>(board: &Board<S>) -> u8;
+    fn stones_left<const S: usize>(board: &Position<S>) -> u8;
 
-    fn caps_left<const S: usize>(board: &Board<S>) -> u8;
+    fn caps_left<const S: usize>(board: &Position<S>) -> u8;
 
     fn road_stones<const S: usize>(group_data: &GroupData<S>) -> BitBoard;
 
@@ -49,11 +49,11 @@ impl ColorTr for WhiteTr {
         Color::White
     }
 
-    fn stones_left<const S: usize>(board: &Board<S>) -> u8 {
+    fn stones_left<const S: usize>(board: &Position<S>) -> u8 {
         board.white_stones_left
     }
 
-    fn caps_left<const S: usize>(board: &Board<S>) -> u8 {
+    fn caps_left<const S: usize>(board: &Position<S>) -> u8 {
         board.white_caps_left
     }
 
@@ -113,11 +113,11 @@ impl ColorTr for BlackTr {
         Color::Black
     }
 
-    fn stones_left<const S: usize>(board: &Board<S>) -> u8 {
+    fn stones_left<const S: usize>(board: &Position<S>) -> u8 {
         board.black_stones_left
     }
 
-    fn caps_left<const S: usize>(board: &Board<S>) -> u8 {
+    fn caps_left<const S: usize>(board: &Position<S>) -> u8 {
         board.black_caps_left
     }
 

@@ -1,5 +1,5 @@
 use crate::aws::{Event, Output};
-use crate::position::Board;
+use crate::position::Position;
 use crate::search;
 use crate::search::MctsSetting;
 use board_game_traits::Position as EvalPosition;
@@ -20,7 +20,7 @@ pub fn handle_aws_event_generic<const S: usize>(
     e: Event,
     _c: Context,
 ) -> Result<Output, HandlerError> {
-    let mut board = <Board<S>>::default();
+    let mut board = <Position<S>>::default();
     for mv in e.moves {
         board.do_move(mv);
     }

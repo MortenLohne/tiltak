@@ -1,5 +1,5 @@
 use crate::position::mv::Move;
-use crate::position::Board;
+use crate::position::Position;
 use crate::tests::do_moves_and_check_validity;
 use crate::tests::move_gen_generic_tests::perft_check_answers;
 use board_game_traits::Position as PositionTrait;
@@ -7,7 +7,7 @@ use pgn_traits::PgnPosition;
 
 #[test]
 fn move_stack_test() {
-    let mut board = <Board<5>>::default();
+    let mut board = <Position<5>>::default();
     let mut moves = vec![];
 
     do_moves_and_check_validity(&mut board, &["d3", "c3", "c4", "1d3<", "1c4-", "Sc4"]);
@@ -31,7 +31,7 @@ fn move_stack_test() {
 
 #[test]
 fn respect_carry_limit_test() {
-    let mut board = <Board<5>>::default();
+    let mut board = <Position<5>>::default();
     let mut moves = vec![];
 
     do_moves_and_check_validity(
@@ -58,13 +58,13 @@ fn respect_carry_limit_test() {
 
 #[test]
 fn start_pos_perf_test() {
-    let mut board = <Board<5>>::default();
+    let mut board = <Position<5>>::default();
     perft_check_answers(&mut board, &[1, 25, 600, 43_320, 2_999_784]);
 }
 
 #[test]
 fn perf_test2() {
-    let mut board = <Board<5>>::default();
+    let mut board = <Position<5>>::default();
 
     do_moves_and_check_validity(&mut board, &["d3", "c3", "c4", "1d3<", "1c4-", "Sc4"]);
 
@@ -73,7 +73,7 @@ fn perf_test2() {
 
 #[test]
 fn perf_test3() {
-    let mut board = <Board<5>>::default();
+    let mut board = <Position<5>>::default();
 
     do_moves_and_check_validity(
         &mut board,
@@ -94,7 +94,7 @@ fn suicide_perf_test() {
         "1c4<", "3c3-", "e5", "e2",
     ];
 
-    let mut board = <Board<5>>::default();
+    let mut board = <Position<5>>::default();
     do_moves_and_check_validity(&mut board, &move_strings);
     perft_check_answers(&mut board, &[1, 85, 11_206, 957_000]);
 }

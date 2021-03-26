@@ -5,7 +5,7 @@ use rand::distributions::Distribution;
 
 use crate::position::mv::Move;
 /// This module contains the core of the MCTS search algorithm
-use crate::position::{Board, GroupData, TunableBoard};
+use crate::position::{GroupData, Position, TunableBoard};
 use crate::search::{cp_to_win_percentage, MctsSetting, Score};
 
 /// A Monte Carlo Search Tree, containing every node that has been seen in search.
@@ -41,7 +41,7 @@ impl TreeEdge {
     /// Moves done on the board are not reversed.
     pub fn select<const S: usize>(
         &mut self,
-        board: &mut Board<S>,
+        board: &mut Position<S>,
         settings: &MctsSetting<S>,
         simple_moves: &mut Vec<Move>,
         moves: &mut Vec<(Move, Score)>,
@@ -113,7 +113,7 @@ impl TreeEdge {
 
     // Never inline, for profiling purposes
     #[inline(never)]
-    fn expand<const S: usize>(&mut self, board: &Board<S>, params: &[f32]) -> Score {
+    fn expand<const S: usize>(&mut self, board: &Position<S>, params: &[f32]) -> Score {
         debug_assert!(self.child.is_none());
         self.child = Some(Box::new(Tree::new_node()));
         let child = self.child.as_mut().unwrap();
@@ -162,7 +162,7 @@ impl Tree {
     #[inline(never)]
     fn init_children<const S: usize>(
         &mut self,
-        board: &Board<S>,
+        board: &Position<S>,
         group_data: &GroupData<S>,
         simple_moves: &mut Vec<Move>,
         policy_params: &[f32],

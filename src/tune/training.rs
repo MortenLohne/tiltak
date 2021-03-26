@@ -11,7 +11,7 @@ use rand::prelude::*;
 use rayon::prelude::*;
 
 use crate::position::mv::Move;
-use crate::position::Board;
+use crate::position::Position;
 use crate::position::TunableBoard;
 use crate::ptn::Game;
 use crate::ptn::{ptn_parser, PtnMove};
@@ -197,7 +197,7 @@ fn play_game_pair<const S: usize>(
     current_params_wins: &AtomicU64,
     last_params_wins: &AtomicU64,
     i: usize,
-) -> (Game<Board<S>>, Vec<Vec<(Move, f32)>>) {
+) -> (Game<Position<S>>, Vec<Vec<(Move, f32)>>) {
     let settings = MctsSetting::default()
         .add_value_params(value_params.to_vec())
         .add_policy_params(policy_params.to_vec())
@@ -242,7 +242,7 @@ pub struct GameStats {
 }
 
 impl GameStats {
-    pub fn from_games<const N: usize>(games: &[Game<Board<N>>]) -> Self {
+    pub fn from_games<const N: usize>(games: &[Game<Position<N>>]) -> Self {
         let mut stats = GameStats::default();
         for game in games {
             match game.game_result {
@@ -258,7 +258,7 @@ impl GameStats {
 
 pub fn read_games_from_file<const S: usize>(
     file_name: &str,
-) -> Result<Vec<Game<Board<S>>>, Box<dyn error::Error>> {
+) -> Result<Vec<Game<Position<S>>>, Box<dyn error::Error>> {
     let mut file = fs::File::open(file_name)?;
     let mut input = String::new();
     file.read_to_string(&mut input)?;
@@ -313,12 +313,12 @@ pub fn tune_value_from_file<const S: usize, const N: usize>(
 }
 
 pub fn tune_value_and_policy<const S: usize, const N: usize, const M: usize>(
-    games: &[Game<Board<S>>],
+    games: &[Game<Position<S>>],
     move_scoress: &[MoveScoresForGame],
     initial_value_params: &[f32; N],
     initial_policy_params: &[f32; M],
 ) -> Result<([f32; N], [f32; M]), Box<dyn error::Error>> {
-    let mut games_and_move_scoress: Vec<(&Game<Board<S>>, &MoveScoresForGame)> =
+    let mut games_and_move_scoress: Vec<(&Game<Position<S>>, &MoveScoresForGame)> =
         games.iter().zip(move_scoress).collect();
 
     let mut rng = rand::rngs::StdRng::from_seed([0; 32]);
@@ -436,7 +436,7 @@ pub fn tune_value_and_policy_from_file<const S: usize, const N: usize, const M: 
 pub fn games_and_move_scoress_from_file<const S: usize>(
     value_file_name: &str,
     policy_file_name: &str,
-) -> Result<(Vec<Game<Board<S>>>, Vec<MoveScoresForGame>), Box<dyn error::Error>> {
+) -> Result<(Vec<Game<Position<S>>>, Vec<MoveScoresForGame>), Box<dyn error::Error>> {
     let mut move_scoress = read_move_scores_from_file::<S>(policy_file_name)?;
     let mut games = read_games_from_file(value_file_name)?;
 
@@ -491,7 +491,7 @@ pub fn read_move_scores_from_file<const S: usize>(
     let mut input = String::new();
     file.read_to_string(&mut input)?;
 
-    let board = <Board<S>>::start_position();
+    let board = <Position<S>>::start_position();
 
     // Move scores grouped by the game they were played
     let mut move_scoress: Vec<Vec<Vec<(Move, f32)>>> = vec![vec![]];
@@ -519,8 +519,8 @@ pub fn read_move_scores_from_file<const S: usize>(
 }
 
 pub fn positions_and_results_from_games<const S: usize>(
-    games: Vec<Game<Board<S>>>,
-) -> (Vec<Board<S>>, Vec<GameResult>) {
+    games: Vec<Game<Position<S>>>,
+) -> (Vec<Position<S>>, Vec<GameResult>) {
     let mut positions = vec![];
     let mut results = vec![];
     for game in games.into_iter() {

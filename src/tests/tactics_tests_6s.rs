@@ -1,4 +1,4 @@
-use crate::position::Board;
+use crate::position::Position;
 use crate::tests::{do_moves_and_check_validity, plays_correct_hard_move_property};
 use board_game_traits::Position as PositionTrait;
 
@@ -11,7 +11,7 @@ fn tinue_5ply_test() {
         "1d2>1", "c1", "Sc2", "f4", "4e2>4", "Se3", "e1", "d2", "1e4>1", "1e3-1",
     ];
 
-    let mut board = <Board<6>>::start_position();
+    let mut board = <Position<6>>::start_position();
 
     do_moves_and_check_validity(&mut board, &move_strings);
 
@@ -27,7 +27,7 @@ fn tinue_7ply_test() {
         "b4",
     ];
 
-    let mut board = <Board<6>>::start_position();
+    let mut board = <Position<6>>::start_position();
 
     do_moves_and_check_validity(&mut board, &move_strings);
 
@@ -46,7 +46,7 @@ fn tinue_3ply_test() {
         "5f3<32", "Sf3", "2d6>", "f5", "a1", "f4",
     ];
 
-    let mut board = <Board<6>>::start_position();
+    let mut board = <Position<6>>::start_position();
 
     do_moves_and_check_validity(&mut board, &move_strings);
 
@@ -63,7 +63,7 @@ fn tinue_3ply_test2() {
         "Se3", "c4", "e3-", "c5", "d4<", "Se3", "3e2-", "b3", "2e5-11", "d6>", "2e4+11", "Se4",
     ];
 
-    let mut board = <Board<6>>::start_position();
+    let mut board = <Position<6>>::start_position();
 
     do_moves_and_check_validity(&mut board, &move_strings);
 
@@ -81,7 +81,7 @@ fn tinue_nply_test() {
         "d1", "d5", "b2",
     ];
 
-    let mut board = <Board<6>>::start_position();
+    let mut board = <Position<6>>::start_position();
 
     do_moves_and_check_validity(&mut board, &move_strings);
 

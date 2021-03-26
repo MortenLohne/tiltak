@@ -6,7 +6,9 @@ use crate::position::mv::Move;
 use crate::position::utils::Direction::*;
 use crate::position::utils::Role::{Cap, Flat, Wall};
 use crate::position::utils::Square;
-use crate::position::{num_square_symmetries, square_symmetries, Board, GroupData, TunableBoard};
+use crate::position::{
+    num_square_symmetries, square_symmetries, GroupData, Position, TunableBoard,
+};
 use crate::search;
 
 pub fn sigmoid(x: f32) -> f32 {
@@ -18,7 +20,7 @@ pub fn inverse_sigmoid(x: f32) -> f32 {
     f32::ln(x / (1.0 - x))
 }
 
-impl<const S: usize> Board<S> {
+impl<const S: usize> Position<S> {
     pub(crate) fn generate_moves_with_probabilities_colortr<Us: ColorTr, Them: ColorTr>(
         &self,
         params: &[f32],
@@ -56,7 +58,7 @@ impl<const S: usize> Board<S> {
     }
 }
 pub(crate) fn coefficients_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usize>(
-    board: &Board<S>,
+    board: &Position<S>,
     coefficients: &mut [f32],
     mv: &Move,
     group_data: &GroupData<S>,

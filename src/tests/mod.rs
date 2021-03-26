@@ -6,12 +6,12 @@ mod move_gen_generic_tests;
 mod tactics_tests_5s;
 mod tactics_tests_6s;
 
-use crate::position::Board;
+use crate::position::Position;
 use crate::search;
 use board_game_traits::Position as PositionTrait;
 use pgn_traits::PgnPosition;
 
-fn do_moves_and_check_validity<const S: usize>(board: &mut Board<S>, move_strings: &[&str]) {
+fn do_moves_and_check_validity<const S: usize>(board: &mut Position<S>, move_strings: &[&str]) {
     let mut moves = vec![];
     for mv_san in move_strings.iter() {
         let mv = board.move_from_san(&mv_san).unwrap();
@@ -29,7 +29,7 @@ fn do_moves_and_check_validity<const S: usize>(board: &mut Board<S>, move_string
 }
 
 fn plays_correct_hard_move_property<const S: usize>(move_strings: &[&str], correct_moves: &[&str]) {
-    let mut board = <Board<S>>::default();
+    let mut board = <Position<S>>::default();
     let mut moves = vec![];
 
     do_moves_and_check_validity(&mut board, move_strings);

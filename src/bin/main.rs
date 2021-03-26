@@ -14,7 +14,7 @@ use tiltak::minmax;
 use tiltak::position::mv::Move;
 #[cfg(feature = "constant-tuning")]
 use tiltak::position::utils::Role;
-use tiltak::position::Board;
+use tiltak::position::Position;
 use tiltak::position::TunableBoard;
 use tiltak::ptn::{Game, PtnMove};
 use tiltak::search::MctsSetting;
@@ -40,7 +40,7 @@ fn main() {
         }
         match words[0] {
             "play" => {
-                let board = Board::default();
+                let board = Position::default();
                 play_human(board);
             }
             "aimatch" => {
@@ -61,14 +61,14 @@ fn main() {
                 let depth = 4;
                 let mut positions = HashSet::new();
                 let openings =
-                    generate_openings::<6>(Board::start_position(), &mut positions, depth);
+                    generate_openings::<6>(Position::start_position(), &mut positions, depth);
                 println!("{} openings generated, evaluating...", openings.len());
 
                 let mut evaled_openings: Vec<_> = openings
                     .into_par_iter()
                     .filter(|position| position.len() == depth as usize)
                     .map(|position| {
-                        let mut board = <Board<6>>::start_position();
+                        let mut board = <Position<6>>::start_position();
                         for mv in position.iter() {
                             board.do_move(mv.clone());
                         }
@@ -80,7 +80,7 @@ fn main() {
                     score1.partial_cmp(score2).unwrap()
                 });
                 for (p, (mv, s)) in evaled_openings {
-                    let mut board = <Board<6>>::start_position();
+                    let mut board = <Position<6>>::start_position();
                     for mv in p {
                         print!("{} ", board.move_to_san(&mv));
                         board.do_move(mv);
@@ -129,8 +129,8 @@ fn main() {
 
 #[cfg(feature = "constant-tuning")]
 fn generate_openings<const S: usize>(
-    mut board: Board<S>,
-    positions: &mut HashSet<Board<S>>,
+    mut board: Position<S>,
+    positions: &mut HashSet<Position<S>>,
     depth: u8,
 ) -> Vec<Vec<Move>> {
     let mut moves = vec![];
@@ -167,7 +167,7 @@ fn generate_openings<const S: usize>(
 }
 
 fn mcts_selfplay(max_time: time::Duration) {
-    let mut board = <Board<5>>::default();
+    let mut board = <Position<5>>::default();
     let mut moves = vec![];
 
     let mut white_elapsed = time::Duration::default();
@@ -220,7 +220,7 @@ fn mcts_selfplay(max_time: time::Duration) {
 
 fn mcts_vs_minmax(minmax_depth: u16, mcts_nodes: u64) {
     println!("Minmax depth {} vs mcts {} nodes", minmax_depth, mcts_nodes);
-    let mut board = <Board<5>>::default();
+    let mut board = <Position<5>>::default();
     let mut moves = vec![];
     while board.game_result().is_none() {
         let num_moves = moves.len();
@@ -264,7 +264,7 @@ fn mcts_vs_minmax(minmax_depth: u16, mcts_nodes: u64) {
 }
 
 fn test_position<const S: usize>() {
-    let mut board = <Board<S>>::default();
+    let mut board = <Position<S>>::default();
     let mut moves = vec![];
 
     println!("Enter moves:");
@@ -291,7 +291,7 @@ fn test_position<const S: usize>() {
     println!("Top 10 heuristic moves:");
     for (mv, score) in moves.iter().take(10) {
         println!("{}: {:.3}", mv.to_string::<S>(), score);
-        let mut coefficients = vec![0.0; <Board<S>>::policy_params().len()];
+        let mut coefficients = vec![0.0; <Position<S>>::policy_params().len()];
         board.coefficients_for_move(&mut coefficients, mv, &board.group_data(), moves.len());
         for coefficient in coefficients {
             print!("{:.1}, ", coefficient);
@@ -316,7 +316,7 @@ fn test_position<const S: usize>() {
     }
 }
 
-fn analyze_game<const S: usize>(game: Game<Board<S>>) {
+fn analyze_game<const S: usize>(game: Game<Position<S>>) {
     let mut board = game.start_position.clone();
     let mut ply_number = 2;
     for PtnMove { mv, .. } in game.moves {
@@ -347,7 +347,7 @@ fn analyze_game<const S: usize>(game: Game<Board<S>>) {
 }
 
 /// Play a game against the engine through stdin
-fn play_human(mut board: Board<5>) {
+fn play_human(mut board: Position<5>) {
     match board.game_result() {
         None => {
             use board_game_traits::Color::*;
@@ -403,14 +403,14 @@ fn bench() {
     const NODES: u64 = 1_000_000;
     let start_time = time::Instant::now();
     {
-        let board = <Board<5>>::default();
+        let board = <Position<5>>::default();
 
         let (_move, score) = search::mcts::<5>(board, NODES);
         print!("{:.3}, ", score);
     }
 
     {
-        let mut board = Board::default();
+        let mut board = Position::default();
 
         do_moves_and_check_validity(&mut board, &["d3", "c3", "c4", "1d3<", "1c4+", "Sc4"]);
 
@@ -418,7 +418,7 @@ fn bench() {
         print!("{:.3}, ", score);
     }
     {
-        let mut board = Board::default();
+        let mut board = Position::default();
 
         do_moves_and_check_validity(
             &mut board,
@@ -444,7 +444,10 @@ fn bench() {
 fn mem_usage() {
     use std::mem;
     use tiltak::position::{mv, utils};
-    println!("Tak board: {} bytes", mem::size_of::<position::Board<5>>());
+    println!(
+        "Tak board: {} bytes",
+        mem::size_of::<position::Position<5>>()
+    );
     println!("Tak board cell: {} bytes", mem::size_of::<utils::Stack>());
     println!("Tak move: {} bytes", mem::size_of::<mv::Move>());
     println!("MCTS edge 6s: {} bytes", search::edge_mem_usage());
@@ -459,7 +462,7 @@ fn mem_usage() {
     );
 }
 
-fn do_moves_and_check_validity(board: &mut Board<5>, move_strings: &[&str]) {
+fn do_moves_and_check_validity(board: &mut Position<5>, move_strings: &[&str]) {
     let mut moves = vec![];
     for mv_san in move_strings.iter() {
         let mv = board.move_from_san(&mv_san).unwrap();

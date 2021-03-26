@@ -2,21 +2,21 @@ use board_game_traits::{Color, Position as PositionTrait};
 use board_game_traits::{GameResult, GameResult::*};
 use pgn_traits::PgnPosition;
 
+use crate::position as board_mod;
 use crate::position::mv::Move;
 use crate::position::utils::Direction::*;
 use crate::position::utils::Piece::{BlackCap, BlackFlat, WhiteFlat, WhiteWall};
 use crate::position::utils::{squares_iterator, Piece, Role, Square};
-use crate::position::{utils, Board};
+use crate::position::{utils, Position};
 use crate::tests::do_moves_and_check_validity;
-use crate::{position as board_mod, position};
 
 #[test]
 fn default_board_test() {
-    let board = <Board<5>>::default();
+    let board = <Position<5>>::default();
     for square in squares_iterator::<5>() {
         assert!(board[square].is_empty());
     }
-    let board = <Board<6>>::default();
+    let board = <Position<6>>::default();
     for square in squares_iterator::<6>() {
         assert!(board[square].is_empty());
     }
@@ -25,7 +25,7 @@ fn default_board_test() {
 #[test]
 fn get_set_test() {
     let pieces = vec![WhiteFlat, BlackFlat, BlackFlat, WhiteWall];
-    let mut board = <Board<5>>::default();
+    let mut board = <Position<5>>::default();
     for &piece in pieces.iter() {
         board[Square(12)].push(piece);
     }
@@ -105,7 +105,7 @@ fn correct_number_of_legal_directions_test() {
 
 #[test]
 fn stones_left_behind_by_stack_movement_test() {
-    let mut board: Board<5> = <Board<5>>::default();
+    let mut board: Position<5> = <Position<5>>::default();
 
     do_moves_and_check_validity(&mut board, &["d3", "c3", "c4", "1d3<", "1c4-", "Sc4"]);
 
@@ -140,7 +140,7 @@ fn stones_left_behind_by_stack_movement_test() {
 
 #[test]
 fn black_can_win_with_road_test() {
-    let mut board = <Board<5>>::default();
+    let mut board = <Position<5>>::default();
     let mut moves = vec![];
 
     for mv_san in [
@@ -159,7 +159,7 @@ fn black_can_win_with_road_test() {
 
 #[test]
 fn game_win_test() {
-    let mut board = <Board<5>>::default();
+    let mut board = <Position<5>>::default();
     for mv in [
         Move::Place(Role::Flat, Square(13)),
         Move::Place(Role::Flat, Square(12)),
@@ -181,7 +181,7 @@ fn game_win_test() {
 
 #[test]
 fn game_win_test2() {
-    let mut board = <Board<5>>::default();
+    let mut board = <Position<5>>::default();
     for mv in [
         Move::Place(Role::Flat, Square(7)),
         Move::Place(Role::Flat, Square(12)),
@@ -203,7 +203,7 @@ fn game_win_test2() {
 
 #[test]
 fn double_road_wins_test() {
-    let mut board = <Board<5>>::default();
+    let mut board = <Position<5>>::default();
     let mut moves = vec![];
 
     let move_strings = [
@@ -232,7 +232,7 @@ fn double_road_wins_test() {
 // Check that placing it as a wall is suicide, but placing it flat is not
 #[test]
 fn suicide_into_points_loss_test() {
-    let mut board = <Board<5>>::start_position();
+    let mut board = <Position<5>>::start_position();
     let move_strings = [
         "a1", "e5", "e3", "Cc3", "e4", "e2", "d3", "c3>", "d4", "b2", "c3", "c2", "c4", "d2",
         "c3-", "a2", "c3", "c1", "2c2<", "c2", "c3-", "b1", "e3-", "e1", "2e2-", "d1", "2c2-",
@@ -280,7 +280,7 @@ fn suicide_into_road_loss_test() {
         "b4", "2a4>", "2b2>11", "d3>", "2c4-", "c4", "d4", "4e3+13", "a3", "3b4-", "3c3+12",
     ];
 
-    let mut board = <Board<5>>::start_position();
+    let mut board = <Position<5>>::start_position();
 
     do_moves_and_check_validity(&mut board, &move_strings);
 
@@ -295,7 +295,7 @@ fn suicide_into_road_loss_test() {
 
 #[test]
 fn games_ends_when_board_is_full_test() {
-    let mut board = <Board<5>>::start_position();
+    let mut board = <Position<5>>::start_position();
     let move_strings: Vec<String> = squares_iterator::<5>()
         .skip(1)
         .map(|sq| sq.to_string::<5>())
@@ -316,7 +316,7 @@ fn games_ends_when_board_is_full_test() {
 
 #[test]
 fn every_move_is_suicide_test() {
-    let mut board = <Board<5>>::start_position();
+    let mut board = <Position<5>>::start_position();
 
     do_moves_and_check_validity(&mut board, &["b3", "c4", "c4-", "b3>"]);
 
@@ -336,7 +336,7 @@ fn every_move_is_suicide_test() {
 fn critical_square_test() {
     let move_strings = ["a1", "e5", "e4", "a2", "e3", "a3", "e2", "a4"];
 
-    let mut board = <Board<5>>::default();
+    let mut board = <Position<5>>::default();
 
     do_moves_and_check_validity(&mut board, &move_strings);
 
@@ -367,7 +367,7 @@ fn critical_square_test() {
 
 #[test]
 fn move_iterator_test() {
-    let mut board = <Board<5>>::start_position();
+    let mut board = <Position<5>>::start_position();
     do_moves_and_check_validity(&mut board, &["a1", "e5"]);
     let mv = board.move_from_san("e5-").unwrap();
     match mv {
@@ -383,7 +383,7 @@ fn move_iterator_test() {
 
 #[test]
 fn repetitions_are_draws_test() {
-    let mut board = <Board<5>>::start_position();
+    let mut board = <Position<5>>::start_position();
     do_moves_and_check_validity(&mut board, &["a1", "e5"]);
 
     let cycle_move_strings = ["e5-", "a1+", "e4+", "a2-"];
@@ -399,7 +399,7 @@ fn repetitions_are_draws_test() {
 
 #[test]
 fn fake_repetitions_are_not_draws_test() {
-    let mut board = <Board<6>>::start_position();
+    let mut board = <Position<6>>::start_position();
     let move_strings = [
         "a1", "f1", "d3", "d4", "c3", "c4", "e3", "b4", "e4", "b3", "e5", "Ce2", "Cc5", "b5", "a4",
         "b2", "c5-", "a2", "2c4<", "c4", "a3", "c2", "d2", "c5", "d1", "e2<", "e2", "b6", "a3>",
@@ -415,11 +415,11 @@ fn fake_repetitions_are_not_draws_test() {
 fn parse_tps_test() {
     let tps_string = "x4,1/x5/x5/x5/2,x4 1 2";
 
-    let mut board = <Board<5>>::start_position();
+    let mut board = <Position<5>>::start_position();
     do_moves_and_check_validity(&mut board, &["a1", "e5"]);
-    assert_eq!(<Board<5>>::from_fen(tps_string).unwrap(), board);
+    assert_eq!(<Position<5>>::from_fen(tps_string).unwrap(), board);
 
     do_moves_and_check_validity(&mut board, &["c5"]);
     let tps_string = "x2,1,x,1/x5/x5/x5/2,x4 2 2";
-    assert_eq!(<Board<5>>::from_fen(tps_string).unwrap(), board);
+    assert_eq!(<Position<5>>::from_fen(tps_string).unwrap(), board);
 }

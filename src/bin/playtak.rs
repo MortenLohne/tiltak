@@ -15,7 +15,7 @@ use log::{debug, info, warn};
 #[cfg(feature = "aws-lambda-client")]
 use tiltak::aws;
 use tiltak::position::mv::Move;
-use tiltak::position::Board;
+use tiltak::position::Position;
 use tiltak::ptn::{Game, PtnMove};
 #[cfg(not(feature = "aws-lambda-client"))]
 use tiltak::search;
@@ -371,7 +371,7 @@ impl PlaytakSession {
             game.time_left.as_secs(),
             game.increment.as_secs_f32()
         );
-        let mut board = <Board<S>>::start_position();
+        let mut board = <Position<S>>::start_position();
         let mut moves = vec![];
         let mut our_time_left = game.time_left;
         'gameloop: loop {
@@ -496,7 +496,7 @@ impl PlaytakSession {
             ];
 
             let game = Game {
-                start_position: <Board<S>>::start_position(),
+                start_position: <Position<S>>::start_position(),
                 moves: moves.clone(),
                 game_result: board.game_result(),
                 tags,

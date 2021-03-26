@@ -9,9 +9,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::position::bitboard::BitBoard;
 use crate::position::color_trait::{BlackTr, ColorTr, WhiteTr};
+use crate::position::utils::Direction::*;
 use crate::position::Piece::{BlackCap, BlackFlat, BlackWall, WhiteCap, WhiteFlat, WhiteWall};
 use crate::position::Role::{Cap, Flat, Wall};
-use crate::position::utils::Direction::*;
 
 /// A location on the board. Can be used to index a `Board`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

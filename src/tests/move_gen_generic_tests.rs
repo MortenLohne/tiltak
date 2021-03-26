@@ -1,4 +1,4 @@
-use crate::position::Board;
+use crate::position::Position;
 use board_game_traits::Position as PositionTrait;
 
 #[test]
@@ -10,7 +10,7 @@ fn start_position_move_gen_test() {
     start_position_move_gen_prop::<8>();
 }
 
-pub fn perft<const S: usize>(board: &mut Board<S>, depth: u16) -> u64 {
+pub fn perft<const S: usize>(board: &mut Position<S>, depth: u16) -> u64 {
     if depth == 0 || board.game_result().is_some() {
         1
     } else {
@@ -35,7 +35,7 @@ pub fn perft<const S: usize>(board: &mut Board<S>, depth: u16) -> u64 {
 }
 
 /// Verifies the perft result of a position against a known answer
-pub fn perft_check_answers<const S: usize>(board: &mut Board<S>, answers: &[u64]) {
+pub fn perft_check_answers<const S: usize>(board: &mut Position<S>, answers: &[u64]) {
     for (depth, &answer) in answers.iter().enumerate() {
         assert_eq!(
             perft(board, depth as u16),
@@ -86,7 +86,7 @@ pub fn perft_check_answers<const S: usize>(board: &mut Board<S>, answers: &[u64]
 }
 
 fn start_position_move_gen_prop<const S: usize>() {
-    let mut board = <Board<S>>::default();
+    let mut board = <Position<S>>::default();
     let mut moves = vec![];
     board.generate_moves(&mut moves);
     assert_eq!(moves.len(), S * S);
