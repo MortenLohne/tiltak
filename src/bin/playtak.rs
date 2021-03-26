@@ -1,25 +1,21 @@
-use std::{io, net, thread};
-use std::cmp::Ordering;
 use std::convert::Infallible;
-use std::fmt::Write as FmtWrite;
 use std::io::{BufRead, Result, Write};
-use std::iter;
 use std::net::TcpStream;
 use std::str::FromStr;
 use std::time::Duration;
+use std::{io, net, thread};
 
 use board_game_traits::{Color, GameResult, Position as PositionTrait};
 use bufstream::BufStream;
 use chrono::{Datelike, Local};
 use clap::{App, Arg};
-use log::{debug, info, warn};
 use log::error;
+use log::{debug, info, warn};
 
 #[cfg(feature = "aws-lambda-client")]
 use tiltak::aws;
-use tiltak::position::{Board, mv, utils};
 use tiltak::position::mv::Move;
-use tiltak::position::utils::{Direction, Movement, Role, StackMovement};
+use tiltak::position::Board;
 use tiltak::ptn::{Game, PtnMove};
 #[cfg(not(feature = "aws-lambda-client"))]
 use tiltak::search;
@@ -414,8 +410,11 @@ impl PlaytakSession {
                     comment: score.to_string(),
                 });
 
-                let mut output_string = format!("Game#{} ", game.game_no);
-                write_move::<S>(best_move, &mut output_string);
+                let output_string = format!(
+                    "Game#{} {}",
+                    game.game_no,
+                    best_move.to_string_playtak::<S>()
+                );
                 self.send_line(&output_string)?;
 
                 // Say "Tak" whenever there is a threat to win
@@ -450,7 +449,7 @@ impl PlaytakSession {
                         match words[1] {
                             "P" | "M" => {
                                 let move_string = words[1..].join(" ");
-                                let move_played = parse_move::<S>(&move_string);
+                                let move_played = Move::from_string_playtak::<S>(&move_string);
                                 board.do_move(move_played.clone());
                                 moves.push(PtnMove {
                                     mv: move_played,
@@ -529,100 +528,4 @@ fn connect() -> Result<BufStream<TcpStream>> {
 
 fn dial() -> Result<BufStream<TcpStream>> {
     net::TcpStream::connect("playtak.com:10000").map(BufStream::new)
-}
-
-pub fn parse_move<const S: usize>(input: &str) -> mv::Move {
-    let words: Vec<&str> = input.split_whitespace().collect();
-    if words[0] == "P" {
-        let square = utils::Square::parse_square::<S>(&words[1].to_lowercase()).unwrap();
-        let role = match words.get(2) {
-            Some(&"C") => Role::Cap,
-            Some(&"W") => Role::Wall,
-            None => Role::Flat,
-            Some(s) => panic!("Unknown role {} for move {}", s, input),
-        };
-        mv::Move::Place(role, square)
-    } else if words[0] == "M" {
-        let start_square = utils::Square::parse_square::<S>(&words[1].to_lowercase()).unwrap();
-        let end_square = utils::Square::parse_square::<S>(&words[2].to_lowercase()).unwrap();
-        let pieces_dropped: Vec<u8> = words
-            .iter()
-            .skip(3)
-            .map(|s| u8::from_str(s).unwrap())
-            .collect();
-
-        let num_pieces_taken: u8 = pieces_dropped.iter().sum();
-
-        let mut pieces_held = num_pieces_taken;
-
-        let pieces_taken: StackMovement = iter::once(num_pieces_taken)
-            .chain(
-                pieces_dropped
-                    .iter()
-                    .take(pieces_dropped.len() - 1)
-                    .map(|pieces_to_drop| {
-                        pieces_held -= pieces_to_drop;
-                        pieces_held
-                    }),
-            )
-            .map(|pieces_to_take| Movement { pieces_to_take })
-            .collect();
-
-        let direction = match (
-            start_square.rank::<S>().cmp(&end_square.rank::<S>()),
-            start_square.file::<S>().cmp(&end_square.file::<S>()),
-        ) {
-            (Ordering::Equal, Ordering::Less) => Direction::East,
-            (Ordering::Equal, Ordering::Greater) => Direction::West,
-            (Ordering::Less, Ordering::Equal) => Direction::South,
-            (Ordering::Greater, Ordering::Equal) => Direction::North,
-            _ => panic!("Diagonal move string {}", input),
-        };
-
-        mv::Move::Move(start_square, direction, pieces_taken)
-    } else {
-        unreachable!()
-    }
-}
-
-pub fn write_move<const S: usize>(mv: mv::Move, w: &mut String) {
-    match mv {
-        mv::Move::Place(role, square) => {
-            let role_string = match role {
-                Role::Flat => "",
-                Role::Wall => " W",
-                Role::Cap => " C",
-            };
-            let square_string = square.to_string::<S>().to_uppercase();
-            write!(w, "P {}{}", square_string, role_string).unwrap();
-        }
-        Move::Move(start_square, direction, stack_movement) => {
-            let mut end_square = start_square;
-            let mut pieces_held = stack_movement.get(0).pieces_to_take;
-            let pieces_to_leave: Vec<u8> = stack_movement
-                .into_iter()
-                .skip(1)
-                .map(|Movement { pieces_to_take }| {
-                    end_square = end_square.go_direction::<S>(direction).unwrap();
-                    let pieces_to_leave = pieces_held - pieces_to_take;
-                    pieces_held = pieces_to_take;
-                    pieces_to_leave
-                })
-                .collect();
-
-            end_square = end_square.go_direction::<S>(direction).unwrap();
-
-            write!(
-                w,
-                "M {} {} ",
-                start_square.to_string::<S>().to_uppercase(),
-                end_square.to_string::<S>().to_uppercase()
-            )
-            .unwrap();
-            for num_to_leave in pieces_to_leave {
-                write!(w, "{} ", num_to_leave).unwrap();
-            }
-            write!(w, "{}", pieces_held).unwrap();
-        }
-    }
 }

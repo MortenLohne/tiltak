@@ -1,6 +1,7 @@
 use std::fmt::Write;
 use std::iter::FromIterator;
 use std::ops;
+use std::ops::{Index, IndexMut};
 
 use board_game_traits::Color;
 #[cfg(feature = "serde")]
@@ -469,4 +470,31 @@ pub struct Movement {
 pub enum ColorDef {
     White,
     Black,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub(crate) struct AbstractBoard<T, const S: usize> {
+    pub(crate) raw: [[T; S]; S],
+}
+
+impl<T: Default + Copy, const S: usize> Default for AbstractBoard<T, S> {
+    fn default() -> Self {
+        AbstractBoard {
+            raw: [[T::default(); S]; S],
+        }
+    }
+}
+
+impl<T, const S: usize> Index<Square> for AbstractBoard<T, S> {
+    type Output = T;
+
+    fn index(&self, square: Square) -> &Self::Output {
+        &self.raw[square.0 as usize % S][square.0 as usize / S]
+    }
+}
+
+impl<T, const S: usize> IndexMut<Square> for AbstractBoard<T, S> {
+    fn index_mut(&mut self, square: Square) -> &mut Self::Output {
+        &mut self.raw[square.0 as usize % S][square.0 as usize / S]
+    }
 }

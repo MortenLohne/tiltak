@@ -1,11 +1,15 @@
 use std::fmt::Write;
+use std::iter;
+use std::str::FromStr;
 
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
-use crate::position::utils::{Direction, Movement, Role, Square, StackMovement};
+use crate::position::utils;
 use crate::position::utils::Direction::{East, North, South, West};
 use crate::position::utils::Role::{Cap, Flat, Wall};
+use crate::position::utils::{Direction, Movement, Role, Square, StackMovement};
+use std::cmp::Ordering;
 
 /// A legal move for a position.
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -124,6 +128,102 @@ impl Move {
                     input.len()
                 ),
             )),
+        }
+    }
+
+    pub fn to_string_playtak<const S: usize>(&self) -> String {
+        match self {
+            Move::Place(role, square) => {
+                let role_string = match role {
+                    Role::Flat => "",
+                    Role::Wall => " W",
+                    Role::Cap => " C",
+                };
+                let square_string = square.to_string::<S>().to_uppercase();
+                format!("P {}{}", square_string, role_string)
+            }
+            Move::Move(start_square, direction, stack_movement) => {
+                let mut output = String::new();
+                let mut end_square = *start_square;
+                let mut pieces_held = stack_movement.get(0).pieces_to_take;
+                let pieces_to_leave: Vec<u8> = stack_movement
+                    .into_iter()
+                    .skip(1)
+                    .map(|Movement { pieces_to_take }| {
+                        end_square = end_square.go_direction::<S>(*direction).unwrap();
+                        let pieces_to_leave = pieces_held - pieces_to_take;
+                        pieces_held = pieces_to_take;
+                        pieces_to_leave
+                    })
+                    .collect();
+
+                end_square = end_square.go_direction::<S>(*direction).unwrap();
+
+                write!(
+                    output,
+                    "M {} {} ",
+                    start_square.to_string::<S>().to_uppercase(),
+                    end_square.to_string::<S>().to_uppercase()
+                )
+                .unwrap();
+                for num_to_leave in pieces_to_leave {
+                    write!(output, "{} ", num_to_leave).unwrap();
+                }
+                write!(output, "{}", pieces_held).unwrap();
+                output
+            }
+        }
+    }
+
+    pub fn from_string_playtak<const S: usize>(input: &str) -> Self {
+        let words: Vec<&str> = input.split_whitespace().collect();
+        if words[0] == "P" {
+            let square = Square::parse_square::<S>(&words[1].to_lowercase()).unwrap();
+            let role = match words.get(2) {
+                Some(&"C") => Role::Cap,
+                Some(&"W") => Role::Wall,
+                None => Role::Flat,
+                Some(s) => panic!("Unknown role {} for move {}", s, input),
+            };
+            Move::Place(role, square)
+        } else if words[0] == "M" {
+            let start_square = utils::Square::parse_square::<S>(&words[1].to_lowercase()).unwrap();
+            let end_square = utils::Square::parse_square::<S>(&words[2].to_lowercase()).unwrap();
+            let pieces_dropped: Vec<u8> = words
+                .iter()
+                .skip(3)
+                .map(|s| u8::from_str(s).unwrap())
+                .collect();
+
+            let num_pieces_taken: u8 = pieces_dropped.iter().sum();
+
+            let mut pieces_held = num_pieces_taken;
+
+            let pieces_taken: StackMovement =
+                iter::once(num_pieces_taken)
+                    .chain(pieces_dropped.iter().take(pieces_dropped.len() - 1).map(
+                        |pieces_to_drop| {
+                            pieces_held -= pieces_to_drop;
+                            pieces_held
+                        },
+                    ))
+                    .map(|pieces_to_take| Movement { pieces_to_take })
+                    .collect();
+
+            let direction = match (
+                start_square.rank::<S>().cmp(&end_square.rank::<S>()),
+                start_square.file::<S>().cmp(&end_square.file::<S>()),
+            ) {
+                (Ordering::Equal, Ordering::Less) => Direction::East,
+                (Ordering::Equal, Ordering::Greater) => Direction::West,
+                (Ordering::Less, Ordering::Equal) => Direction::South,
+                (Ordering::Greater, Ordering::Equal) => Direction::North,
+                _ => panic!("Diagonal move string {}", input),
+            };
+
+            Move::Move(start_square, direction, pieces_taken)
+        } else {
+            unreachable!()
         }
     }
 }

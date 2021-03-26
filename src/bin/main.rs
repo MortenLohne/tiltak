@@ -1,7 +1,7 @@
-use std::{io, time};
 #[cfg(feature = "constant-tuning")]
 use std::collections::HashSet;
 use std::io::{Read, Write};
+use std::{io, time};
 
 use board_game_traits::{Color, GameResult};
 use board_game_traits::{EvalPosition, Position as PositionTrait};
@@ -9,16 +9,16 @@ use pgn_traits::PgnPosition;
 #[cfg(feature = "constant-tuning")]
 use rayon::prelude::*;
 
-use tiltak::{position, search};
 use tiltak::minmax;
-use tiltak::position::Board;
 #[cfg(feature = "constant-tuning")]
 use tiltak::position::mv::Move;
-use tiltak::position::TunableBoard;
 #[cfg(feature = "constant-tuning")]
 use tiltak::position::utils::Role;
+use tiltak::position::Board;
+use tiltak::position::TunableBoard;
 use tiltak::ptn::{Game, PtnMove};
 use tiltak::search::MctsSetting;
+use tiltak::{position, search};
 
 #[cfg(test)]
 mod tests;
@@ -445,10 +445,7 @@ fn mem_usage() {
     use std::mem;
     use tiltak::position::{mv, utils};
     println!("Tak board: {} bytes", mem::size_of::<position::Board<5>>());
-    println!(
-        "Tak board cell: {} bytes",
-        mem::size_of::<utils::Stack>()
-    );
+    println!("Tak board cell: {} bytes", mem::size_of::<utils::Stack>());
     println!("Tak move: {} bytes", mem::size_of::<mv::Move>());
     println!("MCTS edge 6s: {} bytes", search::edge_mem_usage());
     println!("MCTS node 6s: {} bytes", search::node_mem_usage());

@@ -18,7 +18,7 @@ use serde::{Deserialize, Serialize};
 use bitboard::BitBoard;
 use color_trait::{BlackTr, WhiteTr};
 use mv::{Move, ReverseMove};
-use utils::{Direction, Movement, Piece, Role, Square, Stack, StackMovement};
+use utils::{AbstractBoard, Direction, Movement, Piece, Role, Square, Stack, StackMovement};
 use utils::Piece::*;
 use utils::Role::*;
 use utils::Role::Flat;
@@ -30,6 +30,7 @@ use crate::evaluation::parameters::{
 };
 use crate::position::color_trait::ColorTr;
 use crate::search;
+use crate::position::utils::squares_iterator;
 
 pub(crate) mod bitboard;
 pub(crate) mod color_trait;
@@ -422,7 +423,7 @@ impl<const S: usize> fmt::Debug for Board<S> {
             for print_row in 0..3 {
                 for x in 0..S {
                     for print_column in 0..3 {
-                        match self.cells.raw[x][y].get(print_column * 3 + print_row) {
+                        match self.cells[Square::from_rank_file::<S>(x as u8, y as u8)].get(print_column * 3 + print_row) {
                             None => write!(f, "[.]")?,
                             Some(WhiteFlat) => write!(f, "[w]")?,
                             Some(WhiteWall) => write!(f, "[W]")?,
@@ -613,11 +614,7 @@ impl<const S: usize> Board<S> {
     }
 
     fn count_all_pieces(&self) -> u8 {
-        self.cells
-            .raw
-            .iter()
-            .flatten()
-            .map(|stack: &Stack| stack.len())
+        squares_iterator::<S>().map(|square| self[square].len())
             .sum()
     }
 
@@ -1360,33 +1357,6 @@ impl<const S: usize> pgn_traits::PgnPosition for Board<S> {
 
     fn move_to_lan(&self, mv: &Self::Move) -> String {
         self.move_to_san(mv)
-    }
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub(crate) struct AbstractBoard<T, const S: usize> {
-    raw: [[T; S]; S],
-}
-
-impl<T: Default + Copy, const S: usize> Default for AbstractBoard<T, S> {
-    fn default() -> Self {
-        AbstractBoard {
-            raw: [[T::default(); S]; S],
-        }
-    }
-}
-
-impl<T, const S: usize> Index<Square> for AbstractBoard<T, S> {
-    type Output = T;
-
-    fn index(&self, square: Square) -> &Self::Output {
-        &self.raw[square.0 as usize % S][square.0 as usize / S]
-    }
-}
-
-impl<T, const S: usize> IndexMut<Square> for AbstractBoard<T, S> {
-    fn index_mut(&mut self, square: Square) -> &mut Self::Output {
-        &mut self.raw[square.0 as usize % S][square.0 as usize / S]
     }
 }
 

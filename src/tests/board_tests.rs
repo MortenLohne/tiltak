@@ -2,13 +2,13 @@ use board_game_traits::{Color, Position as PositionTrait};
 use board_game_traits::{GameResult, GameResult::*};
 use pgn_traits::PgnPosition;
 
-use crate::{position as board_mod, position};
-use crate::position::{Board, utils};
 use crate::position::mv::Move;
-use crate::position::utils::{Piece, Role, Square, squares_iterator};
 use crate::position::utils::Direction::*;
 use crate::position::utils::Piece::{BlackCap, BlackFlat, WhiteFlat, WhiteWall};
+use crate::position::utils::{squares_iterator, Piece, Role, Square};
+use crate::position::{utils, Board};
 use crate::tests::do_moves_and_check_validity;
+use crate::{position as board_mod, position};
 
 #[test]
 fn default_board_test() {
