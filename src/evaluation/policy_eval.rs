@@ -2,10 +2,11 @@ use arrayvec::ArrayVec;
 
 use crate::position::bitboard::BitBoard;
 use crate::position::color_trait::ColorTr;
+use crate::position::mv::Move;
 use crate::position::utils::Role::{Cap, Flat, Wall};
 use crate::position::utils::Square;
 use crate::position::{
-    num_square_symmetries, square_symmetries, Board, Direction::*, GroupData, Move, TunableBoard,
+    num_square_symmetries, square_symmetries, Board, Direction::*, GroupData, TunableBoard,
 };
 use crate::search;
 

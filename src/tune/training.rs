@@ -1,21 +1,23 @@
-use crate::tune::gradient_descent;
-use crate::tune::play_match::play_game;
-use board_game_traits::GameResult;
-use board_game_traits::Position as PositionTrait;
-use rand::prelude::*;
-use rayon::prelude::*;
-
-use crate::position::TunableBoard;
-use crate::position::{Board, Move};
-use crate::ptn::Game;
-use crate::ptn::{ptn_parser, PtnMove};
-use crate::search::MctsSetting;
-use pgn_traits::PgnPosition;
 use std::io::Read;
 use std::io::Write;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time;
 use std::{error, fs, io};
+
+use board_game_traits::GameResult;
+use board_game_traits::Position as PositionTrait;
+use pgn_traits::PgnPosition;
+use rand::prelude::*;
+use rayon::prelude::*;
+
+use crate::position::mv::Move;
+use crate::position::Board;
+use crate::position::TunableBoard;
+use crate::ptn::Game;
+use crate::ptn::{ptn_parser, PtnMove};
+use crate::search::MctsSetting;
+use crate::tune::gradient_descent;
+use crate::tune::play_match::play_game;
 
 // The score, or probability of being played, for a given move
 type MoveScore = (Move, f32);

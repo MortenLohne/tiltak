@@ -11,10 +11,10 @@ use rayon::prelude::*;
 
 use tiltak::minmax;
 #[cfg(feature = "constant-tuning")]
+use tiltak::position::mv::Move;
+#[cfg(feature = "constant-tuning")]
 use tiltak::position::utils::Role;
 use tiltak::position::Board;
-#[cfg(feature = "constant-tuning")]
-use tiltak::position::Move;
 use tiltak::position::TunableBoard;
 use tiltak::ptn::{Game, PtnMove};
 use tiltak::search::MctsSetting;
@@ -443,12 +443,13 @@ fn bench() {
 /// Print memory usage of various data types in the project, for debugging purposes
 fn mem_usage() {
     use std::mem;
+    use tiltak::position::mv;
     println!("Tak board: {} bytes", mem::size_of::<position::Board<5>>());
     println!(
         "Tak board cell: {} bytes",
         mem::size_of::<position::Stack>()
     );
-    println!("Tak move: {} bytes", mem::size_of::<position::Move>());
+    println!("Tak move: {} bytes", mem::size_of::<mv::Move>());
     println!("MCTS edge 6s: {} bytes", search::edge_mem_usage());
     println!("MCTS node 6s: {} bytes", search::node_mem_usage());
     println!(

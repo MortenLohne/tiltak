@@ -1,4 +1,4 @@
-use crate::position::Move;
+use crate::position::mv::Move;
 use serde::Deserialize;
 use serde::Serialize;
 use std::time::Duration;

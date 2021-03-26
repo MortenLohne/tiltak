@@ -1,9 +1,12 @@
-/// This module contains the core of the MCTS search algorithm
-use crate::position::{Board, GroupData, Move, TunableBoard};
-use crate::search::{cp_to_win_percentage, MctsSetting, Score};
+use std::ops;
+
 use board_game_traits::{Color, GameResult, Position as PositionTrait};
 use rand::distributions::Distribution;
-use std::ops;
+
+use crate::position::mv::Move;
+/// This module contains the core of the MCTS search algorithm
+use crate::position::{Board, GroupData, TunableBoard};
+use crate::search::{cp_to_win_percentage, MctsSetting, Score};
 
 /// A Monte Carlo Search Tree, containing every node that has been seen in search.
 #[derive(Clone, PartialEq, Debug)]

@@ -2,8 +2,9 @@ use board_game_traits::{Color, Position as PositionTrait};
 use rand::seq::SliceRandom;
 use rand::Rng;
 
+use crate::position::mv::Move;
 use crate::position::utils::Role;
-use crate::position::{Board, Move};
+use crate::position::Board;
 use crate::ptn::{Game, PtnMove};
 use crate::search;
 use crate::search::{MctsSetting, Score};

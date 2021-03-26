@@ -4,8 +4,9 @@
 
 use std::{mem, time};
 
+use crate::position::mv::Move;
 use crate::position::utils::{Role, Square};
-use crate::position::{Board, Move, TunableBoard};
+use crate::position::{Board, TunableBoard};
 use crate::search::mcts_core::Tree;
 
 use self::mcts_core::{Pv, TreeEdge};

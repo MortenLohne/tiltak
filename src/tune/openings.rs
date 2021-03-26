@@ -1,9 +1,12 @@
-use crate::position::{Board, Move};
-use board_game_traits::Position as PositionTrait;
-use pgn_traits::PgnPosition;
 use std::fs;
 use std::io;
 use std::io::BufRead;
+
+use board_game_traits::Position as PositionTrait;
+use pgn_traits::PgnPosition;
+
+use crate::position::mv::Move;
+use crate::position::Board;
 
 pub fn openings_from_file<const S: usize>(path: &str) -> io::Result<Vec<Vec<Move>>> {
     let reader = io::BufReader::new(fs::File::open(path)?);

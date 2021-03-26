@@ -1,5 +1,5 @@
+use crate::position::mv::Move;
 use crate::position::Board;
-use crate::position::Move;
 use crate::tests::do_moves_and_check_validity;
 use crate::tests::move_gen_generic_tests::perft_check_answers;
 use board_game_traits::Position as PositionTrait;

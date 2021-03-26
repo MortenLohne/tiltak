@@ -2,8 +2,9 @@ use board_game_traits::{EvalPosition, GameResult::*, Position as PositionTrait};
 use pgn_traits::PgnPosition;
 use rand::seq::SliceRandom;
 
+use crate::position::mv::Move;
 use crate::position::utils::{squares_iterator, Role, Square};
-use crate::position::{Board, GroupEdgeConnection, Move};
+use crate::position::{Board, GroupEdgeConnection};
 use crate::tests::do_moves_and_check_validity;
 
 #[test]
