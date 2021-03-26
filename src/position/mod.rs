@@ -1069,7 +1069,7 @@ impl<const S: usize> TunableBoard for Position<S> {
             4 => &VALUE_PARAMS_4S,
             5 => &VALUE_PARAMS_5S,
             6 => &VALUE_PARAMS_6S,
-            _ => &[],
+            _ => unimplemented!("{}s is not supported.", S),
         }
     }
 
@@ -1078,7 +1078,7 @@ impl<const S: usize> TunableBoard for Position<S> {
             4 => &POLICY_PARAMS_4S,
             5 => &POLICY_PARAMS_5S,
             6 => &POLICY_PARAMS_6S,
-            _ => &[],
+            _ => unimplemented!("{}s is not supported.", S),
         }
     }
 
