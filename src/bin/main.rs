@@ -301,8 +301,9 @@ fn test_position<const S: usize>() {
         }
         println!();
     }
+    let settings: MctsSetting<S> = search::MctsSetting::default().exclude_moves(vec![]);
 
-    let mut tree = search::MonteCarloTree::new(position.clone());
+    let mut tree = search::MonteCarloTree::with_settings(position.clone(), settings);
     for i in 1.. {
         tree.select();
         if i % 100_000 == 0 {

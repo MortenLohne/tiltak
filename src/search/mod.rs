@@ -21,6 +21,7 @@ pub struct MctsSetting<const S: usize> {
     policy_params: Vec<f32>,
     search_params: Vec<Score>,
     dirichlet: Option<f32>,
+    excluded_moves: Vec<Move>,
 }
 
 impl<const S: usize> Default for MctsSetting<S> {
@@ -30,6 +31,7 @@ impl<const S: usize> Default for MctsSetting<S> {
             policy_params: Vec::from(<Position<S>>::policy_params()),
             search_params: vec![1.2, 3500.0],
             dirichlet: None,
+            excluded_moves: vec![],
         }
     }
 }
@@ -52,6 +54,11 @@ impl<const N: usize> MctsSetting<N> {
 
     pub fn add_dirichlet(mut self, alpha: f32) -> Self {
         self.dirichlet = Some(alpha);
+        self
+    }
+
+    pub fn exclude_moves(mut self, excluded_moves: Vec<Move>) -> Self {
+        self.excluded_moves = excluded_moves;
         self
     }
 
@@ -106,7 +113,7 @@ impl<const S: usize> MonteCarloTree<S> {
                 heuristic_score: 0.0,
             },
             position,
-            settings,
+            settings: settings.clone(),
             simple_moves: vec![],
             moves: vec![],
         };
@@ -116,6 +123,23 @@ impl<const S: usize> MonteCarloTree<S> {
             tree.select();
             (*tree.edge.child.as_mut().unwrap()).apply_dirichlet(0.25, alpha);
         }
+
+        if !tree.settings.excluded_moves.is_empty() {
+            tree.select();
+            tree.select();
+            let filtered_edges: Vec<TreeEdge> = tree
+                .edge
+                .child
+                .as_ref()
+                .unwrap()
+                .children
+                .iter()
+                .filter(|edge| !settings.excluded_moves.contains(&edge.mv))
+                .cloned()
+                .collect();
+            tree.edge.child.as_mut().unwrap().children = filtered_edges.into_boxed_slice();
+        }
+
         tree
     }
 
