@@ -279,6 +279,7 @@ fn test_position<const S: usize>() {
         moves.clear();
     }
 
+    println!("TPS {}", position.to_fen());
     println!("{:?}", position);
 
     let mut simple_moves = vec![];

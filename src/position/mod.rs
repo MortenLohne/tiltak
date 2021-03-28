@@ -1331,15 +1331,13 @@ impl<const S: usize> pgn_traits::PgnPosition for Position<S> {
 
     fn to_fen(&self) -> String {
         let mut f = String::new();
-        for rank in (0..S).rev() {
-            for file in 0..S {
+        for file in 0..S {
+            for rank in 0..S {
                 let square = Square::from_rank_file::<S>(rank as u8, file as u8);
                 if self[square].is_empty() {
                     f.push('x')
                 } else {
-                    let mut stack_pieces: Vec<Piece> = self[square].into_iter().collect();
-                    stack_pieces.reverse();
-                    for piece in stack_pieces {
+                    for piece in self[square].into_iter() {
                         match piece {
                             WhiteFlat => f.push('1'),
                             BlackFlat => f.push('2'),
@@ -1350,11 +1348,11 @@ impl<const S: usize> pgn_traits::PgnPosition for Position<S> {
                         }
                     }
                 }
-                if file < S - 1 {
+                if rank < S - 1 {
                     f.push(',');
                 }
             }
-            if rank > 0 {
+            if file < S - 1 {
                 f.push('/');
             }
         }
