@@ -1354,13 +1354,13 @@ impl<const S: usize> pgn_traits::PgnPosition for Position<S> {
                     f.push(',');
                 }
             }
-            if rank < S - 1 {
+            if rank > 0 {
                 f.push('/');
             }
         }
         match self.side_to_move() {
-            Color::White => f.push('1'),
-            Color::Black => f.push('2'),
+            Color::White => f.push_str(" 1 "),
+            Color::Black => f.push_str(" 2 "),
         }
         write!(f, "{}", (self.half_moves_played() / 2) + 1).unwrap();
         f
