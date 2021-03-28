@@ -1331,20 +1331,38 @@ impl<const S: usize> pgn_traits::PgnPosition for Position<S> {
 
     fn to_fen(&self) -> String {
         let mut f = String::new();
-        utils::squares_iterator::<S>()
-            .map(|square| self[square])
-            .for_each(|stack: Stack| {
-                (match stack.top_stone() {
-                    None => write!(f, "-"),
-                    Some(WhiteFlat) => write!(f, "w"),
-                    Some(WhiteWall) => write!(f, "W"),
-                    Some(WhiteCap) => write!(f, "C"),
-                    Some(BlackFlat) => write!(f, "b"),
-                    Some(BlackWall) => write!(f, "B"),
-                    Some(BlackCap) => write!(f, "c"),
-                })
-                .unwrap()
-            });
+        for rank in (0..S).rev() {
+            for file in 0..S {
+                let square = Square::from_rank_file::<S>(rank as u8, file as u8);
+                if self[square].is_empty() {
+                    f.push('x')
+                } else {
+                    let mut stack_pieces: Vec<Piece> = self[square].into_iter().collect();
+                    stack_pieces.reverse();
+                    for piece in stack_pieces {
+                        match piece {
+                            WhiteFlat => f.push('1'),
+                            BlackFlat => f.push('2'),
+                            WhiteWall => f.push_str("1S"),
+                            BlackWall => f.push_str("2S"),
+                            WhiteCap => f.push_str("1C"),
+                            BlackCap => f.push_str("2C"),
+                        }
+                    }
+                }
+                if file < S - 1 {
+                    f.push(',');
+                }
+            }
+            if rank < S - 1 {
+                f.push('/');
+            }
+        }
+        match self.side_to_move() {
+            Color::White => f.push('1'),
+            Color::Black => f.push('2'),
+        }
+        write!(f, "{}", (self.half_moves_played() / 2) + 1).unwrap();
         f
     }
 
