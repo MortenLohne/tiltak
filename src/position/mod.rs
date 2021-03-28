@@ -1331,8 +1331,8 @@ impl<const S: usize> pgn_traits::PgnPosition for Position<S> {
 
     fn to_fen(&self) -> String {
         let mut f = String::new();
-        for file in 0..S {
-            for rank in 0..S {
+        for rank in 0..S {
+            for file in 0..S {
                 let square = Square::from_rank_file::<S>(rank as u8, file as u8);
                 if self[square].is_empty() {
                     f.push('x')
@@ -1348,11 +1348,11 @@ impl<const S: usize> pgn_traits::PgnPosition for Position<S> {
                         }
                     }
                 }
-                if rank < S - 1 {
+                if file < S - 1 {
                     f.push(',');
                 }
             }
-            if file < S - 1 {
+            if rank < S - 1 {
                 f.push('/');
             }
         }
