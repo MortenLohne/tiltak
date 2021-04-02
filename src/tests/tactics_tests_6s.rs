@@ -71,6 +71,27 @@ fn tinue_3ply_test2() {
 }
 
 #[test]
+fn endgame_tinue_test() {
+    // f1 a1 a2 b4 b2 c3 c2 d2 e2 d3 f2 d1 b3 d4 Cc4 c5 c4> d2< d2 c1 c4 c6 c4- 2c2< c2 b4- b1 c1< a1> 3b2< b2 f1+ c4 Ca3 d5 2b3> c2+ d3< c4- Sc4 5c3>122 c4- b3 3c3>12 b4 a3- b5 5a2> b6 c2 3b1>12 Se1 c4 e1< c3 3d1<12 e4 6b2+51 c4+ Sc4 e5 c4+ c3< 2b4- c4 b4 c3 b2 c3- c3 a6 2c5< b6> b6 e6 4e3- e3 b6> 2c2- 2b1> c4+ 2c6- Sc4 4c5>13 2d4- 4c1<13 4d3+13 a3 4d5<31 e1 d2- d2 4b5>112
+    let move_strings = [
+        "f1", "a1", "a2", "b4", "b2", "c3", "c2", "d2", "e2", "d3", "f2", "d1", "b3", "d4", "Cc4",
+        "c5", "c4>", "d2<", "d2", "c1", "c4", "c6", "c4-", "2c2<", "c2", "b4-", "b1", "c1<", "a1>",
+        "3b2<", "b2", "f1+", "c4", "Ca3", "d5", "2b3>", "c2+", "d3<", "c4-", "Sc4", "5c3>122",
+        "c4-", "b3", "3c3>12", "b4", "a3-", "b5", "5a2>", "b6", "c2", "3b1>12", "Se1", "c4", "e1<",
+        "c3", "3d1<12", "e4", "6b2+51", "c4+", "Sc4", "e5", "c4+", "c3<", "2b4-", "c4", "b4", "c3",
+        "b2", "c3-", "c3", "a6", "2c5<", "b6>", "b6", "e6", "4e3-", "e3", "b6>", "2c2-", "2b1>",
+        "c4+", "2c6-", "Sc4", "4c5>13", "2d4-", "4c1<13", "4d3+13", "a3", "4d5<31", "e1", "d2-",
+        "d2", "4b5>112",
+    ];
+
+    let mut position = <Position<6>>::start_position();
+
+    do_moves_and_check_validity(&mut position, &move_strings);
+
+    plays_correct_hard_move_property::<6>(&move_strings, &["3e2+"]);
+}
+
+#[test]
 fn tinue_nply_test() {
     // e6 f6 f5 e5 f4 e4 f3 Ce3 f2 e3> e2 e3 d2 c2 d3 d4 Cc3 d1 b3 c2> d3- d1+ e2< e1 e2 2f3- e2+ 3f2<12 d1 d5 b2
     // Requires centralizing our cap, making the vertical threats unstoppable
