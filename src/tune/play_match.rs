@@ -1,6 +1,5 @@
 use board_game_traits::{Color, Position as PositionTrait};
 use rand::seq::SliceRandom;
-use rand::Rng;
 
 use crate::position::Move;
 use crate::position::Position;
@@ -53,9 +52,9 @@ pub fn play_game<const S: usize>(
         }
         // Turn off temperature in the middle-game, when all games are expected to be unique
         else if position.half_moves_played() < 20 {
-            best_move(temperature, &moves_scores[..])
+            search::best_move(&mut rand::thread_rng(), temperature, &moves_scores[..])
         } else {
-            best_move(0.1, &moves_scores[..])
+            search::best_move(&mut rand::thread_rng(), 0.1, &moves_scores[..])
         };
         position.do_move(best_move.clone());
         game_moves.push(best_move);
@@ -77,23 +76,4 @@ pub fn play_game<const S: usize>(
         },
         move_scores,
     )
-}
-
-pub fn best_move(temperature: f64, move_scores: &[(Move, Score)]) -> Move {
-    let mut rng = rand::thread_rng();
-    let mut move_probabilities = vec![];
-    let mut cumulative_prob = 0.0;
-
-    for (mv, individual_prob) in move_scores.iter() {
-        cumulative_prob += (*individual_prob as f64).powf(1.0 / temperature);
-        move_probabilities.push((mv, cumulative_prob));
-    }
-
-    let p = rng.gen_range(0.0, cumulative_prob);
-    for (mv, cumulative_prob) in move_probabilities {
-        if cumulative_prob > p {
-            return mv.clone();
-        }
-    }
-    unreachable!()
 }

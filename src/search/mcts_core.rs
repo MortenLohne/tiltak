@@ -2,11 +2,12 @@ use std::ops;
 
 use board_game_traits::{Color, GameResult, Position as PositionTrait};
 use rand::distributions::Distribution;
+use rand::Rng;
 
 use crate::position::Move;
 /// This module contains the core of the MCTS search algorithm
 use crate::position::{GroupData, Position, TunableBoard};
-use crate::search::{cp_to_win_percentage, MctsSetting, Score};
+use crate::search::{MctsSetting, Score};
 
 /// A Monte Carlo Search Tree, containing every node that has been seen in search.
 #[derive(Clone, PartialEq, Debug)]
@@ -47,7 +48,7 @@ impl TreeEdge {
         moves: &mut Vec<(Move, Score)>,
     ) -> Score {
         if self.visits == 0 {
-            self.expand(position, &settings.value_params)
+            self.expand(position, settings, simple_moves, moves)
         } else if self.child.as_ref().unwrap().is_terminal {
             self.visits += 1;
             self.child.as_mut().unwrap().total_action_value += self.mean_action_value as f64;
@@ -113,7 +114,13 @@ impl TreeEdge {
 
     // Never inline, for profiling purposes
     #[inline(never)]
-    fn expand<const S: usize>(&mut self, position: &Position<S>, params: &[f32]) -> Score {
+    fn expand<const S: usize>(
+        &mut self,
+        position: &mut Position<S>,
+        settings: &MctsSetting<S>,
+        simple_moves: &mut Vec<Move>,
+        moves: &mut Vec<(Move, Score)>,
+    ) -> Score {
         debug_assert!(self.child.is_none());
         self.child = Some(Box::new(Tree::new_node()));
         let child = self.child.as_mut().unwrap();
@@ -138,15 +145,12 @@ impl TreeEdge {
             return score;
         }
 
-        let mut static_eval =
-            cp_to_win_percentage(position.static_eval_with_params_and_data(&group_data, params));
-        if position.side_to_move() == Color::Black {
-            static_eval = 1.0 - static_eval;
-        }
+        let eval = rollout(position, settings, 5, simple_moves, moves);
+
         self.visits = 1;
-        child.total_action_value = static_eval as f64;
-        self.mean_action_value = static_eval;
-        static_eval
+        child.total_action_value = eval as f64;
+        self.mean_action_value = eval;
+        eval
     }
 
     #[inline]
@@ -205,6 +209,48 @@ impl Tree {
     }
 }
 
+pub fn rollout<const S: usize>(
+    position: &mut Position<S>,
+    settings: &MctsSetting<S>,
+    depth: usize,
+    simple_moves: &mut Vec<Move>,
+    moves: &mut Vec<(Move, Score)>,
+) -> Score {
+    let group_data = position.group_data();
+
+    if let Some(game_result) = position.game_result_with_group_data(&group_data) {
+        let game_result_for_us = match (game_result, position.side_to_move()) {
+            (GameResult::Draw, _) => GameResultForUs::Draw,
+            (GameResult::WhiteWin, Color::Black) => GameResultForUs::Loss, // The side to move has lost
+            (GameResult::BlackWin, Color::White) => GameResultForUs::Loss, // The side to move has lost
+            (GameResult::WhiteWin, Color::White) => GameResultForUs::Win, // The side to move has lost
+            (GameResult::BlackWin, Color::Black) => GameResultForUs::Win, // The side to move has lost
+        };
+
+        game_result_for_us.score()
+    } else if depth == 0 {
+        position.static_eval_with_params_and_data(&group_data, &settings.value_params)
+    } else {
+        position.generate_moves_with_params(
+            &settings.policy_params,
+            &group_data,
+            simple_moves,
+            moves,
+        );
+        let policy_sum: f32 = moves.iter().map(|(_, score)| *score).sum();
+        let inv_sum = 1.0 / policy_sum;
+        for (_mv, score) in moves.iter_mut() {
+            *score *= inv_sum
+        }
+
+        let best_move = best_move(&mut rand::thread_rng(), 0.5, &moves);
+        position.do_move(best_move);
+
+        moves.clear();
+        rollout(position, settings, depth - 1, simple_moves, moves)
+    }
+}
+
 /// A game result from one side's perspective
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum GameResultForUs {
@@ -260,4 +306,22 @@ impl<'a> Iterator for Pv<'a> {
                 })
             })
     }
+}
+
+pub fn best_move<R: Rng>(rng: &mut R, temperature: f64, move_scores: &[(Move, Score)]) -> Move {
+    let mut move_probabilities = vec![];
+    let mut cumulative_prob = 0.0;
+
+    for (mv, individual_prob) in move_scores.iter() {
+        cumulative_prob += (*individual_prob as f64).powf(1.0 / temperature);
+        move_probabilities.push((mv, cumulative_prob));
+    }
+
+    let p = rng.gen_range(0.0, cumulative_prob);
+    for (mv, cumulative_prob) in move_probabilities {
+        if cumulative_prob > p {
+            return mv.clone();
+        }
+    }
+    unreachable!()
 }

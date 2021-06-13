@@ -398,7 +398,7 @@ impl PlaytakSession {
 
                 #[cfg(not(feature = "aws-lambda-client"))]
                 let (best_move, score) = {
-                    let maximum_time = our_time_left / 5 + game.increment;
+                    let maximum_time = our_time_left / 20 + game.increment;
                     let settings = MctsSetting::default().add_dirichlet(0.1);
                     search::play_move_time(position.clone(), maximum_time, settings)
                 };

@@ -337,7 +337,7 @@ fn test_position<const S: usize>() {
     let mut tree = search::MonteCarloTree::with_settings(position.clone(), settings);
     for i in 1.. {
         tree.select();
-        if i % 100_000 == 0 {
+        if i % 1_000 == 0 {
             println!(
                 "{} visits, val={:.2}%, static eval={:.4}, static winning probability={:.2}%",
                 tree.visits(),
@@ -359,7 +359,7 @@ fn analyze_game<const S: usize>(game: Game<Position<S>>) {
         if position.game_result().is_some() {
             break;
         }
-        let (best_move, score) = search::mcts::<S>(position.clone(), 1_000_000);
+        let (best_move, score) = search::mcts::<S>(position.clone(), 10_000);
         if ply_number % 2 == 0 {
             print!(
                 "{}. {} {{{:.2}%, best reply {}}} ",
