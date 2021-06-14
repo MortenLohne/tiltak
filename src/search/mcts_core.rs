@@ -2,7 +2,6 @@ use std::ops;
 
 use board_game_traits::{Color, GameResult, Position as PositionTrait};
 use rand::distributions::Distribution;
-use rand::seq::SliceRandom;
 use rand::Rng;
 
 use crate::position::Move;
@@ -49,7 +48,7 @@ impl TreeEdge {
         moves: &mut Vec<(Move, Score)>,
     ) -> Score {
         if self.visits == 0 {
-            self.expand(position, settings, simple_moves)
+            self.expand(position, settings, simple_moves, moves)
         } else if self.child.as_ref().unwrap().is_terminal {
             self.visits += 1;
             self.child.as_mut().unwrap().total_action_value += self.mean_action_value as f64;
@@ -120,6 +119,7 @@ impl TreeEdge {
         position: &mut Position<S>,
         settings: &MctsSetting<S>,
         simple_moves: &mut Vec<Move>,
+        moves: &mut Vec<(Move, Score)>,
     ) -> Score {
         debug_assert!(self.child.is_none());
         self.child = Some(Box::new(Tree::new_node()));
@@ -145,7 +145,7 @@ impl TreeEdge {
             return score;
         }
 
-        let eval = rollout(position, settings, 5, simple_moves);
+        let eval = rollout(position, settings, 100, simple_moves, moves);
 
         self.visits = 1;
         child.total_action_value = eval as f64;
@@ -216,6 +216,7 @@ pub fn rollout<const S: usize>(
     settings: &MctsSetting<S>,
     depth: usize,
     simple_moves: &mut Vec<Move>,
+    moves: &mut Vec<(Move, Score)>,
 ) -> Score {
     let group_data = position.group_data();
 
@@ -238,15 +239,15 @@ pub fn rollout<const S: usize>(
             Color::Black => 1.0 - static_eval,
         }
     } else {
-        position.generate_moves(simple_moves);
+        position.generate_moves_with_probabilities(&group_data, simple_moves, moves);
 
         let mut rng = rand::thread_rng();
 
-        let best_move = simple_moves.choose(&mut rng).unwrap().clone();
+        let best_move = best_move(&mut rng, 0.5, moves);
         position.do_move(best_move);
 
-        simple_moves.clear();
-        1.0 - rollout(position, settings, depth - 1, simple_moves)
+        moves.clear();
+        1.0 - rollout(position, settings, depth - 1, simple_moves, moves)
     }
 }
 
