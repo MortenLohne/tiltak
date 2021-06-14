@@ -209,6 +209,8 @@ impl Tree {
     }
 }
 
+// Never inline, for profiling purposes
+#[inline(never)]
 pub fn rollout<const S: usize>(
     position: &mut Position<S>,
     settings: &MctsSetting<S>,

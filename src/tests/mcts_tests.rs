@@ -200,3 +200,36 @@ fn plays_correct_move_property(move_strings: &[&str], correct_moves: &[&str]) {
         }
     }
 }
+
+#[test]
+// This test is probabilistic, and can theoretically fail due to random chance
+fn best_move_temperature_test() {
+    let position = <Position<5>>::start_position();
+    let moves = vec![
+        (position.move_from_san("a1").unwrap(), 0.5),
+        (position.move_from_san("a2").unwrap(), 0.1),
+        (position.move_from_san("a3").unwrap(), 0.1),
+        (position.move_from_san("a4").unwrap(), 0.1),
+        (position.move_from_san("a5").unwrap(), 0.1),
+        (position.move_from_san("b1").unwrap(), 0.1),
+    ];
+
+    let mut rng = rand::thread_rng();
+    let mut top_move_selected = 0;
+    let mut b1_selected = 0;
+
+    for _ in 0..1000 {
+        let move_string_selected = search::best_move(&mut rng, 1.0, &moves).to_string::<5>();
+        if move_string_selected == "a1" {
+            top_move_selected += 1;
+        } else if move_string_selected == "b1" {
+            b1_selected += 1;
+        }
+    }
+
+    println!("top move {}, a2 {}", top_move_selected, b1_selected);
+    assert!(top_move_selected > 400);
+    assert!(top_move_selected < 600);
+    assert!(b1_selected > 75);
+    assert!(b1_selected < 150);
+}
