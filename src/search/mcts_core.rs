@@ -2,12 +2,13 @@ use std::ops;
 
 use board_game_traits::{Color, GameResult, Position as PositionTrait};
 use rand::distributions::Distribution;
+use rand::seq::SliceRandom;
 use rand::Rng;
 
 use crate::position::Move;
 /// This module contains the core of the MCTS search algorithm
 use crate::position::{GroupData, Position, TunableBoard};
-use crate::search::{MctsSetting, Score};
+use crate::search::{cp_to_win_percentage, MctsSetting, Score};
 
 /// A Monte Carlo Search Tree, containing every node that has been seen in search.
 #[derive(Clone, PartialEq, Debug)]
@@ -48,7 +49,7 @@ impl TreeEdge {
         moves: &mut Vec<(Move, Score)>,
     ) -> Score {
         if self.visits == 0 {
-            self.expand(position, settings, simple_moves, moves)
+            self.expand(position, settings, simple_moves)
         } else if self.child.as_ref().unwrap().is_terminal {
             self.visits += 1;
             self.child.as_mut().unwrap().total_action_value += self.mean_action_value as f64;
@@ -119,7 +120,6 @@ impl TreeEdge {
         position: &mut Position<S>,
         settings: &MctsSetting<S>,
         simple_moves: &mut Vec<Move>,
-        moves: &mut Vec<(Move, Score)>,
     ) -> Score {
         debug_assert!(self.child.is_none());
         self.child = Some(Box::new(Tree::new_node()));
@@ -145,7 +145,7 @@ impl TreeEdge {
             return score;
         }
 
-        let eval = rollout(position, settings, 5, simple_moves, moves);
+        let eval = rollout(position, settings, 5, simple_moves);
 
         self.visits = 1;
         child.total_action_value = eval as f64;
@@ -216,7 +216,6 @@ pub fn rollout<const S: usize>(
     settings: &MctsSetting<S>,
     depth: usize,
     simple_moves: &mut Vec<Move>,
-    moves: &mut Vec<(Move, Score)>,
 ) -> Score {
     let group_data = position.group_data();
 
@@ -231,25 +230,23 @@ pub fn rollout<const S: usize>(
 
         game_result_for_us.score()
     } else if depth == 0 {
-        position.static_eval_with_params_and_data(&group_data, &settings.value_params)
-    } else {
-        position.generate_moves_with_params(
-            &settings.policy_params,
-            &group_data,
-            simple_moves,
-            moves,
+        let static_eval = cp_to_win_percentage(
+            position.static_eval_with_params_and_data(&group_data, &settings.value_params),
         );
-        let policy_sum: f32 = moves.iter().map(|(_, score)| *score).sum();
-        let inv_sum = 1.0 / policy_sum;
-        for (_mv, score) in moves.iter_mut() {
-            *score *= inv_sum
+        match position.side_to_move() {
+            Color::White => static_eval,
+            Color::Black => 1.0 - static_eval,
         }
+    } else {
+        position.generate_moves(simple_moves);
 
-        let best_move = best_move(&mut rand::thread_rng(), 0.5, &moves);
+        let mut rng = rand::thread_rng();
+
+        let best_move = simple_moves.choose(&mut rng).unwrap().clone();
         position.do_move(best_move);
 
-        moves.clear();
-        rollout(position, settings, depth - 1, simple_moves, moves)
+        simple_moves.clear();
+        1.0 - rollout(position, settings, depth - 1, simple_moves)
     }
 }
 
