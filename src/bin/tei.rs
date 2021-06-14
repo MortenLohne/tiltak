@@ -109,7 +109,7 @@ fn parse_go_string<const S: usize>(line: &str, position: &Position<S>) {
             let mut tree = search::MonteCarloTree::new(position.clone());
             let mut total_nodes = 0;
             for i in 0.. {
-                let nodes_to_search = (1000.0 * f64::powf(1.26, i as f64)) as u64;
+                let nodes_to_search = (200.0 * f64::powf(1.26, i as f64)) as u64;
                 for _ in 0..nodes_to_search {
                     tree.select();
                 }
