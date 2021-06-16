@@ -125,31 +125,12 @@ impl TreeEdge {
         self.child = Some(Box::new(Tree::new_node()));
         let child = self.child.as_mut().unwrap();
 
-        let group_data = position.group_data();
-
-        if let Some(game_result) = position.game_result_with_group_data(&group_data) {
-            let game_result_for_us = match (game_result, position.side_to_move()) {
-                (GameResult::Draw, _) => GameResultForUs::Draw,
-                (GameResult::WhiteWin, Color::Black) => GameResultForUs::Loss, // The side to move has lost
-                (GameResult::BlackWin, Color::White) => GameResultForUs::Loss, // The side to move has lost
-                (GameResult::WhiteWin, Color::White) => GameResultForUs::Win, // The side to move has lost
-                (GameResult::BlackWin, Color::Black) => GameResultForUs::Win, // The side to move has lost
-            };
-            self.visits = 1;
-            child.is_terminal = true;
-
-            let score = game_result_for_us.score();
-            self.mean_action_value = score;
-            child.total_action_value = score as f64;
-
-            return score;
-        }
-
-        let eval = rollout(position, settings, 100, simple_moves, moves);
+        let (eval, is_terminal) = rollout(position, settings, 0, simple_moves, moves);
 
         self.visits = 1;
         child.total_action_value = eval as f64;
         self.mean_action_value = eval;
+        child.is_terminal = is_terminal;
         eval
     }
 
@@ -217,7 +198,7 @@ pub fn rollout<const S: usize>(
     depth: usize,
     simple_moves: &mut Vec<Move>,
     moves: &mut Vec<(Move, Score)>,
-) -> Score {
+) -> (Score, bool) {
     let group_data = position.group_data();
 
     if let Some(game_result) = position.game_result_with_group_data(&group_data) {
@@ -229,14 +210,14 @@ pub fn rollout<const S: usize>(
             (GameResult::BlackWin, Color::Black) => GameResultForUs::Win, // The side to move has lost
         };
 
-        game_result_for_us.score()
+        (game_result_for_us.score(), true)
     } else if depth == 0 {
         let static_eval = cp_to_win_percentage(
             position.static_eval_with_params_and_data(&group_data, &settings.value_params),
         );
         match position.side_to_move() {
-            Color::White => static_eval,
-            Color::Black => 1.0 - static_eval,
+            Color::White => (static_eval, false),
+            Color::Black => (1.0 - static_eval, false),
         }
     } else {
         position.generate_moves_with_probabilities(&group_data, simple_moves, moves);
@@ -247,7 +228,8 @@ pub fn rollout<const S: usize>(
         position.do_move(best_move);
 
         moves.clear();
-        1.0 - rollout(position, settings, depth - 1, simple_moves, moves)
+        let (score, _) = rollout(position, settings, depth - 1, simple_moves, moves);
+        (1.0 - score, false)
     }
 }
 
