@@ -125,7 +125,13 @@ impl TreeEdge {
         self.child = Some(Box::new(Tree::new_node()));
         let child = self.child.as_mut().unwrap();
 
-        let (eval, is_terminal) = rollout(position, settings, 0, simple_moves, moves);
+        let (eval, is_terminal) = rollout(
+            position,
+            settings,
+            settings.rollout_depth,
+            simple_moves,
+            moves,
+        );
 
         self.visits = 1;
         child.total_action_value = eval as f64;
@@ -195,7 +201,7 @@ impl Tree {
 pub fn rollout<const S: usize>(
     position: &mut Position<S>,
     settings: &MctsSetting<S>,
-    depth: usize,
+    depth: u16,
     simple_moves: &mut Vec<Move>,
     moves: &mut Vec<(Move, Score)>,
 ) -> (Score, bool) {
@@ -224,7 +230,7 @@ pub fn rollout<const S: usize>(
 
         let mut rng = rand::thread_rng();
 
-        let best_move = best_move(&mut rng, 0.5, moves);
+        let best_move = best_move(&mut rng, settings.rollout_temperature, moves);
         position.do_move(best_move);
 
         moves.clear();

@@ -23,6 +23,8 @@ pub struct MctsSetting<const S: usize> {
     search_params: Vec<Score>,
     dirichlet: Option<f32>,
     excluded_moves: Vec<Move>,
+    rollout_depth: u16,
+    rollout_temperature: f64,
 }
 
 impl<const S: usize> Default for MctsSetting<S> {
@@ -33,6 +35,8 @@ impl<const S: usize> Default for MctsSetting<S> {
             search_params: vec![1.2, 3500.0],
             dirichlet: None,
             excluded_moves: vec![],
+            rollout_depth: 0,
+            rollout_temperature: 0.25,
         }
     }
 }
@@ -60,6 +64,16 @@ impl<const N: usize> MctsSetting<N> {
 
     pub fn exclude_moves(mut self, excluded_moves: Vec<Move>) -> Self {
         self.excluded_moves = excluded_moves;
+        self
+    }
+
+    pub fn add_rollout_depth(mut self, rollout_depth: u16) -> Self {
+        self.rollout_depth = rollout_depth;
+        self
+    }
+
+    pub fn add_rollout_temperature(mut self, temperature: f64) -> Self {
+        self.rollout_temperature = temperature;
         self
     }
 
