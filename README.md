@@ -69,7 +69,7 @@ This is otherwise not well documented, try `tune --help` for more.
 ## bootstrap 
 To build this binary:
 ```
-cargo build --release --target x86_64-unknown-linux-musl --bin bootstrap --features aws-lambda
+cargo build --release --target x86_64-unknown-linux-musl --bin bootstrap --features aws-lambda-runtime
 ```
 This is otherwise undocumented.
 
