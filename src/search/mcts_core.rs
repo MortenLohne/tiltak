@@ -196,6 +196,9 @@ impl Tree {
     }
 }
 
+/// Do a mcts rollout up to `depth` plies, before doing a static evaluation.
+/// Depth is 0 on default settings, in which case it immediately does a static evaluation
+/// Higher depths are mainly used for playing with reduced difficulty
 // Never inline, for profiling purposes
 #[inline(never)]
 pub fn rollout<const S: usize>(
@@ -296,6 +299,10 @@ impl<'a> Iterator for Pv<'a> {
     }
 }
 
+/// Selects a move from the move_scores vector,
+/// tending towards the highest-scoring moves, but with a random component
+/// If temperature is low (e.g. 0.1), it tends to choose the highest-scoring move
+/// If temperature is 1.0, it chooses a move proportional to its score
 pub fn best_move<R: Rng>(rng: &mut R, temperature: f64, move_scores: &[(Move, Score)]) -> Move {
     let mut move_probabilities = vec![];
     let mut cumulative_prob = 0.0;

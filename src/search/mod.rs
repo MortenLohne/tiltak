@@ -67,11 +67,14 @@ impl<const N: usize> MctsSetting<N> {
         self
     }
 
+    /// The maximum depth of the MCTS rollouts. Defaults to 0, in which case no rollouts are done
     pub fn add_rollout_depth(mut self, rollout_depth: u16) -> Self {
         self.rollout_depth = rollout_depth;
         self
     }
 
+    /// The degree of randomness when picking moves in MCTS rollouts
+    /// A value of 1.0 is highly random, values around 0.2 give low randomness
     pub fn add_rollout_temperature(mut self, temperature: f64) -> Self {
         self.rollout_temperature = temperature;
         self
