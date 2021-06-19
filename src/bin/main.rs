@@ -89,6 +89,7 @@ fn main() {
                 }
                 return;
             }
+            "analyze_openings" => analyze_openings::<6>(6_000_000),
             "game" => {
                 println!("Enter a full game PTN, then press enter followed by CTRL+D:");
                 let mut input = String::new();
@@ -123,6 +124,35 @@ fn main() {
             "selfplay" => mcts_selfplay(time::Duration::from_secs(10)),
             s => println!("Unknown option \"{}\"", s),
         }
+    }
+}
+
+fn analyze_openings<const S: usize>(nodes: u64) {
+    let mut input = String::new();
+    io::stdin().read_to_string(&mut input).unwrap();
+    for line in input.lines() {
+        let mut position = <Position<6>>::start_position();
+        for word in line.split_whitespace() {
+            let mv = position.move_from_san(word).unwrap();
+            position.do_move(mv);
+        }
+        let start_time = time::Instant::now();
+        let mut tree = search::MonteCarloTree::new(position.clone());
+        for _ in 0..nodes {
+            tree.select();
+        }
+        let pv: Vec<Move> = tree.pv().take(4).collect();
+        print!(
+            "{}, {:.3}, {:.1}s, ",
+            line.trim(),
+            tree.best_move().1,
+            start_time.elapsed().as_secs_f32()
+        );
+        for mv in pv {
+            print!("{} ", position.move_to_san(&mv));
+            position.do_move(mv);
+        }
+        println!();
     }
 }
 
