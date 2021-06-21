@@ -4,6 +4,7 @@ use board_game_traits::{Color, GameResult, Position as PositionTrait};
 use rand::distributions::Distribution;
 use rand::Rng;
 
+use crate::evaluation::parameters;
 use crate::position::Move;
 /// This module contains the core of the MCTS search algorithm
 use crate::position::{GroupData, Position, TunableBoard};
@@ -26,6 +27,42 @@ pub struct TreeEdge {
     pub heuristic_score: Score,
 }
 
+/// Temporary vectors that are continually re-used during search to avoid unnecessary allocations
+#[derive(Clone, PartialEq, Debug)]
+pub struct TempVectors {
+    simple_moves: Vec<Move>,
+    moves: Vec<(Move, f32)>,
+    value_scores: Vec<Score>,
+    policy_scores: Vec<Score>,
+}
+
+impl TempVectors {
+    pub fn new<const S: usize>() -> Self {
+        TempVectors {
+            simple_moves: vec![],
+            moves: vec![],
+            value_scores: vec![
+                0.0;
+                match S {
+                    4 => parameters::NUM_VALUE_PARAMS_4S,
+                    5 => parameters::NUM_VALUE_PARAMS_5S,
+                    6 => parameters::NUM_VALUE_PARAMS_6S,
+                    _ => unimplemented!(),
+                }
+            ],
+            policy_scores: vec![
+                0.0;
+                match S {
+                    4 => parameters::NUM_POLICY_PARAMS_4S,
+                    5 => parameters::NUM_POLICY_PARAMS_5S,
+                    6 => parameters::NUM_POLICY_PARAMS_6S,
+                    _ => unimplemented!(),
+                }
+            ],
+        }
+    }
+}
+
 impl TreeEdge {
     pub fn new(mv: Move, heuristic_score: Score) -> Self {
         TreeEdge {
@@ -44,11 +81,10 @@ impl TreeEdge {
         &mut self,
         position: &mut Position<S>,
         settings: &MctsSetting<S>,
-        simple_moves: &mut Vec<Move>,
-        moves: &mut Vec<(Move, Score)>,
+        temp_vectors: &mut TempVectors,
     ) -> Score {
         if self.visits == 0 {
-            self.expand(position, settings, simple_moves, moves)
+            self.expand(position, settings, temp_vectors)
         } else if self.child.as_ref().unwrap().is_terminal {
             self.visits += 1;
             self.child.as_mut().unwrap().total_action_value += self.mean_action_value as f64;
@@ -66,13 +102,7 @@ impl TreeEdge {
             // Only generate child moves on the 2nd visit
             if self.visits == 1 {
                 let group_data = position.group_data();
-                node.init_children(
-                    &position,
-                    &group_data,
-                    simple_moves,
-                    &settings.policy_params,
-                    moves,
-                );
+                node.init_children(&position, &group_data, settings, temp_vectors);
             }
 
             let visits_sqrt = (self.visits as Score).sqrt();
@@ -102,7 +132,7 @@ impl TreeEdge {
             let child_edge = node.children.get_mut(best_child_node_index).unwrap();
 
             position.do_move(child_edge.mv.clone());
-            let result = 1.0 - child_edge.select::<S>(position, settings, simple_moves, moves);
+            let result = 1.0 - child_edge.select::<S>(position, settings, temp_vectors);
             self.visits += 1;
 
             node.total_action_value += result as f64;
@@ -118,20 +148,13 @@ impl TreeEdge {
         &mut self,
         position: &mut Position<S>,
         settings: &MctsSetting<S>,
-        simple_moves: &mut Vec<Move>,
-        moves: &mut Vec<(Move, Score)>,
+        temp_vectors: &mut TempVectors,
     ) -> Score {
         debug_assert!(self.child.is_none());
         self.child = Some(Box::new(Tree::new_node()));
         let child = self.child.as_mut().unwrap();
 
-        let (eval, is_terminal) = rollout(
-            position,
-            settings,
-            settings.rollout_depth,
-            simple_moves,
-            moves,
-        );
+        let (eval, is_terminal) = rollout(position, settings, settings.rollout_depth, temp_vectors);
 
         self.visits = 1;
         child.total_action_value = eval as f64;
@@ -155,15 +178,20 @@ impl Tree {
         &mut self,
         position: &Position<S>,
         group_data: &GroupData<S>,
-        simple_moves: &mut Vec<Move>,
-        policy_params: &[f32],
-        moves: &mut Vec<(Move, Score)>,
+        settings: &MctsSetting<S>,
+        temp_vectors: &mut TempVectors,
     ) {
-        position.generate_moves_with_params(policy_params, group_data, simple_moves, moves);
-        let mut children_vec = Vec::with_capacity(moves.len());
-        let policy_sum: f32 = moves.iter().map(|(_, score)| *score).sum();
+        position.generate_moves_with_params(
+            &settings.policy_params,
+            group_data,
+            &mut temp_vectors.simple_moves,
+            &mut temp_vectors.moves,
+            &mut temp_vectors.policy_scores,
+        );
+        let mut children_vec = Vec::with_capacity(temp_vectors.moves.len());
+        let policy_sum: f32 = temp_vectors.moves.iter().map(|(_, score)| *score).sum();
         let inv_sum = 1.0 / policy_sum;
-        for (mv, heuristic_score) in moves.drain(..) {
+        for (mv, heuristic_score) in temp_vectors.moves.drain(..) {
             children_vec.push(TreeEdge::new(mv.clone(), heuristic_score * inv_sum));
         }
         self.children = children_vec.into_boxed_slice();
@@ -205,8 +233,7 @@ pub fn rollout<const S: usize>(
     position: &mut Position<S>,
     settings: &MctsSetting<S>,
     depth: u16,
-    simple_moves: &mut Vec<Move>,
-    moves: &mut Vec<(Move, Score)>,
+    temp_vectors: &mut TempVectors,
 ) -> (Score, bool) {
     let group_data = position.group_data();
 
@@ -229,15 +256,20 @@ pub fn rollout<const S: usize>(
             Color::Black => (1.0 - static_eval, false),
         }
     } else {
-        position.generate_moves_with_probabilities(&group_data, simple_moves, moves);
+        position.generate_moves_with_probabilities(
+            &group_data,
+            &mut temp_vectors.simple_moves,
+            &mut temp_vectors.moves,
+            &mut temp_vectors.policy_scores,
+        );
 
         let mut rng = rand::thread_rng();
 
-        let best_move = best_move(&mut rng, settings.rollout_temperature, moves);
+        let best_move = best_move(&mut rng, settings.rollout_temperature, &temp_vectors.moves);
         position.do_move(best_move);
 
-        moves.clear();
-        let (score, _) = rollout(position, settings, depth - 1, simple_moves, moves);
+        temp_vectors.moves.clear();
+        let (score, _) = rollout(position, settings, depth - 1, temp_vectors);
         (1.0 - score, false)
     }
 }

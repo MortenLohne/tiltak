@@ -8,7 +8,7 @@ use crate::position::Move;
 use crate::position::{Position, TunableBoard};
 use crate::position::{Role, Square};
 pub use crate::search::mcts_core::best_move;
-use crate::search::mcts_core::Tree;
+use crate::search::mcts_core::{TempVectors, Tree};
 
 use self::mcts_core::{Pv, TreeEdge};
 
@@ -99,8 +99,7 @@ pub struct MonteCarloTree<const S: usize> {
     edge: TreeEdge, // A virtual edge to the first node, with fake move and heuristic score
     position: Position<S>,
     settings: MctsSetting<S>,
-    simple_moves: Vec<Move>,
-    moves: Vec<(Move, f32)>,
+    temp_vectors: TempVectors,
 }
 
 impl<const S: usize> MonteCarloTree<S> {
@@ -115,8 +114,7 @@ impl<const S: usize> MonteCarloTree<S> {
             },
             position,
             settings: MctsSetting::default(),
-            simple_moves: vec![],
-            moves: vec![],
+            temp_vectors: TempVectors::new::<S>(),
         }
     }
 
@@ -132,8 +130,7 @@ impl<const S: usize> MonteCarloTree<S> {
             },
             position,
             settings: settings.clone(),
-            simple_moves: vec![],
-            moves: vec![],
+            temp_vectors: TempVectors::new::<S>(),
         };
 
         if let Some(alpha) = tree.settings.dirichlet {
@@ -166,8 +163,7 @@ impl<const S: usize> MonteCarloTree<S> {
         self.edge.select::<S>(
             &mut self.position.clone(),
             &self.settings,
-            &mut self.simple_moves,
-            &mut self.moves,
+            &mut self.temp_vectors,
         )
     }
 

@@ -6,9 +6,7 @@ use crate::position::Direction::*;
 use crate::position::Move;
 use crate::position::Role::{Cap, Flat, Wall};
 use crate::position::Square;
-use crate::position::{
-    num_square_symmetries, square_symmetries, GroupData, Position, TunableBoard,
-};
+use crate::position::{num_square_symmetries, square_symmetries, GroupData, Position};
 use crate::search;
 
 pub fn sigmoid(x: f32) -> f32 {
@@ -27,12 +25,19 @@ impl<const S: usize> Position<S> {
         group_data: &GroupData<S>,
         simple_moves: &mut Vec<Move>,
         moves: &mut Vec<(Move, search::Score)>,
+        coefficients: &mut [f32],
     ) {
         let num_moves = simple_moves.len();
         moves.extend(simple_moves.drain(..).map(|mv| {
             (
                 mv.clone(),
-                self.probability_for_move_colortr::<Us, Them>(params, &mv, group_data, num_moves),
+                self.probability_for_move_colortr::<Us, Them>(
+                    params,
+                    &mv,
+                    group_data,
+                    num_moves,
+                    coefficients,
+                ),
             )
         }));
     }
@@ -43,16 +48,14 @@ impl<const S: usize> Position<S> {
         mv: &Move,
         group_data: &GroupData<S>,
         num_moves: usize,
+        coefficients: &mut [f32],
     ) -> f32 {
-        let mut coefficients = vec![0.0; Self::policy_params().len()];
-        coefficients_for_move_colortr::<Us, Them, S>(
-            self,
-            &mut coefficients,
-            mv,
-            group_data,
-            num_moves,
-        );
+        coefficients_for_move_colortr::<Us, Them, S>(self, coefficients, mv, group_data, num_moves);
         let total_value: f32 = coefficients.iter().zip(params).map(|(c, p)| c * p).sum();
+
+        for a in coefficients.iter_mut() {
+            *a = 0.0;
+        }
 
         sigmoid(total_value)
     }

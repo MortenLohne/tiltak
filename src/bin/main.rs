@@ -9,6 +9,7 @@ use pgn_traits::PgnPosition;
 #[cfg(feature = "constant-tuning")]
 use rayon::prelude::*;
 
+use tiltak::evaluation::parameters;
 use tiltak::minmax;
 use tiltak::position::Move;
 #[cfg(feature = "constant-tuning")]
@@ -314,11 +315,21 @@ fn test_position<const S: usize>() {
 
     let mut simple_moves = vec![];
     let mut moves = vec![];
+    let mut coefficients = vec![
+        0.0;
+        match S {
+            4 => parameters::NUM_POLICY_PARAMS_4S,
+            5 => parameters::NUM_POLICY_PARAMS_5S,
+            6 => parameters::NUM_POLICY_PARAMS_6S,
+            _ => unimplemented!(),
+        }
+    ];
 
     position.generate_moves_with_probabilities(
         &position.group_data(),
         &mut simple_moves,
         &mut moves,
+        &mut coefficients,
     );
     moves.sort_by_key(|(_mv, score)| -(score * 1000.0) as i64);
 
