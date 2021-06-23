@@ -116,6 +116,7 @@ pub trait TunableBoard: PositionTrait {
         data: &Self::ExtraData,
         simple_moves: &mut Vec<<Self as PositionTrait>::Move>,
         moves: &mut Vec<(<Self as PositionTrait>::Move, search::Score)>,
+        coefficients: &mut [f32],
     );
 
     fn coefficients_for_move(
@@ -137,6 +138,7 @@ pub trait TunableBoard: PositionTrait {
         group_data: &Self::ExtraData,
         simple_moves: &mut Vec<Move>,
         moves: &mut Vec<(Move, search::Score)>,
+        coefficients: &mut [f32],
     );
 }
 
@@ -1095,6 +1097,7 @@ impl<const S: usize> TunableBoard for Position<S> {
         group_data: &GroupData<S>,
         simple_moves: &mut Vec<Self::Move>,
         moves: &mut Vec<(Self::Move, f32)>,
+        coefficients: &mut [f32],
     ) {
         debug_assert!(simple_moves.is_empty());
         self.generate_moves(simple_moves);
@@ -1104,12 +1107,14 @@ impl<const S: usize> TunableBoard for Position<S> {
                 group_data,
                 simple_moves,
                 moves,
+                coefficients,
             ),
             Color::Black => self.generate_moves_with_probabilities_colortr::<BlackTr, WhiteTr>(
                 params,
                 group_data,
                 simple_moves,
                 moves,
+                coefficients,
             ),
         }
     }
@@ -1149,8 +1154,15 @@ impl<const S: usize> TunableBoard for Position<S> {
         group_data: &GroupData<S>,
         simple_moves: &mut Vec<Move>,
         moves: &mut Vec<(Move, search::Score)>,
+        coefficients: &mut [f32],
     ) {
-        self.generate_moves_with_params(Self::policy_params(), group_data, simple_moves, moves)
+        self.generate_moves_with_params(
+            Self::policy_params(),
+            group_data,
+            simple_moves,
+            moves,
+            coefficients,
+        )
     }
 }
 

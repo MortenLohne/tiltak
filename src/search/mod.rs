@@ -7,7 +7,8 @@ use std::{mem, time};
 use crate::position::Move;
 use crate::position::{Position, TunableBoard};
 use crate::position::{Role, Square};
-use crate::search::mcts_core::Tree;
+pub use crate::search::mcts_core::best_move;
+use crate::search::mcts_core::{TempVectors, Tree};
 
 use self::mcts_core::{Pv, TreeEdge};
 
@@ -22,6 +23,8 @@ pub struct MctsSetting<const S: usize> {
     search_params: Vec<Score>,
     dirichlet: Option<f32>,
     excluded_moves: Vec<Move>,
+    rollout_depth: u16,
+    rollout_temperature: f64,
 }
 
 impl<const S: usize> Default for MctsSetting<S> {
@@ -32,6 +35,8 @@ impl<const S: usize> Default for MctsSetting<S> {
             search_params: vec![1.2, 3500.0],
             dirichlet: None,
             excluded_moves: vec![],
+            rollout_depth: 0,
+            rollout_temperature: 0.25,
         }
     }
 }
@@ -62,6 +67,19 @@ impl<const N: usize> MctsSetting<N> {
         self
     }
 
+    /// The maximum depth of the MCTS rollouts. Defaults to 0, in which case no rollouts are done
+    pub fn add_rollout_depth(mut self, rollout_depth: u16) -> Self {
+        self.rollout_depth = rollout_depth;
+        self
+    }
+
+    /// The degree of randomness when picking moves in MCTS rollouts
+    /// A value of 1.0 is highly random, values around 0.2 give low randomness
+    pub fn add_rollout_temperature(mut self, temperature: f64) -> Self {
+        self.rollout_temperature = temperature;
+        self
+    }
+
     pub fn c_puct_init(&self) -> Score {
         self.search_params[0]
     }
@@ -81,8 +99,7 @@ pub struct MonteCarloTree<const S: usize> {
     edge: TreeEdge, // A virtual edge to the first node, with fake move and heuristic score
     position: Position<S>,
     settings: MctsSetting<S>,
-    simple_moves: Vec<Move>,
-    moves: Vec<(Move, f32)>,
+    temp_vectors: TempVectors,
 }
 
 impl<const S: usize> MonteCarloTree<S> {
@@ -97,8 +114,7 @@ impl<const S: usize> MonteCarloTree<S> {
             },
             position,
             settings: MctsSetting::default(),
-            simple_moves: vec![],
-            moves: vec![],
+            temp_vectors: TempVectors::new::<S>(),
         }
     }
 
@@ -114,8 +130,7 @@ impl<const S: usize> MonteCarloTree<S> {
             },
             position,
             settings: settings.clone(),
-            simple_moves: vec![],
-            moves: vec![],
+            temp_vectors: TempVectors::new::<S>(),
         };
 
         if let Some(alpha) = tree.settings.dirichlet {
@@ -148,8 +163,7 @@ impl<const S: usize> MonteCarloTree<S> {
         self.edge.select::<S>(
             &mut self.position.clone(),
             &self.settings,
-            &mut self.simple_moves,
-            &mut self.moves,
+            &mut self.temp_vectors,
         )
     }
 
