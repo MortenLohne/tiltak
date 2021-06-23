@@ -77,7 +77,7 @@ impl<B: PgnPosition + Clone> Game<B> {
                 buffer.push_str(&comment);
                 buffer.push('}');
             }
-            if position.side_to_move() == Color::Black {
+            if position.side_to_move() == Color::Black || i == self.moves.len() - 1 {
                 if column_position == 0 {
                     write!(f, "{}", buffer)?;
                     column_position = buffer.len();
