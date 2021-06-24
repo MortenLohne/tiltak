@@ -20,7 +20,7 @@ pub fn best_move_aws(aws_function_name: &str, payload: &Event) -> io::Result<Out
         qualifier: None,
     };
 
-    let mut rt = tokio::runtime::Runtime::new().unwrap();
+    let rt = tokio::runtime::Runtime::new().unwrap();
     let result = rt.block_on(async { client.invoke(request).await });
     match result {
         Ok(response) => {

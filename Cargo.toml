@@ -32,10 +32,10 @@ rand = "0.8"
 rayon = { version = "1.5", optional = true }
 serde = { version = "1.0", optional = true, features = ["derive"] }
 serde_json = { version = "1", optional = true }
-rusoto_core = { version = "0.45", optional = true }
-rusoto_lambda = { version = "0.45", optional = true }
-bytes = { version = "0.5", optional = true }
-tokio = { version = "0.2.24", optional = true }
+rusoto_core = { version = "0.46", optional = true }
+rusoto_lambda = { version = "0.46", optional = true }
+bytes = { version = "1", optional = true }
+tokio = { version = "1.7", optional = true }
 lambda_runtime = { version = "0.2.1", optional = true }
 rand_distr = "0.4"
 log = "0.4"
