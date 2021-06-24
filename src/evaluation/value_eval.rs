@@ -42,7 +42,7 @@ pub(crate) fn static_eval_game_phase<const S: usize>(
             if stack.height > 1 {
                 let controlling_player = piece.color();
                 let color_factor = piece.color().multiplier() as f32;
-                for piece in stack.clone().into_iter().take(stack.height as usize - 1) {
+                for piece in stack.into_iter().take(stack.height as usize - 1) {
                     if piece.color() == controlling_player {
                         coefficients[our_stack_psqt + square_symmetries::<S>()[i]] += color_factor;
                     } else {
@@ -244,7 +244,7 @@ fn critical_squares_eval<Us: ColorTr, Them: ColorTr, const S: usize>(
         if position[neighbour].top_stone() == Some(Us::cap_piece()) {
             coefficients[critical_squares + 4] += Us::color().multiplier() as f32;
             // Further bonus for a capped stack next to our critical square
-            for piece in position[neighbour].clone().into_iter() {
+            for piece in position[neighbour].into_iter() {
                 if piece == Us::flat_piece() {
                     coefficients[critical_squares + 5] += Us::color().multiplier() as f32;
                 }

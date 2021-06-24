@@ -429,14 +429,13 @@ fn play_human(mut position: Position<5>) {
                 }
                 let c_move = position.move_from_san(input_str.trim()).unwrap();
                 position.do_move(c_move);
-                play_human(position);
             } else {
                 let (best_move, score) = search::mcts::<5>(position.clone(), 1_000_000);
 
                 println!("Computer played {:?} with score {}", best_move, score);
                 position.do_move(best_move);
-                play_human(position);
             }
+            play_human(position);
         }
 
         Some(GameResult::WhiteWin) => println!("White won! Board:\n{:?}", position),

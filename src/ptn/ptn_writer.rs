@@ -40,10 +40,7 @@ impl<B: PgnPosition + Clone> Game<B> {
         }
 
         if self.start_position != B::start_position()
-            && tags
-                .iter()
-                .find(|(tag, _)| tag.eq_ignore_ascii_case("FEN"))
-                .is_none()
+            && !tags.iter().any(|(tag, _)| tag.eq_ignore_ascii_case("FEN"))
         {
             writeln!(f, "[FEN \"{}\"", self.start_position.to_fen())?;
         }
