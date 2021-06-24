@@ -129,7 +129,7 @@ impl Square {
         }
     }
 
-    pub fn to_string<const S: usize>(&self) -> String {
+    pub fn to_string<const S: usize>(self) -> String {
         let mut string = String::new();
         write!(string, "{}", (self.file::<S>() + b'a') as char).unwrap();
         write!(string, "{}", S as u8 - self.rank::<S>()).unwrap();
