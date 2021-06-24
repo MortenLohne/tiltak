@@ -133,8 +133,8 @@ pub(crate) fn coefficients_for_move_colortr<Us: ColorTr, Them: ColorTr, const S:
             }
 
             // If square is next to a group
-            let mut our_unique_neighbour_groups: ArrayVec<[(Square, u8); 4]> = ArrayVec::new();
-            let mut their_unique_neighbour_groups: ArrayVec<[(Square, u8); 4]> = ArrayVec::new();
+            let mut our_unique_neighbour_groups: ArrayVec<(Square, u8), 4> = ArrayVec::new();
+            let mut their_unique_neighbour_groups: ArrayVec<(Square, u8), 4> = ArrayVec::new();
             for neighbour in square
                 .neighbours::<S>()
                 .filter(|sq| !position[*sq].is_empty())

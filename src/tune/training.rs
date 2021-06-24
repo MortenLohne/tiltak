@@ -30,9 +30,9 @@ pub fn train_from_scratch<const S: usize, const N: usize, const M: usize>(
 ) -> Result<(), Box<dyn error::Error>> {
     let mut rng = rand::rngs::StdRng::from_seed([0; 32]);
 
-    let initial_value_params: [f32; N] = array_from_fn(|| rng.gen_range(-0.01, 0.01));
+    let initial_value_params: [f32; N] = array_from_fn(|| rng.gen_range(-0.01..0.01));
 
-    let mut initial_policy_params: [f32; M] = array_from_fn(|| rng.gen_range(-0.01, 0.01));
+    let mut initial_policy_params: [f32; M] = array_from_fn(|| rng.gen_range(-0.01..0.01));
 
     // The move number parameter should always be around 1.0, so start it here
     // If we don't, variation of this parameter completely dominates the other parameters
@@ -296,7 +296,7 @@ pub fn tune_value_from_file<const S: usize, const N: usize>(
     let mut initial_params = [0.00; N];
 
     for param in initial_params.iter_mut() {
-        *param = rng.gen_range(-0.01, 0.01)
+        *param = rng.gen_range(-0.01..0.01)
     }
     let tuned_parameters = gradient_descent::gradient_descent(
         &coefficient_sets[0..middle_index],
@@ -418,9 +418,9 @@ pub fn tune_value_and_policy_from_file<const S: usize, const N: usize, const M: 
 
     let mut rng = rand::rngs::StdRng::from_seed([0; 32]);
 
-    let initial_value_params: [f32; N] = array_from_fn(|| rng.gen_range(-0.01, 0.01));
+    let initial_value_params: [f32; N] = array_from_fn(|| rng.gen_range(-0.01..0.01));
 
-    let mut initial_policy_params: [f32; M] = array_from_fn(|| rng.gen_range(-0.01, 0.01));
+    let mut initial_policy_params: [f32; M] = array_from_fn(|| rng.gen_range(-0.01..0.01));
 
     // The move number parameter should always be around 1.0, so start it here
     // If we don't, variation of this parameter completely dominates the other parameters

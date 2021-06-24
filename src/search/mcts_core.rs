@@ -344,7 +344,7 @@ pub fn best_move<R: Rng>(rng: &mut R, temperature: f64, move_scores: &[(Move, Sc
         move_probabilities.push((mv, cumulative_prob));
     }
 
-    let p = rng.gen_range(0.0, cumulative_prob);
+    let p = rng.gen_range(0.0..cumulative_prob);
     for (mv, cumulative_prob) in move_probabilities {
         if cumulative_prob > p {
             return mv.clone();
