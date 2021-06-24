@@ -100,13 +100,16 @@ fn parse_position_string<const S: usize>(line: &str) -> Position<S> {
 fn parse_go_string<const S: usize>(line: &str, position: &Position<S>) {
     let mut words = line.split_whitespace();
     words.next(); // go
+
+    let mcts_settings = MctsSetting::default();
+
     match words.next() {
         Some("movetime") => {
             let msecs = words.next().unwrap();
             let movetime = Duration::from_millis(u64::from_str(msecs).unwrap());
             let start_time = Instant::now();
 
-            let mut tree = search::MonteCarloTree::new(position.clone());
+            let mut tree = search::MonteCarloTree::with_settings(position.clone(), mcts_settings);
             let mut total_nodes = 0;
             for i in 0.. {
                 let nodes_to_search = (200.0 * f64::powf(1.26, i as f64)) as u64;
@@ -162,7 +165,7 @@ fn parse_go_string<const S: usize>(line: &str, position: &Position<S>) {
 
             let start_time = Instant::now();
             let (best_move, score) =
-                search::play_move_time::<S>(position.clone(), max_time, MctsSetting::default());
+                search::play_move_time::<S>(position.clone(), max_time, mcts_settings);
 
             println!(
                 "info score cp {} time {} pv {}",
