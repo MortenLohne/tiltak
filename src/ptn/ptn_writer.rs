@@ -96,6 +96,8 @@ impl<B: PgnPosition + Clone> Game<B> {
             position.do_move(mv.clone());
         }
 
+        assert!(buffer.is_empty(), "\"{}\" was not written to the ptn", buffer);
+
         write!(
             f,
             " {}",
