@@ -25,7 +25,11 @@ pub fn handle_aws_event_generic<const S: usize>(
         position.do_move(mv);
     }
 
-    let max_time = Duration::min(e.time_left / 40 + e.increment / 2, Duration::from_secs(30));
+    let max_time = if position.half_moves_played() < 4 {
+        Duration::min(e.time_left / 80 + e.increment / 4, Duration::from_secs(40))
+    } else {
+        Duration::min(e.time_left / 40 + e.increment / 2, Duration::from_secs(40))
+    };
 
     let settings = MctsSetting::default().add_dirichlet(0.1);
 
