@@ -77,6 +77,16 @@ impl<B: PgnPosition + Clone> Game<B> {
                 buffer.push_str(&comment);
                 buffer.push('}');
             }
+
+            if i == self.moves.len() - 1 {
+                match self.game_result {
+                    None => buffer.push_str(" *"),
+                    Some(GameResult::WhiteWin) => buffer.push_str(" 1-0"),
+                    Some(GameResult::BlackWin) => buffer.push_str(" 0-1"),
+                    Some(GameResult::Draw) => buffer.push_str(" 1/2-1/2"),
+                }
+            }
+
             if position.side_to_move() == Color::Black || i == self.moves.len() - 1 {
                 if column_position == 0 {
                     write!(f, "{}", buffer)?;
@@ -96,18 +106,12 @@ impl<B: PgnPosition + Clone> Game<B> {
             position.do_move(mv.clone());
         }
 
-        assert!(buffer.is_empty(), "\"{}\" was not written to the ptn", buffer);
+        assert!(
+            buffer.is_empty(),
+            "\"{}\" was not written to the ptn",
+            buffer
+        );
 
-        write!(
-            f,
-            " {}",
-            match self.game_result {
-                None => "*",
-                Some(GameResult::WhiteWin) => "1-0",
-                Some(GameResult::BlackWin) => "0-1",
-                Some(GameResult::Draw) => "1/2-1/2",
-            }
-        )?;
         writeln!(f)?;
         writeln!(f)?;
         Ok(())
