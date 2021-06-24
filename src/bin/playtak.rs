@@ -12,10 +12,11 @@ use clap::{App, Arg};
 use log::error;
 use log::{debug, info, warn};
 
+use rand::seq::SliceRandom;
 #[cfg(feature = "aws-lambda-client")]
 use tiltak::aws;
-use tiltak::position::Move;
 use tiltak::position::Position;
+use tiltak::position::{squares_iterator, Move, Role, Square};
 use tiltak::ptn::{Game, PtnMove};
 #[cfg(not(feature = "aws-lambda-client"))]
 use tiltak::search;
@@ -379,29 +380,42 @@ impl PlaytakSession {
                 break;
             }
             if position.side_to_move() == game.our_color {
-                #[cfg(feature = "aws-lambda-client")]
-                let (best_move, score) = {
-                    let aws_function_name = self.aws_function_name.as_ref().unwrap();
-                    let event = aws::Event {
-                        size: S,
-                        moves: moves
-                            .iter()
-                            .map(|PtnMove { mv, .. }: &PtnMove<Move>| mv.clone())
-                            .collect(),
-                        time_left: our_time_left,
-                        increment: game.increment,
-                    };
-                    let aws::Output { best_move, score } =
-                        aws::client::best_move_aws(aws_function_name, &event)?;
-                    (best_move, score)
-                };
+                let (best_move, score) =
+                    // On the very first move, always place instantly in a random corner
+                    if squares_iterator::<S>().all(|square| position[square].is_empty()) {
+                        let mut rng = rand::thread_rng();
+                        let moves = vec![
+                            Move::Place(Role::Flat, Square(0)),
+                            Move::Place(Role::Flat, Square(S as u8 - 1)),
+                            Move::Place(Role::Flat, Square((S * (S - 1)) as u8)),
+                            Move::Place(Role::Flat, Square((S * S - 1) as u8)),
+                        ];
+                        (moves.choose(&mut rng).unwrap().clone(), 0.0)
+                    } else {
+                        #[cfg(feature = "aws-lambda-client")]
+                        {
+                            let aws_function_name = self.aws_function_name.as_ref().unwrap();
+                            let event = aws::Event {
+                                size: S,
+                                moves: moves
+                                    .iter()
+                                    .map(|PtnMove { mv, .. }: &PtnMove<Move>| mv.clone())
+                                    .collect(),
+                                time_left: our_time_left,
+                                increment: game.increment,
+                            };
+                            let aws::Output { best_move, score } =
+                                aws::client::best_move_aws(aws_function_name, &event)?;
+                            (best_move, score)
+                        }
 
-                #[cfg(not(feature = "aws-lambda-client"))]
-                let (best_move, score) = {
-                    let maximum_time = our_time_left / 20 + game.increment;
-                    let settings = MctsSetting::default().add_dirichlet(0.1);
-                    search::play_move_time(position.clone(), maximum_time, settings)
-                };
+                        #[cfg(not(feature = "aws-lambda-client"))]
+                        {
+                            let maximum_time = our_time_left / 20 + game.increment;
+                            let settings = MctsSetting::default().add_dirichlet(0.1);
+                            search::play_move_time(position.clone(), maximum_time, settings)
+                        }
+                    };
 
                 position.do_move(best_move.clone());
                 moves.push(PtnMove {
