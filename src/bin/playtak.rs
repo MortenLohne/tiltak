@@ -67,7 +67,25 @@ pub fn main() -> Result<()> {
                 .value_name("botname")
                 .help("Instead of seeking any game, accept any seek from the specified bot")
                 .takes_value(true),
-        );
+        )
+        .arg(Arg::with_name("policyNoise")
+            .long("policy-noise")
+            .help("Add dirichlet noise to the policy scores of the root node in search. This gives the bot a small amount of randomness in its play, especially on low nodecounts.")
+            .takes_value(true)
+            .possible_values(&["none", "low", "medium", "high"])
+            .default_value("none"))
+        .arg(Arg::with_name("rolloutDepth")
+            .long("rollout-depth")
+            .help("Depth of MCTS rollouts. Once a rollout reaches the maximum depth, the heuristic eval function is returned. Can be set to 0 to disable rollouts entirely.")
+            .takes_value(true)
+            .default_value("0"))
+        .arg(Arg::with_name("rolloutNoise")
+            .long("rollout-noise")
+            .help("Add a random component to move selection in MCTS rollouts. Has no effect if --rollout-depth is 0. For full rollouts, even the 'low' setting is enough to give highly variable play.")
+            .takes_value(true)
+            .possible_values(&["low", "medium", "high"])
+            .default_value("low"));
+
     if cfg!(feature = "aws-lambda-client") {
         app = app.arg(
             Arg::with_name("aws-function-name")
@@ -115,6 +133,21 @@ pub fn main() -> Result<()> {
     }
 
     let size: usize = matches.value_of("size").unwrap().parse().unwrap();
+    let dirichlet_noise: Option<f32> = match matches.value_of("policyNoise").unwrap() {
+        "none" => None,
+        "low" => Some(0.5),
+        "medium" => Some(0.25),
+        "high" => Some(0.1),
+        s => panic!("policyNoise cannot be {}", s),
+    };
+
+    let rollout_depth: u16 = matches.value_of("rolloutDepth").unwrap().parse().unwrap();
+    let rollout_temperature: f64 = match matches.value_of("rolloutNoise").unwrap() {
+        "low" => 0.2,
+        "medium" => 0.3,
+        "high" => 0.5,
+        s => panic!("rolloutTemperature cannot be {}", s),
+    };
 
     loop {
         #[cfg(feature = "aws-lambda-client")]
@@ -150,9 +183,24 @@ pub fn main() -> Result<()> {
         };
 
         let result = match size {
-            4 => session.seek_game::<4>(seekmode),
-            5 => session.seek_game::<5>(seekmode),
-            6 => session.seek_game::<6>(seekmode),
+            4 => session.seek_game::<4>(
+                seekmode,
+                dirichlet_noise,
+                rollout_depth,
+                rollout_temperature,
+            ),
+            5 => session.seek_game::<5>(
+                seekmode,
+                dirichlet_noise,
+                rollout_depth,
+                rollout_temperature,
+            ),
+            6 => session.seek_game::<6>(
+                seekmode,
+                dirichlet_noise,
+                rollout_depth,
+                rollout_temperature,
+            ),
             s => panic!("Unsupported size {}", s),
         };
 
@@ -295,6 +343,9 @@ impl PlaytakSession {
     pub fn seek_game<const S: usize>(
         &mut self,
         seek_mode: SeekMode,
+        dirichlet_noise: Option<f32>,
+        rollout_depth: u16,
+        rollout_temperature: f64,
     ) -> io::Result<std::convert::Infallible> {
         let mut time_for_game = Duration::from_secs(900);
         let mut increment = Duration::from_secs(30);
@@ -329,7 +380,13 @@ impl PlaytakSession {
                         time_left: time_for_game,
                         increment,
                     };
-                    self.play_game::<S>(seek_mode, playtak_game)?;
+                    self.play_game::<S>(
+                        seek_mode,
+                        playtak_game,
+                        dirichlet_noise,
+                        rollout_depth,
+                        rollout_temperature,
+                    )?;
                     unreachable!()
                 }
 
@@ -362,6 +419,9 @@ impl PlaytakSession {
         &mut self,
         seek_mode: SeekMode,
         game: PlaytakGame,
+        dirichlet_noise: Option<f32>,
+        rollout_depth: u16,
+        rollout_temperature: f64,
     ) -> io::Result<Infallible> {
         info!(
             "Starting game #{}, {} vs {} as {}, {}+{:.1}",
@@ -403,6 +463,9 @@ impl PlaytakSession {
                                     .collect(),
                                 time_left: our_time_left,
                                 increment: game.increment,
+                                dirichlet_noise,
+                                rollout_depth,
+                                rollout_temperature,
                             };
                             let aws::Output { best_move, score } =
                                 aws::client::best_move_aws(aws_function_name, &event)?;
@@ -412,7 +475,17 @@ impl PlaytakSession {
                         #[cfg(not(feature = "aws-lambda-client"))]
                         {
                             let maximum_time = our_time_left / 20 + game.increment;
-                            let settings = MctsSetting::default().add_dirichlet(0.1);
+                            let settings = if let Some(dirichlet) = dirichlet_noise {
+                                MctsSetting::default()
+                                    .add_dirichlet(dirichlet)
+                                    .add_rollout_depth(rollout_depth)
+                                    .add_rollout_temperature(rollout_temperature)
+                            }
+                            else {
+                                MctsSetting::default()
+                                    .add_rollout_depth(rollout_depth)
+                                    .add_rollout_temperature(rollout_temperature)
+                            };
                             search::play_move_time(position.clone(), maximum_time, settings)
                         }
                     };
@@ -531,7 +604,12 @@ impl PlaytakSession {
 
         info!("Move list: {}", move_list.join(" "));
 
-        self.seek_game::<S>(seek_mode)
+        self.seek_game::<S>(
+            seek_mode,
+            dirichlet_noise,
+            rollout_depth,
+            rollout_temperature,
+        )
     }
 }
 
