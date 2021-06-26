@@ -381,7 +381,6 @@ impl PlaytakSession {
                         increment,
                     };
                     self.play_game::<S>(
-                        seek_mode,
                         playtak_game,
                         dirichlet_noise,
                         rollout_depth,
@@ -417,7 +416,6 @@ impl PlaytakSession {
     /// Mutually recursive with `seek_game`, which places a new seek as soon as the game finishes.
     fn play_game<const S: usize>(
         &mut self,
-        seek_mode: SeekMode,
         game: PlaytakGame,
         dirichlet_noise: Option<f32>,
         rollout_depth: u16,
@@ -605,7 +603,7 @@ impl PlaytakSession {
         info!("Move list: {}", move_list.join(" "));
 
         self.seek_game::<S>(
-            seek_mode,
+            SeekMode::OpenSeek,
             dirichlet_noise,
             rollout_depth,
             rollout_temperature,
