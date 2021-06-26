@@ -35,10 +35,13 @@ Four experimental commands entered through stdin:
 
 Connect to the playtak.com server, and seek games as a bot. If no username/password is provided, the bot will login as guest. 
 
-Example usage: 
+At the time of writing, two bots based on this project are running on Playtak. They are configured as follows:
 ````
-playtak -u <username> -p <password>
+playtak -s 6 --policy-noise high -u Tiltak_Bot -p <password> -l tiltak.log
+playtak -s 6 --rollout-depth 200 --rollout-noise low -u SlateBot -p <password> -l slate.log
 ````
+
+The time control is hard-coded.
 
 ## tei 
 
