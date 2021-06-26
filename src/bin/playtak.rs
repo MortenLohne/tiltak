@@ -23,6 +23,13 @@ use tiltak::search;
 #[cfg(not(feature = "aws-lambda-client"))]
 use tiltak::search::MctsSetting;
 
+#[derive(Debug, PartialEq, Clone, Copy)]
+pub struct PlaytakSettings {
+    dirichlet_noise: Option<f32>,
+    rollout_depth: u16,
+    rollout_temperature: f64,
+}
+
 pub fn main() -> Result<()> {
     let mut app = App::new("Tiltak playtak client")
         .version("0.1")
@@ -149,6 +156,12 @@ pub fn main() -> Result<()> {
         s => panic!("rolloutTemperature cannot be {}", s),
     };
 
+    let playtak_settings = PlaytakSettings {
+        dirichlet_noise,
+        rollout_depth,
+        rollout_temperature,
+    };
+
     loop {
         #[cfg(feature = "aws-lambda-client")]
         let connection_result =
@@ -183,24 +196,9 @@ pub fn main() -> Result<()> {
         };
 
         let result = match size {
-            4 => session.seek_game::<4>(
-                seekmode,
-                dirichlet_noise,
-                rollout_depth,
-                rollout_temperature,
-            ),
-            5 => session.seek_game::<5>(
-                seekmode,
-                dirichlet_noise,
-                rollout_depth,
-                rollout_temperature,
-            ),
-            6 => session.seek_game::<6>(
-                seekmode,
-                dirichlet_noise,
-                rollout_depth,
-                rollout_temperature,
-            ),
+            4 => session.seek_game::<4>(seekmode, playtak_settings),
+            5 => session.seek_game::<5>(seekmode, playtak_settings),
+            6 => session.seek_game::<6>(seekmode, playtak_settings),
             s => panic!("Unsupported size {}", s),
         };
 
@@ -343,9 +341,7 @@ impl PlaytakSession {
     pub fn seek_game<const S: usize>(
         &mut self,
         seek_mode: SeekMode,
-        dirichlet_noise: Option<f32>,
-        rollout_depth: u16,
-        rollout_temperature: f64,
+        playtak_settings: PlaytakSettings,
     ) -> io::Result<std::convert::Infallible> {
         let mut time_for_game = Duration::from_secs(900);
         let mut increment = Duration::from_secs(30);
@@ -380,12 +376,7 @@ impl PlaytakSession {
                         time_left: time_for_game,
                         increment,
                     };
-                    self.play_game::<S>(
-                        playtak_game,
-                        dirichlet_noise,
-                        rollout_depth,
-                        rollout_temperature,
-                    )?;
+                    self.play_game::<S>(playtak_game, playtak_settings)?;
                     unreachable!()
                 }
 
@@ -417,9 +408,7 @@ impl PlaytakSession {
     fn play_game<const S: usize>(
         &mut self,
         game: PlaytakGame,
-        dirichlet_noise: Option<f32>,
-        rollout_depth: u16,
-        rollout_temperature: f64,
+        playtak_settings: PlaytakSettings,
     ) -> io::Result<Infallible> {
         info!(
             "Starting game #{}, {} vs {} as {}, {}+{:.1}",
@@ -461,9 +450,9 @@ impl PlaytakSession {
                                     .collect(),
                                 time_left: our_time_left,
                                 increment: game.increment,
-                                dirichlet_noise,
-                                rollout_depth,
-                                rollout_temperature,
+                                dirichlet_noise: playtak_settings.dirichlet_noise,
+                                rollout_depth: playtak_settings.rollout_depth,
+                                rollout_temperature: playtak_settings.rollout_temperature,
                             };
                             let aws::Output { best_move, score } =
                                 aws::client::best_move_aws(aws_function_name, &event)?;
@@ -473,16 +462,16 @@ impl PlaytakSession {
                         #[cfg(not(feature = "aws-lambda-client"))]
                         {
                             let maximum_time = our_time_left / 20 + game.increment;
-                            let settings = if let Some(dirichlet) = dirichlet_noise {
+                            let settings = if let Some(dirichlet) = playtak_settings.dirichlet_noise {
                                 MctsSetting::default()
                                     .add_dirichlet(dirichlet)
-                                    .add_rollout_depth(rollout_depth)
-                                    .add_rollout_temperature(rollout_temperature)
+                                    .add_rollout_depth(playtak_settings.rollout_depth)
+                                    .add_rollout_temperature(playtak_settings.rollout_temperature)
                             }
                             else {
                                 MctsSetting::default()
-                                    .add_rollout_depth(rollout_depth)
-                                    .add_rollout_temperature(rollout_temperature)
+                                    .add_rollout_depth(playtak_settings.rollout_depth)
+                                    .add_rollout_temperature(playtak_settings.rollout_temperature)
                             };
                             search::play_move_time(position.clone(), maximum_time, settings)
                         }
@@ -602,12 +591,7 @@ impl PlaytakSession {
 
         info!("Move list: {}", move_list.join(" "));
 
-        self.seek_game::<S>(
-            SeekMode::OpenSeek,
-            dirichlet_noise,
-            rollout_depth,
-            rollout_temperature,
-        )
+        self.seek_game::<S>(SeekMode::OpenSeek, playtak_settings)
     }
 }
 
