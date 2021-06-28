@@ -239,11 +239,18 @@ pub fn play_move_time<const S: usize>(
     max_time: time::Duration,
     settings: MctsSetting<S>,
 ) -> (Move, Score) {
+    let nodes_per_iteration = if settings.rollout_depth == 0 {
+        200
+    } else if settings.rollout_depth < 10 {
+        40
+    } else {
+        20
+    };
     let mut tree = MonteCarloTree::with_settings(board, settings);
     let start_time = time::Instant::now();
 
     for i in 1.. {
-        for _ in 0..i * 100 {
+        for _ in 0..i * nodes_per_iteration {
             tree.select();
         }
 
