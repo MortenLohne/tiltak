@@ -43,6 +43,8 @@ fn play_random_games_prop<const S: usize>() {
             );
             assert_eq!(position, position.flip_colors().flip_colors());
 
+            assert_eq!(Position::from_fen(&position.to_fen()).unwrap(), position);
+
             let group_data = position.group_data();
 
             assert!((group_data.white_road_pieces() & group_data.black_road_pieces()).is_empty());
