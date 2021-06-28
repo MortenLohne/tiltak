@@ -515,7 +515,8 @@ impl<const S: usize> Position<S> {
         let stack = &self[square];
         if let Some(top_stone) = stack.top_stone {
             hash ^= zobrist_top_stones::<S>(square, top_stone);
-            for i in 0..(stack.len() as usize - 1) / 8 {
+            // Only enter this loop if stack.len() is 2 or more
+            for i in 0..(stack.len() as usize + 6) / 8 {
                 hash ^= zobrist_stones_in_stack::<S>(
                     square,
                     i as usize,
