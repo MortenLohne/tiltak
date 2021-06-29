@@ -64,11 +64,11 @@ impl TempVectors {
 }
 
 impl TreeEdge {
-    pub fn new(mv: Move, heuristic_score: Score) -> Self {
+    pub fn new(mv: Move, heuristic_score: Score, mean_action_value: Score) -> Self {
         TreeEdge {
             child: None,
             mv,
-            mean_action_value: 0.1,
+            mean_action_value,
             visits: 0,
             heuristic_score,
         }
@@ -192,7 +192,11 @@ impl Tree {
         let policy_sum: f32 = temp_vectors.moves.iter().map(|(_, score)| *score).sum();
         let inv_sum = 1.0 / policy_sum;
         for (mv, heuristic_score) in temp_vectors.moves.drain(..) {
-            children_vec.push(TreeEdge::new(mv.clone(), heuristic_score * inv_sum));
+            children_vec.push(TreeEdge::new(
+                mv.clone(),
+                heuristic_score * inv_sum,
+                settings.initial_mean_action_value(),
+            ));
         }
         self.children = children_vec.into_boxed_slice();
     }

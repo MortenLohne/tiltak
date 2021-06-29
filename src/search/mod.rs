@@ -32,7 +32,7 @@ impl<const S: usize> Default for MctsSetting<S> {
         MctsSetting {
             value_params: Vec::from(<Position<S>>::value_params()),
             policy_params: Vec::from(<Position<S>>::policy_params()),
-            search_params: vec![1.2, 3500.0],
+            search_params: vec![1.2, 3500.0, 0.1],
             dirichlet: None,
             excluded_moves: vec![],
             rollout_depth: 0,
@@ -86,6 +86,10 @@ impl<const N: usize> MctsSetting<N> {
 
     pub fn c_puct_base(&self) -> Score {
         self.search_params[1]
+    }
+
+    pub fn initial_mean_action_value(&self) -> Score {
+        self.search_params[2]
     }
 }
 
