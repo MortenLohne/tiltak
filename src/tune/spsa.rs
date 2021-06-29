@@ -54,7 +54,7 @@ pub fn tune<const S: usize>(variables: &mut [Variable], book_path: Option<&str>)
             }
         }
 
-        if i % 100 == 0 {
+        if i % 29 == 0 {
             println!(
                 "{}: Variables: {:?}",
                 i,
