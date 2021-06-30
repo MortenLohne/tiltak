@@ -187,17 +187,17 @@ fn main() {
         ("spsa", Some(arg)) => {
             let mut variables = vec![
                 spsa::Variable {
-                    value: 1.1,
+                    value: 1.37,
                     delta: 0.20,
                     apply_factor: 0.002,
                 },
                 spsa::Variable {
-                    value: 3200.0,
+                    value: 2800.0,
                     delta: 1000.0,
                     apply_factor: 0.002,
                 },
                 spsa::Variable {
-                    value: 0.4,
+                    value: 0.6,
                     delta: 0.05,
                     apply_factor: 0.002,
                 },
