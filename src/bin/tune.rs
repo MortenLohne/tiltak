@@ -189,17 +189,17 @@ fn main() {
                 spsa::Variable {
                     value: 1.37,
                     delta: 0.20,
-                    apply_factor: 0.002,
+                    apply_factor: 0.005,
                 },
                 spsa::Variable {
                     value: 2800.0,
                     delta: 1000.0,
-                    apply_factor: 0.002,
+                    apply_factor: 0.005,
                 },
                 spsa::Variable {
                     value: 0.6,
                     delta: 0.05,
-                    apply_factor: 0.002,
+                    apply_factor: 0.005,
                 },
             ];
             match size {
