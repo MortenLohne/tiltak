@@ -192,12 +192,12 @@ fn main() {
                     apply_factor: 0.002,
                 },
                 spsa::Variable {
-                    value: 3400.0,
-                    delta: 1500.0,
+                    value: 3200.0,
+                    delta: 1000.0,
                     apply_factor: 0.002,
                 },
                 spsa::Variable {
-                    value: 0.25,
+                    value: 0.4,
                     delta: 0.05,
                     apply_factor: 0.002,
                 },
