@@ -44,10 +44,10 @@ pub fn tune<const S: usize>(variables: &mut [Variable], book_path: Option<&str>)
             for (variable, result) in (*mut_variables).iter_mut().zip(&result) {
                 match result {
                     SpsaDirection::Increase => {
-                        variable.value += variable.value * variable.apply_factor
+                        variable.value += variable.delta * variable.apply_factor
                     }
                     SpsaDirection::Decrease => {
-                        variable.value -= variable.value * variable.apply_factor
+                        variable.value -= variable.delta * variable.apply_factor
                     }
                     SpsaDirection::NoChange => (),
                 }
