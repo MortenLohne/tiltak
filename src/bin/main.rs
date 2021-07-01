@@ -369,26 +369,48 @@ fn analyze_game<const S: usize>(game: Game<Position<S>>) {
     let mut ply_number = 2;
     for PtnMove { mv, .. } in game.moves {
         position.do_move(mv.clone());
-        if position.game_result().is_some() {
-            break;
-        }
-        let (best_move, score) = search::mcts::<S>(position.clone(), 1_000_000);
-        if ply_number % 2 == 0 {
-            print!(
-                "{}. {} {{{:.2}%, best reply {}}} ",
-                ply_number / 2,
-                position.move_to_san(&mv),
-                (1.0 - score) * 100.0,
-                best_move.to_string::<S>()
-            );
+        if let Some(game_result) = position.game_result() {
+            let result_string = match game_result {
+                GameResult::WhiteWin => "1-0",
+                GameResult::BlackWin => "0-1",
+                GameResult::Draw => "1/2-1/2",
+            };
+            if ply_number % 2 == 0 {
+                print!(
+                    "{}. {} {}",
+                    ply_number / 2,
+                    mv.to_string::<S>(),
+                    result_string
+                );
+                io::stdout().flush().unwrap();
+            } else {
+                println!(
+                    "{}... {} {}",
+                    ply_number / 2,
+                    mv.to_string::<S>(),
+                    result_string
+                );
+            }
         } else {
-            println!(
-                "{}... {} {{{:.2}%, best reply {}}}",
-                ply_number / 2,
-                position.move_to_san(&mv),
-                (1.0 - score) * 100.0,
-                best_move.to_string::<S>()
-            );
+            let (best_move, score) = search::mcts::<S>(position.clone(), 1_000_000);
+            if ply_number % 2 == 0 {
+                print!(
+                    "{}. {} {{{:.2}%, best reply {}}} ",
+                    ply_number / 2,
+                    position.move_to_san(&mv),
+                    (1.0 - score) * 100.0,
+                    best_move.to_string::<S>()
+                );
+                io::stdout().flush().unwrap();
+            } else {
+                println!(
+                    "{}... {} {{{:.2}%, best reply {}}}",
+                    ply_number / 2,
+                    position.move_to_san(&mv),
+                    (1.0 - score) * 100.0,
+                    best_move.to_string::<S>()
+                );
+            }
         }
         ply_number += 1;
     }
