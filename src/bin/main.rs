@@ -49,12 +49,12 @@ fn main() {
                 }
             }
             "analyze" => match words.get(1) {
-                Some(&"4") => test_position::<4>(),
-                Some(&"5") => test_position::<5>(),
-                Some(&"6") => test_position::<6>(),
-                Some(&"7") => test_position::<7>(),
-                Some(&"8") => test_position::<8>(),
-                _ => test_position::<5>(),
+                Some(&"4") => analyze_position::<4>(),
+                Some(&"5") => analyze_position::<5>(),
+                Some(&"6") => analyze_position::<6>(),
+                Some(&"7") => analyze_position::<7>(),
+                Some(&"8") => analyze_position::<8>(),
+                _ => analyze_position::<5>(),
             },
             #[cfg(feature = "constant-tuning")]
             "openings" => {
@@ -293,25 +293,27 @@ fn mcts_vs_minmax(minmax_depth: u16, mcts_nodes: u64) {
     println!("\n{:?}\nResult: {:?}", position, position.game_result());
 }
 
-fn test_position<const S: usize>() {
-    let mut position = <Position<S>>::default();
-    let mut moves = vec![];
-
-    println!("Enter moves:");
+fn analyze_position<const S: usize>() {
+    println!("Enter moves list or a full ptn, then press enter followed by CTRL+D");
 
     let mut input = String::new();
-    io::stdin().read_line(&mut input).unwrap();
+    io::stdin().read_to_string(&mut input).unwrap();
+    let games: Vec<Game<Position<S>>> = tiltak::ptn::ptn_parser::parse_ptn(&input).unwrap();
+    if games.is_empty() {
+        println!("Couldn't parse any games");
+        return;
+    }
 
-    for mv_san in input.split_whitespace() {
-        let mv = position.move_from_san(&mv_san).unwrap();
-        position.generate_moves(&mut moves);
-        assert!(moves.contains(&mv));
+    let mut position: Position<S> = games[0].start_position.clone();
+
+    for PtnMove { mv, .. } in games[0].moves.clone() {
         position.do_move(mv);
-        moves.clear();
     }
 
     println!("TPS {}", position.to_fen());
     println!("{:?}", position);
+
+    assert_eq!(position.game_result(), None, "Cannot analyze finished game");
 
     let mut simple_moves = vec![];
     let mut moves = vec![];
