@@ -100,13 +100,22 @@ fn parse_moves<B: PgnPosition + Debug + Clone>(
     let mut _ply_counter = 0; // Last ply seen
     loop {
         input.skip_whitespaces();
-        let word = input.take_word();
-
-        if word.is_empty() {
+        if input.peek().is_none() || input.peek() == Some('[') {
+            // Games without a result aren't allowed by the spec,
+            // but try to accept it anyway and return a `None` result
+            if !moves.is_empty() {
+                return Ok((moves, None));
+            }
+            // Return an error if we've read tags, but no moves
             return Err(Box::new(pgn_traits::Error::new_parse_error(
                 "Unexpected EOF, expected a move or a game result.".to_string(),
             )));
-        } else if let Some(num_string) = word.strip_suffix("...") {
+        }
+        let word = input.take_word();
+
+        assert!(!word.is_empty());
+
+        if let Some(num_string) = word.strip_suffix("...") {
             let _num = u64::from_str(num_string)?;
             _ply_counter = _num * 2 - 1;
         } else if let Some(num_string) = word.strip_suffix('.') {
