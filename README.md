@@ -24,12 +24,13 @@ The project consists of 5 different binaries, that use the core engine in variou
 
 ## main
 
-Four experimental commands entered through stdin:
+Five experimental commands entered through stdin:
 
 * play: Play against the engine through the command line.
 * aimatch: Watch the engine play against a very simple minmax implementation.
-* analyze \<size\>: Analyze a given position, provided from a simple move list
-* game \<size\>: Analyze a whole game, provided from a PTN
+* analyze <size>: Analyze a given position, provided from a PTN or a simple move list.
+* tps <size>: Analyze a given position, provided from a tps string.
+* game <size>: Analyze a whole game, provided from a PTN or a simple move list.
 
 ## playtak
 
