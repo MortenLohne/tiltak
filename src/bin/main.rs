@@ -29,8 +29,9 @@ pub mod tei;
 fn main() {
     println!("play: Play against the engine through the command line");
     println!("aimatch: Watch the engine play against a very simple minmax implementation");
-    println!("analyze <size>: Analyze a given position, provided from a simple move list");
-    println!("game <size>: Analyze a whole game, provided from a PTN");
+    println!("analyze <size>: Analyze a given position, provided from a PTN or a simple move list");
+    println!("tps <size>: Analyze a given position, provided from a tps string");
+    println!("game <size>: Analyze a whole game, provided from a PTN or a simple move list");
     loop {
         let mut input = String::new();
         io::stdin().read_line(&mut input).unwrap();
@@ -49,12 +50,20 @@ fn main() {
                 }
             }
             "analyze" => match words.get(1) {
-                Some(&"4") => analyze_position::<4>(),
-                Some(&"5") => analyze_position::<5>(),
-                Some(&"6") => analyze_position::<6>(),
-                Some(&"7") => analyze_position::<7>(),
-                Some(&"8") => analyze_position::<8>(),
-                _ => analyze_position::<5>(),
+                Some(&"4") => analyze_position_from_ptn::<4>(),
+                Some(&"5") => analyze_position_from_ptn::<5>(),
+                Some(&"6") => analyze_position_from_ptn::<6>(),
+                Some(&"7") => analyze_position_from_ptn::<7>(),
+                Some(&"8") => analyze_position_from_ptn::<8>(),
+                _ => analyze_position_from_ptn::<5>(),
+            },
+            "tps" => match words.get(1) {
+                Some(&"4") => analyze_position_from_tps::<4>(),
+                Some(&"5") => analyze_position_from_tps::<5>(),
+                Some(&"6") => analyze_position_from_tps::<6>(),
+                Some(&"7") => analyze_position_from_tps::<7>(),
+                Some(&"8") => analyze_position_from_tps::<8>(),
+                _ => analyze_position_from_tps::<5>(),
             },
             #[cfg(feature = "constant-tuning")]
             "openings" => {
@@ -92,7 +101,7 @@ fn main() {
             }
             "analyze_openings" => analyze_openings::<6>(6_000_000),
             "game" => {
-                println!("Enter a full game PTN, then press enter followed by CTRL+D:");
+                println!("Enter move list or a full PTN, then press enter followed by CTRL+D");
                 let mut input = String::new();
 
                 match words.get(1) {
@@ -293,8 +302,8 @@ fn mcts_vs_minmax(minmax_depth: u16, mcts_nodes: u64) {
     println!("\n{:?}\nResult: {:?}", position, position.game_result());
 }
 
-fn analyze_position<const S: usize>() {
-    println!("Enter moves list or a full ptn, then press enter followed by CTRL+D");
+fn analyze_position_from_ptn<const S: usize>() {
+    println!("Enter move list or a full PTN, then press enter followed by CTRL+D");
 
     let mut input = String::new();
     io::stdin().read_to_string(&mut input).unwrap();
@@ -309,7 +318,18 @@ fn analyze_position<const S: usize>() {
     for PtnMove { mv, .. } in games[0].moves.clone() {
         position.do_move(mv);
     }
+    analyze_position(&position)
+}
 
+fn analyze_position_from_tps<const S: usize>() {
+    println!("Enter TPS");
+    let mut input = String::new();
+    io::stdin().read_line(&mut input).unwrap();
+    let position = <Position<S>>::from_fen(&input).unwrap();
+    analyze_position(&position)
+}
+
+fn analyze_position<const S: usize>(position: &Position<S>) {
     println!("TPS {}", position.to_fen());
     println!("{:?}", position);
 
