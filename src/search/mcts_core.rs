@@ -102,7 +102,7 @@ impl TreeEdge {
             // Only generate child moves on the 2nd visit
             if self.visits == 1 {
                 let group_data = position.group_data();
-                node.init_children(&position, &group_data, settings, temp_vectors);
+                node.init_children(&position, &group_data, settings, temp_vectors, self.mean_action_value);
             }
 
             let visits_sqrt = (self.visits as Score).sqrt();
@@ -180,6 +180,7 @@ impl Tree {
         group_data: &GroupData<S>,
         settings: &MctsSetting<S>,
         temp_vectors: &mut TempVectors,
+        mean_action_value: Score,
     ) {
         position.generate_moves_with_params(
             &settings.policy_params,
@@ -195,7 +196,7 @@ impl Tree {
             children_vec.push(TreeEdge::new(
                 mv.clone(),
                 heuristic_score * inv_sum,
-                settings.initial_mean_action_value(),
+                1.0 - mean_action_value - settings.initial_mean_action_value(),
             ));
         }
         self.children = children_vec.into_boxed_slice();
