@@ -102,7 +102,13 @@ impl TreeEdge {
             // Only generate child moves on the 2nd visit
             if self.visits == 1 {
                 let group_data = position.group_data();
-                node.init_children(&position, &group_data, settings, temp_vectors, self.mean_action_value);
+                node.init_children(
+                    &position,
+                    &group_data,
+                    settings,
+                    temp_vectors,
+                    self.mean_action_value,
+                );
             }
 
             let visits_sqrt = (self.visits as Score).sqrt();
