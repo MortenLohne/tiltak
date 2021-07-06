@@ -108,3 +108,25 @@ fn tinue_nply_test() {
 
     plays_correct_hard_move_property::<6>(&move_strings, &["5d2>"]);
 }
+
+#[test]
+fn flatten_our_wall_to_win_test() {
+    // b5 b6 f6 b4 c6 b3 a6 Cc5 b2 d5 d6 c5+ c5 c3 Cc4 d3 d4 e3 c4- c4 e4 a3 e5 a2 a1 f3 e5< e5 c2 2c6> e4- 3d6- b2+ a4 e2 f5 f6- d2 d1 f4 Se4 4d5< 2f5< d6 e6 f2 b1 f1 e1 f6 e4> d3> 2c3>11 f6< 3e5+ e5 4e6- Se4 b2 c3 c1 a2- a2 a3- a3 a4- 2b3< 2a1> b2- d3+ 4b1+112 d2< 4a3-13 c4< b3+ b5- Sc4 4b4+22 b1 2c2- b1> Sc2 d2 a5 a6> 2b4+11 3c1< c2- c2 c3- f5 f6 Sc6 f6< 5e5+ 2b6< c6< e5 3b6>12 f6 b6- 2c1<11 3b5< 4a1+1111 6e6>
+    let move_strings = [
+        "b5", "b6", "f6", "b4", "c6", "b3", "a6", "Cc5", "b2", "d5", "d6", "c5+", "c5", "c3",
+        "Cc4", "d3", "d4", "e3", "c4-", "c4", "e4", "a3", "e5", "a2", "a1", "f3", "e5<", "e5",
+        "c2", "2c6>", "e4-", "3d6-", "b2+", "a4", "e2", "f5", "f6-", "d2", "d1", "f4", "Se4",
+        "4d5<", "2f5<", "d6", "e6", "f2", "b1", "f1", "e1", "f6", "e4>", "d3>", "2c3>11", "f6<",
+        "3e5+", "e5", "4e6-", "Se4", "b2", "c3", "c1", "a2-", "a2", "a3-", "a3", "a4-", "2b3<",
+        "2a1>", "b2-", "d3+", "4b1+112", "d2<", "4a3-13", "c4<", "b3+", "b5-", "Sc4", "4b4+22",
+        "b1", "2c2-", "b1>", "Sc2", "d2", "a5", "a6>", "2b4+11", "3c1<", "c2-", "c2", "c3-", "f5",
+        "f6", "Sc6", "f6<", "5e5+", "2b6<", "c6<", "e5", "3b6>12", "f6", "b6-", "2c1<11", "3b5<",
+        "4a1+1111", "6e6>",
+    ];
+
+    let mut position = <Position<6>>::start_position();
+
+    do_moves_and_check_validity(&mut position, &move_strings);
+
+    plays_correct_hard_move_property::<6>(&move_strings, &["2c5<11"])
+}
