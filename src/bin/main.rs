@@ -368,9 +368,9 @@ fn analyze_position<const S: usize>(position: &Position<S>) {
     let settings: MctsSetting<S> = search::MctsSetting::default().exclude_moves(vec![]);
 
     let mut tree = search::MonteCarloTree::with_settings(position.clone(), settings);
-    for i in 1..100_000 {
+    for i in 1.. {
         tree.select();
-        if i % 1_000 == 0 {
+        if i % 100_000 == 0 {
             println!(
                 "{} visits, val={:.2}%, static eval={:.4}, static winning probability={:.2}%",
                 tree.visits(),
