@@ -96,7 +96,7 @@ fn do_not_blunder_property<const S: usize>(position: Position<S>, correct_moves:
             position
         );
     }
-    let (best_move, score) = search::mcts(position.clone(), 10_000);
+    let (best_move, score) = search::mcts(position.clone(), 5_000);
 
     assert!(
         correct_moves
