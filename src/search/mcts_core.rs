@@ -198,11 +198,12 @@ impl Tree {
         let mut children_vec = Vec::with_capacity(temp_vectors.moves.len());
         let policy_sum: f32 = temp_vectors.moves.iter().map(|(_, score)| *score).sum();
         let inv_sum = 1.0 / policy_sum;
+        let child_mean_action_value = 1.0 - mean_action_value - settings.initial_mean_action_value();
         for (mv, heuristic_score) in temp_vectors.moves.drain(..) {
             children_vec.push(TreeEdge::new(
                 mv.clone(),
                 heuristic_score * inv_sum,
-                1.0 - mean_action_value - settings.initial_mean_action_value(),
+                Score::min(child_mean_action_value, settings.max_initial_mean_action_value()),
             ));
         }
         self.children = children_vec.into_boxed_slice();
