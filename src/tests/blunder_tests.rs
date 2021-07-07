@@ -47,6 +47,38 @@ fn do_not_blunder_road_win4() {
     )
 }
 
+#[test]
+fn do_not_blunder_road_win5() {
+    let position: Position<6> = Position::from_fen("x3,2,1,x/2,2,2,2,1,1/2,1,2,21C,1,2/2,2,1S,1,2,2/2,1,2S,2,1121S,1/1,1,x,1,111211212C,1 1 30").unwrap();
+
+    do_not_blunder_property(
+        position,
+        &[
+            "a1+", "e6<", "e5<", "Sc1", "b4+", "b4<", "b2<", "2d4+", "4e2+22",
+        ],
+    )
+}
+
+#[test]
+fn do_not_blunder_road_win6() {
+    let position: Position<6> = Position::from_fen(
+        "1,121,1,121,x2/x2,2,x3/2,2,21,2,2,1/x2,2S,12C,122122121C,x/x,212S,21,2,12S,1/x6 2 29",
+    )
+    .unwrap();
+
+    do_not_blunder_property(position, &["Se5", "Se6", "c5+", "e4>"])
+}
+
+#[test]
+fn do_not_blunder_road_win7() {
+    let position: Position<6> = Position::from_fen("1,1,2,1,1,1/11112221,x,2S,1,1,x/121,1,21C,12C,112,112/221,x,2,1S,1,1/2,2,2,2,12,1/x3,2,x,12221 1 40").unwrap();
+
+    do_not_blunder_property(
+        position,
+        &["3a4-12", "6a5-114", "3a3-", "f3+", "e3-", "f2<", "2c4-11"],
+    )
+}
+
 fn do_not_blunder_property<const S: usize>(position: Position<S>, correct_moves: &[&str]) {
     let mut moves = vec![];
     position.generate_moves(&mut moves);
