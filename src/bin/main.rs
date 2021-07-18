@@ -366,17 +366,19 @@ fn analyze_position<const S: usize>(position: &Position<S>) {
         println!();
     }
     let settings: MctsSetting<S> = search::MctsSetting::default().exclude_moves(vec![]);
+    let start_time = time::Instant::now();
 
     let mut tree = search::MonteCarloTree::with_settings(position.clone(), settings);
     for i in 1.. {
         tree.select();
         if i % 100_000 == 0 {
             println!(
-                "{} visits, val={:.2}%, static eval={:.4}, static winning probability={:.2}%",
+                "{} visits, val={:.2}%, static eval={:.4}, static winning probability={:.2}%, {:.2}s",
                 tree.visits(),
                 tree.mean_action_value() * 100.0,
                 position.static_eval(),
-                search::cp_to_win_percentage(position.static_eval()) * 100.0
+                search::cp_to_win_percentage(position.static_eval()) * 100.0,
+                start_time.elapsed().as_secs_f64()
             );
             tree.print_info();
             println!("Best move: {:?}", tree.best_move())
