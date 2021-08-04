@@ -16,7 +16,7 @@ use pgn_traits::PgnPosition;
 fn do_moves_and_check_validity<const S: usize>(position: &mut Position<S>, move_strings: &[&str]) {
     let mut moves = vec![];
     for mv_san in move_strings.iter() {
-        let mv = position.move_from_san(&mv_san).unwrap();
+        let mv = position.move_from_san(mv_san).unwrap();
         position.generate_moves(&mut moves);
         assert!(
             moves.contains(&mv),
