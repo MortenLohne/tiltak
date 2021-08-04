@@ -12,11 +12,11 @@ impl<const S: usize> Position<S> {
         for square in squares_iterator::<S>() {
             match self[square].top_stone() {
                 None => {
-                    if Us::stones_left(&self) > 0 {
+                    if Us::stones_left(self) > 0 {
                         moves.push(Move::Place(Flat, square));
                         moves.push(Move::Place(Wall, square));
                     }
-                    if Us::caps_left(&self) > 0 {
+                    if Us::caps_left(self) > 0 {
                         moves.push(Move::Place(Cap, square));
                     }
                 }

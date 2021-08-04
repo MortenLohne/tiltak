@@ -185,7 +185,7 @@ pub fn main() -> Result<()> {
         if let (Some(user), Some(pwd)) =
             (matches.value_of("username"), matches.value_of("password"))
         {
-            session.login("Tiltak", &user, &pwd)?;
+            session.login("Tiltak", user, pwd)?;
         } else {
             warn!("No username/password provided, logging in as guest");
             session.login_guest()?;
@@ -533,9 +533,9 @@ impl PlaytakSession {
                             }
                             "Time" => {
                                 let white_time_left =
-                                    Duration::from_secs(u64::from_str(&words[2]).unwrap());
+                                    Duration::from_secs(u64::from_str(words[2]).unwrap());
                                 let black_time_left =
-                                    Duration::from_secs(u64::from_str(&words[3]).unwrap());
+                                    Duration::from_secs(u64::from_str(words[3]).unwrap());
                                 our_time_left = match game.our_color {
                                     Color::White => white_time_left,
                                     Color::Black => black_time_left,

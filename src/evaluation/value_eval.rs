@@ -187,24 +187,24 @@ pub(crate) fn static_eval_game_phase<const S: usize>(
     let mut num_files_occupied_black = 0;
 
     for line in BitBoard::all_lines::<S>().iter() {
-        line_score::<WhiteTr, BlackTr, S>(&group_data, *line, coefficients, line_control);
-        line_score::<BlackTr, WhiteTr, S>(&group_data, *line, coefficients, line_control);
+        line_score::<WhiteTr, BlackTr, S>(group_data, *line, coefficients, line_control);
+        line_score::<BlackTr, WhiteTr, S>(group_data, *line, coefficients, line_control);
     }
 
     for i in 0..S as u8 {
-        if !WhiteTr::road_stones(&group_data).rank::<S>(i).is_empty() {
+        if !WhiteTr::road_stones(group_data).rank::<S>(i).is_empty() {
             num_ranks_occupied_white += 1;
         }
-        if !BlackTr::road_stones(&group_data).rank::<S>(i).is_empty() {
+        if !BlackTr::road_stones(group_data).rank::<S>(i).is_empty() {
             num_ranks_occupied_black += 1;
         }
     }
 
     for i in 0..S as u8 {
-        if !WhiteTr::road_stones(&group_data).file::<S>(i).is_empty() {
+        if !WhiteTr::road_stones(group_data).file::<S>(i).is_empty() {
             num_files_occupied_white += 1;
         }
-        if !BlackTr::road_stones(&group_data).file::<S>(i).is_empty() {
+        if !BlackTr::road_stones(group_data).file::<S>(i).is_empty() {
             num_files_occupied_black += 1;
         }
     }

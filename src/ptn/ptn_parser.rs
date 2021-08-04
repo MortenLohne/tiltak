@@ -137,7 +137,7 @@ fn parse_moves<B: PgnPosition + Debug + Clone>(
                 annotations.insert(0, *annotation);
             }
 
-            match position.move_from_san(&move_string) {
+            match position.move_from_san(move_string) {
                 Ok(mv) => {
                     let mut legal_moves = vec![];
                     position.generate_moves(&mut legal_moves);

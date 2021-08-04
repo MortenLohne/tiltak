@@ -812,7 +812,7 @@ impl<const S: usize> Position<S> {
         params: &[f32],
     ) -> f32 {
         let mut coefficients = vec![0.0; Self::value_params().len()];
-        value_eval::static_eval_game_phase(&self, group_data, &mut coefficients);
+        value_eval::static_eval_game_phase(self, group_data, &mut coefficients);
         coefficients.iter().zip(params).map(|(a, b)| a * b).sum()
     }
 }
@@ -1060,7 +1060,7 @@ impl<const S: usize> Iterator for MoveIterator<S> {
 
 impl<const S: usize> EvalPositionTrait for Position<S> {
     fn static_eval(&self) -> f32 {
-        self.static_eval_with_params(&Self::value_params())
+        self.static_eval_with_params(Self::value_params())
     }
 }
 
@@ -1089,7 +1089,7 @@ impl<const S: usize> TunableBoard for Position<S> {
         debug_assert!(self.game_result().is_none());
 
         let group_data = self.group_data();
-        value_eval::static_eval_game_phase(&self, &group_data, coefficients)
+        value_eval::static_eval_game_phase(self, &group_data, coefficients)
     }
 
     fn generate_moves_with_params(
@@ -1129,14 +1129,14 @@ impl<const S: usize> TunableBoard for Position<S> {
     ) {
         match self.side_to_move() {
             Color::White => policy_eval::coefficients_for_move_colortr::<WhiteTr, BlackTr, S>(
-                &self,
+                self,
                 coefficients,
                 mv,
                 group_data,
                 num_legal_moves,
             ),
             Color::Black => policy_eval::coefficients_for_move_colortr::<BlackTr, WhiteTr, S>(
-                &self,
+                self,
                 coefficients,
                 mv,
                 group_data,

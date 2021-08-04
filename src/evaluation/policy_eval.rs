@@ -124,8 +124,8 @@ pub(crate) fn coefficients_for_move_colortr<Us: ColorTr, Them: ColorTr, const S:
             };
 
             for &line in BitBoard::lines_for_square::<S>(*square).iter() {
-                let our_line_score = (Us::road_stones(&group_data) & line).count();
-                let their_line_score = (Them::road_stones(&group_data) & line).count();
+                let our_line_score = (Us::road_stones(group_data) & line).count();
+                let their_line_score = (Them::road_stones(group_data) & line).count();
                 coefficients[our_road_stones_in_line + S * role_id + our_line_score as usize] +=
                     1.0;
                 coefficients

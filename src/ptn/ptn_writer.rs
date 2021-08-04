@@ -58,20 +58,20 @@ impl<B: PgnPosition + Clone> Game<B> {
 
         for (i, PtnMove { mv, comment, .. }) in self.moves.iter().enumerate() {
             if i == 0 && position.side_to_move() == Color::Black {
-                buffer.push_str(&format!("1... {}", position.move_to_san(&mv)));
+                buffer.push_str(&format!("1... {}", position.move_to_san(mv)));
             } else if position.side_to_move() == Color::White {
                 buffer.push_str(&format!(
                     "{}. {}",
                     (i + 1) / 2 + 1,
-                    position.move_to_san(&mv),
+                    position.move_to_san(mv),
                 ));
             } else {
-                buffer.push_str(&position.move_to_san(&mv));
+                buffer.push_str(&position.move_to_san(mv));
             }
 
             if !comment.is_empty() {
                 buffer.push_str(" {");
-                buffer.push_str(&comment);
+                buffer.push_str(comment);
                 buffer.push('}');
             }
 

@@ -387,7 +387,7 @@ pub fn tune_value_and_policy<const S: usize, const N: usize, const M: usize>(
         &value_results[0..middle_index],
         &value_coefficient_sets[middle_index..],
         &value_results[middle_index..],
-        &initial_value_params,
+        initial_value_params,
         10.0,
     );
 
@@ -400,7 +400,7 @@ pub fn tune_value_and_policy<const S: usize, const N: usize, const M: usize>(
         &policy_results[0..middle_index],
         &policy_coefficients_sets[middle_index..],
         &policy_results[middle_index..],
-        &initial_policy_params,
+        initial_policy_params,
         10000.0,
     );
 
