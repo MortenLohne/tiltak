@@ -26,6 +26,6 @@ pub struct Event {
 
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 pub struct Output {
-    pub best_move: Move,
+    pub pv: Vec<Move>,
     pub score: f32,
 }

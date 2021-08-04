@@ -453,9 +453,9 @@ impl PlaytakSession {
                                 rollout_depth: playtak_settings.rollout_depth,
                                 rollout_temperature: playtak_settings.rollout_temperature,
                             };
-                            let aws::Output { best_move, score } =
+                            let aws::Output { pv, score } =
                                 aws::client::best_move_aws(aws_function_name, &event)?;
-                            (best_move, score)
+                            (pv[0].clone(), score)
                         }
 
                         #[cfg(not(feature = "aws-lambda-client"))]

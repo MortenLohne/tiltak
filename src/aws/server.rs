@@ -45,11 +45,19 @@ pub fn handle_aws_event_generic<const S: usize>(
             };
 
             let (best_move, score) = search::play_move_time(position, max_time, settings);
-            Ok(Output { best_move, score })
+            Ok(Output {
+                pv: vec![best_move],
+                score,
+            })
         }
         TimeControl::FixedNodes(nodes) => {
-            let (best_move, score) = search::mcts(position, nodes);
-            Ok(Output { best_move, score })
+            let mut tree = search::MonteCarloTree::with_settings(position, settings);
+            for _ in 0..nodes {
+                tree.select();
+            }
+            let score = tree.mean_action_value();
+            let pv = tree.pv().collect();
+            Ok(Output { pv, score })
         }
     }
 }
