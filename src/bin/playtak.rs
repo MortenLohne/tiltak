@@ -448,8 +448,7 @@ impl PlaytakSession {
                                     .iter()
                                     .map(|PtnMove { mv, .. }: &PtnMove<Move>| mv.clone())
                                     .collect(),
-                                time_left: our_time_left,
-                                increment: game.increment,
+                                time_control: aws::TimeControl::Time(our_time_left, game.increment),
                                 dirichlet_noise: playtak_settings.dirichlet_noise,
                                 rollout_depth: playtak_settings.rollout_depth,
                                 rollout_temperature: playtak_settings.rollout_temperature,
