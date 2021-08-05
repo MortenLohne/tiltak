@@ -1,8 +1,11 @@
 use board_game_traits::GameResult;
 use board_game_traits::Position;
+use std::error;
 
 pub mod ptn_parser;
 pub mod ptn_writer;
+
+type ParseError = Box<dyn error::Error + Send + Sync>;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Game<B: Position> {
