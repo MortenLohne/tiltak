@@ -13,7 +13,11 @@ pub fn parse_ptn<B: PgnPosition + Debug + Clone>(input: &str) -> Result<Vec<Game
                 Ok(game) => games.push(game),
                 Err(err) => {
                     eprintln!("Couldn't parse game: {}", err);
-                    return Ok(games);
+                    if games.is_empty() {
+                        return Err(err);
+                    } else {
+                        return Ok(games);
+                    }
                 }
             }
         } else {
