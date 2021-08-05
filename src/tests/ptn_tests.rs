@@ -1,4 +1,4 @@
-use crate::position::Position;
+use crate::position::{Move, Position};
 use crate::ptn::{ptn_parser, Game, PtnMove};
 use crate::tests::do_moves_and_check_validity;
 use board_game_traits::{GameResult, Position as PositionTrait};
@@ -64,4 +64,9 @@ fn parse_ptn_without_result2() {
     assert_eq!(games.len(), 2);
     assert_eq!(games[0].game_result, None);
     assert_eq!(games[1].game_result, None)
+}
+
+#[test]
+fn parse_bad_direction_test() {
+    assert!(Move::from_string::<6>("a1d").is_err())
 }

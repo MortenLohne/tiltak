@@ -359,13 +359,13 @@ impl Direction {
         }
     }
 
-    pub(crate) fn parse(ch: char) -> Self {
+    pub(crate) fn parse(ch: char) -> Option<Self> {
         match ch {
-            '+' => North,
-            '<' => West,
-            '>' => East,
-            '-' => South,
-            _ => panic!("Couldn't parse \"{}\" as direction.", ch),
+            '+' => Some(North),
+            '<' => Some(West),
+            '>' => Some(East),
+            '-' => Some(South),
+            _ => None,
         }
     }
 }
