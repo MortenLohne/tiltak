@@ -55,7 +55,7 @@ pub fn handle_aws_event_generic<const S: usize>(
             for _ in 0..nodes {
                 tree.select();
             }
-            let score = tree.mean_action_value();
+            let score = 1.0 - tree.best_move().1;
             let pv = tree.pv().collect();
             Ok(Output { pv, score })
         }
