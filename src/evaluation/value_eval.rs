@@ -4,8 +4,7 @@ use crate::evaluation::parameters::ValueParameters;
 use crate::position::bitboard::BitBoard;
 use crate::position::color_trait::{BlackTr, ColorTr, WhiteTr};
 use crate::position::{
-    num_square_symmetries, square_symmetries, squares_iterator, GroupData, Piece::*, Position,
-    Role::*, Square,
+    square_symmetries, squares_iterator, GroupData, Piece::*, Position, Role::*, Square,
 };
 
 pub(crate) fn static_eval_game_phase<const S: usize>(
