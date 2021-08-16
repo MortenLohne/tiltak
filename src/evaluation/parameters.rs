@@ -9,74 +9,71 @@ pub const NUM_POLICY_PARAMS_5S: usize = 93;
 pub const NUM_VALUE_PARAMS_6S: usize = 72;
 pub const NUM_POLICY_PARAMS_6S: usize = 99;
 
-struct ValueParameters<'a> {
-    flat_psqt: &'a [f32],
-    wall_psqt: &'a [f32],
-    cap_psqt: &'a [f32],
-    our_stack_psqt: &'a [f32],
-    their_stack_psqt: &'a [f32],
-    side_to_move: &'a [f32],
-    flatstone_lead: &'a [f32],
-    i_number_of_groups: &'a [f32],
-    critical_squares: &'a [f32],
-    capstone_over_own_piece: &'a [f32],
-    capstone_on_stack: &'a [f32],
-    standing_stone_on_stack: &'a [f32],
-    flat_stone_next_to_our_stack: &'a [f32],
-    standing_stone_next_to_our_stack: &'a [f32],
-    capstone_next_to_our_stack: &'a [f32],
-    num_lines_occupied: &'a [f32],
-    line_control: &'a [f32],
+pub struct ValueParameters {
+    pub flat_psqt: Vec<f32>,
+    pub wall_psqt: Vec<f32>,
+    pub cap_psqt: Vec<f32>,
+    pub our_stack_psqt: Vec<f32>,
+    pub their_stack_psqt: Vec<f32>,
+    pub side_to_move: Vec<f32>,
+    pub flatstone_lead: Vec<f32>,
+    pub i_number_of_groups: Vec<f32>,
+    pub critical_squares: Vec<f32>,
+    pub capstone_over_own_piece: Vec<f32>,
+    pub capstone_on_stack: Vec<f32>,
+    pub standing_stone_on_stack: Vec<f32>,
+    pub flat_stone_next_to_our_stack: Vec<f32>,
+    pub standing_stone_next_to_our_stack: Vec<f32>,
+    pub capstone_next_to_our_stack: Vec<f32>,
+    pub num_lines_occupied: Vec<f32>,
+    pub line_control: Vec<f32>,
+    pub block_their_line: Vec<f32>,
 }
 
-impl<'a> ValueParameters<'a> {
-    fn new<const S: usize>(raw_parameters: &'a [f32]) -> Self {
-        let flat_psqt: usize = 0;
-        let wall_psqt: usize = flat_psqt + num_square_symmetries::<S>();
-        let cap_psqt: usize = wall_psqt + num_square_symmetries::<S>();
-        let our_stack_psqt: usize = cap_psqt + num_square_symmetries::<S>();
-        let their_stack_psqt: usize = our_stack_psqt + num_square_symmetries::<S>();
-        let side_to_move: usize = their_stack_psqt + num_square_symmetries::<S>();
-        let flatstone_lead: usize = side_to_move + 3;
-        let i_number_of_groups: usize = flatstone_lead + 3;
-        let critical_squares: usize = i_number_of_groups + 3;
-        let capstone_over_own_piece: usize = critical_squares + 6;
-        let capstone_on_stack: usize = capstone_over_own_piece + 1;
-        let standing_stone_on_stack: usize = capstone_on_stack + 1;
-        let flat_stone_next_to_our_stack: usize = standing_stone_on_stack + 1;
-        let standing_stone_next_to_our_stack: usize = flat_stone_next_to_our_stack + 1;
-        let capstone_next_to_our_stack: usize = standing_stone_next_to_our_stack + 1;
-        // Number of pieces in each line
-        let num_lines_occupied: usize = capstone_next_to_our_stack + 1;
-        // Number of lines with at least one road stone
-        let line_control: usize = num_lines_occupied + S + 1;
-        let last_const = line_control + 2 * (S + 1);
-
-        assert_eq!(last_const, raw_parameters.len());
-
+impl ValueParameters {
+    pub fn new<const S: usize>() -> Self {
         ValueParameters {
-            flat_psqt: &raw_parameters[flat_psqt..wall_psqt],
-            wall_psqt: &raw_parameters[wall_psqt..cap_psqt],
-            cap_psqt: &raw_parameters[cap_psqt..our_stack_psqt],
-            our_stack_psqt: &raw_parameters[our_stack_psqt..their_stack_psqt],
-            their_stack_psqt: &raw_parameters[their_stack_psqt..side_to_move],
-            side_to_move: &raw_parameters[side_to_move..flatstone_lead],
-            flatstone_lead: &raw_parameters[flatstone_lead..i_number_of_groups],
-            i_number_of_groups: &raw_parameters[i_number_of_groups..critical_squares],
-            critical_squares: &raw_parameters[critical_squares..capstone_over_own_piece],
-            capstone_over_own_piece: &raw_parameters[capstone_over_own_piece..capstone_on_stack],
-            capstone_on_stack: &raw_parameters[capstone_on_stack..standing_stone_on_stack],
-            standing_stone_on_stack: &raw_parameters
-                [standing_stone_on_stack..flat_stone_next_to_our_stack],
-            flat_stone_next_to_our_stack: &raw_parameters
-                [flat_stone_next_to_our_stack..standing_stone_next_to_our_stack],
-            standing_stone_next_to_our_stack: &raw_parameters
-                [standing_stone_next_to_our_stack..capstone_next_to_our_stack],
-            capstone_next_to_our_stack: &raw_parameters
-                [capstone_next_to_our_stack..num_lines_occupied],
-            num_lines_occupied: &raw_parameters[num_lines_occupied..line_control],
-            line_control: &raw_parameters[line_control..last_const],
+            flat_psqt: vec![0.0; num_square_symmetries::<S>()],
+            wall_psqt: vec![0.0; num_square_symmetries::<S>()],
+            cap_psqt: vec![0.0; num_square_symmetries::<S>()],
+            our_stack_psqt: vec![0.0; num_square_symmetries::<S>()],
+            their_stack_psqt: vec![0.0; num_square_symmetries::<S>()],
+            side_to_move: vec![0.0; 3],
+            flatstone_lead: vec![0.0; 3],
+            i_number_of_groups: vec![0.0; 3],
+            critical_squares: vec![0.0; 6],
+            capstone_over_own_piece: vec![0.0; 1],
+            capstone_on_stack: vec![0.0; 1],
+            standing_stone_on_stack: vec![0.0; 1],
+            flat_stone_next_to_our_stack: vec![0.0; 1],
+            standing_stone_next_to_our_stack: vec![0.0; 1],
+            capstone_next_to_our_stack: vec![0.0; 1],
+            num_lines_occupied: vec![0.0; S + 1],
+            line_control: vec![0.0; S + 1],
+            block_their_line: vec![0.0; S + 1],
         }
+    }
+
+    pub fn parameters(&self) -> impl Iterator<Item = &f32> {
+        self.flat_psqt
+            .iter()
+            .chain(self.wall_psqt.iter())
+            .chain(self.cap_psqt.iter())
+            .chain(self.our_stack_psqt.iter())
+            .chain(self.their_stack_psqt.iter())
+            .chain(self.side_to_move.iter())
+            .chain(self.flatstone_lead.iter())
+            .chain(self.i_number_of_groups.iter())
+            .chain(self.critical_squares.iter())
+            .chain(self.capstone_over_own_piece.iter())
+            .chain(self.capstone_on_stack.iter())
+            .chain(self.standing_stone_on_stack.iter())
+            .chain(self.flat_stone_next_to_our_stack.iter())
+            .chain(self.standing_stone_next_to_our_stack.iter())
+            .chain(self.capstone_next_to_our_stack.iter())
+            .chain(self.num_lines_occupied.iter())
+            .chain(self.line_control.iter())
+            .chain(self.block_their_line.iter())
     }
 }
 

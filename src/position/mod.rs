@@ -27,8 +27,8 @@ pub use utils::{
 pub use mv::{Move, ReverseMove};
 
 use crate::evaluation::parameters::{
-    POLICY_PARAMS_4S, POLICY_PARAMS_5S, POLICY_PARAMS_6S, VALUE_PARAMS_4S, VALUE_PARAMS_5S,
-    VALUE_PARAMS_6S,
+    ValueParameters, POLICY_PARAMS_4S, POLICY_PARAMS_5S, POLICY_PARAMS_6S, VALUE_PARAMS_4S,
+    VALUE_PARAMS_5S, VALUE_PARAMS_6S,
 };
 use crate::evaluation::{policy_eval, value_eval};
 use crate::position::color_trait::ColorTr;
@@ -811,9 +811,10 @@ impl<const S: usize> Position<S> {
         group_data: &GroupData<S>,
         params: &[f32],
     ) -> f32 {
-        let mut coefficients = vec![0.0; Self::value_params().len()];
-        value_eval::static_eval_game_phase(self, group_data, &mut coefficients);
-        coefficients.iter().zip(params).map(|(a, b)| a * b).sum()
+        let mut value_params = ValueParameters::new::<S>();
+        value_eval::static_eval_game_phase(&self, group_data, &mut value_params);
+        let coefficients = value_params.parameters();
+        coefficients.zip(params).map(|(a, b)| a * b).sum()
     }
 }
 
@@ -1060,7 +1061,7 @@ impl<const S: usize> Iterator for MoveIterator<S> {
 
 impl<const S: usize> EvalPositionTrait for Position<S> {
     fn static_eval(&self) -> f32 {
-        self.static_eval_with_params(Self::value_params())
+        self.static_eval_with_params(&Self::value_params())
     }
 }
 
@@ -1089,7 +1090,11 @@ impl<const S: usize> TunableBoard for Position<S> {
         debug_assert!(self.game_result().is_none());
 
         let group_data = self.group_data();
-        value_eval::static_eval_game_phase(self, &group_data, coefficients)
+        let mut value_params = ValueParameters::new::<S>();
+        value_eval::static_eval_game_phase(&self, &group_data, &mut value_params);
+        for (i, c) in value_params.parameters().enumerate() {
+            coefficients[i] = *c;
+        }
     }
 
     fn generate_moves_with_params(
@@ -1129,14 +1134,14 @@ impl<const S: usize> TunableBoard for Position<S> {
     ) {
         match self.side_to_move() {
             Color::White => policy_eval::coefficients_for_move_colortr::<WhiteTr, BlackTr, S>(
-                self,
+                &self,
                 coefficients,
                 mv,
                 group_data,
                 num_legal_moves,
             ),
             Color::Black => policy_eval::coefficients_for_move_colortr::<BlackTr, WhiteTr, S>(
-                self,
+                &self,
                 coefficients,
                 mv,
                 group_data,
