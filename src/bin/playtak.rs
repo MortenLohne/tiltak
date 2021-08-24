@@ -72,8 +72,19 @@ pub fn main() -> Result<()> {
             Arg::with_name("playBot")
                 .long("play-bot")
                 .value_name("botname")
-                .help("Instead of seeking any game, accept any seek from the specified bot")
-                .takes_value(true),
+                .help("Instead of seeking any game, accept any seek from the specified bot. Mutually exclusive with --tc")
+                .conflicts_with("tc")
+                .takes_value(true)
+                .required(true),
+
+        )
+        .arg(
+            Arg::with_name("tc")
+                 .long("tc")
+                 .help("Time control to seek games for. Mutually exclusive with --play-bot")
+                 .conflicts_with("playBot")
+                 .takes_value(true)
+                 .required(true),
         )
         .arg(Arg::with_name("policyNoise")
             .long("policy-noise")
@@ -192,7 +203,7 @@ pub fn main() -> Result<()> {
         }
         let seekmode = match matches.value_of("playBot") {
             Some(name) => SeekMode::PlayOtherBot(name.to_string()),
-            None => SeekMode::OpenSeek,
+            None => SeekMode::OpenSeek(parse_tc(matches.value_of("tc").unwrap())),
         };
 
         let result = match size {
@@ -217,6 +228,20 @@ pub fn main() -> Result<()> {
     }
 }
 
+pub fn parse_tc(input: &str) -> (Duration, Duration) {
+    let mut parts = input.split('+');
+    let time_part = parts.next().expect("Couldn't parse tc");
+    let inc_part = parts.next();
+    let time = Duration::from_millis((f64::from_str(time_part).unwrap() * 1000.0) as u64);
+
+    let inc = if let Some(inc_part) = inc_part {
+        Duration::from_millis((f64::from_str(inc_part).unwrap() * 1000.0) as u64)
+    } else {
+        Duration::default()
+    };
+    (time, inc)
+}
+
 struct PlaytakSession {
     #[cfg(feature = "aws-lambda-client")]
     aws_function_name: Option<String>,
@@ -228,7 +253,7 @@ struct PlaytakSession {
 
 #[derive(Debug, PartialEq, Eq)]
 enum SeekMode {
-    OpenSeek,
+    OpenSeek((Duration, Duration)),
     PlayOtherBot(String),
 }
 
@@ -343,14 +368,16 @@ impl PlaytakSession {
         seek_mode: SeekMode,
         playtak_settings: PlaytakSettings,
     ) -> io::Result<std::convert::Infallible> {
-        let mut time_for_game = Duration::from_secs(900);
-        let mut increment = Duration::from_secs(30);
+        // The server doesn't send increment when the game starts
+        // We have to keep track of it ourselves, depending on the seekmode
+        let mut increment = Duration::from_secs(0);
 
-        if seek_mode == SeekMode::OpenSeek {
+        if let SeekMode::OpenSeek((game_time, inc)) = seek_mode {
+            increment = inc;
             self.send_line(&format!(
                 "Seek {} {} {}",
                 S,
-                time_for_game.as_secs(),
+                game_time.as_secs(),
                 increment.as_secs()
             ))?;
         }
@@ -373,10 +400,10 @@ impl PlaytakSession {
                             "black" => Color::Black,
                             color => panic!("Bad color \"{}\"", color),
                         },
-                        time_left: time_for_game,
+                        time_left: Duration::from_secs(u64::from_str(words[8]).unwrap()),
                         increment,
                     };
-                    self.play_game::<S>(playtak_game, playtak_settings)?;
+                    self.play_game::<S>(playtak_game, playtak_settings, seek_mode)?;
                     unreachable!()
                 }
 
@@ -385,11 +412,9 @@ impl PlaytakSession {
                         if words[1] == "new" {
                             let number = u64::from_str(words[2]).unwrap();
                             let name = words[3];
-                            let time = Duration::from_secs(u64::from_str(words[5]).unwrap());
                             let inc = Duration::from_secs(u64::from_str(words[6]).unwrap());
                             if name.eq_ignore_ascii_case(bot_name) {
                                 self.send_line(&format!("Accept {}", number))?;
-                                time_for_game = time;
                                 increment = inc;
                             }
                         }
@@ -409,6 +434,7 @@ impl PlaytakSession {
         &mut self,
         game: PlaytakGame,
         playtak_settings: PlaytakSettings,
+        seek_mode: SeekMode,
     ) -> io::Result<Infallible> {
         info!(
             "Starting game #{}, {} vs {} as {}, {}+{:.1}",
@@ -590,7 +616,7 @@ impl PlaytakSession {
 
         info!("Move list: {}", move_list.join(" "));
 
-        self.seek_game::<S>(SeekMode::OpenSeek, playtak_settings)
+        self.seek_game::<S>(seek_mode, playtak_settings)
     }
 }
 
