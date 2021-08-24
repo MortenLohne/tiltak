@@ -13,6 +13,8 @@ use log::error;
 use log::{debug, info, warn};
 
 use rand::seq::SliceRandom;
+#[cfg(not(feature = "aws-lambda-client"))]
+use rand::Rng;
 #[cfg(feature = "aws-lambda-client")]
 use tiltak::aws;
 use tiltak::position::Position;
@@ -25,6 +27,7 @@ use tiltak::search::MctsSetting;
 
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub struct PlaytakSettings {
+    fixed_nodes: Option<u64>,
     dirichlet_noise: Option<f32>,
     rollout_depth: u16,
     rollout_temperature: f64,
@@ -102,7 +105,12 @@ pub fn main() -> Result<()> {
             .help("Add a random component to move selection in MCTS rollouts. Has no effect if --rollout-depth is 0. For full rollouts, even the 'low' setting is enough to give highly variable play.")
             .takes_value(true)
             .possible_values(&["low", "medium", "high"])
-            .default_value("low"));
+            .default_value("low"))
+        .arg(Arg::with_name("fixedNodes")
+            .long("fixed-nodes")
+            .conflicts_with("aws-lambda-client")
+            .help("Normally, the bot will search a variable number of nodes, depending on hardware on time control. This option overrides that to calculate a fixed amount of nodes each move")
+            .takes_value(true));
 
     if cfg!(feature = "aws-lambda-client") {
         app = app.arg(
@@ -167,7 +175,10 @@ pub fn main() -> Result<()> {
         s => panic!("rolloutTemperature cannot be {}", s),
     };
 
+    let fixed_nodes: Option<u64> = matches.value_of("fixedNodes").map(|v| v.parse().unwrap());
+
     let playtak_settings = PlaytakSettings {
+        fixed_nodes,
         dirichlet_noise,
         rollout_depth,
         rollout_temperature,
@@ -486,7 +497,6 @@ impl PlaytakSession {
 
                         #[cfg(not(feature = "aws-lambda-client"))]
                         {
-                            let maximum_time = our_time_left / 20 + game.increment;
                             let settings = if let Some(dirichlet) = playtak_settings.dirichlet_noise {
                                 MctsSetting::default()
                                     .add_dirichlet(dirichlet)
@@ -498,7 +508,25 @@ impl PlaytakSession {
                                     .add_rollout_depth(playtak_settings.rollout_depth)
                                     .add_rollout_temperature(playtak_settings.rollout_temperature)
                             };
-                            search::play_move_time(position.clone(), maximum_time, settings)
+
+                            if let Some(fixed_nodes) = playtak_settings.fixed_nodes {
+                                let mut tree = search::MonteCarloTree::with_settings(position.clone(), settings);
+                                for _ in 0..fixed_nodes {
+                                    tree.select();
+                                }
+
+                                // Wait for a bit
+                                let mut rng = rand::thread_rng();
+                                let sleep_duration = Duration::from_millis(rng.gen_range(0..1500));
+                                thread::sleep(sleep_duration);
+
+                                tree.best_move()
+                            }
+                            else {
+                                let maximum_time = our_time_left / 20 + game.increment;
+
+                                search::play_move_time(position.clone(), maximum_time, settings)
+                            }
                         }
                     };
 
