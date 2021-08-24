@@ -13,16 +13,13 @@ use log::error;
 use log::{debug, info, warn};
 
 use rand::seq::SliceRandom;
-#[cfg(not(feature = "aws-lambda-client"))]
 use rand::Rng;
 #[cfg(feature = "aws-lambda-client")]
 use tiltak::aws;
 use tiltak::position::Position;
 use tiltak::position::{squares_iterator, Move, Role, Square};
 use tiltak::ptn::{Game, PtnMove};
-#[cfg(not(feature = "aws-lambda-client"))]
 use tiltak::search;
-#[cfg(not(feature = "aws-lambda-client"))]
 use tiltak::search::MctsSetting;
 
 #[derive(Debug, PartialEq, Clone, Copy)]
@@ -31,6 +28,21 @@ pub struct PlaytakSettings {
     dirichlet_noise: Option<f32>,
     rollout_depth: u16,
     rollout_temperature: f64,
+}
+
+impl PlaytakSettings {
+    pub fn to_mcts_setting<const S: usize>(&self) -> MctsSetting<S> {
+        if let Some(dirichlet) = self.dirichlet_noise {
+            MctsSetting::default()
+                .add_dirichlet(dirichlet)
+                .add_rollout_depth(self.rollout_depth)
+                .add_rollout_temperature(self.rollout_temperature)
+        } else {
+            MctsSetting::default()
+                .add_rollout_depth(self.rollout_depth)
+                .add_rollout_temperature(self.rollout_temperature)
+        }
+    }
 }
 
 pub fn main() -> Result<()> {
@@ -108,7 +120,7 @@ pub fn main() -> Result<()> {
             .default_value("low"))
         .arg(Arg::with_name("fixedNodes")
             .long("fixed-nodes")
-            .conflicts_with("aws-lambda-client")
+            .conflicts_with("aws-function-name")
             .help("Normally, the bot will search a variable number of nodes, depending on hardware on time control. This option overrides that to calculate a fixed amount of nodes each move")
             .takes_value(true));
 
@@ -118,6 +130,7 @@ pub fn main() -> Result<()> {
                 .long("aws-function-name")
                 .value_name("tiltak")
                 .required(true)
+                .conflicts_with("fixedNodes")
                 .help(
                     "Run the engine on AWS instead of locally. Requires aws cli installed locally.",
                 )
@@ -475,6 +488,19 @@ impl PlaytakSession {
                             Move::Place(Role::Flat, Square((S * S - 1) as u8)),
                         ];
                         (moves.choose(&mut rng).unwrap().clone(), 0.0)
+                    } else if let Some(fixed_nodes) = playtak_settings.fixed_nodes {
+                        let settings = playtak_settings.to_mcts_setting();
+                        let mut tree = search::MonteCarloTree::with_settings(position.clone(), settings);
+                        for _ in 0..fixed_nodes {
+                            tree.select();
+                        }
+
+                        // Wait for a bit
+                        let mut rng = rand::thread_rng();
+                        let sleep_duration = Duration::from_millis(rng.gen_range(0..1500));
+                        thread::sleep(sleep_duration);
+
+                        tree.best_move()
                     } else {
                         #[cfg(feature = "aws-lambda-client")]
                         {
@@ -497,36 +523,11 @@ impl PlaytakSession {
 
                         #[cfg(not(feature = "aws-lambda-client"))]
                         {
-                            let settings = if let Some(dirichlet) = playtak_settings.dirichlet_noise {
-                                MctsSetting::default()
-                                    .add_dirichlet(dirichlet)
-                                    .add_rollout_depth(playtak_settings.rollout_depth)
-                                    .add_rollout_temperature(playtak_settings.rollout_temperature)
-                            }
-                            else {
-                                MctsSetting::default()
-                                    .add_rollout_depth(playtak_settings.rollout_depth)
-                                    .add_rollout_temperature(playtak_settings.rollout_temperature)
-                            };
+                            let settings = playtak_settings.to_mcts_setting();
 
-                            if let Some(fixed_nodes) = playtak_settings.fixed_nodes {
-                                let mut tree = search::MonteCarloTree::with_settings(position.clone(), settings);
-                                for _ in 0..fixed_nodes {
-                                    tree.select();
-                                }
+                            let maximum_time = our_time_left / 20 + game.increment;
 
-                                // Wait for a bit
-                                let mut rng = rand::thread_rng();
-                                let sleep_duration = Duration::from_millis(rng.gen_range(0..1500));
-                                thread::sleep(sleep_duration);
-
-                                tree.best_move()
-                            }
-                            else {
-                                let maximum_time = our_time_left / 20 + game.increment;
-
-                                search::play_move_time(position.clone(), maximum_time, settings)
-                            }
+                            search::play_move_time(position.clone(), maximum_time, settings)
                         }
                     };
 
