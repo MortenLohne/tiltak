@@ -497,7 +497,7 @@ impl PlaytakSession {
 
                         // Wait for a bit
                         let mut rng = rand::thread_rng();
-                        let sleep_duration = Duration::from_millis(rng.gen_range(0..1500));
+                        let sleep_duration = Duration::from_millis(rng.gen_range(1000..2500));
                         thread::sleep(sleep_duration);
 
                         tree.best_move()
