@@ -42,3 +42,21 @@ fn pure_spread_into_road() {
     let fen = "2,2,2,1S,22,1112/x2,1,2,22,21112C/1,1,1,2,21,11121C/x,1,x,2,x2/x,1,x3,2/x6 1 30";
     correct_top_policy_move_property::<6>(fen, &["4f4<112", "4f4<13", "4f4<22", "3f4<12"]);
 }
+
+#[test]
+fn two_pure_spreads_into_road() {
+    let fen = "x,2,2S,21,1,1/2,212,12,12111122C,x,1/21,x,1,211,x,1S/1,2,1C,x2,1/x2,1,2,11212,2/x2,1,2,x,212 2 36";
+    correct_top_policy_move_property::<6>(fen, &["6d5-51", "6d5>51"]);
+}
+
+#[test]
+fn imperfect_cap_spread_onto_critical_square() {
+    let fen = "2,x4/2,1,x,1,2S/1112,1,x,1S,x/2,121121C,x,1,x/1,x,112C,x,111212S 2 24";
+    correct_top_policy_move_property::<5>(fen, &["3c1<12", "3c1<21", "2c1<11"]);
+}
+
+#[test]
+fn simple_flat_movement_onto_critical_square() {
+    let fen = "1,1,2,x2/1,1,2,x2/x,1,2,x2/1,2,1,1,x/x,2,2,x,2 2 8";
+    correct_top_policy_move_property::<5>(fen, &["b2>", "c1+"]);
+}
