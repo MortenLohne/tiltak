@@ -7,6 +7,24 @@ pub const NUM_POLICY_PARAMS_5S: usize = 93;
 pub const NUM_VALUE_PARAMS_6S: usize = 72;
 pub const NUM_POLICY_PARAMS_6S: usize = 99;
 
+pub fn num_value_params<const S: usize>() -> usize {
+    match S {
+        4 => NUM_VALUE_PARAMS_4S,
+        5 => NUM_VALUE_PARAMS_5S,
+        6 => NUM_VALUE_PARAMS_6S,
+        _ => unimplemented!(),
+    }
+}
+
+pub fn num_policy_params<const S: usize>() -> usize {
+    match S {
+        4 => NUM_POLICY_PARAMS_4S,
+        5 => NUM_POLICY_PARAMS_5S,
+        6 => NUM_POLICY_PARAMS_6S,
+        _ => unimplemented!(),
+    }
+}
+
 #[allow(clippy::unreadable_literal)]
 pub const VALUE_PARAMS_4S: [f32; NUM_VALUE_PARAMS_4S] = [
     0.40710354,
