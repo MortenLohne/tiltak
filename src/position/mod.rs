@@ -27,8 +27,8 @@ pub use utils::{
 pub use mv::{Move, ReverseMove};
 
 use crate::evaluation::parameters::{
-    ValueParameters, POLICY_PARAMS_4S, POLICY_PARAMS_5S, POLICY_PARAMS_6S, VALUE_PARAMS_4S,
-    VALUE_PARAMS_5S, VALUE_PARAMS_6S,
+    PolicyParameters, ValueParameters, POLICY_PARAMS_4S, POLICY_PARAMS_5S, POLICY_PARAMS_6S,
+    VALUE_PARAMS_4S, VALUE_PARAMS_5S, VALUE_PARAMS_6S,
 };
 use crate::evaluation::{policy_eval, value_eval};
 use crate::position::color_trait::ColorTr;
@@ -1132,21 +1132,25 @@ impl<const S: usize> TunableBoard for Position<S> {
         group_data: &GroupData<S>,
         num_legal_moves: usize,
     ) {
+        let mut policy_params = PolicyParameters::new::<S>();
         match self.side_to_move() {
             Color::White => policy_eval::coefficients_for_move_colortr::<WhiteTr, BlackTr, S>(
                 self,
-                coefficients,
+                &mut policy_params,
                 mv,
                 group_data,
                 num_legal_moves,
             ),
             Color::Black => policy_eval::coefficients_for_move_colortr::<BlackTr, WhiteTr, S>(
                 self,
-                coefficients,
+                &mut policy_params,
                 mv,
                 group_data,
                 num_legal_moves,
             ),
+        }
+        for (i, p) in policy_params.parameters().enumerate() {
+            coefficients[i] = *p;
         }
     }
     /// Move generation that includes a heuristic probability of each move being played.
