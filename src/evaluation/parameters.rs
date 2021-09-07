@@ -134,6 +134,34 @@ impl PolicyParameters {
         }
     }
 
+    pub fn clear(&mut self) {
+        self.move_count.clear();
+        self.flat_psqt.clear();
+        self.wall_psqt.clear();
+        self.cap_psqt.clear();
+        self.our_road_stones_in_line.clear();
+        self.their_road_stones_in_line.clear();
+        self.extend_group.clear();
+        self.merge_two_groups.clear();
+        self.block_merger.clear();
+        self.place_critical_square.clear();
+        self.ignore_critical_square.clear();
+        self.next_to_our_last_stone.clear();
+        self.next_to_their_last_stone.clear();
+        self.diagonal_to_our_last_stone.clear();
+        self.diagonal_to_their_last_stone.clear();
+        self.attack_strong_flats.clear();
+        self.blocking_stone_blocks_extensions_of_two_flats.clear();
+        self.move_role_bonus.clear();
+        self.stack_movement_that_gives_us_top_pieces.clear();
+        self.stack_captured_by_movement.clear();
+        self.stack_capture_in_strong_line.clear();
+        self.stack_capture_in_strong_line_cap.clear();
+        self.move_cap_onto_strong_line.clear();
+        self.move_onto_critical_square.clear();
+        debug_assert_eq!(self.parameters().sum::<f32>(), 0.0);
+    }
+
     pub fn parameters(&self) -> impl Iterator<Item = &f32> {
         self.move_count
             .iter()
