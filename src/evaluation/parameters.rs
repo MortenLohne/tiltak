@@ -60,6 +60,17 @@ impl<'a> SliceArena {
             }
         }
     }
+
+    fn extract_parameters(&self, parameters: &mut [f32]) {
+        unsafe {
+            let box_ptr: *mut Box<[f32]> = self.backing_array.get();
+            assert_eq!((*box_ptr).len(), parameters.len());
+
+            for (i, p) in parameters.iter_mut().enumerate() {
+                *p = (*box_ptr)[i];
+            }
+        }
+    }
 }
 
 pub struct ValueParameters {
