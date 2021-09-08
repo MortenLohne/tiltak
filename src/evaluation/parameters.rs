@@ -50,6 +50,16 @@ impl<'a> SliceArena {
             sum
         }
     }
+
+    fn clear(&self) {
+        unsafe {
+            let box_ptr: *mut Box<[f32]> = self.backing_array.get();
+
+            for i in 0..(*box_ptr).len() {
+                (*box_ptr)[i] = 0.0;
+            }
+        }
+    }
 }
 
 pub struct ValueParameters {
