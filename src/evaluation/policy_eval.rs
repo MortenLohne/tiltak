@@ -65,11 +65,7 @@ impl<const S: usize> Position<S> {
 
         policy_parameters.parameters(coefficients);
 
-        let total_value: f32 = coefficients
-            .iter()
-            .zip(params)
-            .map(|(c, p)| c * p)
-            .sum();
+        let total_value: f32 = coefficients.iter().zip(params).map(|(c, p)| c * p).sum();
 
         coefficients.clear();
         policy_parameters.clear();
@@ -86,7 +82,6 @@ pub(crate) fn coefficients_for_move_colortr<Us: ColorTr, Them: ColorTr, const S:
     group_data: &GroupData<S>,
     num_legal_moves: usize,
 ) {
-
     let initial_move_prob = 1.0 / num_legal_moves.max(2) as f32;
 
     policy_params.move_count[0] = inverse_sigmoid(initial_move_prob);

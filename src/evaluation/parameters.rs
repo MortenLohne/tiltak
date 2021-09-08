@@ -1,4 +1,7 @@
 use crate::position::num_square_symmetries;
+use std::cell::UnsafeCell;
+use std::slice;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 pub const NUM_VALUE_PARAMS_4S: usize = 51;
 pub const NUM_POLICY_PARAMS_4S: usize = 78;
@@ -8,6 +11,46 @@ pub const NUM_POLICY_PARAMS_5S: usize = 93;
 
 pub const NUM_VALUE_PARAMS_6S: usize = 72;
 pub const NUM_POLICY_PARAMS_6S: usize = 99;
+
+struct SliceArena {
+    backing_array: UnsafeCell<Box<[f32]>>,
+    next_free_index: AtomicUsize,
+}
+
+impl<'a> SliceArena {
+    fn new(capacity: usize) -> Self {
+        SliceArena {
+            backing_array: UnsafeCell::new(vec![0.0; capacity].into_boxed_slice()),
+            next_free_index: AtomicUsize::new(0),
+        }
+    }
+
+    fn create_new_slice(&self, len: usize) -> &'a mut [f32] {
+        let slice = unsafe {
+            let box_ptr: *mut Box<[f32]> = self.backing_array.get();
+            assert!(self.next_free_index.load(Ordering::SeqCst) + len <= (*box_ptr).len());
+
+            let new_slice_start: *mut f32 =
+                ((*box_ptr).as_mut_ptr()).add(self.next_free_index.load(Ordering::SeqCst));
+            slice::from_raw_parts_mut(new_slice_start, len)
+        };
+
+        self.next_free_index.fetch_add(len, Ordering::SeqCst);
+        slice
+    }
+
+    fn mul_slice_and_sum(&self, coefficients: &[f32]) -> f32 {
+        unsafe {
+            let box_ptr: *mut Box<[f32]> = self.backing_array.get();
+
+            let mut sum = 0.0;
+            for (i, c) in coefficients.iter().enumerate() {
+                sum += *c * *((*box_ptr).as_mut_ptr().add(i));
+            }
+            sum
+        }
+    }
+}
 
 pub struct ValueParameters {
     pub flat_psqt: Vec<f32>,
