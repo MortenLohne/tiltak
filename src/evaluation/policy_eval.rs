@@ -26,41 +26,59 @@ impl<const S: usize> Position<S> {
         group_data: &GroupData<S>,
         simple_moves: &mut Vec<Move>,
         moves: &mut Vec<(Move, search::Score)>,
-        coefficients: &mut [f32],
+        coefficients: &mut Vec<f32>,
+        policy_parameters: &mut PolicyParameters,
     ) {
         let num_moves = simple_moves.len();
         moves.extend(simple_moves.drain(..).map(|mv| {
             (
                 mv.clone(),
-                self.probability_for_move_colortr::<Us, Them>(params, &mv, group_data, num_moves),
+                self.probability_for_move_colortr::<Us, Them>(
+                    params,
+                    &mv,
+                    group_data,
+                    coefficients,
+                    policy_parameters,
+                    num_moves,
+                ),
             )
         }));
     }
 
+    #[inline(never)]
     fn probability_for_move_colortr<Us: ColorTr, Them: ColorTr>(
         &self,
         params: &[f32],
         mv: &Move,
         group_data: &GroupData<S>,
+        coefficients: &mut Vec<f32>,
+        policy_parameters: &mut PolicyParameters,
         num_moves: usize,
     ) -> f32 {
-        let mut policy_params = PolicyParameters::new::<S>();
         coefficients_for_move_colortr::<Us, Them, S>(
             self,
-            &mut policy_params,
+            policy_parameters,
             mv,
             group_data,
             num_moves,
         );
-        let total_value: f32 = policy_params
-            .parameters()
+
+        policy_parameters.parameters(coefficients);
+
+        let total_value: f32 = coefficients
+            .iter()
             .zip(params)
             .map(|(c, p)| c * p)
             .sum();
 
+        coefficients.clear();
+        policy_parameters.clear();
+
         sigmoid(total_value)
     }
 }
+
+#[inline(never)]
 pub(crate) fn coefficients_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usize>(
     position: &Position<S>,
     policy_params: &mut PolicyParameters,
@@ -68,6 +86,7 @@ pub(crate) fn coefficients_for_move_colortr<Us: ColorTr, Them: ColorTr, const S:
     group_data: &GroupData<S>,
     num_legal_moves: usize,
 ) {
+
     let initial_move_prob = 1.0 / num_legal_moves.max(2) as f32;
 
     policy_params.move_count[0] = inverse_sigmoid(initial_move_prob);
@@ -290,6 +309,7 @@ pub(crate) fn coefficients_for_move_colortr<Us: ColorTr, Them: ColorTr, const S:
                             .neighbours::<S>()
                             .any(|n| Us::is_critical_square(group_data, n))
                         {
+                            // TODO: This writes to the wrong index in 6s
                             policy_params.move_cap_onto_strong_line[road_piece_count - 1] += 1.0;
                         }
                     }

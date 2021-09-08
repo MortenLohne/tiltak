@@ -116,12 +116,13 @@ pub trait TunableBoard: PositionTrait {
         data: &Self::ExtraData,
         simple_moves: &mut Vec<<Self as PositionTrait>::Move>,
         moves: &mut Vec<(<Self as PositionTrait>::Move, search::Score)>,
-        coefficients: &mut [f32],
+        coefficients: &mut Vec<f32>,
+        policy_parameters: &mut PolicyParameters,
     );
 
     fn coefficients_for_move(
         &self,
-        coefficients: &mut [f32],
+        coefficients: &mut Vec<f32>,
         mv: &Move,
         data: &Self::ExtraData,
         num_legal_moves: usize,
@@ -138,7 +139,8 @@ pub trait TunableBoard: PositionTrait {
         group_data: &Self::ExtraData,
         simple_moves: &mut Vec<Move>,
         moves: &mut Vec<(Move, search::Score)>,
-        coefficients: &mut [f32],
+        coefficients: &mut Vec<f32>,
+        policy_parameters: &mut PolicyParameters,
     );
 }
 
@@ -1103,7 +1105,8 @@ impl<const S: usize> TunableBoard for Position<S> {
         group_data: &GroupData<S>,
         simple_moves: &mut Vec<Self::Move>,
         moves: &mut Vec<(Self::Move, f32)>,
-        coefficients: &mut [f32],
+        coefficients: &mut Vec<f32>,
+        policy_parameters: &mut PolicyParameters,
     ) {
         debug_assert!(simple_moves.is_empty());
         self.generate_moves(simple_moves);
@@ -1114,6 +1117,7 @@ impl<const S: usize> TunableBoard for Position<S> {
                 simple_moves,
                 moves,
                 coefficients,
+                policy_parameters,
             ),
             Color::Black => self.generate_moves_with_probabilities_colortr::<BlackTr, WhiteTr>(
                 params,
@@ -1121,13 +1125,14 @@ impl<const S: usize> TunableBoard for Position<S> {
                 simple_moves,
                 moves,
                 coefficients,
+                policy_parameters,
             ),
         }
     }
 
     fn coefficients_for_move(
         &self,
-        coefficients: &mut [f32],
+        coefficients: &mut Vec<f32>,
         mv: &Move,
         group_data: &GroupData<S>,
         num_legal_moves: usize,
@@ -1149,9 +1154,7 @@ impl<const S: usize> TunableBoard for Position<S> {
                 num_legal_moves,
             ),
         }
-        for (i, p) in policy_params.parameters().enumerate() {
-            coefficients[i] = *p;
-        }
+        policy_params.parameters(coefficients);
     }
     /// Move generation that includes a heuristic probability of each move being played.
     ///
@@ -1164,7 +1167,8 @@ impl<const S: usize> TunableBoard for Position<S> {
         group_data: &GroupData<S>,
         simple_moves: &mut Vec<Move>,
         moves: &mut Vec<(Move, search::Score)>,
-        coefficients: &mut [f32],
+        coefficients: &mut Vec<f32>,
+        policy_parameters: &mut PolicyParameters,
     ) {
         self.generate_moves_with_params(
             Self::policy_params(),
@@ -1172,6 +1176,7 @@ impl<const S: usize> TunableBoard for Position<S> {
             simple_moves,
             moves,
             coefficients,
+            policy_parameters,
         )
     }
 }

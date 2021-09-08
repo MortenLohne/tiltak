@@ -77,6 +77,7 @@ impl ValueParameters {
     }
 }
 
+#[derive(PartialEq, Debug, Clone)]
 pub struct PolicyParameters {
     pub move_count: Vec<f32>,
     pub flat_psqt: Vec<f32>,
@@ -127,67 +128,73 @@ impl PolicyParameters {
             move_role_bonus: vec![0.0; 3],
             stack_movement_that_gives_us_top_pieces: vec![0.0; 6],
             stack_captured_by_movement: vec![0.0; 1],
-            stack_capture_in_strong_line: vec![0.0; 2],
-            stack_capture_in_strong_line_cap: vec![0.0; 2],
-            move_cap_onto_strong_line: vec![0.0; 4],
+            stack_capture_in_strong_line: vec![0.0; S - 3],
+            stack_capture_in_strong_line_cap: vec![0.0; S - 3],
+            move_cap_onto_strong_line: vec![0.0; 5],
             move_onto_critical_square: vec![0.0; 4],
         }
     }
 
+    #[inline(never)]
     pub fn clear(&mut self) {
-        self.move_count.clear();
-        self.flat_psqt.clear();
-        self.wall_psqt.clear();
-        self.cap_psqt.clear();
-        self.our_road_stones_in_line.clear();
-        self.their_road_stones_in_line.clear();
-        self.extend_group.clear();
-        self.merge_two_groups.clear();
-        self.block_merger.clear();
-        self.place_critical_square.clear();
-        self.ignore_critical_square.clear();
-        self.next_to_our_last_stone.clear();
-        self.next_to_their_last_stone.clear();
-        self.diagonal_to_our_last_stone.clear();
-        self.diagonal_to_their_last_stone.clear();
-        self.attack_strong_flats.clear();
-        self.blocking_stone_blocks_extensions_of_two_flats.clear();
-        self.move_role_bonus.clear();
-        self.stack_movement_that_gives_us_top_pieces.clear();
-        self.stack_captured_by_movement.clear();
-        self.stack_capture_in_strong_line.clear();
-        self.stack_capture_in_strong_line_cap.clear();
-        self.move_cap_onto_strong_line.clear();
-        self.move_onto_critical_square.clear();
-        debug_assert_eq!(self.parameters().sum::<f32>(), 0.0);
+        set_zero(&mut self.move_count);
+        set_zero(&mut self.flat_psqt);
+        set_zero(&mut self.wall_psqt);
+        set_zero(&mut self.cap_psqt);
+        set_zero(&mut self.our_road_stones_in_line);
+        set_zero(&mut self.their_road_stones_in_line);
+        set_zero(&mut self.extend_group);
+        set_zero(&mut self.merge_two_groups);
+        set_zero(&mut self.block_merger);
+        set_zero(&mut self.place_critical_square);
+        set_zero(&mut self.ignore_critical_square);
+        set_zero(&mut self.next_to_our_last_stone);
+        set_zero(&mut self.next_to_their_last_stone);
+        set_zero(&mut self.diagonal_to_our_last_stone);
+        set_zero(&mut self.diagonal_to_their_last_stone);
+        set_zero(&mut self.attack_strong_flats);
+        set_zero(&mut self.blocking_stone_blocks_extensions_of_two_flats);
+        set_zero(&mut self.move_role_bonus);
+        set_zero(&mut self.stack_movement_that_gives_us_top_pieces);
+        set_zero(&mut self.stack_captured_by_movement);
+        set_zero(&mut self.stack_capture_in_strong_line);
+        set_zero(&mut self.stack_capture_in_strong_line_cap);
+        set_zero(&mut self.move_cap_onto_strong_line);
+        set_zero(&mut self.move_onto_critical_square);
     }
 
-    pub fn parameters(&self) -> impl Iterator<Item = &f32> {
-        self.move_count
-            .iter()
-            .chain(self.flat_psqt.iter())
-            .chain(self.wall_psqt.iter())
-            .chain(self.cap_psqt.iter())
-            .chain(self.our_road_stones_in_line.iter())
-            .chain(self.their_road_stones_in_line.iter())
-            .chain(self.extend_group.iter())
-            .chain(self.merge_two_groups.iter())
-            .chain(self.block_merger.iter())
-            .chain(self.place_critical_square.iter())
-            .chain(self.ignore_critical_square.iter())
-            .chain(self.next_to_our_last_stone.iter())
-            .chain(self.next_to_their_last_stone.iter())
-            .chain(self.diagonal_to_our_last_stone.iter())
-            .chain(self.diagonal_to_their_last_stone.iter())
-            .chain(self.attack_strong_flats.iter())
-            .chain(self.blocking_stone_blocks_extensions_of_two_flats.iter())
-            .chain(self.move_role_bonus.iter())
-            .chain(self.stack_movement_that_gives_us_top_pieces.iter())
-            .chain(self.stack_captured_by_movement.iter())
-            .chain(self.stack_capture_in_strong_line.iter())
-            .chain(self.stack_capture_in_strong_line_cap.iter())
-            .chain(self.move_cap_onto_strong_line.iter())
-            .chain(self.move_onto_critical_square.iter())
+    #[inline(never)]
+    pub fn parameters(&self, vec: &mut Vec<f32>) {
+        vec.extend_from_slice(&self.move_count);
+        vec.extend_from_slice(&self.flat_psqt);
+        vec.extend_from_slice(&self.wall_psqt);
+        vec.extend_from_slice(&self.cap_psqt);
+        vec.extend_from_slice(&self.our_road_stones_in_line);
+        vec.extend_from_slice(&self.their_road_stones_in_line);
+        vec.extend_from_slice(&self.extend_group);
+        vec.extend_from_slice(&self.merge_two_groups);
+        vec.extend_from_slice(&self.block_merger);
+        vec.extend_from_slice(&self.place_critical_square);
+        vec.extend_from_slice(&self.ignore_critical_square);
+        vec.extend_from_slice(&self.next_to_our_last_stone);
+        vec.extend_from_slice(&self.next_to_their_last_stone);
+        vec.extend_from_slice(&self.diagonal_to_our_last_stone);
+        vec.extend_from_slice(&self.diagonal_to_their_last_stone);
+        vec.extend_from_slice(&self.attack_strong_flats);
+        vec.extend_from_slice(&self.blocking_stone_blocks_extensions_of_two_flats);
+        vec.extend_from_slice(&self.move_role_bonus);
+        vec.extend_from_slice(&self.stack_movement_that_gives_us_top_pieces);
+        vec.extend_from_slice(&self.stack_captured_by_movement);
+        vec.extend_from_slice(&self.stack_capture_in_strong_line);
+        vec.extend_from_slice(&self.stack_capture_in_strong_line_cap);
+        vec.extend_from_slice(&self.move_cap_onto_strong_line);
+        vec.extend_from_slice(&self.move_onto_critical_square);
+    }
+}
+
+pub fn set_zero(parameters: &mut [f32]) {
+    for p in parameters.iter_mut() {
+        *p = 0.0;
     }
 }
 

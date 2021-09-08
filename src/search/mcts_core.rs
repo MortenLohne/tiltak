@@ -5,6 +5,7 @@ use rand::distributions::Distribution;
 use rand::Rng;
 
 use crate::evaluation::parameters;
+use crate::evaluation::parameters::PolicyParameters;
 use crate::position::Move;
 /// This module contains the core of the MCTS search algorithm
 use crate::position::{GroupData, Position, TunableBoard};
@@ -34,6 +35,7 @@ pub struct TempVectors {
     moves: Vec<(Move, f32)>,
     value_scores: Vec<Score>,
     policy_scores: Vec<Score>,
+    policy_parameters: PolicyParameters,
 }
 
 impl TempVectors {
@@ -59,6 +61,7 @@ impl TempVectors {
                     _ => unimplemented!(),
                 }
             ],
+            policy_parameters: PolicyParameters::new::<S>(),
         }
     }
 }
@@ -187,6 +190,7 @@ impl Tree {
             &mut temp_vectors.simple_moves,
             &mut temp_vectors.moves,
             &mut temp_vectors.policy_scores,
+            &mut temp_vectors.policy_parameters,
         );
         let mut children_vec = Vec::with_capacity(temp_vectors.moves.len());
         let policy_sum: f32 = temp_vectors.moves.iter().map(|(_, score)| *score).sum();
@@ -265,6 +269,7 @@ pub fn rollout<const S: usize>(
             &mut temp_vectors.simple_moves,
             &mut temp_vectors.moves,
             &mut temp_vectors.policy_scores,
+            &mut temp_vectors.policy_parameters,
         );
 
         let mut rng = rand::thread_rng();

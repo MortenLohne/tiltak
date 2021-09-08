@@ -9,7 +9,7 @@ use pgn_traits::PgnPosition;
 #[cfg(feature = "constant-tuning")]
 use rayon::prelude::*;
 
-use tiltak::evaluation::parameters;
+use tiltak::evaluation::parameters::PolicyParameters;
 use tiltak::minmax;
 use tiltak::position::Move;
 #[cfg(feature = "constant-tuning")]
@@ -337,28 +337,22 @@ fn analyze_position<const S: usize>(position: &Position<S>) {
 
     let mut simple_moves = vec![];
     let mut moves = vec![];
-    let mut coefficients = vec![
-        0.0;
-        match S {
-            4 => parameters::NUM_POLICY_PARAMS_4S,
-            5 => parameters::NUM_POLICY_PARAMS_5S,
-            6 => parameters::NUM_POLICY_PARAMS_6S,
-            _ => unimplemented!(),
-        }
-    ];
+    let mut policy_parameters = PolicyParameters::new::<S>();
+    let mut coefficients = vec![];
 
     position.generate_moves_with_probabilities(
         &position.group_data(),
         &mut simple_moves,
         &mut moves,
         &mut coefficients,
+        &mut policy_parameters,
     );
     moves.sort_by_key(|(_mv, score)| -(score * 1000.0) as i64);
 
     println!("Top 10 heuristic moves:");
     for (mv, score) in moves.iter().take(10) {
         println!("{}: {:.3}", mv.to_string::<S>(), score);
-        let mut coefficients = vec![0.0; <Position<S>>::policy_params().len()];
+        let mut coefficients = Vec::with_capacity(<Position<S>>::policy_params().len());
         position.coefficients_for_move(&mut coefficients, mv, &position.group_data(), moves.len());
         for coefficient in coefficients {
             print!("{:.1}, ", coefficient);
