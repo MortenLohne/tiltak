@@ -52,7 +52,7 @@ pub const MAX_BOARD_SIZE: usize = 8;
 pub const fn starting_stones<const S: usize>() -> u8 {
     match S {
         3 => 10,
-        4 => 16,
+        4 => 15,
         5 => 21,
         6 => 30,
         7 => 40,
