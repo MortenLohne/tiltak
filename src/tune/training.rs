@@ -401,7 +401,7 @@ pub fn tune_value_and_policy<const S: usize, const N: usize, const M: usize>(
         &policy_coefficients_sets[middle_index..],
         &policy_results[middle_index..],
         initial_policy_params,
-        10000.0,
+        5000.0,
     );
 
     println!("Final parameters: {:?}", tuned_policy_parameters);
