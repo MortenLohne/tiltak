@@ -158,8 +158,9 @@ pub(crate) fn coefficients_for_move_colortr<Us: ColorTr, Them: ColorTr, const S:
                 }
 
                 // If square is next to a road stone laid on our last turn
-                if let Some(Move::Place(last_role, last_square)) =
-                    position.moves().get(position.moves().len() - 2)
+                if let Some(Move::Place(last_role, last_square)) = position
+                    .moves()
+                    .get(position.moves().len().overflowing_sub(2).0)
                 {
                     if *last_role == Flat || *last_role == Cap {
                         if square.neighbours::<S>().any(|neigh| neigh == *last_square) {
