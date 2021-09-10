@@ -1,6 +1,6 @@
 use board_game_traits::{Color, Position as EvalPosition};
 
-use crate::evaluation::parameters::ValueParameters;
+use crate::evaluation::parameters::ValueFeatures;
 use crate::position::bitboard::BitBoard;
 use crate::position::color_trait::{BlackTr, ColorTr, WhiteTr};
 use crate::position::{
@@ -10,7 +10,7 @@ use crate::position::{
 pub(crate) fn static_eval_game_phase<const S: usize>(
     position: &Position<S>,
     group_data: &GroupData<S>,
-    value_params: &mut ValueParameters,
+    value_params: &mut ValueFeatures,
 ) {
     let mut white_flat_count = 0;
     let mut black_flat_count = 0;
@@ -185,7 +185,7 @@ pub(crate) fn static_eval_game_phase<const S: usize>(
 fn critical_squares_eval<Us: ColorTr, Them: ColorTr, const S: usize>(
     position: &Position<S>,
     critical_square: Square,
-    value_params: &mut ValueParameters,
+    value_params: &mut ValueFeatures,
 ) {
     let top_stone = position[critical_square].top_stone;
     if top_stone.is_none() {
@@ -217,7 +217,7 @@ fn critical_squares_eval<Us: ColorTr, Them: ColorTr, const S: usize>(
 fn line_score<Us: ColorTr, Them: ColorTr, const S: usize>(
     group_data: &GroupData<S>,
     line: BitBoard,
-    value_params: &mut ValueParameters,
+    value_params: &mut ValueFeatures,
 ) {
     let road_pieces_in_line = (Us::road_stones(group_data) & line).count();
 

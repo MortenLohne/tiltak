@@ -3,9 +3,9 @@ use std::path::Path;
 use clap::{App, Arg, SubCommand};
 
 use tiltak::evaluation::parameters::{
-    NUM_POLICY_PARAMS_4S, NUM_POLICY_PARAMS_5S, NUM_POLICY_PARAMS_6S, NUM_VALUE_PARAMS_4S,
-    NUM_VALUE_PARAMS_5S, NUM_VALUE_PARAMS_6S, POLICY_PARAMS_4S, POLICY_PARAMS_5S, POLICY_PARAMS_6S,
-    VALUE_PARAMS_4S, VALUE_PARAMS_5S, VALUE_PARAMS_6S,
+    NUM_POLICY_FEATURES_4S, NUM_POLICY_FEATURES_5S, NUM_POLICY_FEATURES_6S, NUM_VALUE_FEATURES_4S,
+    NUM_VALUE_FEATURES_5S, NUM_VALUE_FEATURES_6S, POLICY_PARAMS_4S, POLICY_PARAMS_5S,
+    POLICY_PARAMS_6S, VALUE_PARAMS_4S, VALUE_PARAMS_5S, VALUE_PARAMS_6S,
 };
 use tiltak::tune::{spsa, training};
 
@@ -65,20 +65,20 @@ fn main() {
                     match size {
                         4 => training::train_perpetually::<
                             4,
-                            NUM_VALUE_PARAMS_4S,
-                            NUM_POLICY_PARAMS_4S,
+                            NUM_VALUE_FEATURES_4S,
+                            NUM_POLICY_FEATURES_4S,
                         >(i, &VALUE_PARAMS_4S, &POLICY_PARAMS_4S)
                         .unwrap(),
                         5 => training::train_perpetually::<
                             5,
-                            NUM_VALUE_PARAMS_5S,
-                            NUM_POLICY_PARAMS_5S,
+                            NUM_VALUE_FEATURES_5S,
+                            NUM_POLICY_FEATURES_5S,
                         >(i, &VALUE_PARAMS_5S, &POLICY_PARAMS_5S)
                         .unwrap(),
                         6 => training::train_perpetually::<
                             6,
-                            NUM_VALUE_PARAMS_6S,
-                            NUM_POLICY_PARAMS_6S,
+                            NUM_VALUE_FEATURES_6S,
+                            NUM_POLICY_FEATURES_6S,
                         >(i, &VALUE_PARAMS_6S, &POLICY_PARAMS_6S)
                         .unwrap(),
                         _ => panic!("Size {} not supported.", size),
@@ -96,20 +96,20 @@ fn main() {
                     match size {
                         4 => training::train_from_scratch::<
                             5,
-                            NUM_VALUE_PARAMS_4S,
-                            NUM_POLICY_PARAMS_4S,
+                            NUM_VALUE_FEATURES_4S,
+                            NUM_POLICY_FEATURES_4S,
                         >(i)
                         .unwrap(),
                         5 => training::train_from_scratch::<
                             5,
-                            NUM_VALUE_PARAMS_5S,
-                            NUM_POLICY_PARAMS_5S,
+                            NUM_VALUE_FEATURES_5S,
+                            NUM_POLICY_FEATURES_5S,
                         >(i)
                         .unwrap(),
                         6 => training::train_from_scratch::<
                             6,
-                            NUM_VALUE_PARAMS_6S,
-                            NUM_POLICY_PARAMS_6S,
+                            NUM_VALUE_FEATURES_6S,
+                            NUM_POLICY_FEATURES_6S,
                         >(i)
                         .unwrap(),
                         _ => panic!("Size {} not supported.", size),
@@ -125,19 +125,19 @@ fn main() {
             match size {
                 4 => {
                     let value_params =
-                        training::tune_value_from_file::<4, NUM_VALUE_PARAMS_4S>(file_name)
+                        training::tune_value_from_file::<4, NUM_VALUE_FEATURES_4S>(file_name)
                             .unwrap();
                     println!("{:?}", value_params);
                 }
                 5 => {
                     let value_params =
-                        training::tune_value_from_file::<5, NUM_VALUE_PARAMS_5S>(file_name)
+                        training::tune_value_from_file::<5, NUM_VALUE_FEATURES_5S>(file_name)
                             .unwrap();
                     println!("{:?}", value_params);
                 }
                 6 => {
                     let value_params =
-                        training::tune_value_from_file::<6, NUM_VALUE_PARAMS_6S>(file_name)
+                        training::tune_value_from_file::<6, NUM_VALUE_FEATURES_6S>(file_name)
                             .unwrap();
                     println!("{:?}", value_params);
                 }
@@ -152,8 +152,8 @@ fn main() {
                     let (value_params, policy_params) =
                         training::tune_value_and_policy_from_file::<
                             4,
-                            NUM_VALUE_PARAMS_4S,
-                            NUM_POLICY_PARAMS_4S,
+                            NUM_VALUE_FEATURES_4S,
+                            NUM_POLICY_FEATURES_4S,
                         >(value_file_name, policy_file_name)
                         .unwrap();
                     println!("Value: {:?}", value_params);
@@ -163,8 +163,8 @@ fn main() {
                     let (value_params, policy_params) =
                         training::tune_value_and_policy_from_file::<
                             5,
-                            NUM_VALUE_PARAMS_5S,
-                            NUM_POLICY_PARAMS_5S,
+                            NUM_VALUE_FEATURES_5S,
+                            NUM_POLICY_FEATURES_5S,
                         >(value_file_name, policy_file_name)
                         .unwrap();
                     println!("Value: {:?}", value_params);
@@ -174,8 +174,8 @@ fn main() {
                     let (value_params, policy_params) =
                         training::tune_value_and_policy_from_file::<
                             6,
-                            NUM_VALUE_PARAMS_6S,
-                            NUM_POLICY_PARAMS_6S,
+                            NUM_VALUE_FEATURES_6S,
+                            NUM_POLICY_FEATURES_6S,
                         >(value_file_name, policy_file_name)
                         .unwrap();
                     println!("Value: {:?}", value_params);

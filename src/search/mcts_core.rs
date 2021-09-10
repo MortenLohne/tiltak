@@ -41,8 +41,8 @@ impl TempVectors {
         TempVectors {
             simple_moves: vec![],
             moves: vec![],
-            value_scores: vec![0.0; parameters::num_value_params::<S>()],
-            policy_scores: vec![0.0; parameters::num_policy_params::<S>()],
+            value_scores: vec![0.0; parameters::num_value_features::<S>()],
+            policy_scores: vec![0.0; parameters::num_policy_features::<S>()],
         }
     }
 }

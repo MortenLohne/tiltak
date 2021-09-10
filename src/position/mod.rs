@@ -27,7 +27,7 @@ pub use utils::{
 pub use mv::{Move, ReverseMove};
 
 use crate::evaluation::parameters::{
-    PolicyParameters, ValueParameters, POLICY_PARAMS_4S, POLICY_PARAMS_5S, POLICY_PARAMS_6S,
+    PolicyFeatures, ValueFeatures, POLICY_PARAMS_4S, POLICY_PARAMS_5S, POLICY_PARAMS_6S,
     VALUE_PARAMS_4S, VALUE_PARAMS_5S, VALUE_PARAMS_6S,
 };
 use crate::evaluation::{policy_eval, value_eval};
@@ -812,7 +812,7 @@ impl<const S: usize> Position<S> {
         params: &[f32],
         coefficients: &mut [f32],
     ) -> f32 {
-        let mut value_params = ValueParameters::new::<S>(coefficients);
+        let mut value_params = ValueFeatures::new::<S>(coefficients);
         value_eval::static_eval_game_phase(self, group_data, &mut value_params);
         let eval = coefficients.iter().zip(params).map(|(a, b)| a * b).sum();
         for c in coefficients.iter_mut() {
@@ -1094,7 +1094,7 @@ impl<const S: usize> TunableBoard for Position<S> {
         debug_assert!(self.game_result().is_none());
 
         let group_data = self.group_data();
-        let mut value_params = ValueParameters::new::<S>(coefficients);
+        let mut value_params = ValueFeatures::new::<S>(coefficients);
         value_eval::static_eval_game_phase(self, &group_data, &mut value_params);
     }
 
@@ -1133,7 +1133,7 @@ impl<const S: usize> TunableBoard for Position<S> {
         group_data: &GroupData<S>,
         num_legal_moves: usize,
     ) {
-        let mut policy_params = PolicyParameters::new::<S>(coefficients);
+        let mut policy_params = PolicyFeatures::new::<S>(coefficients);
         match self.side_to_move() {
             Color::White => policy_eval::coefficients_for_move_colortr::<WhiteTr, BlackTr, S>(
                 self,

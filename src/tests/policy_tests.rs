@@ -16,7 +16,7 @@ fn correct_top_policy_move_property<const S: usize>(fen: &str, correct_move_stri
         &group_data,
         &mut simple_moves,
         &mut legal_moves,
-        &mut vec![0.0; parameters::num_policy_params::<S>()],
+        &mut vec![0.0; parameters::num_policy_features::<S>()],
     );
 
     for mv in &moves {

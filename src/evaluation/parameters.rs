@@ -1,16 +1,16 @@
 use crate::position::num_square_symmetries;
 
-pub const NUM_VALUE_PARAMS_4S: usize = 51;
-pub const NUM_POLICY_PARAMS_4S: usize = 74;
+pub const NUM_VALUE_FEATURES_4S: usize = 51;
+pub const NUM_POLICY_FEATURES_4S: usize = 74;
 
-pub const NUM_VALUE_PARAMS_5S: usize = 69;
-pub const NUM_POLICY_PARAMS_5S: usize = 93;
+pub const NUM_VALUE_FEATURES_5S: usize = 69;
+pub const NUM_POLICY_FEATURES_5S: usize = 93;
 
-pub const NUM_VALUE_PARAMS_6S: usize = 72;
-pub const NUM_POLICY_PARAMS_6S: usize = 103;
+pub const NUM_VALUE_FEATURES_6S: usize = 72;
+pub const NUM_POLICY_FEATURES_6S: usize = 103;
 
 #[derive(Debug)]
-pub struct ValueParameters<'a> {
+pub struct ValueFeatures<'a> {
     pub flat_psqt: &'a mut [f32],
     pub wall_psqt: &'a mut [f32],
     pub cap_psqt: &'a mut [f32],
@@ -31,9 +31,9 @@ pub struct ValueParameters<'a> {
     pub block_their_line: &'a mut [f32],
 }
 
-impl<'a> ValueParameters<'a> {
+impl<'a> ValueFeatures<'a> {
     pub fn new<const S: usize>(coefficients: &'a mut [f32]) -> Self {
-        assert_eq!(coefficients.len(), num_value_params::<S>());
+        assert_eq!(coefficients.len(), num_value_features::<S>());
 
         let (flat_psqt, coefficients) = coefficients.split_at_mut(num_square_symmetries::<S>());
         let (wall_psqt, coefficients) = coefficients.split_at_mut(num_square_symmetries::<S>());
@@ -58,7 +58,7 @@ impl<'a> ValueParameters<'a> {
 
         assert!(coefficients.is_empty());
 
-        ValueParameters {
+        ValueFeatures {
             flat_psqt,
             wall_psqt,
             cap_psqt,
@@ -82,7 +82,7 @@ impl<'a> ValueParameters<'a> {
 }
 
 #[derive(Debug)]
-pub struct PolicyParameters<'a> {
+pub struct PolicyFeatures<'a> {
     pub move_count: &'a mut [f32],
     pub flat_psqt: &'a mut [f32],
     pub wall_psqt: &'a mut [f32],
@@ -110,10 +110,10 @@ pub struct PolicyParameters<'a> {
     pub move_onto_critical_square: &'a mut [f32],
 }
 
-impl<'a> PolicyParameters<'a> {
+impl<'a> PolicyFeatures<'a> {
     #[inline(never)]
-    pub fn new<const S: usize>(coefficients: &'a mut [f32]) -> PolicyParameters<'a> {
-        assert_eq!(coefficients.len(), num_policy_params::<S>());
+    pub fn new<const S: usize>(coefficients: &'a mut [f32]) -> PolicyFeatures<'a> {
+        assert_eq!(coefficients.len(), num_policy_features::<S>());
 
         let (move_count, coefficients) = coefficients.split_at_mut(1);
         let (flat_psqt, coefficients) = coefficients.split_at_mut(num_square_symmetries::<S>());
@@ -145,7 +145,7 @@ impl<'a> PolicyParameters<'a> {
 
         assert!(coefficients.is_empty());
 
-        PolicyParameters {
+        PolicyFeatures {
             move_count,
             flat_psqt,
             wall_psqt,
@@ -175,26 +175,26 @@ impl<'a> PolicyParameters<'a> {
     }
 }
 
-pub fn num_value_params<const S: usize>() -> usize {
+pub fn num_value_features<const S: usize>() -> usize {
     match S {
-        4 => NUM_VALUE_PARAMS_4S,
-        5 => NUM_VALUE_PARAMS_5S,
-        6 => NUM_VALUE_PARAMS_6S,
+        4 => NUM_VALUE_FEATURES_4S,
+        5 => NUM_VALUE_FEATURES_5S,
+        6 => NUM_VALUE_FEATURES_6S,
         _ => unimplemented!(),
     }
 }
 
-pub fn num_policy_params<const S: usize>() -> usize {
+pub fn num_policy_features<const S: usize>() -> usize {
     match S {
-        4 => NUM_POLICY_PARAMS_4S,
-        5 => NUM_POLICY_PARAMS_5S,
-        6 => NUM_POLICY_PARAMS_6S,
+        4 => NUM_POLICY_FEATURES_4S,
+        5 => NUM_POLICY_FEATURES_5S,
+        6 => NUM_POLICY_FEATURES_6S,
         _ => unimplemented!(),
     }
 }
 
 #[allow(clippy::unreadable_literal)]
-pub const VALUE_PARAMS_4S: [f32; NUM_VALUE_PARAMS_4S] = [
+pub const VALUE_PARAMS_4S: [f32; NUM_VALUE_FEATURES_4S] = [
     0.40710354,
     0.54004306,
     0.7314182,
@@ -248,7 +248,7 @@ pub const VALUE_PARAMS_4S: [f32; NUM_VALUE_PARAMS_4S] = [
     0.003347816,
 ];
 #[allow(clippy::unreadable_literal)]
-pub const POLICY_PARAMS_4S: [f32; NUM_POLICY_PARAMS_4S] = [
+pub const POLICY_PARAMS_4S: [f32; NUM_POLICY_FEATURES_4S] = [
     0.9671596,
     0.109868206,
     0.25096068,
@@ -326,7 +326,7 @@ pub const POLICY_PARAMS_4S: [f32; NUM_POLICY_PARAMS_4S] = [
 ];
 
 #[allow(clippy::unreadable_literal)]
-pub const VALUE_PARAMS_5S: [f32; NUM_VALUE_PARAMS_5S] = [
+pub const VALUE_PARAMS_5S: [f32; NUM_VALUE_FEATURES_5S] = [
     -0.00044795033,
     0.15347332,
     0.14927012,
@@ -399,7 +399,7 @@ pub const VALUE_PARAMS_5S: [f32; NUM_VALUE_PARAMS_5S] = [
 ];
 
 #[allow(clippy::unreadable_literal)]
-pub const POLICY_PARAMS_5S: [f32; NUM_POLICY_PARAMS_5S] = [
+pub const POLICY_PARAMS_5S: [f32; NUM_POLICY_FEATURES_5S] = [
     0.9295695,
     -0.083421424,
     0.08532888,
@@ -496,7 +496,7 @@ pub const POLICY_PARAMS_5S: [f32; NUM_POLICY_PARAMS_5S] = [
 ];
 
 #[allow(clippy::unreadable_literal)]
-pub const VALUE_PARAMS_6S: [f32; NUM_VALUE_PARAMS_6S] = [
+pub const VALUE_PARAMS_6S: [f32; NUM_VALUE_FEATURES_6S] = [
     0.14389691,
     0.14861599,
     0.21016096,
@@ -572,7 +572,7 @@ pub const VALUE_PARAMS_6S: [f32; NUM_VALUE_PARAMS_6S] = [
 ];
 
 #[allow(clippy::unreadable_literal)]
-pub const POLICY_PARAMS_6S: [f32; NUM_POLICY_PARAMS_6S] = [
+pub const POLICY_PARAMS_6S: [f32; NUM_POLICY_FEATURES_6S] = [
     0.88868046,
     -0.42997846,
     -0.03510685,

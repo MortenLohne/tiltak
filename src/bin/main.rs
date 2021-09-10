@@ -340,9 +340,9 @@ fn analyze_position<const S: usize>(position: &Position<S>) {
     let mut coefficients = vec![
         0.0;
         match S {
-            4 => parameters::NUM_POLICY_PARAMS_4S,
-            5 => parameters::NUM_POLICY_PARAMS_5S,
-            6 => parameters::NUM_POLICY_PARAMS_6S,
+            4 => parameters::NUM_POLICY_FEATURES_4S,
+            5 => parameters::NUM_POLICY_FEATURES_5S,
+            6 => parameters::NUM_POLICY_FEATURES_6S,
             _ => unimplemented!(),
         }
     ];

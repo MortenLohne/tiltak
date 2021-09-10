@@ -1,6 +1,6 @@
 use arrayvec::ArrayVec;
 
-use crate::evaluation::parameters::PolicyParameters;
+use crate::evaluation::parameters::PolicyFeatures;
 use crate::position::bitboard::BitBoard;
 use crate::position::color_trait::ColorTr;
 use crate::position::Direction::*;
@@ -51,7 +51,7 @@ impl<const S: usize> Position<S> {
         coefficients: &mut [f32],
         num_moves: usize,
     ) -> f32 {
-        let mut policy_params = PolicyParameters::new::<S>(coefficients);
+        let mut policy_params = PolicyFeatures::new::<S>(coefficients);
         coefficients_for_move_colortr::<Us, Them, S>(
             self,
             &mut policy_params,
@@ -70,7 +70,7 @@ impl<const S: usize> Position<S> {
 }
 pub(crate) fn coefficients_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usize>(
     position: &Position<S>,
-    policy_params: &mut PolicyParameters,
+    policy_params: &mut PolicyFeatures,
     mv: &Move,
     group_data: &GroupData<S>,
     num_legal_moves: usize,
