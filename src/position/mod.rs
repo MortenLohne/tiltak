@@ -1132,7 +1132,7 @@ impl<const S: usize> TunableBoard for Position<S> {
         group_data: &GroupData<S>,
         num_legal_moves: usize,
     ) {
-        let mut policy_params = PolicyParameters::new::<S>();
+        let mut policy_params = PolicyParameters::new::<S>(coefficients);
         match self.side_to_move() {
             Color::White => policy_eval::coefficients_for_move_colortr::<WhiteTr, BlackTr, S>(
                 self,
@@ -1149,8 +1149,8 @@ impl<const S: usize> TunableBoard for Position<S> {
                 num_legal_moves,
             ),
         }
-        for (i, p) in policy_params.parameters().enumerate() {
-            coefficients[i] = *p;
+        for p in coefficients.iter_mut() {
+            *p = 0.0;
         }
     }
     /// Move generation that includes a heuristic probability of each move being played.

@@ -32,7 +32,13 @@ impl<const S: usize> Position<S> {
         moves.extend(simple_moves.drain(..).map(|mv| {
             (
                 mv.clone(),
-                self.probability_for_move_colortr::<Us, Them>(params, &mv, group_data, num_moves),
+                self.probability_for_move_colortr::<Us, Them>(
+                    params,
+                    &mv,
+                    group_data,
+                    coefficients,
+                    num_moves,
+                ),
             )
         }));
     }
@@ -42,9 +48,10 @@ impl<const S: usize> Position<S> {
         params: &[f32],
         mv: &Move,
         group_data: &GroupData<S>,
+        coefficients: &mut [f32],
         num_moves: usize,
     ) -> f32 {
-        let mut policy_params = PolicyParameters::new::<S>();
+        let mut policy_params = PolicyParameters::new::<S>(coefficients);
         coefficients_for_move_colortr::<Us, Them, S>(
             self,
             &mut policy_params,
@@ -52,11 +59,11 @@ impl<const S: usize> Position<S> {
             group_data,
             num_moves,
         );
-        let total_value: f32 = policy_params
-            .parameters()
-            .zip(params)
-            .map(|(c, p)| c * p)
-            .sum();
+        let total_value: f32 = coefficients.iter().zip(params).map(|(c, p)| c * p).sum();
+
+        for c in coefficients.iter_mut() {
+            *c = 0.0;
+        }
 
         sigmoid(total_value)
     }

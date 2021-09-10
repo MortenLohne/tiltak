@@ -77,89 +77,89 @@ impl ValueParameters {
     }
 }
 
-pub struct PolicyParameters {
-    pub move_count: Vec<f32>,
-    pub flat_psqt: Vec<f32>,
-    pub wall_psqt: Vec<f32>,
-    pub cap_psqt: Vec<f32>,
-    pub our_road_stones_in_line: Vec<f32>,
-    pub their_road_stones_in_line: Vec<f32>,
-    pub extend_group: Vec<f32>,
-    pub merge_two_groups: Vec<f32>,
-    pub block_merger: Vec<f32>,
-    pub place_critical_square: Vec<f32>,
-    pub ignore_critical_square: Vec<f32>,
-    pub next_to_our_last_stone: Vec<f32>,
-    pub next_to_their_last_stone: Vec<f32>,
-    pub diagonal_to_our_last_stone: Vec<f32>,
-    pub diagonal_to_their_last_stone: Vec<f32>,
-    pub attack_strong_flats: Vec<f32>,
-    pub blocking_stone_blocks_extensions_of_two_flats: Vec<f32>,
-    pub move_role_bonus: Vec<f32>,
-    pub stack_movement_that_gives_us_top_pieces: Vec<f32>,
-    pub stack_captured_by_movement: Vec<f32>,
-    pub stack_capture_in_strong_line: Vec<f32>,
-    pub stack_capture_in_strong_line_cap: Vec<f32>,
-    pub move_cap_onto_strong_line: Vec<f32>,
-    pub move_onto_critical_square: Vec<f32>,
+#[derive(Debug)]
+pub struct PolicyParameters<'a> {
+    pub move_count: &'a mut [f32],
+    pub flat_psqt: &'a mut [f32],
+    pub wall_psqt: &'a mut [f32],
+    pub cap_psqt: &'a mut [f32],
+    pub our_road_stones_in_line: &'a mut [f32],
+    pub their_road_stones_in_line: &'a mut [f32],
+    pub extend_group: &'a mut [f32],
+    pub merge_two_groups: &'a mut [f32],
+    pub block_merger: &'a mut [f32],
+    pub place_critical_square: &'a mut [f32],
+    pub ignore_critical_square: &'a mut [f32],
+    pub next_to_our_last_stone: &'a mut [f32],
+    pub next_to_their_last_stone: &'a mut [f32],
+    pub diagonal_to_our_last_stone: &'a mut [f32],
+    pub diagonal_to_their_last_stone: &'a mut [f32],
+    pub attack_strong_flats: &'a mut [f32],
+    pub blocking_stone_blocks_extensions_of_two_flats: &'a mut [f32],
+    pub move_role_bonus: &'a mut [f32],
+    pub stack_movement_that_gives_us_top_pieces: &'a mut [f32],
+    pub stack_captured_by_movement: &'a mut [f32],
+    pub stack_capture_in_strong_line: &'a mut [f32],
+    pub stack_capture_in_strong_line_cap: &'a mut [f32],
+    pub move_cap_onto_strong_line: &'a mut [f32],
+    pub move_onto_critical_square: &'a mut [f32],
 }
 
-impl PolicyParameters {
-    pub fn new<const S: usize>() -> PolicyParameters {
-        PolicyParameters {
-            move_count: vec![0.0; 1],
-            flat_psqt: vec![0.0; num_square_symmetries::<S>()],
-            wall_psqt: vec![0.0; num_square_symmetries::<S>()],
-            cap_psqt: vec![0.0; num_square_symmetries::<S>()],
-            our_road_stones_in_line: vec![0.0; S * 3],
-            their_road_stones_in_line: vec![0.0; S * 3],
-            extend_group: vec![0.0; 3],
-            merge_two_groups: vec![0.0; 3],
-            block_merger: vec![0.0; 3],
-            place_critical_square: vec![0.0; 5],
-            ignore_critical_square: vec![0.0; 2],
-            next_to_our_last_stone: vec![0.0; 1],
-            next_to_their_last_stone: vec![0.0; 1],
-            diagonal_to_our_last_stone: vec![0.0; 1],
-            diagonal_to_their_last_stone: vec![0.0; 1],
-            attack_strong_flats: vec![0.0; 1],
-            blocking_stone_blocks_extensions_of_two_flats: vec![0.0; 1],
-            move_role_bonus: vec![0.0; 3],
-            stack_movement_that_gives_us_top_pieces: vec![0.0; 6],
-            stack_captured_by_movement: vec![0.0; 1],
-            stack_capture_in_strong_line: vec![0.0; 2],
-            stack_capture_in_strong_line_cap: vec![0.0; 2],
-            move_cap_onto_strong_line: vec![0.0; 4],
-            move_onto_critical_square: vec![0.0; 4],
-        }
-    }
+impl<'a> PolicyParameters<'a> {
+    #[inline(never)]
+    pub fn new<const S: usize>(coefficients: &'a mut [f32]) -> PolicyParameters<'a> {
+        let (move_count, coefficients) = coefficients.split_at_mut(1);
+        let (flat_psqt, coefficients) = coefficients.split_at_mut(num_square_symmetries::<S>());
+        let (wall_psqt, coefficients) = coefficients.split_at_mut(num_square_symmetries::<S>());
+        let (cap_psqt, coefficients) = coefficients.split_at_mut(num_square_symmetries::<S>());
+        let (our_road_stones_in_line, coefficients) = coefficients.split_at_mut(S * 3);
+        let (their_road_stones_in_line, coefficients) = coefficients.split_at_mut(S * 3);
+        let (extend_group, coefficients) = coefficients.split_at_mut(3);
+        let (merge_two_groups, coefficients) = coefficients.split_at_mut(3);
+        let (block_merger, coefficients) = coefficients.split_at_mut(3);
+        let (place_critical_square, coefficients) = coefficients.split_at_mut(5);
+        let (ignore_critical_square, coefficients) = coefficients.split_at_mut(2);
+        let (next_to_our_last_stone, coefficients) = coefficients.split_at_mut(1);
+        let (next_to_their_last_stone, coefficients) = coefficients.split_at_mut(1);
+        let (diagonal_to_our_last_stone, coefficients) = coefficients.split_at_mut(1);
+        let (diagonal_to_their_last_stone, coefficients) = coefficients.split_at_mut(1);
+        let (attack_strong_flats, coefficients) = coefficients.split_at_mut(1);
+        let (blocking_stone_blocks_extensions_of_two_flats, coefficients) =
+            coefficients.split_at_mut(1);
+        let (move_role_bonus, coefficients) = coefficients.split_at_mut(3);
+        let (stack_movement_that_gives_us_top_pieces, coefficients) = coefficients.split_at_mut(6);
+        let (stack_captured_by_movement, coefficients) = coefficients.split_at_mut(1);
+        let (stack_capture_in_strong_line, coefficients) = coefficients.split_at_mut(2);
+        let (stack_capture_in_strong_line_cap, coefficients) = coefficients.split_at_mut(2);
+        let (move_cap_onto_strong_line, coefficients) = coefficients.split_at_mut(4);
+        let (move_onto_critical_square, _coefficients) = coefficients.split_at_mut(4);
 
-    pub fn parameters(&self) -> impl Iterator<Item = &f32> {
-        self.move_count
-            .iter()
-            .chain(self.flat_psqt.iter())
-            .chain(self.wall_psqt.iter())
-            .chain(self.cap_psqt.iter())
-            .chain(self.our_road_stones_in_line.iter())
-            .chain(self.their_road_stones_in_line.iter())
-            .chain(self.extend_group.iter())
-            .chain(self.merge_two_groups.iter())
-            .chain(self.block_merger.iter())
-            .chain(self.place_critical_square.iter())
-            .chain(self.ignore_critical_square.iter())
-            .chain(self.next_to_our_last_stone.iter())
-            .chain(self.next_to_their_last_stone.iter())
-            .chain(self.diagonal_to_our_last_stone.iter())
-            .chain(self.diagonal_to_their_last_stone.iter())
-            .chain(self.attack_strong_flats.iter())
-            .chain(self.blocking_stone_blocks_extensions_of_two_flats.iter())
-            .chain(self.move_role_bonus.iter())
-            .chain(self.stack_movement_that_gives_us_top_pieces.iter())
-            .chain(self.stack_captured_by_movement.iter())
-            .chain(self.stack_capture_in_strong_line.iter())
-            .chain(self.stack_capture_in_strong_line_cap.iter())
-            .chain(self.move_cap_onto_strong_line.iter())
-            .chain(self.move_onto_critical_square.iter())
+        PolicyParameters {
+            move_count,
+            flat_psqt,
+            wall_psqt,
+            cap_psqt,
+            our_road_stones_in_line,
+            their_road_stones_in_line,
+            extend_group,
+            merge_two_groups,
+            block_merger,
+            place_critical_square,
+            ignore_critical_square,
+            next_to_our_last_stone,
+            next_to_their_last_stone,
+            diagonal_to_our_last_stone,
+            diagonal_to_their_last_stone,
+            attack_strong_flats,
+            blocking_stone_blocks_extensions_of_two_flats,
+            move_role_bonus,
+            stack_movement_that_gives_us_top_pieces,
+            stack_captured_by_movement,
+            stack_capture_in_strong_line,
+            stack_capture_in_strong_line_cap,
+            move_cap_onto_strong_line,
+            move_onto_critical_square,
+        }
     }
 }
 
