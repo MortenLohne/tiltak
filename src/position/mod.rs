@@ -1150,9 +1150,6 @@ impl<const S: usize> TunableBoard for Position<S> {
                 num_legal_moves,
             ),
         }
-        for p in coefficients.iter_mut() {
-            *p = 0.0;
-        }
     }
     /// Move generation that includes a heuristic probability of each move being played.
     ///
