@@ -33,6 +33,8 @@ pub struct ValueParameters<'a> {
 
 impl<'a> ValueParameters<'a> {
     pub fn new<const S: usize>(coefficients: &'a mut [f32]) -> Self {
+        assert_eq!(coefficients.len(), num_value_params::<S>());
+
         let (flat_psqt, coefficients) = coefficients.split_at_mut(num_square_symmetries::<S>());
         let (wall_psqt, coefficients) = coefficients.split_at_mut(num_square_symmetries::<S>());
         let (cap_psqt, coefficients) = coefficients.split_at_mut(num_square_symmetries::<S>());
@@ -111,6 +113,8 @@ pub struct PolicyParameters<'a> {
 impl<'a> PolicyParameters<'a> {
     #[inline(never)]
     pub fn new<const S: usize>(coefficients: &'a mut [f32]) -> PolicyParameters<'a> {
+        assert_eq!(coefficients.len(), num_policy_params::<S>());
+
         let (move_count, coefficients) = coefficients.split_at_mut(1);
         let (flat_psqt, coefficients) = coefficients.split_at_mut(num_square_symmetries::<S>());
         let (wall_psqt, coefficients) = coefficients.split_at_mut(num_square_symmetries::<S>());
