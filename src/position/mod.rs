@@ -102,12 +102,12 @@ pub trait TunableBoard: PositionTrait {
     fn policy_params() -> &'static [f32];
     type ExtraData;
 
-    fn static_eval_coefficients(&self, coefficients: &mut [f32]);
+    fn static_eval_features(&self, features: &mut [f32]);
 
     fn static_eval_with_params(&self, params: &[f32]) -> f32 {
-        let mut coefficients: Vec<f32> = vec![0.0; Self::value_params().len()];
-        self.static_eval_coefficients(&mut coefficients);
-        coefficients.iter().zip(params).map(|(a, b)| a * b).sum()
+        let mut features: Vec<f32> = vec![0.0; Self::value_params().len()];
+        self.static_eval_features(&mut features);
+        features.iter().zip(params).map(|(a, b)| a * b).sum()
     }
 
     fn generate_moves_with_params(
@@ -116,12 +116,12 @@ pub trait TunableBoard: PositionTrait {
         data: &Self::ExtraData,
         simple_moves: &mut Vec<<Self as PositionTrait>::Move>,
         moves: &mut Vec<(<Self as PositionTrait>::Move, search::Score)>,
-        coefficients: &mut [f32],
+        features: &mut [f32],
     );
 
-    fn coefficients_for_move(
+    fn features_for_move(
         &self,
-        coefficients: &mut [f32],
+        features: &mut [f32],
         mv: &Move,
         data: &Self::ExtraData,
         num_legal_moves: usize,
@@ -138,7 +138,7 @@ pub trait TunableBoard: PositionTrait {
         group_data: &Self::ExtraData,
         simple_moves: &mut Vec<Move>,
         moves: &mut Vec<(Move, search::Score)>,
-        coefficients: &mut [f32],
+        features: &mut [f32],
     );
 }
 
@@ -810,12 +810,12 @@ impl<const S: usize> Position<S> {
         &self,
         group_data: &GroupData<S>,
         params: &[f32],
-        coefficients: &mut [f32],
+        features: &mut [f32],
     ) -> f32 {
-        let mut value_params = ValueFeatures::new::<S>(coefficients);
-        value_eval::static_eval_game_phase(self, group_data, &mut value_params);
-        let eval = coefficients.iter().zip(params).map(|(a, b)| a * b).sum();
-        for c in coefficients.iter_mut() {
+        let mut value_features = ValueFeatures::new::<S>(features);
+        value_eval::static_eval_game_phase(self, group_data, &mut value_features);
+        let eval = features.iter().zip(params).map(|(a, b)| a * b).sum();
+        for c in features.iter_mut() {
             *c = 0.0;
         }
         eval
@@ -1090,12 +1090,12 @@ impl<const S: usize> TunableBoard for Position<S> {
         }
     }
 
-    fn static_eval_coefficients(&self, coefficients: &mut [f32]) {
+    fn static_eval_features(&self, features: &mut [f32]) {
         debug_assert!(self.game_result().is_none());
 
         let group_data = self.group_data();
-        let mut value_params = ValueFeatures::new::<S>(coefficients);
-        value_eval::static_eval_game_phase(self, &group_data, &mut value_params);
+        let mut value_features = ValueFeatures::new::<S>(features);
+        value_eval::static_eval_game_phase(self, &group_data, &mut value_features);
     }
 
     fn generate_moves_with_params(
@@ -1104,7 +1104,7 @@ impl<const S: usize> TunableBoard for Position<S> {
         group_data: &GroupData<S>,
         simple_moves: &mut Vec<Self::Move>,
         moves: &mut Vec<(Self::Move, f32)>,
-        coefficients: &mut [f32],
+        features: &mut [f32],
     ) {
         debug_assert!(simple_moves.is_empty());
         self.generate_moves(simple_moves);
@@ -1114,37 +1114,37 @@ impl<const S: usize> TunableBoard for Position<S> {
                 group_data,
                 simple_moves,
                 moves,
-                coefficients,
+                features,
             ),
             Color::Black => self.generate_moves_with_probabilities_colortr::<BlackTr, WhiteTr>(
                 params,
                 group_data,
                 simple_moves,
                 moves,
-                coefficients,
+                features,
             ),
         }
     }
 
-    fn coefficients_for_move(
+    fn features_for_move(
         &self,
-        coefficients: &mut [f32],
+        features: &mut [f32],
         mv: &Move,
         group_data: &GroupData<S>,
         num_legal_moves: usize,
     ) {
-        let mut policy_params = PolicyFeatures::new::<S>(coefficients);
+        let mut policy_features = PolicyFeatures::new::<S>(features);
         match self.side_to_move() {
-            Color::White => policy_eval::coefficients_for_move_colortr::<WhiteTr, BlackTr, S>(
+            Color::White => policy_eval::features_for_move_colortr::<WhiteTr, BlackTr, S>(
                 self,
-                &mut policy_params,
+                &mut policy_features,
                 mv,
                 group_data,
                 num_legal_moves,
             ),
-            Color::Black => policy_eval::coefficients_for_move_colortr::<BlackTr, WhiteTr, S>(
+            Color::Black => policy_eval::features_for_move_colortr::<BlackTr, WhiteTr, S>(
                 self,
-                &mut policy_params,
+                &mut policy_features,
                 mv,
                 group_data,
                 num_legal_moves,
@@ -1162,14 +1162,14 @@ impl<const S: usize> TunableBoard for Position<S> {
         group_data: &GroupData<S>,
         simple_moves: &mut Vec<Move>,
         moves: &mut Vec<(Move, search::Score)>,
-        coefficients: &mut [f32],
+        features: &mut [f32],
     ) {
         self.generate_moves_with_params(
             Self::policy_params(),
             group_data,
             simple_moves,
             moves,
-            coefficients,
+            features,
         )
     }
 }

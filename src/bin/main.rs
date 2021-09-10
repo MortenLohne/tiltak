@@ -337,7 +337,7 @@ fn analyze_position<const S: usize>(position: &Position<S>) {
 
     let mut simple_moves = vec![];
     let mut moves = vec![];
-    let mut coefficients = vec![
+    let mut features = vec![
         0.0;
         match S {
             4 => parameters::NUM_POLICY_FEATURES_4S,
@@ -351,17 +351,17 @@ fn analyze_position<const S: usize>(position: &Position<S>) {
         &position.group_data(),
         &mut simple_moves,
         &mut moves,
-        &mut coefficients,
+        &mut features,
     );
     moves.sort_by_key(|(_mv, score)| -(score * 1000.0) as i64);
 
     println!("Top 10 heuristic moves:");
     for (mv, score) in moves.iter().take(10) {
         println!("{}: {:.3}", mv.to_string::<S>(), score);
-        let mut coefficients = vec![0.0; <Position<S>>::policy_params().len()];
-        position.coefficients_for_move(&mut coefficients, mv, &position.group_data(), moves.len());
-        for coefficient in coefficients {
-            print!("{:.1}, ", coefficient);
+        let mut features = vec![0.0; <Position<S>>::policy_params().len()];
+        position.features_for_move(&mut features, mv, &position.group_data(), moves.len());
+        for feature in features {
+            print!("{:.1}, ", feature);
         }
         println!();
     }

@@ -272,12 +272,12 @@ pub fn tune_value_from_file<const S: usize, const N: usize>(
 
     let (positions, results) = positions_and_results_from_games(games);
 
-    let coefficient_sets = positions
+    let feature_sets = positions
         .iter()
         .map(|position| {
-            let mut coefficients = [0.0; N];
-            position.static_eval_coefficients(&mut coefficients);
-            coefficients
+            let mut features = [0.0; N];
+            position.static_eval_features(&mut features);
+            features
         })
         .collect::<Vec<[f32; N]>>();
 
@@ -299,9 +299,9 @@ pub fn tune_value_from_file<const S: usize, const N: usize>(
         *param = rng.gen_range(-0.01..0.01)
     }
     let tuned_parameters = gradient_descent::gradient_descent(
-        &coefficient_sets[0..middle_index],
+        &feature_sets[0..middle_index],
         &f32_results[0..middle_index],
-        &coefficient_sets[middle_index..],
+        &feature_sets[middle_index..],
         &f32_results[middle_index..],
         &initial_params,
         50.0,
@@ -330,12 +330,12 @@ pub fn tune_value_and_policy<const S: usize, const N: usize, const M: usize>(
     let (positions, results) =
         positions_and_results_from_games(games.iter().cloned().cloned().collect());
 
-    let value_coefficient_sets = positions
+    let value_feature_sets = positions
         .iter()
         .map(|position| {
-            let mut coefficients = [0.0; N];
-            position.static_eval_coefficients(&mut coefficients);
-            coefficients
+            let mut features = [0.0; N];
+            position.static_eval_features(&mut features);
+            features
         })
         .collect::<Vec<[f32; N]>>();
 
@@ -348,11 +348,10 @@ pub fn tune_value_and_policy<const S: usize, const N: usize, const M: usize>(
         })
         .collect::<Vec<f32>>();
 
-    let number_of_coefficient_sets = move_scoress.iter().flat_map(|a| *a).flatten().count();
+    let number_of_feature_sets = move_scoress.iter().flat_map(|a| *a).flatten().count();
 
-    let mut policy_coefficients_sets: Vec<[f32; M]> =
-        Vec::with_capacity(number_of_coefficient_sets);
-    let mut policy_results: Vec<f32> = Vec::with_capacity(number_of_coefficient_sets);
+    let mut policy_features_sets: Vec<[f32; M]> = Vec::with_capacity(number_of_feature_sets);
+    let mut policy_results: Vec<f32> = Vec::with_capacity(number_of_feature_sets);
 
     for (game, move_scores) in games.iter().zip(move_scoress) {
         let mut position = game.start_position.clone();
@@ -365,27 +364,27 @@ pub fn tune_value_and_policy<const S: usize, const N: usize, const M: usize>(
         {
             let group_data = position.group_data();
             for (possible_move, score) in move_scores {
-                let mut coefficients = [0.0; M];
-                position.coefficients_for_move(
-                    &mut coefficients,
+                let mut features = [0.0; M];
+                position.features_for_move(
+                    &mut features,
                     possible_move,
                     &group_data,
                     move_scores.len(),
                 );
 
-                policy_coefficients_sets.push(coefficients);
+                policy_features_sets.push(features);
                 policy_results.push(*score);
             }
             position.do_move(mv.clone());
         }
     }
 
-    let middle_index = value_coefficient_sets.len() / 2;
+    let middle_index = value_feature_sets.len() / 2;
 
     let tuned_value_parameters = gradient_descent::gradient_descent(
-        &value_coefficient_sets[0..middle_index],
+        &value_feature_sets[0..middle_index],
         &value_results[0..middle_index],
-        &value_coefficient_sets[middle_index..],
+        &value_feature_sets[middle_index..],
         &value_results[middle_index..],
         initial_value_params,
         10.0,
@@ -393,12 +392,12 @@ pub fn tune_value_and_policy<const S: usize, const N: usize, const M: usize>(
 
     println!("Final parameters: {:?}", tuned_value_parameters);
 
-    let middle_index = policy_coefficients_sets.len() / 2;
+    let middle_index = policy_features_sets.len() / 2;
 
     let tuned_policy_parameters = gradient_descent::gradient_descent(
-        &policy_coefficients_sets[0..middle_index],
+        &policy_features_sets[0..middle_index],
         &policy_results[0..middle_index],
-        &policy_coefficients_sets[middle_index..],
+        &policy_features_sets[middle_index..],
         &policy_results[middle_index..],
         initial_policy_params,
         5000.0,
