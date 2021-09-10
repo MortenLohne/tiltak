@@ -41,24 +41,8 @@ impl TempVectors {
         TempVectors {
             simple_moves: vec![],
             moves: vec![],
-            value_scores: vec![
-                0.0;
-                match S {
-                    4 => parameters::NUM_VALUE_PARAMS_4S,
-                    5 => parameters::NUM_VALUE_PARAMS_5S,
-                    6 => parameters::NUM_VALUE_PARAMS_6S,
-                    _ => unimplemented!(),
-                }
-            ],
-            policy_scores: vec![
-                0.0;
-                match S {
-                    4 => parameters::NUM_POLICY_PARAMS_4S,
-                    5 => parameters::NUM_POLICY_PARAMS_5S,
-                    6 => parameters::NUM_POLICY_PARAMS_6S,
-                    _ => unimplemented!(),
-                }
-            ],
+            value_scores: vec![0.0; parameters::num_value_params::<S>()],
+            policy_scores: vec![0.0; parameters::num_policy_params::<S>()],
         }
     }
 }
