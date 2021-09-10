@@ -297,7 +297,8 @@ pub(crate) fn coefficients_for_move_colortr<Us: ColorTr, Them: ColorTr, const S:
                             .neighbours::<S>()
                             .any(|n| Us::is_critical_square(group_data, n))
                         {
-                            policy_params.move_cap_onto_strong_line[road_piece_count - 1] += 1.0;
+                            policy_params.move_cap_onto_strong_line_with_critical_square
+                                [road_piece_count - 3] += 1.0;
                         }
                     }
                 }
