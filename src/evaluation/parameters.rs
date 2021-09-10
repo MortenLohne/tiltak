@@ -9,71 +9,70 @@ pub const NUM_POLICY_PARAMS_5S: usize = 93;
 pub const NUM_VALUE_PARAMS_6S: usize = 72;
 pub const NUM_POLICY_PARAMS_6S: usize = 99;
 
-pub struct ValueParameters {
-    pub flat_psqt: Vec<f32>,
-    pub wall_psqt: Vec<f32>,
-    pub cap_psqt: Vec<f32>,
-    pub our_stack_psqt: Vec<f32>,
-    pub their_stack_psqt: Vec<f32>,
-    pub side_to_move: Vec<f32>,
-    pub flatstone_lead: Vec<f32>,
-    pub i_number_of_groups: Vec<f32>,
-    pub critical_squares: Vec<f32>,
-    pub capstone_over_own_piece: Vec<f32>,
-    pub capstone_on_stack: Vec<f32>,
-    pub standing_stone_on_stack: Vec<f32>,
-    pub flat_stone_next_to_our_stack: Vec<f32>,
-    pub standing_stone_next_to_our_stack: Vec<f32>,
-    pub capstone_next_to_our_stack: Vec<f32>,
-    pub num_lines_occupied: Vec<f32>,
-    pub line_control: Vec<f32>,
-    pub block_their_line: Vec<f32>,
+pub struct ValueParameters<'a> {
+    pub flat_psqt: &'a mut [f32],
+    pub wall_psqt: &'a mut [f32],
+    pub cap_psqt: &'a mut [f32],
+    pub our_stack_psqt: &'a mut [f32],
+    pub their_stack_psqt: &'a mut [f32],
+    pub side_to_move: &'a mut [f32],
+    pub flatstone_lead: &'a mut [f32],
+    pub i_number_of_groups: &'a mut [f32],
+    pub critical_squares: &'a mut [f32],
+    pub capstone_over_own_piece: &'a mut [f32],
+    pub capstone_on_stack: &'a mut [f32],
+    pub standing_stone_on_stack: &'a mut [f32],
+    pub flat_stone_next_to_our_stack: &'a mut [f32],
+    pub standing_stone_next_to_our_stack: &'a mut [f32],
+    pub capstone_next_to_our_stack: &'a mut [f32],
+    pub num_lines_occupied: &'a mut [f32],
+    pub line_control: &'a mut [f32],
+    pub block_their_line: &'a mut [f32],
 }
 
-impl ValueParameters {
-    pub fn new<const S: usize>() -> Self {
-        ValueParameters {
-            flat_psqt: vec![0.0; num_square_symmetries::<S>()],
-            wall_psqt: vec![0.0; num_square_symmetries::<S>()],
-            cap_psqt: vec![0.0; num_square_symmetries::<S>()],
-            our_stack_psqt: vec![0.0; num_square_symmetries::<S>()],
-            their_stack_psqt: vec![0.0; num_square_symmetries::<S>()],
-            side_to_move: vec![0.0; 3],
-            flatstone_lead: vec![0.0; 3],
-            i_number_of_groups: vec![0.0; 3],
-            critical_squares: vec![0.0; 6],
-            capstone_over_own_piece: vec![0.0; 1],
-            capstone_on_stack: vec![0.0; 1],
-            standing_stone_on_stack: vec![0.0; 1],
-            flat_stone_next_to_our_stack: vec![0.0; 1],
-            standing_stone_next_to_our_stack: vec![0.0; 1],
-            capstone_next_to_our_stack: vec![0.0; 1],
-            num_lines_occupied: vec![0.0; S + 1],
-            line_control: vec![0.0; S + 1],
-            block_their_line: vec![0.0; S + 1],
-        }
-    }
+impl<'a> ValueParameters<'a> {
+    pub fn new<const S: usize>(coefficients: &'a mut [f32]) -> Self {
+        let (flat_psqt, coefficients) = coefficients.split_at_mut(num_square_symmetries::<S>());
+        let (wall_psqt, coefficients) = coefficients.split_at_mut(num_square_symmetries::<S>());
+        let (cap_psqt, coefficients) = coefficients.split_at_mut(num_square_symmetries::<S>());
+        let (our_stack_psqt, coefficients) =
+            coefficients.split_at_mut(num_square_symmetries::<S>());
+        let (their_stack_psqt, coefficients) =
+            coefficients.split_at_mut(num_square_symmetries::<S>());
+        let (side_to_move, coefficients) = coefficients.split_at_mut(3);
+        let (flatstone_lead, coefficients) = coefficients.split_at_mut(3);
+        let (i_number_of_groups, coefficients) = coefficients.split_at_mut(3);
+        let (critical_squares, coefficients) = coefficients.split_at_mut(6);
+        let (capstone_over_own_piece, coefficients) = coefficients.split_at_mut(1);
+        let (capstone_on_stack, coefficients) = coefficients.split_at_mut(1);
+        let (standing_stone_on_stack, coefficients) = coefficients.split_at_mut(1);
+        let (flat_stone_next_to_our_stack, coefficients) = coefficients.split_at_mut(1);
+        let (standing_stone_next_to_our_stack, coefficients) = coefficients.split_at_mut(1);
+        let (capstone_next_to_our_stack, coefficients) = coefficients.split_at_mut(1);
+        let (num_lines_occupied, coefficients) = coefficients.split_at_mut(S + 1);
+        let (line_control, coefficients) = coefficients.split_at_mut(S + 1);
+        let (block_their_line, _coefficients) = coefficients.split_at_mut(S + 1);
 
-    pub fn parameters(&self) -> impl Iterator<Item = &f32> {
-        self.flat_psqt
-            .iter()
-            .chain(self.wall_psqt.iter())
-            .chain(self.cap_psqt.iter())
-            .chain(self.our_stack_psqt.iter())
-            .chain(self.their_stack_psqt.iter())
-            .chain(self.side_to_move.iter())
-            .chain(self.flatstone_lead.iter())
-            .chain(self.i_number_of_groups.iter())
-            .chain(self.critical_squares.iter())
-            .chain(self.capstone_over_own_piece.iter())
-            .chain(self.capstone_on_stack.iter())
-            .chain(self.standing_stone_on_stack.iter())
-            .chain(self.flat_stone_next_to_our_stack.iter())
-            .chain(self.standing_stone_next_to_our_stack.iter())
-            .chain(self.capstone_next_to_our_stack.iter())
-            .chain(self.num_lines_occupied.iter())
-            .chain(self.line_control.iter())
-            .chain(self.block_their_line.iter())
+        ValueParameters {
+            flat_psqt,
+            wall_psqt,
+            cap_psqt,
+            our_stack_psqt,
+            their_stack_psqt,
+            side_to_move,
+            flatstone_lead,
+            i_number_of_groups,
+            critical_squares,
+            capstone_over_own_piece,
+            capstone_on_stack,
+            standing_stone_on_stack,
+            flat_stone_next_to_our_stack,
+            standing_stone_next_to_our_stack,
+            capstone_next_to_our_stack,
+            num_lines_occupied,
+            line_control,
+            block_their_line,
+        }
     }
 }
 

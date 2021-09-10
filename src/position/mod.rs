@@ -810,11 +810,15 @@ impl<const S: usize> Position<S> {
         &self,
         group_data: &GroupData<S>,
         params: &[f32],
+        coefficients: &mut [f32],
     ) -> f32 {
-        let mut value_params = ValueParameters::new::<S>();
+        let mut value_params = ValueParameters::new::<S>(coefficients);
         value_eval::static_eval_game_phase(self, group_data, &mut value_params);
-        let coefficients = value_params.parameters();
-        coefficients.zip(params).map(|(a, b)| a * b).sum()
+        let eval = coefficients.iter().zip(params).map(|(a, b)| a * b).sum();
+        for c in coefficients.iter_mut() {
+            *c = 0.0;
+        }
+        eval
     }
 }
 
@@ -1090,11 +1094,8 @@ impl<const S: usize> TunableBoard for Position<S> {
         debug_assert!(self.game_result().is_none());
 
         let group_data = self.group_data();
-        let mut value_params = ValueParameters::new::<S>();
+        let mut value_params = ValueParameters::new::<S>(coefficients);
         value_eval::static_eval_game_phase(self, &group_data, &mut value_params);
-        for (i, c) in value_params.parameters().enumerate() {
-            coefficients[i] = *c;
-        }
     }
 
     fn generate_moves_with_params(
