@@ -52,7 +52,9 @@ impl<'a> ValueParameters<'a> {
         let (capstone_next_to_our_stack, coefficients) = coefficients.split_at_mut(1);
         let (num_lines_occupied, coefficients) = coefficients.split_at_mut(S + 1);
         let (line_control, coefficients) = coefficients.split_at_mut(S + 1);
-        let (block_their_line, _coefficients) = coefficients.split_at_mut(S + 1);
+        let (block_their_line, coefficients) = coefficients.split_at_mut(S + 1);
+
+        assert!(coefficients.is_empty());
 
         ValueParameters {
             flat_psqt,
@@ -135,7 +137,9 @@ impl<'a> PolicyParameters<'a> {
         let (move_cap_onto_strong_line, coefficients) = coefficients.split_at_mut(S - 3);
         let (move_cap_onto_strong_line_with_critical_square, coefficients) =
             coefficients.split_at_mut(S - 3);
-        let (move_onto_critical_square, _coefficients) = coefficients.split_at_mut(4);
+        let (move_onto_critical_square, coefficients) = coefficients.split_at_mut(4);
+
+        assert!(coefficients.is_empty());
 
         PolicyParameters {
             move_count,
