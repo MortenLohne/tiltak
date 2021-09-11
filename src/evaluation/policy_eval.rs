@@ -135,15 +135,31 @@ pub(crate) fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usi
             }
 
             if our_unique_neighbour_groups.len() > 1 {
-                policy_features.merge_two_groups[role_id] += 1.0;
+                let total_neighbours_group_size: f32 = our_unique_neighbour_groups
+                    .iter()
+                    .map(|(_, group_id)| group_data.amount_in_group[*group_id as usize].0 as f32)
+                    .sum();
+
+                policy_features.merge_two_groups_base[role_id] = 1.0;
+                // Divide by 10, as large value confuse the tuner
+                policy_features.merge_two_groups_linear[role_id] =
+                    total_neighbours_group_size / 10.0;
             }
 
             if their_unique_neighbour_groups.len() > 1 {
-                policy_features.block_merger[role_id] += 1.0;
+                let total_neighbours_group_size: f32 = our_unique_neighbour_groups
+                    .iter()
+                    .map(|(_, group_id)| group_data.amount_in_group[*group_id as usize].0 as f32)
+                    .sum();
+
+                policy_features.block_merger_base[role_id] = 1.0;
+                // Divide by 10, as large value confuse the tuner
+                policy_features.block_merger_linear[role_id] = total_neighbours_group_size / 10.0;
             }
 
             for (_, group_id) in our_unique_neighbour_groups {
-                policy_features.extend_group[role_id] +=
+                policy_features.extend_group_base[role_id] += 1.0;
+                policy_features.extend_group_linear[role_id] +=
                     group_data.amount_in_group[group_id as usize].0 as f32;
             }
 
