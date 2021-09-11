@@ -62,10 +62,10 @@ pub fn gradient_descent<const N: usize>(
                 .iter_mut()
                 .zip(gradients.iter())
                 .for_each(|(param, gradient)| *param -= gradient * eta);
-            trace!("New parameters: {:?}", parameter_set);
+            println!("New parameters: {:?}", parameter_set);
 
             let error = average_error(test_feature_sets, test_results, &parameter_set);
-            trace!("Error now {}, eta={}\n", error, eta);
+            println!("Error now {}, eta={}\n", error, eta);
 
             if error < lowest_error {
                 iterations_since_improvement = 0;
