@@ -82,6 +82,32 @@ pub(crate) fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usi
 
     match mv {
         Move::Place(role, square) => {
+            // Apply special bonuses if the game ends on this move
+            if Us::stones_left(position) == 1 && Us::caps_left(position) == 0
+                || group_data.all_pieces().count() as usize == S * S - 1
+            {
+                let our_flat_lead =
+                    Us::flats(group_data).count() as i8 - Them::flats(group_data).count() as i8;
+                if our_flat_lead == 0 {
+                    match *role {
+                        Flat => policy_features.place_to_win[0] = 1.0,
+                        // Technically a draw, not a loss, but ensure that we never do this
+                        Wall => policy_features.place_to_loss[0] = 1.0,
+                        Cap => policy_features.place_to_loss[0] = 1.0,
+                    }
+                } else if our_flat_lead == -1 {
+                    match *role {
+                        Flat => policy_features.place_to_draw[0] = 1.0,
+                        Wall => policy_features.place_to_loss[0] = 1.0,
+                        Cap => policy_features.place_to_loss[0] = 1.0,
+                    }
+                } else if our_flat_lead < -1 {
+                    policy_features.place_to_loss[0] = 1.0;
+                } else {
+                    policy_features.place_to_win[0] = 1.0;
+                }
+            }
+
             let their_open_critical_squares =
                 Them::critical_squares(&*group_data) & (!group_data.all_pieces());
 
