@@ -4,10 +4,10 @@ use crate::evaluation::parameters::PolicyFeatures;
 use crate::position::bitboard::BitBoard;
 use crate::position::color_trait::ColorTr;
 use crate::position::Direction::*;
-use crate::position::Move;
 use crate::position::Role::{Cap, Flat, Wall};
 use crate::position::Square;
 use crate::position::{square_symmetries, GroupData, Position};
+use crate::position::{squares_iterator, Move};
 use crate::search;
 
 pub fn sigmoid(x: f32) -> f32 {
@@ -158,11 +158,24 @@ pub(crate) fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usi
             }
             if our_unique_neighbour_groups.len() == 1 {
                 let group_id = our_unique_neighbour_groups[0].1;
+                let amount_in_group = group_data.amount_in_group[group_id as usize].0 as f32;
 
-                policy_features.extend_single_group_base[role_id] += 1.0;
+                policy_features.extend_single_group_base[role_id] = 1.0;
                 // Divide by 10, as large values confuse the tuner
-                policy_features.extend_single_group_linear[role_id] +=
-                    group_data.amount_in_group[group_id as usize].0 as f32 / 10.0;
+                policy_features.extend_single_group_linear[role_id] = amount_in_group / 10.0;
+
+                // Apply a separate bonus if the piece expands the group to a new line
+                if squares_iterator::<S>()
+                    .filter(|sq| group_data.groups[*sq] == group_id)
+                    .all(|sq| sq.file::<S>() != square.file::<S>())
+                    || squares_iterator::<S>()
+                        .filter(|sq| group_data.groups[*sq] == group_id)
+                        .all(|sq| sq.rank::<S>() != square.rank::<S>())
+                {
+                    policy_features.extend_single_group_to_new_line_base[role_id] = 1.0;
+                    policy_features.extend_single_group_to_new_line_linear[role_id] =
+                        amount_in_group / 10.0;
+                }
             }
 
             if *role == Flat || *role == Cap {
