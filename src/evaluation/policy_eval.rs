@@ -141,7 +141,7 @@ pub(crate) fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usi
                     .sum();
 
                 policy_features.merge_two_groups_base[role_id] = 1.0;
-                // Divide by 10, as large value confuse the tuner
+                // Divide by 10, as large values confuse the tuner
                 policy_features.merge_two_groups_linear[role_id] =
                     total_neighbours_group_size / 10.0;
             }
@@ -153,14 +153,16 @@ pub(crate) fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usi
                     .sum();
 
                 policy_features.block_merger_base[role_id] = 1.0;
-                // Divide by 10, as large value confuse the tuner
+                // Divide by 10, as large values confuse the tuner
                 policy_features.block_merger_linear[role_id] = total_neighbours_group_size / 10.0;
             }
+            if our_unique_neighbour_groups.len() == 1 {
+                let group_id = our_unique_neighbour_groups[0].1;
 
-            for (_, group_id) in our_unique_neighbour_groups {
-                policy_features.extend_group_base[role_id] += 1.0;
-                policy_features.extend_group_linear[role_id] +=
-                    group_data.amount_in_group[group_id as usize].0 as f32;
+                policy_features.extend_single_group_base[role_id] += 1.0;
+                // Divide by 10, as large values confuse the tuner
+                policy_features.extend_single_group_linear[role_id] +=
+                    group_data.amount_in_group[group_id as usize].0 as f32 / 10.0;
             }
 
             if *role == Flat || *role == Cap {
