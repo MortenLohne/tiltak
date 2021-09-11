@@ -82,29 +82,35 @@ pub(crate) fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usi
 
     match mv {
         Move::Place(role, square) => {
+            let our_flat_lead =
+                Us::flats(group_data).count() as i8 - Them::flats(group_data).count() as i8;
+
+            let our_flat_lead_after_move = match *role {
+                Flat => our_flat_lead + 1,
+                Wall => our_flat_lead,
+                Cap => our_flat_lead,
+            };
+
             // Apply special bonuses if the game ends on this move
             if Us::stones_left(position) == 1 && Us::caps_left(position) == 0
                 || group_data.all_pieces().count() as usize == S * S - 1
             {
-                let our_flat_lead =
-                    Us::flats(group_data).count() as i8 - Them::flats(group_data).count() as i8;
-                if our_flat_lead == 0 {
-                    match *role {
-                        Flat => policy_features.place_to_win[0] = 1.0,
-                        // Technically a draw, not a loss, but ensure that we never do this
-                        Wall => policy_features.place_to_loss[0] = 1.0,
-                        Cap => policy_features.place_to_loss[0] = 1.0,
-                    }
-                } else if our_flat_lead == -1 {
-                    match *role {
-                        Flat => policy_features.place_to_draw[0] = 1.0,
-                        Wall => policy_features.place_to_loss[0] = 1.0,
-                        Cap => policy_features.place_to_loss[0] = 1.0,
-                    }
-                } else if our_flat_lead < -1 {
-                    policy_features.place_to_loss[0] = 1.0;
-                } else {
-                    policy_features.place_to_win[0] = 1.0;
+                match our_flat_lead_after_move {
+                    n if n < 0 => policy_features.place_to_loss[0] = 1.0,
+                    0 => policy_features.place_to_draw[0] = 1.0,
+                    n if n > 0 => policy_features.place_to_win[0] = 1.0,
+                    _ => unreachable!(),
+                }
+            }
+            // Bonuses if our opponent can finish on flats next turn
+            else if Them::stones_left(position) == 1 && Them::caps_left(position) == 0
+                || group_data.all_pieces().count() as usize == S * S - 2
+            {
+                match our_flat_lead_after_move {
+                    n if n <= 0 => policy_features.place_to_allow_opponent_to_end[0] = 1.0,
+                    1 => policy_features.place_to_allow_opponent_to_end[1] = 1.0,
+                    n if n > 1 => policy_features.place_to_allow_opponent_to_end[2] = 1.0,
+                    _ => unreachable!(),
                 }
             }
 
