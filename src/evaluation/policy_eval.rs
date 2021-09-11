@@ -147,7 +147,7 @@ pub(crate) fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usi
             }
 
             if their_unique_neighbour_groups.len() > 1 {
-                let total_neighbours_group_size: f32 = our_unique_neighbour_groups
+                let total_neighbours_group_size: f32 = their_unique_neighbour_groups
                     .iter()
                     .map(|(_, group_id)| group_data.amount_in_group[*group_id as usize].0 as f32)
                     .sum();
