@@ -107,11 +107,17 @@ pub(crate) fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usi
                 || group_data.all_pieces().count() as usize == S * S - 2
             {
                 match our_flat_lead_after_move {
-                    n if n <= 0 => policy_features.place_to_allow_opponent_to_end[0] = 1.0,
+                    n if n < 1 => policy_features.place_to_allow_opponent_to_end[0] = 1.0,
                     1 => policy_features.place_to_allow_opponent_to_end[1] = 1.0,
                     n if n > 1 => policy_features.place_to_allow_opponent_to_end[2] = 1.0,
                     _ => unreachable!(),
                 }
+            } else if Us::stones_left(position) == 2 && Us::caps_left(position) == 0 {
+                policy_features.two_flats_left[0] = 1.0;
+                policy_features.two_flats_left[1] = our_flat_lead_after_move as f32;
+            } else if Us::stones_left(position) == 3 && Us::caps_left(position) == 0 {
+                policy_features.three_flats_left[0] = 1.0;
+                policy_features.three_flats_left[1] = our_flat_lead_after_move as f32;
             }
 
             let their_open_critical_squares =
