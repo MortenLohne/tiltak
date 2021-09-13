@@ -5,32 +5,25 @@ use std::time::Instant;
 pub fn gradient_descent<const N: usize>(
     feature_sets: &[[f32; N]],
     results: &[f32],
-    test_feature_sets: &[[f32; N]],
-    test_results: &[f32],
     params: &[f32; N],
     initial_learning_rate: f32,
 ) -> [f32; N] {
     assert_eq!(feature_sets.len(), results.len());
-    assert_eq!(test_feature_sets.len(), test_results.len());
 
     let start_time = Instant::now();
     let beta = 0.95;
 
     // If error is not reduced this number of times, reduce eta, or abort if eta is already low
     const MAX_TRIES: usize = 100;
+    const ERROR_THRESHOLD: f32 = 1.000_001;
 
-    let initial_error = average_error(test_feature_sets, test_results, params);
+    let initial_error = average_error(feature_sets, results, params);
     println!(
-        "Running gradient descent on {} positions and {} test positions",
+        "Running gradient descent on {} positions",
         feature_sets.len(),
-        test_feature_sets.len()
     );
     println!("Initial parameters: {:?}", params);
-    println!("Initial test error: {}", initial_error);
-    println!(
-        "Initial training error: {}",
-        average_error(feature_sets, results, params)
-    );
+    println!("Initial error: {}", initial_error);
 
     let mut lowest_error = initial_error;
     let mut best_parameter_set = *params;
@@ -64,12 +57,12 @@ pub fn gradient_descent<const N: usize>(
                 .for_each(|(param, gradient)| *param -= gradient * eta);
             println!("New parameters: {:?}", parameter_set);
 
-            let error = average_error(test_feature_sets, test_results, &parameter_set);
+            let error = average_error(feature_sets, results, &parameter_set);
             println!("Error now {}, eta={}\n", error, eta);
 
             if error < lowest_error {
                 iterations_since_improvement = 0;
-                if lowest_error / error > 1.000_001 {
+                if lowest_error / error > ERROR_THRESHOLD {
                     iterations_since_large_improvement = 0;
                 } else {
                     iterations_since_large_improvement += 1;

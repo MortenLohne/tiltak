@@ -290,22 +290,14 @@ pub fn tune_value_from_file<const S: usize, const N: usize>(
         })
         .collect::<Vec<f32>>();
 
-    let middle_index = positions.len() / 2;
-
     let mut rng = rand::rngs::StdRng::from_seed([0; 32]);
     let mut initial_params = [0.00; N];
 
     for param in initial_params.iter_mut() {
         *param = rng.gen_range(-0.01..0.01)
     }
-    let tuned_parameters = gradient_descent::gradient_descent(
-        &feature_sets[0..middle_index],
-        &f32_results[0..middle_index],
-        &feature_sets[middle_index..],
-        &f32_results[middle_index..],
-        &initial_params,
-        50.0,
-    );
+    let tuned_parameters =
+        gradient_descent::gradient_descent(&feature_sets, &f32_results, &initial_params, 50.0);
 
     println!("Final parameters: {:?}", tuned_parameters);
 
@@ -379,26 +371,18 @@ pub fn tune_value_and_policy<const S: usize, const N: usize, const M: usize>(
         }
     }
 
-    let middle_index = value_feature_sets.len() / 2;
-
     let tuned_value_parameters = gradient_descent::gradient_descent(
-        &value_feature_sets[0..middle_index],
-        &value_results[0..middle_index],
-        &value_feature_sets[middle_index..],
-        &value_results[middle_index..],
+        &value_feature_sets,
+        &value_results,
         initial_value_params,
         10.0,
     );
 
     println!("Final parameters: {:?}", tuned_value_parameters);
 
-    let middle_index = policy_features_sets.len() / 2;
-
     let tuned_policy_parameters = gradient_descent::gradient_descent(
-        &policy_features_sets[0..middle_index],
-        &policy_results[0..middle_index],
-        &policy_features_sets[middle_index..],
-        &policy_results[middle_index..],
+        &policy_features_sets,
+        &policy_results,
         initial_policy_params,
         5000.0,
     );
