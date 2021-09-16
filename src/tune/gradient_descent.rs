@@ -2,14 +2,17 @@ use log::trace;
 use rayon::prelude::*;
 use std::time::Instant;
 
+pub struct TrainingSample<const N: usize> {
+    pub features: [f32; N],
+    pub offset: f32,
+    pub result: f32,
+}
+
 pub fn gradient_descent<const N: usize>(
-    feature_sets: &[[f32; N]],
-    results: &[f32],
+    samples: &[TrainingSample<N>],
     params: &[f32; N],
     initial_learning_rate: f32,
 ) -> [f32; N] {
-    assert_eq!(feature_sets.len(), results.len());
-
     let start_time = Instant::now();
     let beta = 0.95;
 
@@ -17,11 +20,8 @@ pub fn gradient_descent<const N: usize>(
     const MAX_TRIES: usize = 100;
     const ERROR_THRESHOLD: f32 = 1.000_001;
 
-    let initial_error = average_error(feature_sets, results, params);
-    println!(
-        "Running gradient descent on {} positions",
-        feature_sets.len(),
-    );
+    let initial_error = average_error(samples, params);
+    println!("Running gradient descent on {} positions", samples.len(),);
     println!("Initial parameters: {:?}", params);
     println!("Initial error: {}", initial_error);
 
@@ -43,7 +43,7 @@ pub fn gradient_descent<const N: usize>(
         let mut iterations_since_improvement = 0;
         let mut iterations_since_large_improvement = 0;
         loop {
-            let slopes = calc_slope(feature_sets, results, &parameter_set);
+            let slopes = calc_slope(samples, &parameter_set);
             trace!("Slopes: {:?}", slopes);
             gradients
                 .iter_mut()
@@ -57,7 +57,7 @@ pub fn gradient_descent<const N: usize>(
                 .for_each(|(param, gradient)| *param -= gradient * eta);
             println!("New parameters: {:?}", parameter_set);
 
-            let error = average_error(feature_sets, results, &parameter_set);
+            let error = average_error(samples, &parameter_set);
             println!("Error now {}, eta={}\n", error, eta);
 
             if error < lowest_error {
@@ -97,28 +97,29 @@ pub fn gradient_descent<const N: usize>(
 }
 
 /// For each parameter, calculate the slope for that dimension
-fn calc_slope<const N: usize>(
-    feature_sets: &[[f32; N]],
-    results: &[f32],
-    params: &[f32; N],
-) -> [f32; N] {
-    let mut slopes = feature_sets
+fn calc_slope<const N: usize>(samples: &[TrainingSample<N>], params: &[f32; N]) -> [f32; N] {
+    let mut slopes = samples
         .par_iter()
-        .zip(results)
-        .map(|(features, result)| {
-            let estimated_result = eval_from_params(features, params);
-            let estimated_sigmoid = sigmoid(estimated_result);
-            let derived_sigmoid_result = sigmoid_derived(estimated_result);
+        .map(
+            |TrainingSample {
+                 features,
+                 result,
+                 offset,
+             }| {
+                let estimated_result = eval_from_params(features, params);
+                let estimated_sigmoid = sigmoid(estimated_result);
+                let derived_sigmoid_result = sigmoid_derived(estimated_result);
 
-            let mut gradients_for_this_training_sample = [0.0; N];
-            gradients_for_this_training_sample
-                .iter_mut()
-                .zip(features)
-                .for_each(|(gradient, feature)| {
-                    *gradient = (estimated_sigmoid - result) * derived_sigmoid_result * *feature
-                });
-            gradients_for_this_training_sample
-        })
+                let mut gradients_for_this_training_sample = [0.0; N];
+                gradients_for_this_training_sample
+                    .iter_mut()
+                    .zip(features)
+                    .for_each(|(gradient, feature)| {
+                        *gradient = (estimated_sigmoid - result) * derived_sigmoid_result * *feature
+                    });
+                gradients_for_this_training_sample
+            },
+        )
         // Sum each individual chunk as f32
         // Then sum those chunks as f64, to avoid rounding errors
         .chunks(256)
@@ -150,7 +151,7 @@ fn calc_slope<const N: usize>(
         );
 
     for slope in slopes.iter_mut() {
-        *slope /= feature_sets.len() as f64;
+        *slope /= samples.len() as f64;
     }
     let mut f32_slopes = [0.0; N];
     for (f64_slope, slope) in f32_slopes.iter_mut().zip(&slopes) {
@@ -160,21 +161,19 @@ fn calc_slope<const N: usize>(
 }
 
 /// Mean squared error of the parameter set, measured against given results and positions
-fn average_error<const N: usize>(
-    feature_sets: &[[f32; N]],
-    results: &[f32],
-    params: &[f32; N],
-) -> f32 {
-    assert_eq!(feature_sets.len(), results.len());
-    feature_sets
+fn average_error<const N: usize>(samples: &[TrainingSample<N>], params: &[f32; N]) -> f32 {
+    samples
         .into_par_iter()
-        .zip(results)
-        .map(|(features, game_result)| {
-            (sigmoid(eval_from_params(features, params)) - game_result).powf(2.0)
-        })
+        .map(
+            |TrainingSample {
+                 features,
+                 result,
+                 offset,
+             }| { (sigmoid(eval_from_params(features, params)) - result).powf(2.0) },
+        )
         .map(|f| f as f64)
         .sum::<f64>() as f32
-        / (feature_sets.len() as f32)
+        / (samples.len() as f32)
 }
 
 pub fn eval_from_params<const N: usize>(features: &[f32; N], params: &[f32; N]) -> f32 {

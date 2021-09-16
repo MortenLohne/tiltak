@@ -17,6 +17,7 @@ use crate::ptn::Game;
 use crate::ptn::{ptn_parser, PtnMove};
 use crate::search::MctsSetting;
 use crate::tune::gradient_descent;
+use crate::tune::gradient_descent::TrainingSample;
 use crate::tune::play_match::play_game;
 
 // The score, or probability of being played, for a given move
@@ -272,23 +273,24 @@ pub fn tune_value_from_file<const S: usize, const N: usize>(
 
     let (positions, results) = positions_and_results_from_games(games);
 
-    let feature_sets = positions
+    let samples = positions
         .iter()
-        .map(|position| {
+        .zip(results)
+        .map(|(position, game_result)| {
             let mut features = [0.0; N];
             position.static_eval_features(&mut features);
-            features
+            let result = match game_result {
+                GameResult::WhiteWin => 1.0,
+                GameResult::Draw => 0.5,
+                GameResult::BlackWin => 0.0,
+            };
+            TrainingSample {
+                features,
+                offset: 0.0,
+                result,
+            }
         })
-        .collect::<Vec<[f32; N]>>();
-
-    let f32_results = results
-        .iter()
-        .map(|res| match res {
-            GameResult::WhiteWin => 1.0,
-            GameResult::Draw => 0.5,
-            GameResult::BlackWin => 0.0,
-        })
-        .collect::<Vec<f32>>();
+        .collect::<Vec<_>>();
 
     let mut rng = rand::rngs::StdRng::from_seed([0; 32]);
     let mut initial_params = [0.00; N];
@@ -296,8 +298,8 @@ pub fn tune_value_from_file<const S: usize, const N: usize>(
     for param in initial_params.iter_mut() {
         *param = rng.gen_range(-0.01..0.01)
     }
-    let tuned_parameters =
-        gradient_descent::gradient_descent(&feature_sets, &f32_results, &initial_params, 50.0);
+
+    let tuned_parameters = gradient_descent::gradient_descent(&samples, &initial_params, 50.0);
 
     println!("Final parameters: {:?}", tuned_parameters);
 
@@ -322,28 +324,28 @@ pub fn tune_value_and_policy<const S: usize, const N: usize, const M: usize>(
     let (positions, results) =
         positions_and_results_from_games(games.iter().cloned().cloned().collect());
 
-    let value_feature_sets = positions
+    let value_training_samples = positions
         .iter()
-        .map(|position| {
+        .zip(results)
+        .map(|(position, game_result)| {
             let mut features = [0.0; N];
             position.static_eval_features(&mut features);
-            features
+            let result = match game_result {
+                GameResult::WhiteWin => 1.0,
+                GameResult::Draw => 0.5,
+                GameResult::BlackWin => 0.0,
+            };
+            TrainingSample {
+                features,
+                offset: 0.0,
+                result,
+            }
         })
-        .collect::<Vec<[f32; N]>>();
-
-    let value_results = results
-        .iter()
-        .map(|res| match res {
-            GameResult::WhiteWin => 1.0,
-            GameResult::Draw => 0.5,
-            GameResult::BlackWin => 0.0,
-        })
-        .collect::<Vec<f32>>();
+        .collect::<Vec<_>>();
 
     let number_of_feature_sets = move_scoress.iter().flat_map(|a| *a).flatten().count();
 
-    let mut policy_features_sets: Vec<[f32; M]> = Vec::with_capacity(number_of_feature_sets);
-    let mut policy_results: Vec<f32> = Vec::with_capacity(number_of_feature_sets);
+    let mut policy_training_samples = Vec::with_capacity(number_of_feature_sets);
 
     for (game, move_scores) in games.iter().zip(move_scoress) {
         let mut position = game.start_position.clone();
@@ -355,7 +357,7 @@ pub fn tune_value_and_policy<const S: usize, const N: usize, const M: usize>(
             .zip(move_scores)
         {
             let group_data = position.group_data();
-            for (possible_move, score) in move_scores {
+            for (possible_move, result) in move_scores {
                 let mut features = [0.0; M];
                 position.features_for_move(
                     &mut features,
@@ -364,28 +366,25 @@ pub fn tune_value_and_policy<const S: usize, const N: usize, const M: usize>(
                     move_scores.len(),
                 );
 
-                policy_features_sets.push(features);
-                policy_results.push(*score);
+                policy_training_samples.push({
+                    TrainingSample {
+                        features,
+                        offset: 0.0,
+                        result: *result,
+                    }
+                });
             }
             position.do_move(mv.clone());
         }
     }
 
-    let tuned_value_parameters = gradient_descent::gradient_descent(
-        &value_feature_sets,
-        &value_results,
-        initial_value_params,
-        10.0,
-    );
+    let tuned_value_parameters =
+        gradient_descent::gradient_descent(&value_training_samples, initial_value_params, 10.0);
 
     println!("Final parameters: {:?}", tuned_value_parameters);
 
-    let tuned_policy_parameters = gradient_descent::gradient_descent(
-        &policy_features_sets,
-        &policy_results,
-        initial_policy_params,
-        5000.0,
-    );
+    let tuned_policy_parameters =
+        gradient_descent::gradient_descent(&policy_training_samples, initial_policy_params, 5000.0);
 
     println!("Final parameters: {:?}", tuned_policy_parameters);
 
