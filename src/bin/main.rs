@@ -359,7 +359,7 @@ fn analyze_position<const S: usize>(position: &Position<S>) {
     for (mv, score) in moves.iter().take(10) {
         println!("{}: {:.3}", mv.to_string::<S>(), score);
         let mut features = vec![0.0; <Position<S>>::policy_params().len()];
-        position.features_for_move(&mut features, mv, &position.group_data(), moves.len());
+        position.features_for_move(&mut features, mv, &position.group_data());
         for feature in features {
             print!("{:.1}, ", feature);
         }

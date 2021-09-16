@@ -29,6 +29,7 @@ impl<const S: usize> Position<S> {
         features: &mut [f32],
     ) {
         let num_moves = simple_moves.len();
+
         moves.extend(simple_moves.drain(..).map(|mv| {
             (
                 mv.clone(),
@@ -48,14 +49,11 @@ impl<const S: usize> Position<S> {
         num_moves: usize,
     ) -> f32 {
         let mut policy_params = PolicyFeatures::new::<S>(features);
-        features_for_move_colortr::<Us, Them, S>(
-            self,
-            &mut policy_params,
-            mv,
-            group_data,
-            num_moves,
-        );
-        let total_value: f32 = features.iter().zip(params).map(|(c, p)| c * p).sum();
+        features_for_move_colortr::<Us, Them, S>(self, &mut policy_params, mv, group_data);
+        let offset = inverse_sigmoid(1.0 / num_moves as f32);
+
+        let total_value: f32 =
+            features.iter().zip(params).map(|(c, p)| c * p).sum::<f32>() + offset;
 
         for c in features.iter_mut() {
             *c = 0.0;
@@ -69,12 +67,7 @@ pub(crate) fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usi
     policy_features: &mut PolicyFeatures,
     mv: &Move,
     group_data: &GroupData<S>,
-    num_legal_moves: usize,
 ) {
-    let initial_move_prob = 1.0 / num_legal_moves.max(2) as f32;
-
-    policy_features.move_count[0] = inverse_sigmoid(initial_move_prob);
-
     // If it's the first move, give every move equal probability
     if position.half_moves_played() < 2 {
         return;

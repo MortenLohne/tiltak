@@ -106,7 +106,7 @@ fn calc_slope<const N: usize>(samples: &[TrainingSample<N>], params: &[f32; N]) 
                  result,
                  offset,
              }| {
-                let estimated_result = eval_from_params(features, params);
+                let estimated_result = eval_from_params(features, params, *offset);
                 let estimated_sigmoid = sigmoid(estimated_result);
                 let derived_sigmoid_result = sigmoid_derived(estimated_result);
 
@@ -169,15 +169,21 @@ fn average_error<const N: usize>(samples: &[TrainingSample<N>], params: &[f32; N
                  features,
                  result,
                  offset,
-             }| { (sigmoid(eval_from_params(features, params)) - result).powf(2.0) },
+             }| {
+                (sigmoid(eval_from_params(features, params, *offset)) - result).powf(2.0)
+            },
         )
         .map(|f| f as f64)
         .sum::<f64>() as f32
         / (samples.len() as f32)
 }
 
-pub fn eval_from_params<const N: usize>(features: &[f32; N], params: &[f32; N]) -> f32 {
-    features.iter().zip(params).map(|(c, p)| c * p).sum()
+pub fn eval_from_params<const N: usize>(
+    features: &[f32; N],
+    params: &[f32; N],
+    offset: f32,
+) -> f32 {
+    features.iter().zip(params).map(|(c, p)| c * p).sum::<f32>() + offset
 }
 
 pub fn sigmoid(x: f32) -> f32 {

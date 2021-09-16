@@ -119,13 +119,7 @@ pub trait TunableBoard: PositionTrait {
         features: &mut [f32],
     );
 
-    fn features_for_move(
-        &self,
-        features: &mut [f32],
-        mv: &Move,
-        data: &Self::ExtraData,
-        num_legal_moves: usize,
-    );
+    fn features_for_move(&self, features: &mut [f32], mv: &Move, data: &Self::ExtraData);
 
     /// Move generation that includes a heuristic probability of each move being played.
     ///
@@ -1126,13 +1120,7 @@ impl<const S: usize> TunableBoard for Position<S> {
         }
     }
 
-    fn features_for_move(
-        &self,
-        features: &mut [f32],
-        mv: &Move,
-        group_data: &GroupData<S>,
-        num_legal_moves: usize,
-    ) {
+    fn features_for_move(&self, features: &mut [f32], mv: &Move, group_data: &GroupData<S>) {
         let mut policy_features = PolicyFeatures::new::<S>(features);
         match self.side_to_move() {
             Color::White => policy_eval::features_for_move_colortr::<WhiteTr, BlackTr, S>(
@@ -1140,14 +1128,12 @@ impl<const S: usize> TunableBoard for Position<S> {
                 &mut policy_features,
                 mv,
                 group_data,
-                num_legal_moves,
             ),
             Color::Black => policy_eval::features_for_move_colortr::<BlackTr, WhiteTr, S>(
                 self,
                 &mut policy_features,
                 mv,
                 group_data,
-                num_legal_moves,
             ),
         }
     }

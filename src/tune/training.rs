@@ -10,6 +10,7 @@ use pgn_traits::PgnPosition;
 use rand::prelude::*;
 use rayon::prelude::*;
 
+use crate::evaluation::policy_eval::inverse_sigmoid;
 use crate::position::Move;
 use crate::position::Position;
 use crate::position::TunableBoard;
@@ -359,17 +360,14 @@ pub fn tune_value_and_policy<const S: usize, const N: usize, const M: usize>(
             let group_data = position.group_data();
             for (possible_move, result) in move_scores {
                 let mut features = [0.0; M];
-                position.features_for_move(
-                    &mut features,
-                    possible_move,
-                    &group_data,
-                    move_scores.len(),
-                );
+                position.features_for_move(&mut features, possible_move, &group_data);
+
+                let offset = inverse_sigmoid(1.0 / move_scores.len().max(2) as f32);
 
                 policy_training_samples.push({
                     TrainingSample {
                         features,
-                        offset: 0.0,
+                        offset,
                         result: *result,
                     }
                 });
