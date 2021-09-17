@@ -28,7 +28,7 @@ pub fn gradient_descent<const N: usize>(
     let mut lowest_error = initial_error;
     let mut best_parameter_set = *params;
 
-    for eta in [
+    'eta_loop: for eta in [
         initial_learning_rate,
         initial_learning_rate / 3.0,
         initial_learning_rate / 10.0,
@@ -67,7 +67,9 @@ pub fn gradient_descent<const N: usize>(
                 } else {
                     iterations_since_large_improvement += 1;
                     if iterations_since_large_improvement >= MAX_TRIES {
-                        break;
+                        // If we can only get minute improvements with this eta,
+                        // going to smaller etas will be no good
+                        break 'eta_loop;
                     }
                 }
                 lowest_error = error;
