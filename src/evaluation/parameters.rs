@@ -1,13 +1,13 @@
 use crate::position::num_square_symmetries;
 
 pub const NUM_VALUE_FEATURES_4S: usize = 51;
-pub const NUM_POLICY_FEATURES_4S: usize = 99;
+pub const NUM_POLICY_FEATURES_4S: usize = 98;
 
 pub const NUM_VALUE_FEATURES_5S: usize = 69;
-pub const NUM_POLICY_FEATURES_5S: usize = 118;
+pub const NUM_POLICY_FEATURES_5S: usize = 117;
 
 pub const NUM_VALUE_FEATURES_6S: usize = 72;
-pub const NUM_POLICY_FEATURES_6S: usize = 128;
+pub const NUM_POLICY_FEATURES_6S: usize = 127;
 
 #[derive(Debug)]
 pub struct ValueFeatures<'a> {
@@ -83,7 +83,6 @@ impl<'a> ValueFeatures<'a> {
 
 #[derive(Debug)]
 pub struct PolicyFeatures<'a> {
-    pub move_count: &'a mut [f32],
     pub place_to_win: &'a mut [f32],
     pub place_to_draw: &'a mut [f32],
     pub place_to_loss: &'a mut [f32],
@@ -126,7 +125,6 @@ impl<'a> PolicyFeatures<'a> {
     pub fn new<const S: usize>(coefficients: &'a mut [f32]) -> PolicyFeatures<'a> {
         assert_eq!(coefficients.len(), num_policy_features::<S>());
 
-        let (move_count, coefficients) = coefficients.split_at_mut(1);
         let (place_to_win, coefficients) = coefficients.split_at_mut(1);
         let (place_to_draw, coefficients) = coefficients.split_at_mut(1);
         let (place_to_loss, coefficients) = coefficients.split_at_mut(1);
@@ -168,7 +166,6 @@ impl<'a> PolicyFeatures<'a> {
         assert!(coefficients.is_empty());
 
         PolicyFeatures {
-            move_count,
             place_to_win,
             place_to_draw,
             place_to_loss,
@@ -282,7 +279,6 @@ pub const VALUE_PARAMS_4S: [f32; NUM_VALUE_FEATURES_4S] = [
 ];
 #[allow(clippy::unreadable_literal)]
 pub const POLICY_PARAMS_4S: [f32; NUM_POLICY_FEATURES_4S] = [
-    0.9705593,
     0.98721755,
     0.7949509,
     -1.1216849,
@@ -458,7 +454,6 @@ pub const VALUE_PARAMS_5S: [f32; NUM_VALUE_FEATURES_5S] = [
 
 #[allow(clippy::unreadable_literal)]
 pub const POLICY_PARAMS_5S: [f32; NUM_POLICY_FEATURES_5S] = [
-    0.9239916,
     1.0658056,
     0.32767886,
     -1.3773452,
@@ -656,7 +651,6 @@ pub const VALUE_PARAMS_6S: [f32; NUM_VALUE_FEATURES_6S] = [
 
 #[allow(clippy::unreadable_literal)]
 pub const POLICY_PARAMS_6S: [f32; NUM_POLICY_FEATURES_6S] = [
-    0.8856777,
     1.0309737,
     -0.2668393,
     -1.5111188,
