@@ -17,8 +17,8 @@ pub fn gradient_descent<const N: usize>(
     let beta = 0.95;
 
     // If error is not reduced this number of times, reduce eta, or abort if eta is already low
-    const MAX_TRIES: usize = 100;
-    const ERROR_THRESHOLD: f32 = 1.000_001;
+    const MAX_TRIES: usize = 50;
+    const ERROR_THRESHOLD: f32 = 1.000_002;
 
     let initial_error = average_error(samples, params);
     println!("Running gradient descent on {} positions", samples.len(),);
