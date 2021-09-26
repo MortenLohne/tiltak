@@ -207,7 +207,7 @@ impl<const S: usize> MonteCarloTree<S> {
 
         best_children.iter().take(8).for_each(|edge| {
             println!(
-                "Move {}: {} visits, {:.2}% mean action value, {:.2}% static score, {:.3} exploration value, pv {}",
+                "Move {}: {} visits, {:.2}% mean action value, {:.3}% static score, {:.3} exploration value, pv {}",
                 edge.mv.to_string::<S>(), edge.visits, edge.mean_action_value * 100.0, edge.heuristic_score * 100.0,
                 edge.exploration_value((self.visits() as Score).sqrt(), dynamic_cpuct),
                 Pv::new(edge.child.as_ref().unwrap()).map(|mv| mv.to_string::<S>() + " ").collect::<String>()

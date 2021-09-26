@@ -357,7 +357,7 @@ fn analyze_position<const S: usize>(position: &Position<S>) {
 
     println!("Top 10 heuristic moves:");
     for (mv, score) in moves.iter().take(10) {
-        println!("{}: {:.3}", mv.to_string::<S>(), score);
+        println!("{}: {:.3}%", mv.to_string::<S>(), score * 100.0);
         let mut features = vec![0.0; <Position<S>>::policy_params().len()];
         position.features_for_move(&mut features, mv, &position.group_data());
         for feature in features {
