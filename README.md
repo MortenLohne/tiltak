@@ -36,13 +36,12 @@ Five experimental commands entered through stdin:
 
 Connect to the playtak.com server, and seek games as a bot. If no username/password is provided, the bot will login as guest. 
 
-At the time of writing, two bots based on this project are running on Playtak. They are configured as follows:
+At the time of writing, three bots based on this project are running on Playtak. They are configured as follows:
 ````
-playtak -s 6 --policy-noise high -u Tiltak_Bot -p <password> -l tiltak.log
-playtak -s 6 --rollout-depth 200 --rollout-noise low -u SlateBot -p <password> -l slate.log
+playtak -s 6 --tc 900+30 --policy-noise high -u Tiltak_Bot -p <password> -l tiltak.log
+playtak -s 6 --tc 600+20 --rollout-depth 200 --rollout-noise low -u SlateBot -p <password> -l slate.log
+playtak -s 5 --tc 900+30 --fixed-nodes 100 --policy-noise medium --rollout-depth 200 --rollout-noise low -u CobbleBot -p <password> -l cobble.log
 ````
-
-The time control is hard-coded.
 
 ## tei 
 
