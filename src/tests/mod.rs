@@ -66,3 +66,37 @@ fn plays_correct_hard_move_property<const S: usize>(move_strings: &[&str], corre
         position
     );
 }
+
+fn plays_correct_move_easy_tps_property<const S: usize>(tps: &str, correct_moves: &[&str]) {
+    let position = <Position<S>>::from_fen(tps).unwrap();
+    let mut moves = vec![];
+
+    position.generate_moves(&mut moves);
+
+    for move_string in correct_moves {
+        assert_eq!(
+            *move_string,
+            position.move_to_san(&position.move_from_san(move_string).unwrap())
+        );
+        assert!(
+            moves.contains(&position.move_from_san(move_string).unwrap()),
+            "Candidate move {} was not among legal moves {:?} in position\n{:?}",
+            move_string,
+            moves,
+            position
+        );
+    }
+    let (best_move, score) = search::mcts(position.clone(), 10_000);
+
+    assert!(
+        correct_moves
+            .iter()
+            .any(|move_string| move_string == &position.move_to_san(&best_move)),
+        "{} didn't play one of the correct moves {:?}, {} {:.1}% played instead in position:\n{:?}",
+        position.side_to_move(),
+        correct_moves,
+        position.move_to_san(&best_move),
+        score * 100.0,
+        position
+    );
+}

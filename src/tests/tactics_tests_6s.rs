@@ -1,5 +1,8 @@
 use crate::position::Position;
-use crate::tests::{do_moves_and_check_validity, plays_correct_hard_move_property};
+use crate::tests::{
+    do_moves_and_check_validity, plays_correct_hard_move_property,
+    plays_correct_move_easy_tps_property,
+};
 use board_game_traits::Position as PositionTrait;
 
 #[test]
@@ -129,4 +132,10 @@ fn flatten_our_wall_to_win_test() {
     do_moves_and_check_validity(&mut position, &move_strings);
 
     plays_correct_hard_move_property::<6>(&move_strings, &["2c5<11"])
+}
+
+#[test]
+fn play_instant_road_win_test() {
+    let tps = "1,2S,x,2,2,2/1,2,21,112,11121112,12S/12C,2,1121C,x,2,1/x,212211112112,x2,1,1/2,2S,x3,1/x,21S,x,2,21,2221S 2 53";
+    plays_correct_move_easy_tps_property::<6>(tps, &["6e5<24"]);
 }
