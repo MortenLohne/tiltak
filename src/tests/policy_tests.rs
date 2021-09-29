@@ -60,3 +60,16 @@ fn simple_flat_movement_onto_critical_square() {
     let fen = "1,1,2,x2/1,1,2,x2/x,1,2,x2/1,2,1,1,x/x,2,2,x,2 2 8";
     correct_top_policy_move_property::<5>(fen, &["b2>", "c1+"]);
 }
+
+#[test]
+fn pure_spread_onto_critical_square() {
+    let fen =
+        "x4,11212,221C/x2,2,2,1212,1S/2,2,2,1111,2122C,2S/21,x4,1/x,1112121S,x,1,1,1/2,x4,1 2 36";
+    correct_top_policy_move_property::<6>(fen, &["e4>"]);
+}
+
+#[test]
+fn pure_spread_without_critical_square() {
+    let fen = "2,1,1,1,1,2S/1,12,1,x,1C,11112121/x,2,2,212,2C,11/2,21122,x2,1,x/x3,1,1,x/x2,2,21,x,112S 2 34";
+    correct_top_policy_move_property::<6>(fen, &["4b3>1111"]);
+}
