@@ -73,3 +73,10 @@ fn pure_spread_without_critical_square() {
     let fen = "2,1,1,1,1,2S/1,12,1,x,1C,11112121/x,2,2,212,2C,11/2,21122,x2,1,x/x3,1,1,x/x2,2,21,x,112S 2 34";
     correct_top_policy_move_property::<6>(fen, &["4b3>1111"]);
 }
+
+#[test]
+fn winning_wall_spread_from_critical_square() {
+    let tps =
+        "2,2,x,2121S,x,1/x,2,12,221,2,x/x,2,2,221C,12C,12/x,2,x,121,x,1/x,2,x,1,1,1/x3,1,x,1 1 25";
+    correct_top_policy_move_property::<6>(tps, &["2d6<", "2d6>", "2d6<11"]);
+}
