@@ -1,5 +1,5 @@
 use crate::evaluation::parameters;
-use crate::position::{Move, Position, TunableBoard};
+use crate::position::{Move, Position};
 use pgn_traits::PgnPosition as PgnPositionTrait;
 
 fn correct_top_policy_move_property<const S: usize>(fen: &str, correct_move_strings: &[&str]) {

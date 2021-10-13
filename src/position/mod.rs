@@ -96,46 +96,6 @@ pub(crate) const fn square_symmetries<const S: usize>() -> &'static [usize] {
     }
 }
 
-/// Extra items for tuning evaluation constants.
-pub trait TunableBoard: PositionTrait {
-    fn value_params() -> &'static [f32];
-    fn policy_params() -> &'static [f32];
-    type ExtraData;
-
-    fn static_eval_features(&self, features: &mut [f32]);
-
-    fn static_eval_with_params(&self, params: &[f32]) -> f32 {
-        let mut features: Vec<f32> = vec![0.0; Self::value_params().len()];
-        self.static_eval_features(&mut features);
-        features.iter().zip(params).map(|(a, b)| a * b).sum()
-    }
-
-    fn generate_moves_with_params(
-        &self,
-        params: &[f32],
-        data: &Self::ExtraData,
-        simple_moves: &mut Vec<<Self as PositionTrait>::Move>,
-        moves: &mut Vec<(<Self as PositionTrait>::Move, search::Score)>,
-        features: &mut [f32],
-    );
-
-    fn features_for_move(&self, features: &mut [f32], mv: &Move, data: &Self::ExtraData);
-
-    /// Move generation that includes a heuristic probability of each move being played.
-    ///
-    /// # Arguments
-    ///
-    /// * `simple_moves` - An empty vector to temporarily store moves without probabilities. The vector will be emptied before the function returns, and only serves to re-use allocated memory.
-    /// * `moves` A vector to place the moves and associated probabilities.
-    fn generate_moves_with_probabilities(
-        &self,
-        group_data: &Self::ExtraData,
-        simple_moves: &mut Vec<Move>,
-        moves: &mut Vec<(Move, search::Score)>,
-        features: &mut [f32],
-    );
-}
-
 #[derive(Default, Clone, Copy, PartialEq, Eq, Debug)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct GroupEdgeConnection {
@@ -814,6 +774,99 @@ impl<const S: usize> Position<S> {
         }
         eval
     }
+
+    pub fn value_params() -> &'static [f32] {
+        match S {
+            4 => &VALUE_PARAMS_4S,
+            5 => &VALUE_PARAMS_5S,
+            6 => &VALUE_PARAMS_6S,
+            _ => unimplemented!("{}s is not supported.", S),
+        }
+    }
+
+    pub fn policy_params() -> &'static [f32] {
+        match S {
+            4 => &POLICY_PARAMS_4S,
+            5 => &POLICY_PARAMS_5S,
+            6 => &POLICY_PARAMS_6S,
+            _ => unimplemented!("{}s is not supported.", S),
+        }
+    }
+
+    pub fn static_eval_features(&self, features: &mut [f32]) {
+        debug_assert!(self.game_result().is_none());
+
+        let group_data = self.group_data();
+        let mut value_features = ValueFeatures::new::<S>(features);
+        value_eval::static_eval_game_phase(self, &group_data, &mut value_features);
+    }
+
+    pub fn generate_moves_with_params(
+        &self,
+        params: &[f32],
+        group_data: &GroupData<S>,
+        simple_moves: &mut Vec<<Self as PositionTrait>::Move>,
+        moves: &mut Vec<(<Self as PositionTrait>::Move, f32)>,
+        features: &mut [f32],
+    ) {
+        debug_assert!(simple_moves.is_empty());
+        self.generate_moves(simple_moves);
+        match self.side_to_move() {
+            Color::White => self.generate_moves_with_probabilities_colortr::<WhiteTr, BlackTr>(
+                params,
+                group_data,
+                simple_moves,
+                moves,
+                features,
+            ),
+            Color::Black => self.generate_moves_with_probabilities_colortr::<BlackTr, WhiteTr>(
+                params,
+                group_data,
+                simple_moves,
+                moves,
+                features,
+            ),
+        }
+    }
+
+    pub fn features_for_move(&self, features: &mut [f32], mv: &Move, group_data: &GroupData<S>) {
+        let mut policy_features = PolicyFeatures::new::<S>(features);
+        match self.side_to_move() {
+            Color::White => policy_eval::features_for_move_colortr::<WhiteTr, BlackTr, S>(
+                self,
+                &mut policy_features,
+                mv,
+                group_data,
+            ),
+            Color::Black => policy_eval::features_for_move_colortr::<BlackTr, WhiteTr, S>(
+                self,
+                &mut policy_features,
+                mv,
+                group_data,
+            ),
+        }
+    }
+    /// Move generation that includes a heuristic probability of each move being played.
+    ///
+    /// # Arguments
+    ///
+    /// * `simple_moves` - An empty vector to temporarily store moves without probabilities. The vector will be emptied before the function returns, and only serves to re-use allocated memory.
+    /// * `moves` A vector to place the moves and associated probabilities.
+    pub fn generate_moves_with_probabilities(
+        &self,
+        group_data: &GroupData<S>,
+        simple_moves: &mut Vec<Move>,
+        moves: &mut Vec<(Move, search::Score)>,
+        features: &mut [f32],
+    ) {
+        self.generate_moves_with_params(
+            Self::policy_params(),
+            group_data,
+            simple_moves,
+            moves,
+            features,
+        )
+    }
 }
 
 impl<const S: usize> PositionTrait for Position<S> {
@@ -1059,104 +1112,10 @@ impl<const S: usize> Iterator for MoveIterator<S> {
 
 impl<const S: usize> EvalPositionTrait for Position<S> {
     fn static_eval(&self) -> f32 {
-        self.static_eval_with_params(Self::value_params())
-    }
-}
-
-impl<const S: usize> TunableBoard for Position<S> {
-    type ExtraData = GroupData<S>;
-
-    fn value_params() -> &'static [f32] {
-        match S {
-            4 => &VALUE_PARAMS_4S,
-            5 => &VALUE_PARAMS_5S,
-            6 => &VALUE_PARAMS_6S,
-            _ => unimplemented!("{}s is not supported.", S),
-        }
-    }
-
-    fn policy_params() -> &'static [f32] {
-        match S {
-            4 => &POLICY_PARAMS_4S,
-            5 => &POLICY_PARAMS_5S,
-            6 => &POLICY_PARAMS_6S,
-            _ => unimplemented!("{}s is not supported.", S),
-        }
-    }
-
-    fn static_eval_features(&self, features: &mut [f32]) {
-        debug_assert!(self.game_result().is_none());
-
-        let group_data = self.group_data();
-        let mut value_features = ValueFeatures::new::<S>(features);
-        value_eval::static_eval_game_phase(self, &group_data, &mut value_features);
-    }
-
-    fn generate_moves_with_params(
-        &self,
-        params: &[f32],
-        group_data: &GroupData<S>,
-        simple_moves: &mut Vec<Self::Move>,
-        moves: &mut Vec<(Self::Move, f32)>,
-        features: &mut [f32],
-    ) {
-        debug_assert!(simple_moves.is_empty());
-        self.generate_moves(simple_moves);
-        match self.side_to_move() {
-            Color::White => self.generate_moves_with_probabilities_colortr::<WhiteTr, BlackTr>(
-                params,
-                group_data,
-                simple_moves,
-                moves,
-                features,
-            ),
-            Color::Black => self.generate_moves_with_probabilities_colortr::<BlackTr, WhiteTr>(
-                params,
-                group_data,
-                simple_moves,
-                moves,
-                features,
-            ),
-        }
-    }
-
-    fn features_for_move(&self, features: &mut [f32], mv: &Move, group_data: &GroupData<S>) {
-        let mut policy_features = PolicyFeatures::new::<S>(features);
-        match self.side_to_move() {
-            Color::White => policy_eval::features_for_move_colortr::<WhiteTr, BlackTr, S>(
-                self,
-                &mut policy_features,
-                mv,
-                group_data,
-            ),
-            Color::Black => policy_eval::features_for_move_colortr::<BlackTr, WhiteTr, S>(
-                self,
-                &mut policy_features,
-                mv,
-                group_data,
-            ),
-        }
-    }
-    /// Move generation that includes a heuristic probability of each move being played.
-    ///
-    /// # Arguments
-    ///
-    /// * `simple_moves` - An empty vector to temporarily store moves without probabilities. The vector will be emptied before the function returns, and only serves to re-use allocated memory.
-    /// * `moves` A vector to place the moves and associated probabilities.
-    fn generate_moves_with_probabilities(
-        &self,
-        group_data: &GroupData<S>,
-        simple_moves: &mut Vec<Move>,
-        moves: &mut Vec<(Move, search::Score)>,
-        features: &mut [f32],
-    ) {
-        self.generate_moves_with_params(
-            Self::policy_params(),
-            group_data,
-            simple_moves,
-            moves,
-            features,
-        )
+        let params = Self::value_params();
+        let mut features: Vec<f32> = vec![0.0; Self::value_params().len()];
+        self.static_eval_features(&mut features);
+        features.iter().zip(params).map(|(a, b)| a * b).sum()
     }
 }
 

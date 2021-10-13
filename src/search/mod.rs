@@ -5,7 +5,7 @@
 use std::{mem, time};
 
 use crate::position::Move;
-use crate::position::{Position, TunableBoard};
+use crate::position::Position;
 use crate::position::{Role, Square};
 pub use crate::search::mcts_core::best_move;
 use crate::search::mcts_core::{TempVectors, Tree};

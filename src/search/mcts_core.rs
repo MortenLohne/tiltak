@@ -7,7 +7,7 @@ use rand::Rng;
 use crate::evaluation::parameters;
 use crate::position::Move;
 /// This module contains the core of the MCTS search algorithm
-use crate::position::{GroupData, Position, TunableBoard};
+use crate::position::{GroupData, Position};
 use crate::search::{cp_to_win_percentage, MctsSetting, Score};
 
 /// A Monte Carlo Search Tree, containing every node that has been seen in search.

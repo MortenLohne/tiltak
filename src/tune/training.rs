@@ -13,7 +13,6 @@ use rayon::prelude::*;
 use crate::evaluation::policy_eval::inverse_sigmoid;
 use crate::position::Move;
 use crate::position::Position;
-use crate::position::TunableBoard;
 use crate::ptn::Game;
 use crate::ptn::{ptn_parser, PtnMove};
 use crate::search::MctsSetting;

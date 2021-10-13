@@ -14,7 +14,6 @@ use tiltak::minmax;
 use tiltak::position::Move;
 #[cfg(feature = "constant-tuning")]
 use tiltak::position::Role;
-use tiltak::position::TunableBoard;
 use tiltak::position::{Position, Stack};
 use tiltak::ptn::{Game, PtnMove};
 use tiltak::search::MctsSetting;
