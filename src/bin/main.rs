@@ -352,13 +352,22 @@ fn analyze_position<const S: usize>(position: &Position<S>) {
         &mut moves,
         &mut features,
     );
-    moves.sort_by_key(|(_mv, score)| -(score * 1000.0) as i64);
+    moves.sort_by(|(_mv, score1), (_, score2)| score1.partial_cmp(score2).unwrap().reverse());
+
+    let group_data = position.group_data();
+    let mut feature_sets = vec![vec![0.0; parameters::num_policy_features::<S>()]; moves.len()];
+    let mut policy_feature_sets: Vec<_> = feature_sets
+        .iter_mut()
+        .map(|feature_set| parameters::PolicyFeatures::new::<S>(feature_set))
+        .collect();
+
+    let simple_moves: Vec<Move> = moves.iter().map(|(mv, _)| mv.clone()).collect();
+
+    position.features_for_moves(&mut policy_feature_sets, &simple_moves, &group_data);
 
     println!("Top 10 heuristic moves:");
-    for (mv, score) in moves.iter().take(10) {
+    for ((mv, score), features) in moves.iter().zip(feature_sets).take(10) {
         println!("{}: {:.3}%", mv.to_string::<S>(), score * 100.0);
-        let mut features = vec![0.0; <Position<S>>::policy_params().len()];
-        position.features_for_move(&mut features, mv, &position.group_data());
         for feature in features {
             print!("{:.1}, ", feature);
         }
