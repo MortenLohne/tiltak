@@ -4,6 +4,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::time;
 use std::{error, fs, io};
 
+use crate::evaluation::parameters::PolicyFeatures;
 use board_game_traits::GameResult;
 use board_game_traits::Position as PositionTrait;
 use pgn_traits::PgnPosition;
@@ -357,10 +358,17 @@ pub fn tune_value_and_policy<const S: usize, const N: usize, const M: usize>(
             .zip(move_scores)
         {
             let group_data = position.group_data();
-            for (possible_move, result) in move_scores {
-                let mut features = [0.0; M];
-                position.features_for_move(&mut features, possible_move, &group_data);
 
+            let mut feature_sets = vec![[0.0; M]; move_scores.len()];
+            let mut policy_feature_sets: Vec<PolicyFeatures> = feature_sets
+                .iter_mut()
+                .map(|feature_set| PolicyFeatures::new::<S>(feature_set))
+                .collect();
+            let moves: Vec<Move> = move_scores.iter().map(|(mv, _score)| mv.clone()).collect();
+
+            position.features_for_moves(&mut policy_feature_sets, &moves, &group_data);
+
+            for ((_, result), features) in move_scores.iter().zip(feature_sets) {
                 let offset = inverse_sigmoid(1.0 / move_scores.len().max(2) as f32);
 
                 policy_training_samples.push({

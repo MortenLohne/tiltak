@@ -27,10 +27,10 @@ pub use utils::{
 pub use mv::{Move, ReverseMove};
 
 use crate::evaluation::parameters::{
-    ValueFeatures, POLICY_PARAMS_4S, POLICY_PARAMS_5S, POLICY_PARAMS_6S,
-    VALUE_PARAMS_4S, VALUE_PARAMS_5S, VALUE_PARAMS_6S,
+    ValueFeatures, POLICY_PARAMS_4S, POLICY_PARAMS_5S, POLICY_PARAMS_6S, VALUE_PARAMS_4S,
+    VALUE_PARAMS_5S, VALUE_PARAMS_6S,
 };
-use crate::evaluation::{value_eval};
+use crate::evaluation::value_eval;
 use crate::position::color_trait::ColorTr;
 use crate::search;
 

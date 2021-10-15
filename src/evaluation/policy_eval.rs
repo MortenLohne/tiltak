@@ -63,6 +63,31 @@ impl<const S: usize> Position<S> {
         sigmoid(total_value)
     }
 
+    pub fn features_for_moves(
+        &self,
+        feature_sets: &mut [PolicyFeatures],
+        moves: &[Move],
+        group_data: &GroupData<S>,
+    ) {
+        assert_eq!(feature_sets.len(), moves.len());
+        for (features_set, mv) in feature_sets.iter_mut().zip(moves) {
+            match self.side_to_move() {
+                Color::White => features_for_move_colortr::<WhiteTr, BlackTr, S>(
+                    self,
+                    features_set,
+                    mv,
+                    group_data,
+                ),
+                Color::Black => features_for_move_colortr::<BlackTr, WhiteTr, S>(
+                    self,
+                    features_set,
+                    mv,
+                    group_data,
+                ),
+            }
+        }
+    }
+
     pub fn features_for_move(&self, features: &mut [f32], mv: &Move, group_data: &GroupData<S>) {
         let mut policy_features = PolicyFeatures::new::<S>(features);
         match self.side_to_move() {
