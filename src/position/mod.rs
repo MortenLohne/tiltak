@@ -27,10 +27,10 @@ pub use utils::{
 pub use mv::{Move, ReverseMove};
 
 use crate::evaluation::parameters::{
-    PolicyFeatures, ValueFeatures, POLICY_PARAMS_4S, POLICY_PARAMS_5S, POLICY_PARAMS_6S,
+    ValueFeatures, POLICY_PARAMS_4S, POLICY_PARAMS_5S, POLICY_PARAMS_6S,
     VALUE_PARAMS_4S, VALUE_PARAMS_5S, VALUE_PARAMS_6S,
 };
-use crate::evaluation::{policy_eval, value_eval};
+use crate::evaluation::{value_eval};
 use crate::position::color_trait::ColorTr;
 use crate::search;
 
@@ -829,23 +829,6 @@ impl<const S: usize> Position<S> {
         }
     }
 
-    pub fn features_for_move(&self, features: &mut [f32], mv: &Move, group_data: &GroupData<S>) {
-        let mut policy_features = PolicyFeatures::new::<S>(features);
-        match self.side_to_move() {
-            Color::White => policy_eval::features_for_move_colortr::<WhiteTr, BlackTr, S>(
-                self,
-                &mut policy_features,
-                mv,
-                group_data,
-            ),
-            Color::Black => policy_eval::features_for_move_colortr::<BlackTr, WhiteTr, S>(
-                self,
-                &mut policy_features,
-                mv,
-                group_data,
-            ),
-        }
-    }
     /// Move generation that includes a heuristic probability of each move being played.
     ///
     /// # Arguments

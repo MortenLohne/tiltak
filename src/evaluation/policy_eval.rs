@@ -1,8 +1,9 @@
 use arrayvec::ArrayVec;
+use board_game_traits::{Color, Position as PositionTrait};
 
 use crate::evaluation::parameters::PolicyFeatures;
 use crate::position::bitboard::BitBoard;
-use crate::position::color_trait::ColorTr;
+use crate::position::color_trait::{BlackTr, ColorTr, WhiteTr};
 use crate::position::Direction::*;
 use crate::position::Role::{Cap, Flat, Wall};
 use crate::position::Square;
@@ -60,6 +61,24 @@ impl<const S: usize> Position<S> {
         }
 
         sigmoid(total_value)
+    }
+
+    pub fn features_for_move(&self, features: &mut [f32], mv: &Move, group_data: &GroupData<S>) {
+        let mut policy_features = PolicyFeatures::new::<S>(features);
+        match self.side_to_move() {
+            Color::White => features_for_move_colortr::<WhiteTr, BlackTr, S>(
+                self,
+                &mut policy_features,
+                mv,
+                group_data,
+            ),
+            Color::Black => features_for_move_colortr::<BlackTr, WhiteTr, S>(
+                self,
+                &mut policy_features,
+                mv,
+                group_data,
+            ),
+        }
     }
 }
 pub(crate) fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usize>(
