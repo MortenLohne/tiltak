@@ -71,35 +71,30 @@ impl<const S: usize> Position<S> {
     ) {
         assert_eq!(feature_sets.len(), moves.len());
         for (features_set, mv) in feature_sets.iter_mut().zip(moves) {
-            match self.side_to_move() {
-                Color::White => features_for_move_colortr::<WhiteTr, BlackTr, S>(
-                    self,
-                    features_set,
-                    mv,
-                    group_data,
-                ),
-                Color::Black => features_for_move_colortr::<BlackTr, WhiteTr, S>(
-                    self,
-                    features_set,
-                    mv,
-                    group_data,
-                ),
-            }
+            self.features_for_move(
+                features_set,
+                mv,
+                group_data,
+            );
         }
     }
 
-    pub fn features_for_move(&self, features: &mut [f32], mv: &Move, group_data: &GroupData<S>) {
-        let mut policy_features = PolicyFeatures::new::<S>(features);
+    fn features_for_move(
+        &self,
+        policy_features: &mut PolicyFeatures,
+        mv: &Move,
+        group_data: &GroupData<S>,
+    ) {
         match self.side_to_move() {
             Color::White => features_for_move_colortr::<WhiteTr, BlackTr, S>(
                 self,
-                &mut policy_features,
+                policy_features,
                 mv,
                 group_data,
             ),
             Color::Black => features_for_move_colortr::<BlackTr, WhiteTr, S>(
                 self,
-                &mut policy_features,
+                policy_features,
                 mv,
                 group_data,
             ),
