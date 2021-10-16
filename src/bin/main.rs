@@ -336,21 +336,12 @@ fn analyze_position<const S: usize>(position: &Position<S>) {
 
     let mut simple_moves = vec![];
     let mut moves = vec![];
-    let mut features = vec![
-        0.0;
-        match S {
-            4 => parameters::NUM_POLICY_FEATURES_4S,
-            5 => parameters::NUM_POLICY_FEATURES_5S,
-            6 => parameters::NUM_POLICY_FEATURES_6S,
-            _ => unimplemented!(),
-        }
-    ];
 
     position.generate_moves_with_probabilities(
         &position.group_data(),
         &mut simple_moves,
         &mut moves,
-        &mut features,
+        &mut vec![],
     );
     moves.sort_by(|(_mv, score1), (_, score2)| score1.partial_cmp(score2).unwrap().reverse());
 

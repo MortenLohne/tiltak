@@ -33,7 +33,7 @@ pub struct TempVectors {
     simple_moves: Vec<Move>,
     moves: Vec<(Move, f32)>,
     value_scores: Vec<Score>,
-    policy_scores: Vec<Score>,
+    policy_score_sets: Vec<Box<[Score]>>,
 }
 
 impl TempVectors {
@@ -42,7 +42,7 @@ impl TempVectors {
             simple_moves: vec![],
             moves: vec![],
             value_scores: vec![0.0; parameters::num_value_features::<S>()],
-            policy_scores: vec![0.0; parameters::num_policy_features::<S>()],
+            policy_score_sets: vec![],
         }
     }
 }
@@ -170,7 +170,7 @@ impl Tree {
             group_data,
             &mut temp_vectors.simple_moves,
             &mut temp_vectors.moves,
-            &mut temp_vectors.policy_scores,
+            &mut temp_vectors.policy_score_sets,
         );
         let mut children_vec = Vec::with_capacity(temp_vectors.moves.len());
         let policy_sum: f32 = temp_vectors.moves.iter().map(|(_, score)| *score).sum();
@@ -250,7 +250,7 @@ pub fn rollout<const S: usize>(
             &group_data,
             &mut temp_vectors.simple_moves,
             &mut temp_vectors.moves,
-            &mut temp_vectors.policy_scores,
+            &mut temp_vectors.policy_score_sets,
         );
 
         let mut rng = rand::thread_rng();

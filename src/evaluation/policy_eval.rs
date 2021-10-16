@@ -1,3 +1,4 @@
+use crate::evaluation::parameters;
 use arrayvec::ArrayVec;
 use board_game_traits::{Color, Position as PositionTrait};
 
@@ -27,24 +28,38 @@ impl<const S: usize> Position<S> {
         group_data: &GroupData<S>,
         simple_moves: &mut Vec<Move>,
         moves: &mut Vec<(Move, search::Score)>,
-        features: &mut [f32],
+        feature_sets: &mut Vec<Box<[f32]>>,
     ) {
         let num_moves = simple_moves.len();
 
-        moves.extend(simple_moves.drain(..).map(|mv| {
-            let mut policy_params = PolicyFeatures::new::<S>(features);
-            features_for_move_colortr::<Us, Them, S>(self, &mut policy_params, &mv, group_data);
-            let offset = inverse_sigmoid(1.0 / num_moves as f32);
+        while feature_sets.len() < num_moves {
+            feature_sets.push(vec![0.0; parameters::num_policy_features::<S>()].into_boxed_slice());
+        }
 
-            let total_value: f32 =
-                features.iter().zip(params).map(|(c, p)| c * p).sum::<f32>() + offset;
+        let mut policy_feature_sets: Vec<PolicyFeatures> = feature_sets
+            .iter_mut()
+            .map(|feature_set| PolicyFeatures::new::<S>(feature_set))
+            .collect();
 
-            for c in features.iter_mut() {
-                *c = 0.0;
-            }
+        self.features_for_moves(&mut policy_feature_sets, simple_moves, group_data);
 
-            (mv.clone(), sigmoid(total_value))
-        }));
+        moves.extend(
+            simple_moves
+                .drain(..)
+                .zip(feature_sets)
+                .map(|(mv, features)| {
+                    let offset = inverse_sigmoid(1.0 / num_moves as f32);
+
+                    let total_value: f32 =
+                        features.iter().zip(params).map(|(c, p)| c * p).sum::<f32>() + offset;
+
+                    for c in features.iter_mut() {
+                        *c = 0.0;
+                    }
+
+                    (mv, sigmoid(total_value))
+                }),
+        );
     }
 
     pub fn features_for_moves(
@@ -53,7 +68,7 @@ impl<const S: usize> Position<S> {
         moves: &[Move],
         group_data: &GroupData<S>,
     ) {
-        assert_eq!(feature_sets.len(), moves.len());
+        assert!(feature_sets.len() >= moves.len());
         for (features_set, mv) in feature_sets.iter_mut().zip(moves) {
             self.features_for_move(features_set, mv, group_data);
         }

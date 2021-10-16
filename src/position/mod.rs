@@ -807,7 +807,7 @@ impl<const S: usize> Position<S> {
         group_data: &GroupData<S>,
         simple_moves: &mut Vec<<Self as PositionTrait>::Move>,
         moves: &mut Vec<(<Self as PositionTrait>::Move, f32)>,
-        features: &mut [f32],
+        features: &mut Vec<Box<[f32]>>,
     ) {
         debug_assert!(simple_moves.is_empty());
         self.generate_moves(simple_moves);
@@ -840,7 +840,7 @@ impl<const S: usize> Position<S> {
         group_data: &GroupData<S>,
         simple_moves: &mut Vec<Move>,
         moves: &mut Vec<(Move, search::Score)>,
-        features: &mut [f32],
+        features: &mut Vec<Box<[f32]>>,
     ) {
         self.generate_moves_with_params(
             Self::policy_params(),
