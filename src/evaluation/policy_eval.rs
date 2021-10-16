@@ -55,11 +55,7 @@ impl<const S: usize> Position<S> {
     ) {
         assert_eq!(feature_sets.len(), moves.len());
         for (features_set, mv) in feature_sets.iter_mut().zip(moves) {
-            self.features_for_move(
-                features_set,
-                mv,
-                group_data,
-            );
+            self.features_for_move(features_set, mv, group_data);
         }
     }
 
@@ -85,7 +81,7 @@ impl<const S: usize> Position<S> {
         }
     }
 }
-pub(crate) fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usize>(
+fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usize>(
     position: &Position<S>,
     policy_features: &mut PolicyFeatures,
     mv: &Move,
