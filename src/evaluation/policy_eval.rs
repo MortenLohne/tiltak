@@ -69,8 +69,21 @@ impl<const S: usize> Position<S> {
         group_data: &GroupData<S>,
     ) {
         assert!(feature_sets.len() >= moves.len());
+
+        let mut immediate_win_exists = false;
+
         for (features_set, mv) in feature_sets.iter_mut().zip(moves) {
             self.features_for_move(features_set, mv, group_data);
+            if has_immediate_win(features_set) {
+                immediate_win_exists = true;
+            }
+        }
+        if immediate_win_exists {
+            for features_set in feature_sets {
+                if !has_immediate_win(features_set) {
+                    features_set.decline_win[0] = 1.0;
+                }
+            }
         }
     }
 
@@ -96,6 +109,17 @@ impl<const S: usize> Position<S> {
         }
     }
 }
+
+fn has_immediate_win(policy_features: &PolicyFeatures) -> bool {
+    [
+        policy_features.place_to_win[0],
+        policy_features.place_our_critical_square[0],
+        policy_features.move_onto_critical_square[2],
+    ]
+    .iter()
+    .any(|p| *p != 0.0)
+}
+
 fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usize>(
     position: &Position<S>,
     policy_features: &mut PolicyFeatures,
