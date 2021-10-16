@@ -7,9 +7,9 @@ use crate::position::bitboard::BitBoard;
 use crate::position::color_trait::{BlackTr, ColorTr, WhiteTr};
 use crate::position::Direction::*;
 use crate::position::Role::{Cap, Flat, Wall};
-use crate::position::Square;
 use crate::position::{square_symmetries, GroupData, Position};
 use crate::position::{squares_iterator, Move};
+use crate::position::{GroupEdgeConnection, Square};
 use crate::search;
 
 pub fn sigmoid(x: f32) -> f32 {
@@ -114,7 +114,7 @@ fn has_immediate_win(policy_features: &PolicyFeatures) -> bool {
     [
         policy_features.place_to_win[0],
         policy_features.place_our_critical_square[0],
-        policy_features.move_onto_critical_square[2],
+        policy_features.move_onto_critical_square[0],
     ]
     .iter()
     .any(|p| *p != 0.0)
@@ -382,13 +382,21 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usize>(
                     *square
                 };
 
-            let mut captures_our_critical_square = false;
-            let mut captures_their_critical_square = false;
+            let mut captures_our_critical_square = None;
+            let mut captures_their_critical_square = None;
 
+            let mut our_groups_affected = <ArrayVec<u8, S>>::new();
             let mut our_pieces = 0;
             let mut their_pieces = 0;
             let mut their_pieces_captured = 0;
-            let mut our_flats_lost = 0;
+
+            // Special case for when we spread the whole stack
+            if position[*square].len() == stack_movement.get(0).pieces_to_take {
+                let top_stone = position[*square].top_stone.unwrap();
+                if top_stone.is_road_piece() {
+                    our_groups_affected.push(group_data.groups[*square]);
+                }
+            }
 
             // This iterator skips the first square if we move the whole stack
             for piece in position
@@ -400,10 +408,10 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usize>(
                     if Us::is_critical_square(&*group_data, destination_square)
                         && piece.is_road_piece()
                     {
-                        captures_our_critical_square = true;
+                        captures_our_critical_square = Some(destination_square);
                     }
                     if Them::is_critical_square(&*group_data, destination_square) {
-                        captures_their_critical_square = true;
+                        captures_their_critical_square = Some(destination_square);
                     }
                 } else {
                     their_pieces += 1;
@@ -448,11 +456,11 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usize>(
                         } else {
                             policy_features.stack_captured_by_movement[0] -=
                                 destination_stack.len() as f32;
-                            our_flats_lost += 1;
+                            our_groups_affected.push(group_data.groups[destination_square]);
                         }
                     }
                     if Us::piece_is_ours(destination_top_stone) && piece.role() == Wall {
-                        our_flats_lost += 1;
+                        our_groups_affected.push(group_data.groups[destination_square]);
                     }
 
                     for &line in BitBoard::lines_for_square::<S>(destination_square).iter() {
@@ -492,7 +500,7 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usize>(
                 Them::critical_squares(&*group_data) & (!group_data.all_pieces());
 
             if !their_open_critical_squares.is_empty() {
-                if their_pieces_captured == 0 && !captures_their_critical_square {
+                if their_pieces_captured == 0 && captures_their_critical_square.is_none() {
                     // Move ignores their critical threat, but might win for us
                     policy_features.ignore_their_critical_square[1] += 1.0;
                 } else {
@@ -502,16 +510,28 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usize>(
             }
 
             // Bonus for moving onto a critical square
-            if captures_our_critical_square {
-                let moves_our_whole_stack =
-                    stack_movement.get(0).pieces_to_take == position[*square].len();
+            if let Some(critical_square) = captures_our_critical_square {
+                // Check if reaching the critical square still wins, in case our
+                // stack spread lost some of our flats
+                let mut edge_connection =
+                    GroupEdgeConnection::default().connect_square::<S>(critical_square);
+                for neighbour in critical_square.neighbours::<S>() {
+                    if let Some(neighbour_piece) = position[neighbour].top_stone() {
+                        if Us::piece_is_ours(neighbour_piece) {
+                            let group_id = group_data.groups[neighbour];
+                            if our_groups_affected.iter().all(|g| *g != group_id) {
+                                edge_connection = edge_connection
+                                    | group_data.amount_in_group[group_id as usize].1;
+                            }
+                        }
+                    }
+                }
 
-                match (our_flats_lost == 0, moves_our_whole_stack) {
-                    (false, false) => policy_features.move_onto_critical_square[0] += 1.0,
-                    (false, true) => policy_features.move_onto_critical_square[1] += 1.0,
+                if edge_connection.is_winning() {
                     // Only this option is a guaranteed win:
-                    (true, false) => policy_features.move_onto_critical_square[2] += 1.0,
-                    (true, true) => policy_features.move_onto_critical_square[3] += 1.0,
+                    policy_features.move_onto_critical_square[0] += 1.0
+                } else {
+                    policy_features.move_onto_critical_square[1] += 1.0
                 }
             }
         }
