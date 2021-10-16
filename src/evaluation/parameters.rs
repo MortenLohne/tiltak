@@ -102,8 +102,9 @@ pub struct PolicyFeatures<'a> {
     pub merge_two_groups_linear: &'a mut [f32],
     pub block_merger_base: &'a mut [f32],
     pub block_merger_linear: &'a mut [f32],
-    pub place_critical_square: &'a mut [f32],
-    pub ignore_critical_square: &'a mut [f32],
+    pub place_our_critical_square: &'a mut [f32],
+    pub place_their_critical_square: &'a mut [f32],
+    pub ignore_their_critical_square: &'a mut [f32],
     pub next_to_our_last_stone: &'a mut [f32],
     pub next_to_their_last_stone: &'a mut [f32],
     pub diagonal_to_our_last_stone: &'a mut [f32],
@@ -144,8 +145,9 @@ impl<'a> PolicyFeatures<'a> {
         let (merge_two_groups_linear, coefficients) = coefficients.split_at_mut(3);
         let (block_merger_base, coefficients) = coefficients.split_at_mut(3);
         let (block_merger_linear, coefficients) = coefficients.split_at_mut(3);
-        let (place_critical_square, coefficients) = coefficients.split_at_mut(5);
-        let (ignore_critical_square, coefficients) = coefficients.split_at_mut(2);
+        let (place_our_critical_square, coefficients) = coefficients.split_at_mut(1);
+        let (place_their_critical_square, coefficients) = coefficients.split_at_mut(4);
+        let (ignore_their_critical_square, coefficients) = coefficients.split_at_mut(2);
         let (next_to_our_last_stone, coefficients) = coefficients.split_at_mut(1);
         let (next_to_their_last_stone, coefficients) = coefficients.split_at_mut(1);
         let (diagonal_to_our_last_stone, coefficients) = coefficients.split_at_mut(1);
@@ -185,8 +187,9 @@ impl<'a> PolicyFeatures<'a> {
             merge_two_groups_linear,
             block_merger_base,
             block_merger_linear,
-            place_critical_square,
-            ignore_critical_square,
+            place_our_critical_square,
+            place_their_critical_square,
+            ignore_their_critical_square,
             next_to_our_last_stone,
             next_to_their_last_stone,
             diagonal_to_our_last_stone,

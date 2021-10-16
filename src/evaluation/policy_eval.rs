@@ -245,12 +245,12 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usize>(
 
             if *role == Flat || *role == Cap {
                 if Us::is_critical_square(&*group_data, *square) {
-                    policy_features.place_critical_square[0] += 1.0;
+                    policy_features.place_our_critical_square[0] += 1.0;
                 } else if !their_open_critical_squares.is_empty() {
                     if their_open_critical_squares == BitBoard::empty().set(square.0) {
-                        policy_features.place_critical_square[1] += 1.0;
+                        policy_features.place_their_critical_square[0] += 1.0;
                     } else {
-                        policy_features.ignore_critical_square[0] += 1.0;
+                        policy_features.ignore_their_critical_square[0] += 1.0;
                     }
                 }
 
@@ -306,19 +306,19 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usize>(
 
                 if !their_open_critical_squares.is_empty() {
                     if their_open_critical_squares == BitBoard::empty().set(square.0) {
-                        policy_features.place_critical_square[2] += 1.0;
+                        policy_features.place_their_critical_square[1] += 1.0;
                     } else {
-                        policy_features.ignore_critical_square[0] += 1.0;
+                        policy_features.ignore_their_critical_square[0] += 1.0;
                     }
                 }
             } else if *role == Cap {
                 if Us::is_critical_square(&*group_data, *square) {
-                    policy_features.place_critical_square[0] += 1.0;
+                    policy_features.place_our_critical_square[0] += 1.0;
                 } else if !their_open_critical_squares.is_empty() {
                     if their_open_critical_squares == BitBoard::empty().set(square.0) {
-                        policy_features.place_critical_square[3] += 1.0;
+                        policy_features.place_their_critical_square[2] += 1.0;
                     } else {
-                        policy_features.ignore_critical_square[0] += 1.0;
+                        policy_features.ignore_their_critical_square[0] += 1.0;
                     }
                 }
             }
@@ -357,7 +357,9 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usize>(
                 } else {
                     *square
                 };
-            let mut gets_critical_square = false;
+
+            let mut captures_our_critical_square = false;
+            let mut captures_their_critical_square = false;
 
             let mut our_pieces = 0;
             let mut their_pieces = 0;
@@ -370,6 +372,14 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usize>(
             {
                 if Us::piece_is_ours(piece) {
                     our_pieces += 1;
+                    if Us::is_critical_square(&*group_data, destination_square)
+                        && piece.is_road_piece()
+                    {
+                        captures_our_critical_square = true;
+                    }
+                    if Them::is_critical_square(&*group_data, destination_square) {
+                        captures_their_critical_square = true;
+                    }
                 } else {
                     their_pieces += 1;
                 }
@@ -415,9 +425,6 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usize>(
                                 destination_stack.len() as f32;
                         }
                     }
-                    if Us::is_critical_square(&*group_data, destination_square) {
-                        gets_critical_square = true;
-                    }
 
                     for &line in BitBoard::lines_for_square::<S>(destination_square).iter() {
                         let our_road_stones = (line & Us::road_stones(group_data)).count() as usize;
@@ -456,17 +463,17 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usize>(
                 Them::critical_squares(&*group_data) & (!group_data.all_pieces());
 
             if !their_open_critical_squares.is_empty() {
-                if their_pieces_captured == 0 {
+                if their_pieces_captured == 0 && !captures_their_critical_square {
                     // Move ignores their critical threat, but might win for us
-                    policy_features.ignore_critical_square[1] += 1.0;
+                    policy_features.ignore_their_critical_square[1] += 1.0;
                 } else {
                     // Move captures at least one stack, which might save us
-                    policy_features.place_critical_square[4] += their_pieces_captured as f32;
+                    policy_features.place_their_critical_square[3] += their_pieces_captured as f32;
                 }
             }
 
             // Bonus for moving onto a critical square
-            if gets_critical_square {
+            if captures_our_critical_square {
                 let moves_our_whole_stack =
                     stack_movement.get(0).pieces_to_take == position[*square].len();
 
