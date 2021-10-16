@@ -32,35 +32,19 @@ impl<const S: usize> Position<S> {
         let num_moves = simple_moves.len();
 
         moves.extend(simple_moves.drain(..).map(|mv| {
-            (
-                mv.clone(),
-                self.probability_for_move_colortr::<Us, Them>(
-                    params, &mv, group_data, features, num_moves,
-                ),
-            )
+            let mut policy_params = PolicyFeatures::new::<S>(features);
+            features_for_move_colortr::<Us, Them, S>(self, &mut policy_params, &mv, group_data);
+            let offset = inverse_sigmoid(1.0 / num_moves as f32);
+
+            let total_value: f32 =
+                features.iter().zip(params).map(|(c, p)| c * p).sum::<f32>() + offset;
+
+            for c in features.iter_mut() {
+                *c = 0.0;
+            }
+
+            (mv.clone(), sigmoid(total_value))
         }));
-    }
-
-    fn probability_for_move_colortr<Us: ColorTr, Them: ColorTr>(
-        &self,
-        params: &[f32],
-        mv: &Move,
-        group_data: &GroupData<S>,
-        features: &mut [f32],
-        num_moves: usize,
-    ) -> f32 {
-        let mut policy_params = PolicyFeatures::new::<S>(features);
-        features_for_move_colortr::<Us, Them, S>(self, &mut policy_params, mv, group_data);
-        let offset = inverse_sigmoid(1.0 / num_moves as f32);
-
-        let total_value: f32 =
-            features.iter().zip(params).map(|(c, p)| c * p).sum::<f32>() + offset;
-
-        for c in features.iter_mut() {
-            *c = 0.0;
-        }
-
-        sigmoid(total_value)
     }
 
     pub fn features_for_moves(
