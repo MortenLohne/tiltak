@@ -388,6 +388,7 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usize>(
             let mut our_pieces = 0;
             let mut their_pieces = 0;
             let mut their_pieces_captured = 0;
+            let mut our_flats_lost = 0;
 
             // This iterator skips the first square if we move the whole stack
             for piece in position
@@ -447,7 +448,11 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usize>(
                         } else {
                             policy_features.stack_captured_by_movement[0] -=
                                 destination_stack.len() as f32;
+                            our_flats_lost += 1;
                         }
+                    }
+                    if Us::piece_is_ours(destination_top_stone) && piece.role() == Wall {
+                        our_flats_lost += 1;
                     }
 
                     for &line in BitBoard::lines_for_square::<S>(destination_square).iter() {
@@ -501,7 +506,7 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usize>(
                 let moves_our_whole_stack =
                     stack_movement.get(0).pieces_to_take == position[*square].len();
 
-                match (their_pieces == 0, moves_our_whole_stack) {
+                match (our_flats_lost == 0, moves_our_whole_stack) {
                     (false, false) => policy_features.move_onto_critical_square[0] += 1.0,
                     (false, true) => policy_features.move_onto_critical_square[1] += 1.0,
                     // Only this option is a guaranteed win:
