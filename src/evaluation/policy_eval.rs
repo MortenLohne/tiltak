@@ -115,6 +115,7 @@ fn has_immediate_win(policy_features: &PolicyFeatures) -> bool {
         policy_features.place_to_win[0],
         policy_features.place_our_critical_square[0],
         policy_features.move_onto_critical_square[0],
+        policy_features.spread_that_connects_groups_to_win[0],
     ]
     .iter()
     .any(|p| *p != 0.0)
@@ -385,6 +386,13 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usize>(
             let mut captures_our_critical_square = None;
             let mut captures_their_critical_square = None;
 
+            // The groups that become connected through this move
+            let mut our_groups_joined = <ArrayVec<u8, S>>::new();
+            let mut their_piece_left_on_previous_square = false;
+            // Edge connections created by this move
+            let mut group_edge_connection = GroupEdgeConnection::default();
+
+            // The groups where the move causes us to lose flats
             let mut our_groups_affected = <ArrayVec<u8, S>>::new();
             let mut our_pieces = 0;
             let mut their_pieces = 0;
@@ -415,6 +423,47 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usize>(
                     }
                 } else {
                     their_pieces += 1;
+                }
+
+                if Us::piece_is_ours(piece) && piece.is_road_piece() {
+                    let mut neighbour_group_ids = <ArrayVec<u8, S>>::new();
+
+                    for neighbour in Square::neighbours::<S>(destination_square) {
+                        if destination_square != *square
+                            && destination_square.go_direction::<S>(direction.reverse())
+                                == Some(neighbour)
+                        {
+                            continue;
+                        }
+                        if let Some(neighbour_piece) = position[neighbour].top_stone() {
+                            if Us::piece_is_ours(neighbour_piece) && neighbour_piece.is_road_piece()
+                            {
+                                neighbour_group_ids.push(group_data.groups[neighbour]);
+                            }
+                        }
+                    }
+
+                    // If our stack spread doesn't form one continuous group,
+                    // "disconnect" from previous groups
+                    if their_piece_left_on_previous_square
+                        && our_groups_joined
+                            .iter()
+                            .all(|g| !neighbour_group_ids.contains(g))
+                    {
+                        our_groups_joined.clear();
+                        group_edge_connection = GroupEdgeConnection::default();
+                    }
+                    group_edge_connection =
+                        group_edge_connection.connect_square::<S>(destination_square);
+
+                    for group_id in neighbour_group_ids {
+                        if !our_groups_joined.contains(&group_id) {
+                            our_groups_joined.push(group_id);
+                        }
+                    }
+                    their_piece_left_on_previous_square = false;
+                } else {
+                    their_piece_left_on_previous_square = true;
                 }
 
                 // Bonus for moving our cap to a strong line
@@ -533,6 +582,17 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usize>(
                 } else {
                     policy_features.move_onto_critical_square[1] += 1.0
                 }
+            }
+
+            for group_id in our_groups_joined {
+                if !our_groups_affected.contains(&group_id) {
+                    group_edge_connection =
+                        group_edge_connection | group_data.amount_in_group[group_id as usize].1;
+                }
+            }
+
+            if group_edge_connection.is_winning() {
+                policy_features.spread_that_connects_groups_to_win[0] = 1.0;
             }
         }
     }
