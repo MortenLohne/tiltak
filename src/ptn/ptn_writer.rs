@@ -56,22 +56,34 @@ impl<B: PgnPosition + Clone> Game<B> {
         let mut column_position = 0;
         let mut buffer = String::new();
 
-        for (i, PtnMove { mv, comment, .. }) in self.moves.iter().enumerate() {
+        for (
+            i,
+            PtnMove {
+                mv,
+                comment,
+                annotations,
+            },
+        ) in self.moves.iter().enumerate()
+        {
             if i == 0 && position.side_to_move() == Color::Black {
-                buffer.push_str(&format!("1... {}", position.move_to_san(&mv)));
+                buffer.push_str(&format!("1... {}", position.move_to_san(mv)));
             } else if position.side_to_move() == Color::White {
                 buffer.push_str(&format!(
                     "{}. {}",
                     (i + 1) / 2 + 1,
-                    position.move_to_san(&mv),
+                    position.move_to_san(mv),
                 ));
             } else {
-                buffer.push_str(&position.move_to_san(&mv));
+                buffer.push_str(&position.move_to_san(mv));
+            }
+
+            for annotation in annotations {
+                buffer.push_str(annotation);
             }
 
             if !comment.is_empty() {
                 buffer.push_str(" {");
-                buffer.push_str(&comment);
+                buffer.push_str(comment);
                 buffer.push('}');
             }
 

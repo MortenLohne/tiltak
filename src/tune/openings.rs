@@ -17,7 +17,7 @@ pub fn openings_from_file<const S: usize>(path: &str) -> io::Result<Vec<Vec<Move
         let mut moves = vec![];
         for mv_string in line?.split_whitespace() {
             let mv = position
-                .move_from_san(&mv_string)
+                .move_from_san(mv_string)
                 .map_err(|err| io::Error::new(io::ErrorKind::InvalidData, err))?;
             let mut legal_moves = vec![];
             position.generate_moves(&mut legal_moves);

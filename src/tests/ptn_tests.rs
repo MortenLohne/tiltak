@@ -1,4 +1,4 @@
-use crate::position::Position;
+use crate::position::{Move, Position};
 use crate::ptn::{ptn_parser, Game, PtnMove};
 use crate::tests::do_moves_and_check_validity;
 use board_game_traits::{GameResult, Position as PositionTrait};
@@ -49,7 +49,7 @@ pub fn write_and_read_ptn_test() {
 fn parse_ptn_without_result() {
     let ptn = "[Player1 \"tiltak\"]\n\n1. c4 a5 2. e1 b3";
 
-    let games: Vec<Game<Position<6>>> = ptn_parser::parse_ptn(&ptn).unwrap();
+    let games: Vec<Game<Position<6>>> = ptn_parser::parse_ptn(ptn).unwrap();
 
     assert_eq!(games.len(), 1);
     assert_eq!(games[0].game_result, None)
@@ -59,9 +59,14 @@ fn parse_ptn_without_result() {
 fn parse_ptn_without_result2() {
     let ptn = "[Player1 \"tiltak\"]\n\n1. c4 a5 2. e1 b3\n\n[Player1 \"tiltak\"]1. c4 a5 2. e1 b3";
 
-    let games: Vec<Game<Position<6>>> = ptn_parser::parse_ptn(&ptn).unwrap();
+    let games: Vec<Game<Position<6>>> = ptn_parser::parse_ptn(ptn).unwrap();
 
     assert_eq!(games.len(), 2);
     assert_eq!(games[0].game_result, None);
     assert_eq!(games[1].game_result, None)
+}
+
+#[test]
+fn parse_bad_direction_test() {
+    assert!(Move::from_string::<6>("a1d").is_err())
 }

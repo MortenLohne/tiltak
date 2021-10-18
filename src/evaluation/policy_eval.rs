@@ -1,12 +1,15 @@
+use crate::evaluation::parameters;
 use arrayvec::ArrayVec;
+use board_game_traits::{Color, Position as PositionTrait};
 
+use crate::evaluation::parameters::PolicyFeatures;
 use crate::position::bitboard::BitBoard;
-use crate::position::color_trait::ColorTr;
+use crate::position::color_trait::{BlackTr, ColorTr, WhiteTr};
 use crate::position::Direction::*;
-use crate::position::Move;
 use crate::position::Role::{Cap, Flat, Wall};
-use crate::position::Square;
-use crate::position::{num_square_symmetries, square_symmetries, GroupData, Position};
+use crate::position::{square_symmetries, GroupData, Position};
+use crate::position::{squares_iterator, Move};
+use crate::position::{GroupEdgeConnection, Square};
 use crate::search;
 
 pub fn sigmoid(x: f32) -> f32 {
@@ -25,81 +28,105 @@ impl<const S: usize> Position<S> {
         group_data: &GroupData<S>,
         simple_moves: &mut Vec<Move>,
         moves: &mut Vec<(Move, search::Score)>,
-        coefficients: &mut [f32],
+        feature_sets: &mut Vec<Box<[f32]>>,
     ) {
         let num_moves = simple_moves.len();
-        moves.extend(simple_moves.drain(..).map(|mv| {
-            (
-                mv.clone(),
-                self.probability_for_move_colortr::<Us, Them>(
-                    params,
-                    &mv,
-                    group_data,
-                    num_moves,
-                    coefficients,
-                ),
-            )
-        }));
-    }
 
-    fn probability_for_move_colortr<Us: ColorTr, Them: ColorTr>(
-        &self,
-        params: &[f32],
-        mv: &Move,
-        group_data: &GroupData<S>,
-        num_moves: usize,
-        coefficients: &mut [f32],
-    ) -> f32 {
-        coefficients_for_move_colortr::<Us, Them, S>(self, coefficients, mv, group_data, num_moves);
-        let total_value: f32 = coefficients.iter().zip(params).map(|(c, p)| c * p).sum();
-
-        for a in coefficients.iter_mut() {
-            *a = 0.0;
+        while feature_sets.len() < num_moves {
+            feature_sets.push(vec![0.0; parameters::num_policy_features::<S>()].into_boxed_slice());
         }
 
-        sigmoid(total_value)
+        let mut policy_feature_sets: Vec<PolicyFeatures> = feature_sets
+            .iter_mut()
+            .map(|feature_set| PolicyFeatures::new::<S>(feature_set))
+            .collect();
+
+        self.features_for_moves(&mut policy_feature_sets, simple_moves, group_data);
+
+        moves.extend(
+            simple_moves
+                .drain(..)
+                .zip(feature_sets)
+                .map(|(mv, features)| {
+                    let offset = inverse_sigmoid(1.0 / num_moves as f32);
+
+                    let total_value: f32 =
+                        features.iter().zip(params).map(|(c, p)| c * p).sum::<f32>() + offset;
+
+                    for c in features.iter_mut() {
+                        *c = 0.0;
+                    }
+
+                    (mv, sigmoid(total_value))
+                }),
+        );
+    }
+
+    pub fn features_for_moves(
+        &self,
+        feature_sets: &mut [PolicyFeatures],
+        moves: &[Move],
+        group_data: &GroupData<S>,
+    ) {
+        assert!(feature_sets.len() >= moves.len());
+
+        let mut immediate_win_exists = false;
+
+        for (features_set, mv) in feature_sets.iter_mut().zip(moves) {
+            self.features_for_move(features_set, mv, group_data);
+            if has_immediate_win(features_set) {
+                immediate_win_exists = true;
+            }
+        }
+        if immediate_win_exists {
+            for features_set in feature_sets {
+                if !has_immediate_win(features_set) {
+                    features_set.decline_win[0] = 1.0;
+                }
+            }
+        }
+    }
+
+    fn features_for_move(
+        &self,
+        policy_features: &mut PolicyFeatures,
+        mv: &Move,
+        group_data: &GroupData<S>,
+    ) {
+        match self.side_to_move() {
+            Color::White => features_for_move_colortr::<WhiteTr, BlackTr, S>(
+                self,
+                policy_features,
+                mv,
+                group_data,
+            ),
+            Color::Black => features_for_move_colortr::<BlackTr, WhiteTr, S>(
+                self,
+                policy_features,
+                mv,
+                group_data,
+            ),
+        }
     }
 }
-pub(crate) fn coefficients_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usize>(
+
+fn has_immediate_win(policy_features: &PolicyFeatures) -> bool {
+    [
+        policy_features.place_to_win[0],
+        policy_features.place_our_critical_square[0],
+        policy_features.move_onto_critical_square[0],
+        policy_features.spread_that_connects_groups_to_win[0],
+    ]
+    .iter()
+    .any(|p| *p != 0.0)
+}
+
+fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usize>(
     position: &Position<S>,
-    coefficients: &mut [f32],
+    policy_features: &mut PolicyFeatures,
     mv: &Move,
     group_data: &GroupData<S>,
-    num_legal_moves: usize,
 ) {
-    let move_count: usize = 0;
-    let flat_psqt: usize = move_count + 1;
-    let wall_psqt: usize = flat_psqt + num_square_symmetries::<S>();
-    let cap_psqt: usize = wall_psqt + num_square_symmetries::<S>();
-    let our_road_stones_in_line: usize = cap_psqt + num_square_symmetries::<S>();
-    let their_road_stones_in_line: usize = our_road_stones_in_line + S * 3;
-    let extend_group: usize = their_road_stones_in_line + S * 3;
-    let merge_two_groups: usize = extend_group + 3;
-    let block_merger: usize = merge_two_groups + 3;
-    let place_critical_square: usize = block_merger + 3;
-    let ignore_critical_square: usize = place_critical_square + 5;
-    let next_to_our_last_stone: usize = ignore_critical_square + 2;
-    let next_to_their_last_stone: usize = next_to_our_last_stone + 1;
-    let diagonal_to_our_last_stone: usize = next_to_their_last_stone + 1;
-    let diagonal_to_their_last_stone: usize = diagonal_to_our_last_stone + 1;
-    let attack_strong_flats: usize = diagonal_to_their_last_stone + 1;
-    let blocking_stone_blocks_extensions_of_two_flats: usize = attack_strong_flats + 1;
-
-    let move_role_bonus: usize = blocking_stone_blocks_extensions_of_two_flats + 1;
-    let stack_movement_that_gives_us_top_pieces: usize = move_role_bonus + 3;
-    let stack_captured_by_movement: usize = stack_movement_that_gives_us_top_pieces + 6;
-    let stack_capture_in_strong_line: usize = stack_captured_by_movement + 1;
-    let stack_capture_in_strong_line_cap: usize = stack_capture_in_strong_line + 2;
-    let move_cap_onto_strong_line: usize = stack_capture_in_strong_line_cap + 2;
-    let move_onto_critical_square: usize = move_cap_onto_strong_line + 4;
-    let _next_const: usize = move_onto_critical_square + 4;
-
-    assert_eq!(coefficients.len(), _next_const);
-
-    let initial_move_prob = 1.0 / num_legal_moves.max(2) as f32;
-
-    coefficients[move_count] = inverse_sigmoid(initial_move_prob);
-
     // If it's the first move, give every move equal probability
     if position.half_moves_played() < 2 {
         return;
@@ -107,14 +134,56 @@ pub(crate) fn coefficients_for_move_colortr<Us: ColorTr, Them: ColorTr, const S:
 
     match mv {
         Move::Place(role, square) => {
+            let our_flat_lead =
+                Us::flats(group_data).count() as i8 - Them::flats(group_data).count() as i8;
+
+            let our_flat_lead_after_move = match *role {
+                Flat => our_flat_lead + 1,
+                Wall => our_flat_lead,
+                Cap => our_flat_lead,
+            };
+
+            // Apply special bonuses if the game ends on this move
+            if Us::stones_left(position) == 1 && Us::caps_left(position) == 0
+                || group_data.all_pieces().count() as usize == S * S - 1
+            {
+                match our_flat_lead_after_move {
+                    n if n < 0 => policy_features.place_to_loss[0] = 1.0,
+                    0 => policy_features.place_to_draw[0] = 1.0,
+                    n if n > 0 => policy_features.place_to_win[0] = 1.0,
+                    _ => unreachable!(),
+                }
+            }
+            // Bonuses if our opponent can finish on flats next turn
+            else if Them::stones_left(position) == 1 && Them::caps_left(position) == 0
+                || group_data.all_pieces().count() as usize == S * S - 2
+            {
+                match our_flat_lead_after_move {
+                    n if n < 1 => policy_features.place_to_allow_opponent_to_end[0] = 1.0,
+                    1 => policy_features.place_to_allow_opponent_to_end[1] = 1.0,
+                    n if n > 1 => policy_features.place_to_allow_opponent_to_end[2] = 1.0,
+                    _ => unreachable!(),
+                }
+            } else if Us::stones_left(position) == 2 && Us::caps_left(position) == 0 {
+                policy_features.two_flats_left[0] = 1.0;
+                policy_features.two_flats_left[1] = our_flat_lead_after_move as f32;
+            } else if Us::stones_left(position) == 3 && Us::caps_left(position) == 0 {
+                policy_features.three_flats_left[0] = 1.0;
+                policy_features.three_flats_left[1] = our_flat_lead_after_move as f32;
+            }
+
             let their_open_critical_squares =
                 Them::critical_squares(&*group_data) & (!group_data.all_pieces());
 
             // Apply PSQT
             match role {
-                Flat => coefficients[flat_psqt + square_symmetries::<S>()[square.0 as usize]] = 1.0,
-                Wall => coefficients[wall_psqt + square_symmetries::<S>()[square.0 as usize]] = 1.0,
-                Cap => coefficients[cap_psqt + square_symmetries::<S>()[square.0 as usize]] = 1.0,
+                Flat => {
+                    policy_features.flat_psqt[square_symmetries::<S>()[square.0 as usize]] = 1.0
+                }
+                Wall => {
+                    policy_features.wall_psqt[square_symmetries::<S>()[square.0 as usize]] = 1.0
+                }
+                Cap => policy_features.cap_psqt[square_symmetries::<S>()[square.0 as usize]] = 1.0,
             }
 
             let role_id = match *role {
@@ -124,12 +193,12 @@ pub(crate) fn coefficients_for_move_colortr<Us: ColorTr, Them: ColorTr, const S:
             };
 
             for &line in BitBoard::lines_for_square::<S>(*square).iter() {
-                let our_line_score = (Us::road_stones(&group_data) & line).count();
-                let their_line_score = (Them::road_stones(&group_data) & line).count();
-                coefficients[our_road_stones_in_line + S * role_id + our_line_score as usize] +=
+                let our_line_score = (Us::road_stones(group_data) & line).count();
+                let their_line_score = (Them::road_stones(group_data) & line).count();
+                policy_features.our_road_stones_in_line[S * role_id + our_line_score as usize] +=
                     1.0;
-                coefficients
-                    [their_road_stones_in_line + S * role_id + their_line_score as usize] += 1.0;
+                policy_features.their_road_stones_in_line
+                    [S * role_id + their_line_score as usize] += 1.0;
             }
 
             // If square is next to a group
@@ -156,41 +225,73 @@ pub(crate) fn coefficients_for_move_colortr<Us: ColorTr, Them: ColorTr, const S:
             }
 
             if our_unique_neighbour_groups.len() > 1 {
-                coefficients[merge_two_groups + role_id] += 1.0;
+                let total_neighbours_group_size: f32 = our_unique_neighbour_groups
+                    .iter()
+                    .map(|(_, group_id)| group_data.amount_in_group[*group_id as usize].0 as f32)
+                    .sum();
+
+                policy_features.merge_two_groups_base[role_id] = 1.0;
+                // Divide by 10, as large values confuse the tuner
+                policy_features.merge_two_groups_linear[role_id] =
+                    total_neighbours_group_size / 10.0;
             }
 
             if their_unique_neighbour_groups.len() > 1 {
-                coefficients[block_merger + role_id] += 1.0;
-            }
+                let total_neighbours_group_size: f32 = their_unique_neighbour_groups
+                    .iter()
+                    .map(|(_, group_id)| group_data.amount_in_group[*group_id as usize].0 as f32)
+                    .sum();
 
-            for (_, group_id) in our_unique_neighbour_groups {
-                coefficients[extend_group + role_id] +=
-                    group_data.amount_in_group[group_id as usize].0 as f32;
+                policy_features.block_merger_base[role_id] = 1.0;
+                // Divide by 10, as large values confuse the tuner
+                policy_features.block_merger_linear[role_id] = total_neighbours_group_size / 10.0;
+            }
+            if our_unique_neighbour_groups.len() == 1 {
+                let group_id = our_unique_neighbour_groups[0].1;
+                let amount_in_group = group_data.amount_in_group[group_id as usize].0 as f32;
+
+                policy_features.extend_single_group_base[role_id] = 1.0;
+                // Divide by 10, as large values confuse the tuner
+                policy_features.extend_single_group_linear[role_id] = amount_in_group / 10.0;
+
+                // Apply a separate bonus if the piece expands the group to a new line
+                if squares_iterator::<S>()
+                    .filter(|sq| group_data.groups[*sq] == group_id)
+                    .all(|sq| sq.file::<S>() != square.file::<S>())
+                    || squares_iterator::<S>()
+                        .filter(|sq| group_data.groups[*sq] == group_id)
+                        .all(|sq| sq.rank::<S>() != square.rank::<S>())
+                {
+                    policy_features.extend_single_group_to_new_line_base[role_id] = 1.0;
+                    policy_features.extend_single_group_to_new_line_linear[role_id] =
+                        amount_in_group / 10.0;
+                }
             }
 
             if *role == Flat || *role == Cap {
                 if Us::is_critical_square(&*group_data, *square) {
-                    coefficients[place_critical_square] += 1.0;
+                    policy_features.place_our_critical_square[0] += 1.0;
                 } else if !their_open_critical_squares.is_empty() {
                     if their_open_critical_squares == BitBoard::empty().set(square.0) {
-                        coefficients[place_critical_square + 1] += 1.0;
+                        policy_features.place_their_critical_square[0] += 1.0;
                     } else {
-                        coefficients[ignore_critical_square] += 1.0;
+                        policy_features.ignore_their_critical_square[0] += 1.0;
                     }
                 }
 
                 // If square is next to a road stone laid on our last turn
-                if let Some(Move::Place(last_role, last_square)) =
-                    position.moves().get(position.moves().len() - 2)
+                if let Some(Move::Place(last_role, last_square)) = position
+                    .moves()
+                    .get(position.moves().len().overflowing_sub(2).0)
                 {
                     if *last_role == Flat || *last_role == Cap {
                         if square.neighbours::<S>().any(|neigh| neigh == *last_square) {
-                            coefficients[next_to_our_last_stone] = 1.0;
+                            policy_features.next_to_our_last_stone[0] = 1.0;
                         } else if (square.rank::<S>() as i8 - last_square.rank::<S>() as i8).abs()
                             == 1
                             && (square.file::<S>() as i8 - last_square.file::<S>() as i8).abs() == 1
                         {
-                            coefficients[diagonal_to_our_last_stone] = 1.0;
+                            policy_features.diagonal_to_our_last_stone[0] = 1.0;
                         }
                     }
                 }
@@ -199,12 +300,12 @@ pub(crate) fn coefficients_for_move_colortr<Us: ColorTr, Them: ColorTr, const S:
                 if let Some(Move::Place(last_role, last_square)) = position.moves().last() {
                     if *last_role == Flat {
                         if square.neighbours::<S>().any(|neigh| neigh == *last_square) {
-                            coefficients[next_to_their_last_stone] = 1.0;
+                            policy_features.next_to_their_last_stone[0] = 1.0;
                         } else if (square.rank::<S>() as i8 - last_square.rank::<S>() as i8).abs()
                             == 1
                             && (square.file::<S>() as i8 - last_square.file::<S>() as i8).abs() == 1
                         {
-                            coefficients[diagonal_to_their_last_stone] = 1.0;
+                            policy_features.diagonal_to_their_last_stone[0] = 1.0;
                         }
                     }
                 }
@@ -219,30 +320,30 @@ pub(crate) fn coefficients_for_move_colortr<Us: ColorTr, Them: ColorTr, const S:
                                 .file::<S>(neighbour.file::<S>())
                                 .count();
                         if our_road_stones >= 2 {
-                            coefficients[attack_strong_flats] += (our_road_stones - 1) as f32;
+                            policy_features.attack_strong_flats[0] += (our_road_stones - 1) as f32;
                         }
                     }
                 }
             }
 
             if *role == Wall {
-                coefficients[wall_psqt + square_symmetries::<S>()[square.0 as usize]] = 1.0;
+                policy_features.wall_psqt[square_symmetries::<S>()[square.0 as usize]] = 1.0;
 
                 if !their_open_critical_squares.is_empty() {
                     if their_open_critical_squares == BitBoard::empty().set(square.0) {
-                        coefficients[place_critical_square + 2] += 1.0;
+                        policy_features.place_their_critical_square[1] += 1.0;
                     } else {
-                        coefficients[ignore_critical_square] += 1.0;
+                        policy_features.ignore_their_critical_square[0] += 1.0;
                     }
                 }
             } else if *role == Cap {
                 if Us::is_critical_square(&*group_data, *square) {
-                    coefficients[place_critical_square] += 1.0;
+                    policy_features.place_our_critical_square[0] += 1.0;
                 } else if !their_open_critical_squares.is_empty() {
                     if their_open_critical_squares == BitBoard::empty().set(square.0) {
-                        coefficients[place_critical_square + 3] += 1.0;
+                        policy_features.place_their_critical_square[2] += 1.0;
                     } else {
-                        coefficients[ignore_critical_square] += 1.0;
+                        policy_features.ignore_their_critical_square[0] += 1.0;
                     }
                 }
             }
@@ -260,7 +361,7 @@ pub(crate) fn coefficients_for_move_colortr<Us: ColorTr, Them: ColorTr, const S:
                             .map(Them::is_road_stone)
                             .unwrap_or_default()
                     {
-                        coefficients[blocking_stone_blocks_extensions_of_two_flats] += 1.0;
+                        policy_features.blocking_stone_blocks_extensions_of_two_flats[0] += 1.0;
                     }
                 }
             }
@@ -273,7 +374,7 @@ pub(crate) fn coefficients_for_move_colortr<Us: ColorTr, Them: ColorTr, const S:
                 Cap => 2,
             };
 
-            coefficients[move_role_bonus + role_id] += 1.0;
+            policy_features.move_role_bonus[role_id] += 1.0;
 
             let mut destination_square =
                 if stack_movement.get(0).pieces_to_take == position[*square].len() {
@@ -281,11 +382,29 @@ pub(crate) fn coefficients_for_move_colortr<Us: ColorTr, Them: ColorTr, const S:
                 } else {
                     *square
                 };
-            let mut gets_critical_square = false;
 
+            let mut captures_our_critical_square = None;
+            let mut captures_their_critical_square = None;
+
+            // The groups that become connected through this move
+            let mut our_groups_joined = <ArrayVec<u8, S>>::new();
+            let mut their_piece_left_on_previous_square = false;
+            // Edge connections created by this move
+            let mut group_edge_connection = GroupEdgeConnection::default();
+
+            // The groups where the move causes us to lose flats
+            let mut our_groups_affected = <ArrayVec<u8, S>>::new();
             let mut our_pieces = 0;
             let mut their_pieces = 0;
             let mut their_pieces_captured = 0;
+
+            // Special case for when we spread the whole stack
+            if position[*square].len() == stack_movement.get(0).pieces_to_take {
+                let top_stone = position[*square].top_stone.unwrap();
+                if top_stone.is_road_piece() {
+                    our_groups_affected.push(group_data.groups[*square]);
+                }
+            }
 
             // This iterator skips the first square if we move the whole stack
             for piece in position
@@ -294,8 +413,57 @@ pub(crate) fn coefficients_for_move_colortr<Us: ColorTr, Them: ColorTr, const S:
             {
                 if Us::piece_is_ours(piece) {
                     our_pieces += 1;
+                    if Us::is_critical_square(&*group_data, destination_square)
+                        && piece.is_road_piece()
+                    {
+                        captures_our_critical_square = Some(destination_square);
+                    }
+                    if Them::is_critical_square(&*group_data, destination_square) {
+                        captures_their_critical_square = Some(destination_square);
+                    }
                 } else {
                     their_pieces += 1;
+                }
+
+                if Us::piece_is_ours(piece) && piece.is_road_piece() {
+                    let mut neighbour_group_ids = <ArrayVec<u8, S>>::new();
+
+                    for neighbour in Square::neighbours::<S>(destination_square) {
+                        if destination_square != *square
+                            && destination_square.go_direction::<S>(direction.reverse())
+                                == Some(neighbour)
+                        {
+                            continue;
+                        }
+                        if let Some(neighbour_piece) = position[neighbour].top_stone() {
+                            if Us::piece_is_ours(neighbour_piece) && neighbour_piece.is_road_piece()
+                            {
+                                neighbour_group_ids.push(group_data.groups[neighbour]);
+                            }
+                        }
+                    }
+
+                    // If our stack spread doesn't form one continuous group,
+                    // "disconnect" from previous groups
+                    if their_piece_left_on_previous_square
+                        && our_groups_joined
+                            .iter()
+                            .all(|g| !neighbour_group_ids.contains(g))
+                    {
+                        our_groups_joined.clear();
+                        group_edge_connection = GroupEdgeConnection::default();
+                    }
+                    group_edge_connection =
+                        group_edge_connection.connect_square::<S>(destination_square);
+
+                    for group_id in neighbour_group_ids {
+                        if !our_groups_joined.contains(&group_id) {
+                            our_groups_joined.push(group_id);
+                        }
+                    }
+                    their_piece_left_on_previous_square = false;
+                } else {
+                    their_piece_left_on_previous_square = true;
                 }
 
                 // Bonus for moving our cap to a strong line
@@ -314,12 +482,13 @@ pub(crate) fn coefficients_for_move_colortr<Us: ColorTr, Them: ColorTr, const S:
                         };
                     let road_piece_count = destination_line.count() as usize;
                     if road_piece_count > 2 {
-                        coefficients[move_cap_onto_strong_line + road_piece_count - 3] += 1.0;
+                        policy_features.move_cap_onto_strong_line[road_piece_count - 3] += 1.0;
                         if destination_square
                             .neighbours::<S>()
                             .any(|n| Us::is_critical_square(group_data, n))
                         {
-                            coefficients[move_cap_onto_strong_line + road_piece_count - 1] += 1.0;
+                            policy_features.move_cap_onto_strong_line_with_critical_square
+                                [road_piece_count - 3] += 1.0;
                         }
                     }
                 }
@@ -330,16 +499,17 @@ pub(crate) fn coefficients_for_move_colortr<Us: ColorTr, Them: ColorTr, const S:
                     // whether it's captured by us or them
                     if piece.color() != destination_top_stone.color() {
                         if Us::piece_is_ours(piece) {
-                            coefficients[stack_captured_by_movement] +=
+                            policy_features.stack_captured_by_movement[0] +=
                                 destination_stack.len() as f32;
                             their_pieces_captured += 1;
                         } else {
-                            coefficients[stack_captured_by_movement] -=
+                            policy_features.stack_captured_by_movement[0] -=
                                 destination_stack.len() as f32;
+                            our_groups_affected.push(group_data.groups[destination_square]);
                         }
                     }
-                    if Us::is_critical_square(&*group_data, destination_square) {
-                        gets_critical_square = true;
+                    if Us::piece_is_ours(destination_top_stone) && piece.role() == Wall {
+                        our_groups_affected.push(group_data.groups[destination_square]);
                     }
 
                     for &line in BitBoard::lines_for_square::<S>(destination_square).iter() {
@@ -347,11 +517,12 @@ pub(crate) fn coefficients_for_move_colortr<Us: ColorTr, Them: ColorTr, const S:
                         let color_factor = if Us::piece_is_ours(piece) { 1.0 } else { -1.0 };
                         if our_road_stones > 2 {
                             if piece.role() == Cap {
-                                coefficients
-                                    [stack_capture_in_strong_line_cap + our_road_stones - 3] +=
+                                policy_features.stack_capture_in_strong_line_cap
+                                    [our_road_stones - 3] +=
                                     color_factor * destination_stack.len() as f32;
                             } else {
-                                coefficients[stack_capture_in_strong_line + our_road_stones - 3] +=
+                                policy_features.stack_capture_in_strong_line
+                                    [our_road_stones - 3] +=
                                     color_factor * destination_stack.len() as f32;
                             }
                         }
@@ -364,41 +535,64 @@ pub(crate) fn coefficients_for_move_colortr<Us: ColorTr, Them: ColorTr, const S:
             }
 
             if their_pieces == 0 {
-                coefficients[stack_movement_that_gives_us_top_pieces] = 1.0;
-                coefficients[stack_movement_that_gives_us_top_pieces + 1] = our_pieces as f32;
+                policy_features.stack_movement_that_gives_us_top_pieces[0] = 1.0;
+                policy_features.stack_movement_that_gives_us_top_pieces[1] = our_pieces as f32;
             } else if their_pieces == 1 {
-                coefficients[stack_movement_that_gives_us_top_pieces + 2] = 1.0;
-                coefficients[stack_movement_that_gives_us_top_pieces + 3] = our_pieces as f32;
+                policy_features.stack_movement_that_gives_us_top_pieces[2] = 1.0;
+                policy_features.stack_movement_that_gives_us_top_pieces[3] = our_pieces as f32;
             } else {
-                coefficients[stack_movement_that_gives_us_top_pieces + 4] = 1.0;
-                coefficients[stack_movement_that_gives_us_top_pieces + 5] = our_pieces as f32;
+                policy_features.stack_movement_that_gives_us_top_pieces[4] = 1.0;
+                policy_features.stack_movement_that_gives_us_top_pieces[5] = our_pieces as f32;
             }
 
             let their_open_critical_squares =
                 Them::critical_squares(&*group_data) & (!group_data.all_pieces());
 
             if !their_open_critical_squares.is_empty() {
-                if their_pieces_captured == 0 {
+                if their_pieces_captured == 0 && captures_their_critical_square.is_none() {
                     // Move ignores their critical threat, but might win for us
-                    coefficients[ignore_critical_square + 1] += 1.0;
+                    policy_features.ignore_their_critical_square[1] += 1.0;
                 } else {
                     // Move captures at least one stack, which might save us
-                    coefficients[place_critical_square + 4] += their_pieces_captured as f32;
+                    policy_features.place_their_critical_square[3] += their_pieces_captured as f32;
                 }
             }
 
             // Bonus for moving onto a critical square
-            if gets_critical_square {
-                let moves_our_whole_stack =
-                    stack_movement.get(0).pieces_to_take == position[*square].len();
-
-                match (their_pieces == 0, moves_our_whole_stack) {
-                    (false, false) => coefficients[move_onto_critical_square] += 1.0,
-                    (false, true) => coefficients[move_onto_critical_square + 1] += 1.0,
-                    // Only this option is a guaranteed win:
-                    (true, false) => coefficients[move_onto_critical_square + 2] += 1.0,
-                    (true, true) => coefficients[move_onto_critical_square + 3] += 1.0,
+            if let Some(critical_square) = captures_our_critical_square {
+                // Check if reaching the critical square still wins, in case our
+                // stack spread lost some of our flats
+                let mut edge_connection =
+                    GroupEdgeConnection::default().connect_square::<S>(critical_square);
+                for neighbour in critical_square.neighbours::<S>() {
+                    if let Some(neighbour_piece) = position[neighbour].top_stone() {
+                        if Us::piece_is_ours(neighbour_piece) {
+                            let group_id = group_data.groups[neighbour];
+                            if our_groups_affected.iter().all(|g| *g != group_id) {
+                                edge_connection = edge_connection
+                                    | group_data.amount_in_group[group_id as usize].1;
+                            }
+                        }
+                    }
                 }
+
+                if edge_connection.is_winning() {
+                    // Only this option is a guaranteed win:
+                    policy_features.move_onto_critical_square[0] += 1.0
+                } else {
+                    policy_features.move_onto_critical_square[1] += 1.0
+                }
+            }
+
+            for group_id in our_groups_joined {
+                if !our_groups_affected.contains(&group_id) {
+                    group_edge_connection =
+                        group_edge_connection | group_data.amount_in_group[group_id as usize].1;
+                }
+            }
+
+            if group_edge_connection.is_winning() {
+                policy_features.spread_that_connects_groups_to_win[0] = 1.0;
             }
         }
     }

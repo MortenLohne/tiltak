@@ -4,20 +4,24 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::time;
 use std::{error, fs, io};
 
+use crate::evaluation::parameters::PolicyFeatures;
 use board_game_traits::GameResult;
 use board_game_traits::Position as PositionTrait;
 use pgn_traits::PgnPosition;
 use rand::prelude::*;
 use rayon::prelude::*;
 
+use crate::evaluation::policy_eval::inverse_sigmoid;
 use crate::position::Move;
 use crate::position::Position;
-use crate::position::TunableBoard;
 use crate::ptn::Game;
 use crate::ptn::{ptn_parser, PtnMove};
 use crate::search::MctsSetting;
 use crate::tune::gradient_descent;
+use crate::tune::gradient_descent::TrainingSample;
 use crate::tune::play_match::play_game;
+
+const TRAINING_MCTS_NODES: u64 = 100_000;
 
 // The score, or probability of being played, for a given move
 type MoveScore = (Move, f32);
@@ -27,7 +31,7 @@ type MoveScoresForGame = Vec<Vec<MoveScore>>;
 
 pub fn train_from_scratch<const S: usize, const N: usize, const M: usize>(
     training_id: usize,
-) -> Result<(), Box<dyn error::Error>> {
+) -> Result<(), Box<dyn error::Error + Send + Sync>> {
     let mut rng = rand::rngs::StdRng::from_seed([0; 32]);
 
     let initial_value_params: [f32; N] = array_from_fn(|| rng.gen_range(-0.01..0.01));
@@ -45,7 +49,7 @@ pub fn train_perpetually<const S: usize, const N: usize, const M: usize>(
     training_id: usize,
     initial_value_params: &[f32; N],
     initial_policy_params: &[f32; M],
-) -> Result<(), Box<dyn error::Error>> {
+) -> Result<(), Box<dyn error::Error + Send + Sync>> {
     const BATCH_SIZE: usize = 100;
     // Only train from the last n batches
     const BATCHES_FOR_TRAINING: usize = 10;
@@ -207,7 +211,7 @@ fn play_game_pair<const S: usize>(
         .add_policy_params(last_policy_params.to_vec())
         .add_dirichlet(0.2);
     if i % 2 == 0 {
-        let game = play_game::<S>(&settings, &last_settings, &[], 1.0);
+        let game = play_game::<S>(&settings, &last_settings, &[], 1.0, TRAINING_MCTS_NODES);
         match game.0.game_result {
             Some(GameResult::WhiteWin) => {
                 current_params_wins.fetch_add(1, Ordering::Relaxed);
@@ -219,7 +223,7 @@ fn play_game_pair<const S: usize>(
         };
         game
     } else {
-        let game = play_game::<S>(&last_settings, &settings, &[], 1.0);
+        let game = play_game::<S>(&last_settings, &settings, &[], 1.0, TRAINING_MCTS_NODES);
         match game.0.game_result {
             Some(GameResult::BlackWin) => {
                 current_params_wins.fetch_add(1, Ordering::Relaxed);
@@ -258,7 +262,7 @@ impl GameStats {
 
 pub fn read_games_from_file<const S: usize>(
     file_name: &str,
-) -> Result<Vec<Game<Position<S>>>, Box<dyn error::Error>> {
+) -> Result<Vec<Game<Position<S>>>, Box<dyn error::Error + Send + Sync>> {
     let mut file = fs::File::open(file_name)?;
     let mut input = String::new();
     file.read_to_string(&mut input)?;
@@ -267,30 +271,29 @@ pub fn read_games_from_file<const S: usize>(
 
 pub fn tune_value_from_file<const S: usize, const N: usize>(
     file_name: &str,
-) -> Result<[f32; N], Box<dyn error::Error>> {
+) -> Result<[f32; N], Box<dyn error::Error + Send + Sync>> {
     let games = read_games_from_file::<S>(file_name)?;
 
     let (positions, results) = positions_and_results_from_games(games);
 
-    let coefficient_sets = positions
+    let samples = positions
         .iter()
-        .map(|position| {
-            let mut coefficients = [0.0; N];
-            position.static_eval_coefficients(&mut coefficients);
-            coefficients
+        .zip(results)
+        .map(|(position, game_result)| {
+            let mut features = [0.0; N];
+            position.static_eval_features(&mut features);
+            let result = match game_result {
+                GameResult::WhiteWin => 1.0,
+                GameResult::Draw => 0.5,
+                GameResult::BlackWin => 0.0,
+            };
+            TrainingSample {
+                features,
+                offset: 0.0,
+                result,
+            }
         })
-        .collect::<Vec<[f32; N]>>();
-
-    let f32_results = results
-        .iter()
-        .map(|res| match res {
-            GameResult::WhiteWin => 1.0,
-            GameResult::Draw => 0.5,
-            GameResult::BlackWin => 0.0,
-        })
-        .collect::<Vec<f32>>();
-
-    let middle_index = positions.len() / 2;
+        .collect::<Vec<_>>();
 
     let mut rng = rand::rngs::StdRng::from_seed([0; 32]);
     let mut initial_params = [0.00; N];
@@ -298,14 +301,8 @@ pub fn tune_value_from_file<const S: usize, const N: usize>(
     for param in initial_params.iter_mut() {
         *param = rng.gen_range(-0.01..0.01)
     }
-    let tuned_parameters = gradient_descent::gradient_descent(
-        &coefficient_sets[0..middle_index],
-        &f32_results[0..middle_index],
-        &coefficient_sets[middle_index..],
-        &f32_results[middle_index..],
-        &initial_params,
-        50.0,
-    );
+
+    let tuned_parameters = gradient_descent::gradient_descent(&samples, &initial_params, 100.0);
 
     println!("Final parameters: {:?}", tuned_parameters);
 
@@ -317,7 +314,7 @@ pub fn tune_value_and_policy<const S: usize, const N: usize, const M: usize>(
     move_scoress: &[MoveScoresForGame],
     initial_value_params: &[f32; N],
     initial_policy_params: &[f32; M],
-) -> Result<([f32; N], [f32; M]), Box<dyn error::Error>> {
+) -> Result<([f32; N], [f32; M]), Box<dyn error::Error + Send + Sync>> {
     let mut games_and_move_scoress: Vec<(&Game<Position<S>>, &MoveScoresForGame)> =
         games.iter().zip(move_scoress).collect();
 
@@ -330,29 +327,28 @@ pub fn tune_value_and_policy<const S: usize, const N: usize, const M: usize>(
     let (positions, results) =
         positions_and_results_from_games(games.iter().cloned().cloned().collect());
 
-    let value_coefficient_sets = positions
+    let value_training_samples = positions
         .iter()
-        .map(|position| {
-            let mut coefficients = [0.0; N];
-            position.static_eval_coefficients(&mut coefficients);
-            coefficients
+        .zip(results)
+        .map(|(position, game_result)| {
+            let mut features = [0.0; N];
+            position.static_eval_features(&mut features);
+            let result = match game_result {
+                GameResult::WhiteWin => 1.0,
+                GameResult::Draw => 0.5,
+                GameResult::BlackWin => 0.0,
+            };
+            TrainingSample {
+                features,
+                offset: 0.0,
+                result,
+            }
         })
-        .collect::<Vec<[f32; N]>>();
+        .collect::<Vec<_>>();
 
-    let value_results = results
-        .iter()
-        .map(|res| match res {
-            GameResult::WhiteWin => 1.0,
-            GameResult::Draw => 0.5,
-            GameResult::BlackWin => 0.0,
-        })
-        .collect::<Vec<f32>>();
+    let number_of_feature_sets = move_scoress.iter().flat_map(|a| *a).flatten().count();
 
-    let number_of_coefficient_sets = move_scoress.iter().flat_map(|a| *a).flatten().count();
-
-    let mut policy_coefficients_sets: Vec<[f32; M]> =
-        Vec::with_capacity(number_of_coefficient_sets);
-    let mut policy_results: Vec<f32> = Vec::with_capacity(number_of_coefficient_sets);
+    let mut policy_training_samples = Vec::with_capacity(number_of_feature_sets);
 
     for (game, move_scores) in games.iter().zip(move_scoress) {
         let mut position = game.start_position.clone();
@@ -364,45 +360,38 @@ pub fn tune_value_and_policy<const S: usize, const N: usize, const M: usize>(
             .zip(move_scores)
         {
             let group_data = position.group_data();
-            for (possible_move, score) in move_scores {
-                let mut coefficients = [0.0; M];
-                position.coefficients_for_move(
-                    &mut coefficients,
-                    possible_move,
-                    &group_data,
-                    move_scores.len(),
-                );
 
-                policy_coefficients_sets.push(coefficients);
-                policy_results.push(*score);
+            let mut feature_sets = vec![[0.0; M]; move_scores.len()];
+            let mut policy_feature_sets: Vec<PolicyFeatures> = feature_sets
+                .iter_mut()
+                .map(|feature_set| PolicyFeatures::new::<S>(feature_set))
+                .collect();
+            let moves: Vec<Move> = move_scores.iter().map(|(mv, _score)| mv.clone()).collect();
+
+            position.features_for_moves(&mut policy_feature_sets, &moves, &group_data);
+
+            for ((_, result), features) in move_scores.iter().zip(feature_sets) {
+                let offset = inverse_sigmoid(1.0 / move_scores.len().max(2) as f32);
+
+                policy_training_samples.push({
+                    TrainingSample {
+                        features,
+                        offset,
+                        result: *result,
+                    }
+                });
             }
             position.do_move(mv.clone());
         }
     }
 
-    let middle_index = value_coefficient_sets.len() / 2;
-
-    let tuned_value_parameters = gradient_descent::gradient_descent(
-        &value_coefficient_sets[0..middle_index],
-        &value_results[0..middle_index],
-        &value_coefficient_sets[middle_index..],
-        &value_results[middle_index..],
-        &initial_value_params,
-        10.0,
-    );
+    let tuned_value_parameters =
+        gradient_descent::gradient_descent(&value_training_samples, initial_value_params, 100.0);
 
     println!("Final parameters: {:?}", tuned_value_parameters);
 
-    let middle_index = policy_coefficients_sets.len() / 2;
-
-    let tuned_policy_parameters = gradient_descent::gradient_descent(
-        &policy_coefficients_sets[0..middle_index],
-        &policy_results[0..middle_index],
-        &policy_coefficients_sets[middle_index..],
-        &policy_results[middle_index..],
-        &initial_policy_params,
-        10000.0,
-    );
+    let tuned_policy_parameters =
+        gradient_descent::gradient_descent(&policy_training_samples, initial_policy_params, 5000.0);
 
     println!("Final parameters: {:?}", tuned_policy_parameters);
 
@@ -412,7 +401,7 @@ pub fn tune_value_and_policy<const S: usize, const N: usize, const M: usize>(
 pub fn tune_value_and_policy_from_file<const S: usize, const N: usize, const M: usize>(
     value_file_name: &str,
     policy_file_name: &str,
-) -> Result<([f32; N], [f32; M]), Box<dyn error::Error>> {
+) -> Result<([f32; N], [f32; M]), Box<dyn error::Error + Send + Sync>> {
     let (games, move_scoress) =
         games_and_move_scoress_from_file::<S>(value_file_name, policy_file_name)?;
 
@@ -420,11 +409,8 @@ pub fn tune_value_and_policy_from_file<const S: usize, const N: usize, const M: 
 
     let initial_value_params: [f32; N] = array_from_fn(|| rng.gen_range(-0.01..0.01));
 
-    let mut initial_policy_params: [f32; M] = array_from_fn(|| rng.gen_range(-0.01..0.01));
+    let initial_policy_params: [f32; M] = array_from_fn(|| rng.gen_range(-0.01..0.01));
 
-    // The move number parameter should always be around 1.0, so start it here
-    // If we don't, variation of this parameter completely dominates the other parameters
-    initial_policy_params[0] = 1.0;
     tune_value_and_policy(
         &games,
         &move_scoress,
@@ -436,7 +422,7 @@ pub fn tune_value_and_policy_from_file<const S: usize, const N: usize, const M: 
 pub fn games_and_move_scoress_from_file<const S: usize>(
     value_file_name: &str,
     policy_file_name: &str,
-) -> Result<(Vec<Game<Position<S>>>, Vec<MoveScoresForGame>), Box<dyn error::Error>> {
+) -> Result<(Vec<Game<Position<S>>>, Vec<MoveScoresForGame>), Box<dyn error::Error + Send + Sync>> {
     let mut move_scoress = read_move_scores_from_file::<S>(policy_file_name)?;
     let mut games = read_games_from_file(value_file_name)?;
 
@@ -486,7 +472,7 @@ pub fn games_and_move_scoress_from_file<const S: usize>(
 
 pub fn read_move_scores_from_file<const S: usize>(
     file_name: &str,
-) -> Result<Vec<MoveScoresForGame>, Box<dyn error::Error>> {
+) -> Result<Vec<MoveScoresForGame>, Box<dyn error::Error + Send + Sync>> {
     let mut file = fs::File::open(file_name)?;
     let mut input = String::new();
     file.read_to_string(&mut input)?;

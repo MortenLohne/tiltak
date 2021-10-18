@@ -13,21 +13,36 @@ use log::error;
 use log::{debug, info, warn};
 
 use rand::seq::SliceRandom;
+use rand::Rng;
 #[cfg(feature = "aws-lambda-client")]
 use tiltak::aws;
 use tiltak::position::Position;
 use tiltak::position::{squares_iterator, Move, Role, Square};
 use tiltak::ptn::{Game, PtnMove};
-#[cfg(not(feature = "aws-lambda-client"))]
 use tiltak::search;
-#[cfg(not(feature = "aws-lambda-client"))]
 use tiltak::search::MctsSetting;
 
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub struct PlaytakSettings {
+    fixed_nodes: Option<u64>,
     dirichlet_noise: Option<f32>,
     rollout_depth: u16,
     rollout_temperature: f64,
+}
+
+impl PlaytakSettings {
+    pub fn to_mcts_setting<const S: usize>(&self) -> MctsSetting<S> {
+        if let Some(dirichlet) = self.dirichlet_noise {
+            MctsSetting::default()
+                .add_dirichlet(dirichlet)
+                .add_rollout_depth(self.rollout_depth)
+                .add_rollout_temperature(self.rollout_temperature)
+        } else {
+            MctsSetting::default()
+                .add_rollout_depth(self.rollout_depth)
+                .add_rollout_temperature(self.rollout_temperature)
+        }
+    }
 }
 
 pub fn main() -> Result<()> {
@@ -72,8 +87,19 @@ pub fn main() -> Result<()> {
             Arg::with_name("playBot")
                 .long("play-bot")
                 .value_name("botname")
-                .help("Instead of seeking any game, accept any seek from the specified bot")
-                .takes_value(true),
+                .help("Instead of seeking any game, accept any seek from the specified bot. Mutually exclusive with --tc")
+                .conflicts_with("tc")
+                .takes_value(true)
+                .required(true),
+
+        )
+        .arg(
+            Arg::with_name("tc")
+                 .long("tc")
+                 .help("Time control to seek games for. Mutually exclusive with --play-bot")
+                 .conflicts_with("playBot")
+                 .takes_value(true)
+                 .required(true),
         )
         .arg(Arg::with_name("policyNoise")
             .long("policy-noise")
@@ -91,7 +117,12 @@ pub fn main() -> Result<()> {
             .help("Add a random component to move selection in MCTS rollouts. Has no effect if --rollout-depth is 0. For full rollouts, even the 'low' setting is enough to give highly variable play.")
             .takes_value(true)
             .possible_values(&["low", "medium", "high"])
-            .default_value("low"));
+            .default_value("low"))
+        .arg(Arg::with_name("fixedNodes")
+            .long("fixed-nodes")
+            .conflicts_with("aws-function-name")
+            .help("Normally, the bot will search a variable number of nodes, depending on hardware on time control. This option overrides that to calculate a fixed amount of nodes each move")
+            .takes_value(true));
 
     if cfg!(feature = "aws-lambda-client") {
         app = app.arg(
@@ -99,6 +130,7 @@ pub fn main() -> Result<()> {
                 .long("aws-function-name")
                 .value_name("tiltak")
                 .required(true)
+                .conflicts_with("fixedNodes")
                 .help(
                     "Run the engine on AWS instead of locally. Requires aws cli installed locally.",
                 )
@@ -156,7 +188,10 @@ pub fn main() -> Result<()> {
         s => panic!("rolloutTemperature cannot be {}", s),
     };
 
+    let fixed_nodes: Option<u64> = matches.value_of("fixedNodes").map(|v| v.parse().unwrap());
+
     let playtak_settings = PlaytakSettings {
+        fixed_nodes,
         dirichlet_noise,
         rollout_depth,
         rollout_temperature,
@@ -185,14 +220,14 @@ pub fn main() -> Result<()> {
         if let (Some(user), Some(pwd)) =
             (matches.value_of("username"), matches.value_of("password"))
         {
-            session.login("Tiltak", &user, &pwd)?;
+            session.login("Tiltak", user, pwd)?;
         } else {
             warn!("No username/password provided, logging in as guest");
             session.login_guest()?;
         }
         let seekmode = match matches.value_of("playBot") {
             Some(name) => SeekMode::PlayOtherBot(name.to_string()),
-            None => SeekMode::OpenSeek,
+            None => SeekMode::OpenSeek(parse_tc(matches.value_of("tc").unwrap())),
         };
 
         let result = match size {
@@ -217,6 +252,20 @@ pub fn main() -> Result<()> {
     }
 }
 
+pub fn parse_tc(input: &str) -> (Duration, Duration) {
+    let mut parts = input.split('+');
+    let time_part = parts.next().expect("Couldn't parse tc");
+    let inc_part = parts.next();
+    let time = Duration::from_millis((f64::from_str(time_part).unwrap() * 1000.0) as u64);
+
+    let inc = if let Some(inc_part) = inc_part {
+        Duration::from_millis((f64::from_str(inc_part).unwrap() * 1000.0) as u64)
+    } else {
+        Duration::default()
+    };
+    (time, inc)
+}
+
 struct PlaytakSession {
     #[cfg(feature = "aws-lambda-client")]
     aws_function_name: Option<String>,
@@ -228,7 +277,7 @@ struct PlaytakSession {
 
 #[derive(Debug, PartialEq, Eq)]
 enum SeekMode {
-    OpenSeek,
+    OpenSeek((Duration, Duration)),
     PlayOtherBot(String),
 }
 
@@ -343,14 +392,16 @@ impl PlaytakSession {
         seek_mode: SeekMode,
         playtak_settings: PlaytakSettings,
     ) -> io::Result<std::convert::Infallible> {
-        let mut time_for_game = Duration::from_secs(900);
-        let mut increment = Duration::from_secs(30);
+        // The server doesn't send increment when the game starts
+        // We have to keep track of it ourselves, depending on the seekmode
+        let mut increment = Duration::from_secs(0);
 
-        if seek_mode == SeekMode::OpenSeek {
+        if let SeekMode::OpenSeek((game_time, inc)) = seek_mode {
+            increment = inc;
             self.send_line(&format!(
                 "Seek {} {} {}",
                 S,
-                time_for_game.as_secs(),
+                game_time.as_secs(),
                 increment.as_secs()
             ))?;
         }
@@ -373,10 +424,10 @@ impl PlaytakSession {
                             "black" => Color::Black,
                             color => panic!("Bad color \"{}\"", color),
                         },
-                        time_left: time_for_game,
+                        time_left: Duration::from_secs(u64::from_str(words[8]).unwrap()),
                         increment,
                     };
-                    self.play_game::<S>(playtak_game, playtak_settings)?;
+                    self.play_game::<S>(playtak_game, playtak_settings, seek_mode)?;
                     unreachable!()
                 }
 
@@ -385,11 +436,9 @@ impl PlaytakSession {
                         if words[1] == "new" {
                             let number = u64::from_str(words[2]).unwrap();
                             let name = words[3];
-                            let time = Duration::from_secs(u64::from_str(words[5]).unwrap());
                             let inc = Duration::from_secs(u64::from_str(words[6]).unwrap());
                             if name.eq_ignore_ascii_case(bot_name) {
                                 self.send_line(&format!("Accept {}", number))?;
-                                time_for_game = time;
                                 increment = inc;
                             }
                         }
@@ -409,6 +458,7 @@ impl PlaytakSession {
         &mut self,
         game: PlaytakGame,
         playtak_settings: PlaytakSettings,
+        seek_mode: SeekMode,
     ) -> io::Result<Infallible> {
         info!(
             "Starting game #{}, {} vs {} as {}, {}+{:.1}",
@@ -438,6 +488,19 @@ impl PlaytakSession {
                             Move::Place(Role::Flat, Square((S * S - 1) as u8)),
                         ];
                         (moves.choose(&mut rng).unwrap().clone(), 0.0)
+                    } else if let Some(fixed_nodes) = playtak_settings.fixed_nodes {
+                        let settings = playtak_settings.to_mcts_setting();
+                        let mut tree = search::MonteCarloTree::with_settings(position.clone(), settings);
+                        for _ in 0..fixed_nodes {
+                            tree.select();
+                        }
+
+                        // Wait for a bit
+                        let mut rng = rand::thread_rng();
+                        let sleep_duration = Duration::from_millis(rng.gen_range(1000..2500));
+                        thread::sleep(sleep_duration);
+
+                        tree.best_move()
                     } else {
                         #[cfg(feature = "aws-lambda-client")]
                         {
@@ -448,31 +511,22 @@ impl PlaytakSession {
                                     .iter()
                                     .map(|PtnMove { mv, .. }: &PtnMove<Move>| mv.clone())
                                     .collect(),
-                                time_left: our_time_left,
-                                increment: game.increment,
+                                time_control: aws::TimeControl::Time(our_time_left, game.increment),
                                 dirichlet_noise: playtak_settings.dirichlet_noise,
                                 rollout_depth: playtak_settings.rollout_depth,
                                 rollout_temperature: playtak_settings.rollout_temperature,
                             };
-                            let aws::Output { best_move, score } =
+                            let aws::Output { pv, score } =
                                 aws::client::best_move_aws(aws_function_name, &event)?;
-                            (best_move, score)
+                            (pv[0].clone(), score)
                         }
 
                         #[cfg(not(feature = "aws-lambda-client"))]
                         {
+                            let settings = playtak_settings.to_mcts_setting();
+
                             let maximum_time = our_time_left / 20 + game.increment;
-                            let settings = if let Some(dirichlet) = playtak_settings.dirichlet_noise {
-                                MctsSetting::default()
-                                    .add_dirichlet(dirichlet)
-                                    .add_rollout_depth(playtak_settings.rollout_depth)
-                                    .add_rollout_temperature(playtak_settings.rollout_temperature)
-                            }
-                            else {
-                                MctsSetting::default()
-                                    .add_rollout_depth(playtak_settings.rollout_depth)
-                                    .add_rollout_temperature(playtak_settings.rollout_temperature)
-                            };
+
                             search::play_move_time(position.clone(), maximum_time, settings)
                         }
                     };
@@ -534,9 +588,9 @@ impl PlaytakSession {
                             }
                             "Time" => {
                                 let white_time_left =
-                                    Duration::from_secs(u64::from_str(&words[2]).unwrap());
+                                    Duration::from_secs(u64::from_str(words[2]).unwrap());
                                 let black_time_left =
-                                    Duration::from_secs(u64::from_str(&words[3]).unwrap());
+                                    Duration::from_secs(u64::from_str(words[3]).unwrap());
                                 our_time_left = match game.our_color {
                                     Color::White => white_time_left,
                                     Color::Black => black_time_left,
@@ -591,7 +645,7 @@ impl PlaytakSession {
 
         info!("Move list: {}", move_list.join(" "));
 
-        self.seek_game::<S>(SeekMode::OpenSeek, playtak_settings)
+        self.seek_game::<S>(seek_mode, playtak_settings)
     }
 }
 

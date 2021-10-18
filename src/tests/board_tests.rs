@@ -148,7 +148,7 @@ fn black_can_win_with_road_test() {
     ]
     .iter()
     {
-        let mv = position.move_from_san(&mv_san).unwrap();
+        let mv = position.move_from_san(mv_san).unwrap();
         position.generate_moves(&mut moves);
         assert!(moves.contains(&mv));
         position.do_move(mv);
@@ -212,19 +212,19 @@ fn double_road_wins_test() {
     do_moves_and_check_validity(&mut position, &move_strings);
 
     position.generate_moves(&mut moves);
-    assert!(moves.contains(&position.move_from_san(&"1c4+").unwrap()));
+    assert!(moves.contains(&position.move_from_san("1c4+").unwrap()));
     moves.clear();
 
-    let reverse_move = position.do_move(position.move_from_san(&"1c4+").unwrap());
+    let reverse_move = position.do_move(position.move_from_san("1c4+").unwrap());
     assert_eq!(position.game_result(), Some(WhiteWin));
     position.reverse_move(reverse_move);
 
     position = position.flip_board_y();
 
     position.generate_moves(&mut moves);
-    assert!(moves.contains(&position.move_from_san(&"1c2-").unwrap()));
+    assert!(moves.contains(&position.move_from_san("1c2-").unwrap()));
 
-    position.do_move(position.move_from_san(&"1c2-").unwrap());
+    position.do_move(position.move_from_san("1c2-").unwrap());
     assert_eq!(position.game_result(), Some(WhiteWin));
 }
 

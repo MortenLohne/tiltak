@@ -14,9 +14,8 @@ pub fn play_game<const S: usize>(
     black_settings: &MctsSetting<S>,
     opening: &[Move],
     temperature: f64,
+    mcts_nodes: u64,
 ) -> (Game<Position<S>>, Vec<Vec<(Move, Score)>>) {
-    const MCTS_NODES: u64 = 20_000;
-
     let mut position = Position::start_position();
     let mut game_moves = opening.to_vec();
     let mut move_scores = vec![vec![]; opening.len()];
@@ -33,10 +32,10 @@ pub fn play_game<const S: usize>(
 
         let moves_scores = match position.side_to_move() {
             Color::White => {
-                search::mcts_training::<S>(position.clone(), MCTS_NODES, white_settings.clone())
+                search::mcts_training::<S>(position.clone(), mcts_nodes, white_settings.clone())
             }
             Color::Black => {
-                search::mcts_training::<S>(position.clone(), MCTS_NODES, black_settings.clone())
+                search::mcts_training::<S>(position.clone(), mcts_nodes, black_settings.clone())
             }
         };
 

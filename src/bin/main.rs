@@ -14,7 +14,6 @@ use tiltak::minmax;
 use tiltak::position::Move;
 #[cfg(feature = "constant-tuning")]
 use tiltak::position::Role;
-use tiltak::position::TunableBoard;
 use tiltak::position::{Position, Stack};
 use tiltak::ptn::{Game, PtnMove};
 use tiltak::search::MctsSetting;
@@ -337,46 +336,48 @@ fn analyze_position<const S: usize>(position: &Position<S>) {
 
     let mut simple_moves = vec![];
     let mut moves = vec![];
-    let mut coefficients = vec![
-        0.0;
-        match S {
-            4 => parameters::NUM_POLICY_PARAMS_4S,
-            5 => parameters::NUM_POLICY_PARAMS_5S,
-            6 => parameters::NUM_POLICY_PARAMS_6S,
-            _ => unimplemented!(),
-        }
-    ];
 
     position.generate_moves_with_probabilities(
         &position.group_data(),
         &mut simple_moves,
         &mut moves,
-        &mut coefficients,
+        &mut vec![],
     );
-    moves.sort_by_key(|(_mv, score)| -(score * 1000.0) as i64);
+    moves.sort_by(|(_mv, score1), (_, score2)| score1.partial_cmp(score2).unwrap().reverse());
+
+    let group_data = position.group_data();
+    let mut feature_sets = vec![vec![0.0; parameters::num_policy_features::<S>()]; moves.len()];
+    let mut policy_feature_sets: Vec<_> = feature_sets
+        .iter_mut()
+        .map(|feature_set| parameters::PolicyFeatures::new::<S>(feature_set))
+        .collect();
+
+    let simple_moves: Vec<Move> = moves.iter().map(|(mv, _)| mv.clone()).collect();
+
+    position.features_for_moves(&mut policy_feature_sets, &simple_moves, &group_data);
 
     println!("Top 10 heuristic moves:");
-    for (mv, score) in moves.iter().take(10) {
-        println!("{}: {:.3}", mv.to_string::<S>(), score);
-        let mut coefficients = vec![0.0; <Position<S>>::policy_params().len()];
-        position.coefficients_for_move(&mut coefficients, mv, &position.group_data(), moves.len());
-        for coefficient in coefficients {
-            print!("{:.1}, ", coefficient);
+    for ((mv, score), features) in moves.iter().zip(feature_sets).take(10) {
+        println!("{}: {:.3}%", mv.to_string::<S>(), score * 100.0);
+        for feature in features {
+            print!("{:.1}, ", feature);
         }
         println!();
     }
     let settings: MctsSetting<S> = search::MctsSetting::default().exclude_moves(vec![]);
+    let start_time = time::Instant::now();
 
     let mut tree = search::MonteCarloTree::with_settings(position.clone(), settings);
     for i in 1.. {
         tree.select();
         if i % 100_000 == 0 {
             println!(
-                "{} visits, val={:.2}%, static eval={:.4}, static winning probability={:.2}%",
+                "{} visits, val={:.2}%, static eval={:.4}, static winning probability={:.2}%, {:.2}s",
                 tree.visits(),
                 tree.mean_action_value() * 100.0,
                 position.static_eval(),
-                search::cp_to_win_percentage(position.static_eval()) * 100.0
+                search::cp_to_win_percentage(position.static_eval()) * 100.0,
+                start_time.elapsed().as_secs_f64()
             );
             tree.print_info();
             println!("Best move: {:?}", tree.best_move())
@@ -553,7 +554,7 @@ fn mem_usage() {
 fn do_moves_and_check_validity(position: &mut Position<5>, move_strings: &[&str]) {
     let mut moves = vec![];
     for mv_san in move_strings.iter() {
-        let mv = position.move_from_san(&mv_san).unwrap();
+        let mv = position.move_from_san(mv_san).unwrap();
         position.generate_moves(&mut moves);
         assert!(
             moves.contains(&mv),

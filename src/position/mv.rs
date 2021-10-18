@@ -76,7 +76,8 @@ impl Move {
             }
             'a'..='h' if input.len() == 3 => {
                 let square = Square::parse_square::<S>(&input[0..2])?;
-                let direction = Direction::parse(input.chars().nth(2).unwrap());
+                let direction = Direction::parse(input.chars().nth(2).unwrap())
+                    .ok_or_else(|| pgn_traits::Error::new_parse_error("Bad direction"))?;
                 // Moves in the simplified move notation always move one piece
                 let mut movement = StackMovement::new();
                 movement.push(Movement { pieces_to_take: 1 });
@@ -90,7 +91,8 @@ impl Move {
             }
             '1'..='8' if input.len() > 3 => {
                 let square = Square::parse_square::<S>(&input[1..3])?;
-                let direction = Direction::parse(input.chars().nth(3).unwrap());
+                let direction = Direction::parse(input.chars().nth(3).unwrap())
+                    .ok_or_else(|| pgn_traits::Error::new_parse_error("Bad direction"))?;
                 let pieces_taken = first_char.to_digit(10).unwrap() as u8;
                 let mut pieces_held = pieces_taken;
 

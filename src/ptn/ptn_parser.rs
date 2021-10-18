@@ -1,14 +1,10 @@
-use crate::ptn::{Game, PtnMove};
+use crate::ptn::{Game, ParseError, PtnMove};
 use board_game_traits::GameResult;
 use pgn_traits::PgnPosition;
-use std::error;
-use std::error::Error;
 use std::fmt::Debug;
 use std::str::FromStr;
 
-pub fn parse_ptn<B: PgnPosition + Debug + Clone>(
-    input: &str,
-) -> Result<Vec<Game<B>>, Box<dyn error::Error>> {
+pub fn parse_ptn<B: PgnPosition + Debug + Clone>(input: &str) -> Result<Vec<Game<B>>, ParseError> {
     let mut parser = ParserData { input };
     let mut games = vec![];
     loop {
@@ -17,7 +13,11 @@ pub fn parse_ptn<B: PgnPosition + Debug + Clone>(
                 Ok(game) => games.push(game),
                 Err(err) => {
                     eprintln!("Couldn't parse game: {}", err);
-                    return Ok(games);
+                    if games.is_empty() {
+                        return Err(err);
+                    } else {
+                        return Ok(games);
+                    }
                 }
             }
         } else {
@@ -28,7 +28,7 @@ pub fn parse_ptn<B: PgnPosition + Debug + Clone>(
 
 fn parse_game<B: PgnPosition + Debug + Clone>(
     input: &mut ParserData,
-) -> Result<Game<B>, Box<dyn Error>> {
+) -> Result<Game<B>, ParseError> {
     let mut tags = vec![];
     input.skip_whitespaces();
     while input.peek() == Some('[') {
@@ -95,7 +95,7 @@ fn parse_tag<'a>(input: &mut ParserData<'a>) -> Result<(&'a str, String), pgn_tr
 fn parse_moves<B: PgnPosition + Debug + Clone>(
     input: &mut ParserData,
     mut position: B,
-) -> Result<(Vec<PtnMove<B::Move>>, Option<GameResult>), Box<dyn Error>> {
+) -> Result<(Vec<PtnMove<B::Move>>, Option<GameResult>), ParseError> {
     let mut moves: Vec<PtnMove<B::Move>> = vec![];
     let mut _ply_counter = 0; // Last ply seen
     loop {
@@ -137,7 +137,7 @@ fn parse_moves<B: PgnPosition + Debug + Clone>(
                 annotations.insert(0, *annotation);
             }
 
-            match position.move_from_san(&move_string) {
+            match position.move_from_san(move_string) {
                 Ok(mv) => {
                     let mut legal_moves = vec![];
                     position.generate_moves(&mut legal_moves);

@@ -7,7 +7,7 @@ use rand::Rng;
 use crate::evaluation::parameters;
 use crate::position::Move;
 /// This module contains the core of the MCTS search algorithm
-use crate::position::{GroupData, Position, TunableBoard};
+use crate::position::{GroupData, Position};
 use crate::search::{cp_to_win_percentage, MctsSetting, Score};
 
 /// A Monte Carlo Search Tree, containing every node that has been seen in search.
@@ -33,7 +33,7 @@ pub struct TempVectors {
     simple_moves: Vec<Move>,
     moves: Vec<(Move, f32)>,
     value_scores: Vec<Score>,
-    policy_scores: Vec<Score>,
+    policy_score_sets: Vec<Box<[Score]>>,
 }
 
 impl TempVectors {
@@ -41,24 +41,8 @@ impl TempVectors {
         TempVectors {
             simple_moves: vec![],
             moves: vec![],
-            value_scores: vec![
-                0.0;
-                match S {
-                    4 => parameters::NUM_VALUE_PARAMS_4S,
-                    5 => parameters::NUM_VALUE_PARAMS_5S,
-                    6 => parameters::NUM_VALUE_PARAMS_6S,
-                    _ => unimplemented!(),
-                }
-            ],
-            policy_scores: vec![
-                0.0;
-                match S {
-                    4 => parameters::NUM_POLICY_PARAMS_4S,
-                    5 => parameters::NUM_POLICY_PARAMS_5S,
-                    6 => parameters::NUM_POLICY_PARAMS_6S,
-                    _ => unimplemented!(),
-                }
-            ],
+            value_scores: vec![0.0; parameters::num_value_features::<S>()],
+            policy_score_sets: vec![],
         }
     }
 }
@@ -103,7 +87,7 @@ impl TreeEdge {
             if self.visits == 1 {
                 let group_data = position.group_data();
                 node.init_children(
-                    &position,
+                    position,
                     &group_data,
                     settings,
                     temp_vectors,
@@ -193,17 +177,21 @@ impl Tree {
             group_data,
             &mut temp_vectors.simple_moves,
             &mut temp_vectors.moves,
-            &mut temp_vectors.policy_scores,
+            &mut temp_vectors.policy_score_sets,
         );
         let mut children_vec = Vec::with_capacity(temp_vectors.moves.len());
         let policy_sum: f32 = temp_vectors.moves.iter().map(|(_, score)| *score).sum();
         let inv_sum = 1.0 / policy_sum;
-        let child_mean_action_value = 1.0 - mean_action_value - settings.initial_mean_action_value();
+        let child_mean_action_value =
+            1.0 - mean_action_value - settings.initial_mean_action_value();
         for (mv, heuristic_score) in temp_vectors.moves.drain(..) {
             children_vec.push(TreeEdge::new(
                 mv.clone(),
                 heuristic_score * inv_sum,
-                Score::min(child_mean_action_value, settings.max_initial_mean_action_value()),
+                Score::min(
+                    child_mean_action_value,
+                    settings.max_initial_mean_action_value(),
+                ),
             ));
         }
         self.children = children_vec.into_boxed_slice();
@@ -260,9 +248,11 @@ pub fn rollout<const S: usize>(
 
         (game_result_for_us.score(), true)
     } else if depth == 0 {
-        let static_eval = cp_to_win_percentage(
-            position.static_eval_with_params_and_data(&group_data, &settings.value_params),
-        );
+        let static_eval = cp_to_win_percentage(position.static_eval_with_params_and_data(
+            &group_data,
+            &settings.value_params,
+            &mut temp_vectors.value_scores,
+        ));
         match position.side_to_move() {
             Color::White => (static_eval, false),
             Color::Black => (1.0 - static_eval, false),
@@ -272,7 +262,7 @@ pub fn rollout<const S: usize>(
             &group_data,
             &mut temp_vectors.simple_moves,
             &mut temp_vectors.moves,
-            &mut temp_vectors.policy_scores,
+            &mut temp_vectors.policy_score_sets,
         );
 
         let mut rng = rand::thread_rng();

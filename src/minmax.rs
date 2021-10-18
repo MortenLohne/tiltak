@@ -26,10 +26,10 @@ pub fn minmax<B: EvalPosition>(position: &mut B, depth: u16) -> (Option<B::Move>
         });
         match side_to_move {
             Color::White => child_evaluations
-                .max_by(|(_, a), (_, b)| a.partial_cmp(&b).unwrap())
+                .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap())
                 .unwrap(),
             Color::Black => child_evaluations
-                .min_by(|(_, a), (_, b)| a.partial_cmp(&b).unwrap())
+                .min_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap())
                 .unwrap(),
         }
     }

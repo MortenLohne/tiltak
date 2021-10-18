@@ -9,6 +9,8 @@ use rand::SeedableRng;
 use rayon::prelude::*;
 use std::sync::Mutex;
 
+const SPSA_MCTS_NODES: u64 = 50_000;
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Variable {
     pub value: f32,
@@ -94,7 +96,13 @@ fn tuning_iteration<R: rand::Rng, const S: usize>(
     let player2_settings = <MctsSetting<S>>::default()
         .add_search_params(player2_variables.iter().map(|(_, a)| *a).collect());
 
-    let (game, _) = play_game::<S>(&player1_settings, &player2_settings, opening, 0.2);
+    let (game, _) = play_game::<S>(
+        &player1_settings,
+        &player2_settings,
+        opening,
+        0.2,
+        SPSA_MCTS_NODES,
+    );
     match game.game_result {
         Some(GameResult::WhiteWin) => player1_variables.iter().map(|(a, _)| *a).collect(),
         Some(GameResult::BlackWin) => player2_variables.iter().map(|(a, _)| *a).collect(),

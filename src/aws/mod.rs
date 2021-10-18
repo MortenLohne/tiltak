@@ -9,11 +9,16 @@ pub mod client;
 pub mod server;
 
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
+pub enum TimeControl {
+    FixedNodes(u64),
+    Time(Duration, Duration), // Total time left, increment
+}
+
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 pub struct Event {
     pub size: usize,
     pub moves: Vec<Move>,
-    pub time_left: Duration,
-    pub increment: Duration,
+    pub time_control: TimeControl,
     pub dirichlet_noise: Option<f32>,
     pub rollout_depth: u16,
     pub rollout_temperature: f64,
@@ -21,6 +26,6 @@ pub struct Event {
 
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 pub struct Output {
-    pub best_move: Move,
+    pub pv: Vec<Move>,
     pub score: f32,
 }

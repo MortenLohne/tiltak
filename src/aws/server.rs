@@ -1,4 +1,4 @@
-use crate::aws::{Event, Output};
+use crate::aws::{Event, Output, TimeControl};
 use crate::position::Position;
 use crate::search;
 use crate::search::MctsSetting;
@@ -25,12 +25,6 @@ pub fn handle_aws_event_generic<const S: usize>(
         position.do_move(mv);
     }
 
-    let max_time = if position.half_moves_played() < 4 {
-        Duration::min(e.time_left / 80 + e.increment / 6, Duration::from_secs(40))
-    } else {
-        Duration::min(e.time_left / 40 + e.increment / 3, Duration::from_secs(40))
-    };
-
     let settings = if let Some(dirichlet) = e.dirichlet_noise {
         MctsSetting::default()
             .add_dirichlet(dirichlet)
@@ -42,7 +36,28 @@ pub fn handle_aws_event_generic<const S: usize>(
             .add_rollout_temperature(e.rollout_temperature)
     };
 
-    let (best_move, score) = search::play_move_time(position, max_time, settings);
+    match e.time_control {
+        TimeControl::Time(time_left, increment) => {
+            let max_time = if position.half_moves_played() < 4 {
+                Duration::min(time_left / 80 + increment / 6, Duration::from_secs(40))
+            } else {
+                Duration::min(time_left / 40 + increment / 3, Duration::from_secs(40))
+            };
 
-    Ok(Output { best_move, score })
+            let (best_move, score) = search::play_move_time(position, max_time, settings);
+            Ok(Output {
+                pv: vec![best_move],
+                score,
+            })
+        }
+        TimeControl::FixedNodes(nodes) => {
+            let mut tree = search::MonteCarloTree::with_settings(position, settings);
+            for _ in 0..nodes {
+                tree.select();
+            }
+            let score = 1.0 - tree.best_move().1;
+            let pv = tree.pv().collect();
+            Ok(Output { pv, score })
+        }
+    }
 }

@@ -21,10 +21,7 @@ fn move_stack_test() {
         moves,
         moves
             .iter()
-            .filter(|mv| match mv {
-                Move::Move(_, _, _) => true,
-                _ => false,
-            })
+            .filter(|mv| matches!(mv, Move::Move(_, _, _)))
             .collect::<Vec<_>>()
     );
 }
