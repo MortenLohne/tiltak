@@ -2,13 +2,13 @@ use board_game_traits::{Color, Position as PositionTrait};
 use board_game_traits::{GameResult, GameResult::*};
 use pgn_traits::PgnPosition;
 
-use crate::position as board_mod;
 use crate::position::Direction::*;
 use crate::position::Move;
 use crate::position::Piece::{BlackCap, BlackFlat, WhiteFlat, WhiteWall};
 use crate::position::Position;
 use crate::position::{squares_iterator, Piece, Role, Square, Stack};
 use crate::tests::do_moves_and_check_validity;
+use crate::{position as board_mod, search};
 
 #[test]
 fn default_board_test() {
@@ -422,4 +422,11 @@ fn parse_tps_test() {
     do_moves_and_check_validity(&mut position, &["c5"]);
     let tps_string = "x2,1,x,1/x5/x5/x5/2,x4 2 2";
     assert_eq!(<Position<5>>::from_fen(tps_string).unwrap(), position);
+}
+
+#[test]
+fn join_too_many_groups_test() {
+    let tps = "1,x,1,x,1,x/21121111S,x4,1/1,x,1,x,1,x/x6/x,2,2,2,2,x/2,x5 1 18";
+    let position = <Position<6>>::from_fen(tps).unwrap();
+    search::mcts(position, 1000);
 }

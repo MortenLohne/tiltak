@@ -387,7 +387,7 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usize>(
             let mut captures_their_critical_square = None;
 
             // The groups that become connected through this move
-            let mut our_groups_joined = <ArrayVec<u8, S>>::new();
+            let mut our_groups_joined = <ArrayVec<u8, 10>>::new();
             let mut their_piece_left_on_previous_square = false;
             // Edge connections created by this move
             let mut group_edge_connection = GroupEdgeConnection::default();
