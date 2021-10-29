@@ -27,7 +27,7 @@ pub fn play_game<const S: usize>(
 
     while position.game_result().is_none() {
         let num_plies = game_moves.len();
-        if num_plies > 200 {
+        if num_plies > 400 {
             break;
         }
 
