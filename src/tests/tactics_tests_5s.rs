@@ -217,6 +217,7 @@ fn winning_movement_test() {
 
 #[test]
 fn winning_movement_test2() {
+    // a1 a5 b5 Cc3 c5 d5 Cd4 c4 e5 c4+ c4 b4 c4+ d5< d5 c4 d4< 4c5<22 c5 b3 2c4+ 3b5- 2c5< a4
     let move_strings = [
         "a1", "a5", "b5", "Cc3", "c5", "d5", "Cd4", "c4", "e5", "c4+", "c4", "b4", "c4+", "d5<",
         "d5", "c4", "d4<", "4c5<22", "c5", "b3", "2c4+", "3b5-", "2c5<", "a4",
