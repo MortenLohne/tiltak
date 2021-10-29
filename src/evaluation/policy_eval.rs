@@ -1,6 +1,7 @@
 use crate::evaluation::parameters;
 use arrayvec::ArrayVec;
 use board_game_traits::{Color, Position as PositionTrait};
+use pgn_traits::PgnPosition;
 
 use crate::evaluation::parameters::PolicyFeatures;
 use crate::position::bitboard::BitBoard;
@@ -391,6 +392,7 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usize>(
             let mut their_piece_left_on_previous_square = false;
             // Edge connections created by this move
             let mut group_edge_connection = GroupEdgeConnection::default();
+            let mut group_not_affected = false;
 
             // The groups where the move causes us to lose flats
             let mut our_groups_affected = <ArrayVec<u8, S>>::new();
@@ -402,7 +404,11 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usize>(
             if position[*square].len() == stack_movement.get(0).pieces_to_take {
                 let top_stone = position[*square].top_stone.unwrap();
                 if top_stone.is_road_piece() {
-                    our_groups_affected.push(group_data.groups[*square]);
+                    if !square_is_disposable_in_group(*square, group_data) {
+                        our_groups_affected.push(group_data.groups[*square]);
+                    } else {
+                        group_not_affected = true;
+                    }
                 }
             }
 
@@ -505,10 +511,15 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usize>(
                         } else {
                             policy_features.stack_captured_by_movement[0] -=
                                 destination_stack.len() as f32;
-                            our_groups_affected.push(group_data.groups[destination_square]);
+                            if !square_is_disposable_in_group(*square, group_data) {
+                                our_groups_affected.push(group_data.groups[destination_square]);
+                            }
                         }
                     }
-                    if Us::piece_is_ours(destination_top_stone) && piece.role() == Wall {
+                    if Us::piece_is_ours(destination_top_stone)
+                        && piece.role() == Wall
+                        && !square_is_disposable_in_group(*square, group_data)
+                    {
                         our_groups_affected.push(group_data.groups[destination_square]);
                     }
 
@@ -578,7 +589,18 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usize>(
 
                 if edge_connection.is_winning() {
                     // Only this option is a guaranteed win:
-                    policy_features.move_onto_critical_square[0] += 1.0
+                    policy_features.move_onto_critical_square[0] += 1.0;
+                    /*
+                    if group_not_affected {
+                        println!(
+                            "Square {} move {} is disposable on tps {}",
+                            square.to_string::<S>(),
+                            mv.to_string::<S>(),
+                            position.to_fen()
+                        );
+                        println!("Captured critical square");
+                    }
+                     */
                 } else {
                     policy_features.move_onto_critical_square[1] += 1.0
                 }
@@ -593,7 +615,59 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usize>(
 
             if group_edge_connection.is_winning() {
                 policy_features.spread_that_connects_groups_to_win[0] = 1.0;
+                /*
+                if group_not_affected {
+                    println!(
+                        "Square {} move {} is disposable on tps {}",
+                        square.to_string::<S>(),
+                        mv.to_string::<S>(),
+                        position.to_fen()
+                    );
+                    println!("Group connection is winning");
+                }
+                 */
             }
         }
+    }
+}
+
+/// Check whether the group is still connected if we remove this square
+fn square_is_disposable_in_group<const S: usize>(
+    square: Square,
+    group_data: &GroupData<S>,
+) -> bool {
+    let neighbour_squares: ArrayVec<Square, 4> = square.neighbours::<S>().collect();
+    let group_id = group_data.groups[square];
+    match neighbour_squares.len() {
+        2 => false,
+        3 => {
+            /*
+            let direction_away_from_edge = [
+                Direction::North,
+                Direction::South,
+                Direction::West,
+                Direction::East,
+            ]
+            .iter()
+            .find(|direction| square.go_direction::<S>(**direction).is_none())
+            .unwrap()
+            .reverse();
+
+            group_data.groups[square.go_direction::<S>(direction_away_from_edge).unwrap()]
+                != group_id
+                && group_data.amount_in_group[group_id as usize].1
+                    == GroupEdgeConnection::default().connect_square::<S>(square)
+
+             */
+            false
+        }
+        4 => {
+            neighbour_squares
+                .iter()
+                .filter(|neighbour| group_data.groups[**neighbour] == group_id)
+                .count()
+                == 1
+        }
+        _ => unreachable!(),
     }
 }
