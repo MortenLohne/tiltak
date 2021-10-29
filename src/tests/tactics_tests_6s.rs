@@ -131,7 +131,7 @@ fn flatten_our_wall_to_win_test() {
 
     do_moves_and_check_validity(&mut position, &move_strings);
 
-    plays_correct_hard_move_property::<6>(&move_strings, &["2c5<11"])
+    plays_correct_hard_move_property::<6>(&move_strings, &["2c5<11", "5c5<41"])
 }
 
 #[test]
