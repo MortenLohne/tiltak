@@ -1,7 +1,6 @@
 use crate::evaluation::parameters;
 use arrayvec::ArrayVec;
 use board_game_traits::{Color, Position as PositionTrait};
-use pgn_traits::PgnPosition;
 
 use crate::evaluation::parameters::PolicyFeatures;
 use crate::position::bitboard::BitBoard;
@@ -393,7 +392,6 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usize>(
             let mut their_piece_left_on_previous_square = false;
             // Edge connections created by this move
             let mut group_edge_connection = GroupEdgeConnection::default();
-            let mut group_not_affected = false;
 
             // The groups where the move causes us to lose flats
             let mut our_groups_affected = <ArrayVec<u8, S>>::new();
@@ -589,17 +587,6 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usize>(
                 if edge_connection.is_winning() {
                     // Only this option is a guaranteed win:
                     policy_features.move_onto_critical_square[0] += 1.0;
-                    /*
-                    if group_not_affected {
-                        println!(
-                            "Square {} move {} is disposable on tps {}",
-                            square.to_string::<S>(),
-                            mv.to_string::<S>(),
-                            position.to_fen()
-                        );
-                        println!("Captured critical square");
-                    }
-                     */
                 } else if critical_square.neighbours::<S>().any(|sq| sq == *square) {
                     // If the critical square has two neighbours of the same group,
                     // and neither the origin square nor the critical square is a wall,
@@ -636,17 +623,6 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usize>(
 
             if group_edge_connection.is_winning() {
                 policy_features.spread_that_connects_groups_to_win[0] = 1.0;
-                /*
-                if group_not_affected {
-                    println!(
-                        "Square {} move {} is disposable on tps {}",
-                        square.to_string::<S>(),
-                        mv.to_string::<S>(),
-                        position.to_fen()
-                    );
-                    println!("Group connection is winning");
-                }
-                 */
             }
         }
     }
