@@ -24,6 +24,24 @@ fn play_random_6s_games_test() {
     play_random_games_prop::<6>(500)
 }
 
+#[test]
+#[ignore]
+fn play_random_4s_games_test_long() {
+    play_random_games_prop::<4>(10_000)
+}
+
+#[test]
+#[ignore]
+fn play_random_5s_games_test_long() {
+    play_random_games_prop::<5>(10_000)
+}
+
+#[test]
+#[ignore]
+fn play_random_6s_games_test_long() {
+    play_random_games_prop::<6>(10_000)
+}
+
 fn play_random_games_prop<const S: usize>(num_games: usize) {
     let mut white_wins = 0;
     let mut black_wins = 0;
