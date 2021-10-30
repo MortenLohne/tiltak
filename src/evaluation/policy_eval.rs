@@ -469,6 +469,9 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usize>(
                     their_piece_left_on_previous_square = false;
                 } else {
                     their_piece_left_on_previous_square = true;
+                    // We may have joined this group on the previous iteration
+                    // If so, remove it, since the group is now affected
+                    our_groups_joined.retain(|id| *id != group_data.groups[destination_square]);
                 }
 
                 // Bonus for moving our cap to a strong line
