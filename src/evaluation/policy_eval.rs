@@ -8,7 +8,7 @@ use crate::position::bitboard::BitBoard;
 use crate::position::color_trait::{BlackTr, ColorTr, WhiteTr};
 use crate::position::Direction::*;
 use crate::position::Role::{Cap, Flat, Wall};
-use crate::position::{square_symmetries, GroupData, Position};
+use crate::position::{square_symmetries, Direction, GroupData, Position};
 use crate::position::{squares_iterator, Move};
 use crate::position::{GroupEdgeConnection, Square};
 use crate::search;
@@ -116,6 +116,7 @@ fn has_immediate_win(policy_features: &PolicyFeatures) -> bool {
         policy_features.place_to_win[0],
         policy_features.place_our_critical_square[0],
         policy_features.move_onto_critical_square[0],
+        policy_features.move_onto_critical_square[1],
         policy_features.spread_that_connects_groups_to_win[0],
     ]
     .iter()
@@ -396,6 +397,7 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usize>(
 
             // The groups where the move causes us to lose flats
             let mut our_groups_affected = <ArrayVec<u8, S>>::new();
+            let mut our_squares_affected = <ArrayVec<Square, S>>::new();
             let mut our_pieces = 0;
             let mut their_pieces = 0;
             let mut their_pieces_captured = 0;
@@ -404,11 +406,8 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usize>(
             if position[*square].len() == stack_movement.get(0).pieces_to_take {
                 let top_stone = position[*square].top_stone.unwrap();
                 if top_stone.is_road_piece() {
-                    if !square_is_disposable_in_group(*square, group_data) {
-                        our_groups_affected.push(group_data.groups[*square]);
-                    } else {
-                        group_not_affected = true;
-                    }
+                    our_squares_affected.push(*square);
+                    our_groups_affected.push(group_data.groups[*square]);
                 }
             }
 
@@ -511,15 +510,12 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usize>(
                         } else {
                             policy_features.stack_captured_by_movement[0] -=
                                 destination_stack.len() as f32;
-                            if !square_is_disposable_in_group(*square, group_data) {
-                                our_groups_affected.push(group_data.groups[destination_square]);
-                            }
+                            our_squares_affected.push(destination_square);
+                            our_groups_affected.push(group_data.groups[destination_square]);
                         }
                     }
-                    if Us::piece_is_ours(destination_top_stone)
-                        && piece.role() == Wall
-                        && !square_is_disposable_in_group(*square, group_data)
-                    {
+                    if Us::piece_is_ours(destination_top_stone) && piece.role() == Wall {
+                        our_squares_affected.push(destination_square);
                         our_groups_affected.push(group_data.groups[destination_square]);
                     }
 
@@ -601,8 +597,27 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usize>(
                         println!("Captured critical square");
                     }
                      */
+                } else if critical_square.neighbours::<S>().any(|sq| sq == *square) {
+                    // If the critical square has two neighbours of the same group,
+                    // at least one of the spreads onto the critical square will be a road win
+                    if critical_square
+                        .neighbours::<S>()
+                        .filter(|sq| group_data.groups[*sq] == group_data.groups[*square])
+                        .count()
+                        > 1
+                    {
+                        policy_features.move_onto_critical_square[1] += 1.0
+                    } else {
+                        policy_features.move_onto_critical_square[3] += 1.0
+                    }
+                } else if our_squares_affected.len() == 1
+                    && square_is_disposable_in_group(our_squares_affected[0], group_data)
+                {
+                    // If the affected square is not a neighbour of the critical square,
+                    // and is disposable in its group, this is always a win
+                    policy_features.move_onto_critical_square[2] += 1.0
                 } else {
-                    policy_features.move_onto_critical_square[1] += 1.0
+                    policy_features.move_onto_critical_square[3] += 1.0
                 }
             }
 
@@ -641,7 +656,6 @@ fn square_is_disposable_in_group<const S: usize>(
     match neighbour_squares.len() {
         2 => false,
         3 => {
-            /*
             let direction_away_from_edge = [
                 Direction::North,
                 Direction::South,
@@ -657,9 +671,6 @@ fn square_is_disposable_in_group<const S: usize>(
                 != group_id
                 && group_data.amount_in_group[group_id as usize].1
                     == GroupEdgeConnection::default().connect_square::<S>(square)
-
-             */
-            false
         }
         4 => {
             neighbour_squares
