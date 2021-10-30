@@ -1,4 +1,7 @@
+use crate::evaluation::parameters;
+use crate::evaluation::parameters::PolicyFeatures;
 use crate::position::{Move, Position};
+use board_game_traits::Position as PositionTrait;
 use pgn_traits::PgnPosition as PgnPositionTrait;
 
 fn correct_top_policy_move_property<const S: usize>(fen: &str, correct_move_strings: &[&str]) {
@@ -34,6 +37,26 @@ fn correct_top_policy_move_property<const S: usize>(fen: &str, correct_move_stri
         highest_policy_move.to_string::<S>(),
         score
     );
+}
+
+fn sets_winning_flag<const S: usize>(fen: &str) -> bool {
+    let position: Position<S> = Position::from_fen(fen).unwrap();
+
+    let group_data = position.group_data();
+    let mut moves = vec![];
+    position.generate_moves(&mut moves);
+
+    let mut feature_sets = vec![vec![0.0; parameters::num_policy_features::<S>()]; moves.len()];
+    let mut policy_feature_sets: Vec<PolicyFeatures> = feature_sets
+        .iter_mut()
+        .map(|feature_set| PolicyFeatures::new::<S>(feature_set))
+        .collect();
+
+    position.features_for_moves(&mut policy_feature_sets, &moves, &group_data);
+
+    policy_feature_sets
+        .iter()
+        .any(|features| features.decline_win[0] != 0.0)
 }
 
 #[test]
@@ -78,4 +101,16 @@ fn winning_wall_spread_from_critical_square() {
     let tps =
         "2,2,x,2121S,x,1/x,2,12,221,2,x/x,2,2,221C,12C,12/x,2,x,121,x,1/x,2,x,1,1,1/x3,1,x,1 1 25";
     correct_top_policy_move_property::<6>(tps, &["2d6<", "2d6>", "2d6<11"]);
+}
+
+#[test]
+fn false_positive_win_test() {
+    let tps = "21,21C,122S,1,1/x,221,1,2C,1S/1S,x,21,1222,1/1S,x3,2S/1212,x,11S,1S,2 1 42";
+    assert!(!sets_winning_flag::<5>(tps));
+}
+
+#[test]
+fn false_positive_win_test2() {
+    let tps = "2,x,2S,1/2,x,1,1S/2,1,22S,1/1S,2,x,1S 2 12";
+    assert!(!sets_winning_flag::<4>(tps));
 }
