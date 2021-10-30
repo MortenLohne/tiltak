@@ -8,7 +8,7 @@ use crate::position::bitboard::BitBoard;
 use crate::position::color_trait::{BlackTr, ColorTr, WhiteTr};
 use crate::position::Direction::*;
 use crate::position::Role::{Cap, Flat, Wall};
-use crate::position::{square_symmetries, Direction, GroupData, Position};
+use crate::position::{square_symmetries, Direction, GroupData, Piece, Position};
 use crate::position::{squares_iterator, Move};
 use crate::position::{GroupEdgeConnection, Square};
 use crate::search;
@@ -599,12 +599,15 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usize>(
                      */
                 } else if critical_square.neighbours::<S>().any(|sq| sq == *square) {
                     // If the critical square has two neighbours of the same group,
+                    // and neither the origin square nor the critical square is a wall,
                     // at least one of the spreads onto the critical square will be a road win
                     if critical_square
                         .neighbours::<S>()
                         .filter(|sq| group_data.groups[*sq] == group_data.groups[*square])
                         .count()
                         > 1
+                        && position[critical_square].top_stone().map(Piece::role) != Some(Wall)
+                        && role_id != 1
                     {
                         policy_features.move_onto_critical_square[1] += 1.0
                     } else {
