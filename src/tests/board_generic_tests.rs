@@ -11,27 +11,27 @@ use crate::tests::do_moves_and_check_validity;
 
 #[test]
 fn play_random_4s_games_test() {
-    play_random_games_prop::<4>()
+    play_random_games_prop::<4>(500)
 }
 
 #[test]
 fn play_random_5s_games_test() {
-    play_random_games_prop::<5>()
+    play_random_games_prop::<5>(500)
 }
 
 #[test]
 fn play_random_6s_games_test() {
-    play_random_games_prop::<6>()
+    play_random_games_prop::<6>(500)
 }
 
-fn play_random_games_prop<const S: usize>() {
+fn play_random_games_prop<const S: usize>(num_games: usize) {
     let mut white_wins = 0;
     let mut black_wins = 0;
     let mut draws = 0;
     let mut duration = 0;
 
     let mut rng = rand::thread_rng();
-    for _ in 0..1_000 {
+    for _ in 0..num_games {
         let mut position = <Position<S>>::default();
         let mut moves = vec![];
 
