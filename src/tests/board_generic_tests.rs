@@ -1,3 +1,5 @@
+use crate::evaluation::parameters;
+use crate::evaluation::parameters::PolicyFeatures;
 use board_game_traits::{EvalPosition, GameResult::*, Position as PositionTrait};
 use pgn_traits::PgnPosition;
 use rand::seq::SliceRandom;
@@ -9,29 +11,48 @@ use crate::tests::do_moves_and_check_validity;
 
 #[test]
 fn play_random_4s_games_test() {
-    play_random_games_prop::<4>()
+    play_random_games_prop::<4>(500)
 }
 
 #[test]
 fn play_random_5s_games_test() {
-    play_random_games_prop::<5>()
+    play_random_games_prop::<5>(500)
 }
 
 #[test]
 fn play_random_6s_games_test() {
-    play_random_games_prop::<6>()
+    play_random_games_prop::<6>(500)
 }
 
-fn play_random_games_prop<const S: usize>() {
+#[test]
+#[ignore]
+fn play_random_4s_games_test_long() {
+    play_random_games_prop::<4>(10_000)
+}
+
+#[test]
+#[ignore]
+fn play_random_5s_games_test_long() {
+    play_random_games_prop::<5>(10_000)
+}
+
+#[test]
+#[ignore]
+fn play_random_6s_games_test_long() {
+    play_random_games_prop::<6>(10_000)
+}
+
+fn play_random_games_prop<const S: usize>(num_games: usize) {
     let mut white_wins = 0;
     let mut black_wins = 0;
     let mut draws = 0;
     let mut duration = 0;
 
     let mut rng = rand::thread_rng();
-    for _ in 0..1_000 {
+    for _ in 0..num_games {
         let mut position = <Position<S>>::default();
         let mut moves = vec![];
+
         for i in 0.. {
             let hash_from_scratch = position.zobrist_hash_from_scratch();
             assert_eq!(
@@ -63,7 +84,35 @@ fn play_random_games_prop<const S: usize>() {
             }
 
             moves.clear();
+
             position.generate_moves(&mut moves);
+
+            let mut feature_sets =
+                vec![vec![0.0; parameters::num_policy_features::<S>()]; moves.len()];
+            let mut policy_feature_sets: Vec<PolicyFeatures> = feature_sets
+                .iter_mut()
+                .map(|feature_set| PolicyFeatures::new::<S>(feature_set))
+                .collect();
+
+            position.features_for_moves(&mut policy_feature_sets, &moves, &group_data);
+
+            // If the decline_win value is set, check that there really is a winning move
+            if policy_feature_sets
+                .iter()
+                .any(|features| features.decline_win[0] != 0.0)
+            {
+                assert!(
+                    moves.iter().any(|mv| {
+                        let reverse_move = position.do_move(mv.clone());
+                        let game_result = position.game_result();
+                        position.reverse_move(reverse_move);
+                        game_result == Some(WhiteWin) || game_result == Some(BlackWin)
+                    }),
+                    "TPS {} shows a win, but no winning move.",
+                    position.to_fen()
+                )
+            }
+
             let mv = moves
                 .choose(&mut rng)
                 .unwrap_or_else(|| panic!("No legal moves on board\n{:?}", position))

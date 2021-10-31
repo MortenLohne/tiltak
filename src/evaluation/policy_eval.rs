@@ -7,7 +7,7 @@ use crate::position::bitboard::BitBoard;
 use crate::position::color_trait::{BlackTr, ColorTr, WhiteTr};
 use crate::position::Direction::*;
 use crate::position::Role::{Cap, Flat, Wall};
-use crate::position::{square_symmetries, GroupData, Position};
+use crate::position::{square_symmetries, GroupData, Piece, Position};
 use crate::position::{squares_iterator, Move};
 use crate::position::{GroupEdgeConnection, Square};
 use crate::search;
@@ -115,6 +115,7 @@ fn has_immediate_win(policy_features: &PolicyFeatures) -> bool {
         policy_features.place_to_win[0],
         policy_features.place_our_critical_square[0],
         policy_features.move_onto_critical_square[0],
+        policy_features.move_onto_critical_square[1],
         policy_features.spread_that_connects_groups_to_win[0],
     ]
     .iter()
@@ -394,6 +395,7 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usize>(
 
             // The groups where the move causes us to lose flats
             let mut our_groups_affected = <ArrayVec<u8, S>>::new();
+            let mut our_squares_affected = <ArrayVec<Square, S>>::new();
             let mut our_pieces = 0;
             let mut their_pieces = 0;
             let mut their_pieces_captured = 0;
@@ -402,6 +404,7 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usize>(
             if position[*square].len() == stack_movement.get(0).pieces_to_take {
                 let top_stone = position[*square].top_stone.unwrap();
                 if top_stone.is_road_piece() {
+                    our_squares_affected.push(*square);
                     our_groups_affected.push(group_data.groups[*square]);
                 }
             }
@@ -464,6 +467,9 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usize>(
                     their_piece_left_on_previous_square = false;
                 } else {
                     their_piece_left_on_previous_square = true;
+                    // We may have joined this group on the previous iteration
+                    // If so, remove it, since the group is now affected
+                    our_groups_joined.retain(|id| *id != group_data.groups[destination_square]);
                 }
 
                 // Bonus for moving our cap to a strong line
@@ -505,10 +511,12 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usize>(
                         } else {
                             policy_features.stack_captured_by_movement[0] -=
                                 destination_stack.len() as f32;
+                            our_squares_affected.push(destination_square);
                             our_groups_affected.push(group_data.groups[destination_square]);
                         }
                     }
                     if Us::piece_is_ours(destination_top_stone) && piece.role() == Wall {
+                        our_squares_affected.push(destination_square);
                         our_groups_affected.push(group_data.groups[destination_square]);
                     }
 
@@ -578,9 +586,27 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usize>(
 
                 if edge_connection.is_winning() {
                     // Only this option is a guaranteed win:
-                    policy_features.move_onto_critical_square[0] += 1.0
-                } else {
+                    policy_features.move_onto_critical_square[0] += 1.0;
+                }
+                // If the critical square has two neighbours of the same group,
+                // and neither the origin square nor the critical square is a wall,
+                // at least one of the spreads onto the critical square will be a road win
+                else if our_squares_affected.len() == 1
+                    && critical_square
+                        .neighbours::<S>()
+                        .any(|sq| sq == our_squares_affected[0])
+                    && critical_square
+                        .neighbours::<S>()
+                        .filter(|sq| {
+                            group_data.groups[*sq] == group_data.groups[our_squares_affected[0]]
+                        })
+                        .count()
+                        > 1
+                    && position[critical_square].top_stone().map(Piece::role) != Some(Wall)
+                {
                     policy_features.move_onto_critical_square[1] += 1.0
+                } else {
+                    policy_features.move_onto_critical_square[2] += 1.0
                 }
             }
 
