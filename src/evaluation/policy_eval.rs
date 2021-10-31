@@ -7,7 +7,7 @@ use crate::position::bitboard::BitBoard;
 use crate::position::color_trait::{BlackTr, ColorTr, WhiteTr};
 use crate::position::Direction::*;
 use crate::position::Role::{Cap, Flat, Wall};
-use crate::position::{square_symmetries, Direction, GroupData, Piece, Position};
+use crate::position::{square_symmetries, GroupData, Piece, Position};
 use crate::position::{squares_iterator, Move};
 use crate::position::{GroupEdgeConnection, Square};
 use crate::search;
@@ -116,7 +116,6 @@ fn has_immediate_win(policy_features: &PolicyFeatures) -> bool {
         policy_features.place_our_critical_square[0],
         policy_features.move_onto_critical_square[0],
         policy_features.move_onto_critical_square[1],
-        policy_features.move_onto_critical_square[2],
         policy_features.spread_that_connects_groups_to_win[0],
     ]
     .iter()
@@ -588,34 +587,26 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usize>(
                 if edge_connection.is_winning() {
                     // Only this option is a guaranteed win:
                     policy_features.move_onto_critical_square[0] += 1.0;
-                } else if our_squares_affected.len() == 1 {
-                    if critical_square
+                }
+                // If the critical square has two neighbours of the same group,
+                // and neither the origin square nor the critical square is a wall,
+                // at least one of the spreads onto the critical square will be a road win
+                else if our_squares_affected.len() == 1
+                    && critical_square
                         .neighbours::<S>()
                         .any(|sq| sq == our_squares_affected[0])
-                    {
-                        // If the critical square has two neighbours of the same group,
-                        // and neither the origin square nor the critical square is a wall,
-                        // at least one of the spreads onto the critical square will be a road win
-                        if critical_square
-                            .neighbours::<S>()
-                            .filter(|sq| {
-                                group_data.groups[*sq] == group_data.groups[our_squares_affected[0]]
-                            })
-                            .count()
-                            > 1
-                            && position[critical_square].top_stone().map(Piece::role) != Some(Wall)
-                        {
-                            policy_features.move_onto_critical_square[1] += 1.0
-                        } else {
-                            policy_features.move_onto_critical_square[3] += 1.0
-                        }
-                    } else if square_is_disposable_in_group(our_squares_affected[0], group_data) {
-                        // If the affected square is not a neighbour of the critical square,
-                        // and is disposable in its group, this is always a win
-                        policy_features.move_onto_critical_square[2] += 1.0
-                    }
+                    && critical_square
+                        .neighbours::<S>()
+                        .filter(|sq| {
+                            group_data.groups[*sq] == group_data.groups[our_squares_affected[0]]
+                        })
+                        .count()
+                        > 1
+                    && position[critical_square].top_stone().map(Piece::role) != Some(Wall)
+                {
+                    policy_features.move_onto_critical_square[1] += 1.0
                 } else {
-                    policy_features.move_onto_critical_square[3] += 1.0
+                    policy_features.move_onto_critical_square[2] += 1.0
                 }
             }
 
@@ -630,42 +621,5 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usize>(
                 policy_features.spread_that_connects_groups_to_win[0] = 1.0;
             }
         }
-    }
-}
-
-/// Check whether the group is still connected if we remove this square
-fn square_is_disposable_in_group<const S: usize>(
-    square: Square,
-    group_data: &GroupData<S>,
-) -> bool {
-    let neighbour_squares: ArrayVec<Square, 4> = square.neighbours::<S>().collect();
-    let group_id = group_data.groups[square];
-    match neighbour_squares.len() {
-        2 => false,
-        3 => {
-            let direction_away_from_edge = [
-                Direction::North,
-                Direction::South,
-                Direction::West,
-                Direction::East,
-            ]
-            .iter()
-            .find(|direction| square.go_direction::<S>(**direction).is_none())
-            .unwrap()
-            .reverse();
-
-            group_data.groups[square.go_direction::<S>(direction_away_from_edge).unwrap()]
-                != group_id
-                && group_data.amount_in_group[group_id as usize].1
-                    == GroupEdgeConnection::default().connect_square::<S>(square)
-        }
-        4 => {
-            neighbour_squares
-                .iter()
-                .filter(|neighbour| group_data.groups[**neighbour] == group_id)
-                .count()
-                == 1
-        }
-        _ => unreachable!(),
     }
 }

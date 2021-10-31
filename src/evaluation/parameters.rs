@@ -1,13 +1,13 @@
 use crate::position::num_square_symmetries;
 
 pub const NUM_VALUE_FEATURES_4S: usize = 51;
-pub const NUM_POLICY_FEATURES_4S: usize = 100;
+pub const NUM_POLICY_FEATURES_4S: usize = 99;
 
 pub const NUM_VALUE_FEATURES_5S: usize = 69;
-pub const NUM_POLICY_FEATURES_5S: usize = 119;
+pub const NUM_POLICY_FEATURES_5S: usize = 118;
 
 pub const NUM_VALUE_FEATURES_6S: usize = 72;
-pub const NUM_POLICY_FEATURES_6S: usize = 129;
+pub const NUM_POLICY_FEATURES_6S: usize = 128;
 
 #[derive(Debug)]
 pub struct ValueFeatures<'a> {
@@ -166,7 +166,7 @@ impl<'a> PolicyFeatures<'a> {
         let (move_cap_onto_strong_line, coefficients) = coefficients.split_at_mut(S - 3);
         let (move_cap_onto_strong_line_with_critical_square, coefficients) =
             coefficients.split_at_mut(S - 3);
-        let (move_onto_critical_square, coefficients) = coefficients.split_at_mut(4);
+        let (move_onto_critical_square, coefficients) = coefficients.split_at_mut(3);
         let (spread_that_connects_groups_to_win, coefficients) = coefficients.split_at_mut(1);
 
         assert!(coefficients.is_empty());
@@ -386,7 +386,6 @@ pub const POLICY_PARAMS_4S: [f32; NUM_POLICY_FEATURES_4S] = [
     1.0982375,
     0.6184283,
     0.6184283,
-    0.6184283,
     1.3567312,
 ];
 
@@ -580,7 +579,6 @@ pub const POLICY_PARAMS_5S: [f32; NUM_POLICY_FEATURES_5S] = [
     -0.069492124,
     -0.1426198,
     0.86491776,
-    0.9123078,
     0.9123078,
     0.9123078,
     2.2782326,
@@ -789,7 +787,6 @@ pub const POLICY_PARAMS_6S: [f32; NUM_POLICY_FEATURES_6S] = [
     -0.2014504,
     -0.07103049,
     1.0650625,
-    0.99812114,
     0.99812114,
     0.99812114,
     3.1032639,
