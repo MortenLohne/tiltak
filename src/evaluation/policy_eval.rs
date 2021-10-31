@@ -116,6 +116,7 @@ fn has_immediate_win(policy_features: &PolicyFeatures) -> bool {
         policy_features.place_our_critical_square[0],
         policy_features.move_onto_critical_square[0],
         policy_features.move_onto_critical_square[1],
+        policy_features.move_onto_critical_square[2],
         policy_features.spread_that_connects_groups_to_win[0],
     ]
     .iter()
@@ -587,28 +588,32 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usize>(
                 if edge_connection.is_winning() {
                     // Only this option is a guaranteed win:
                     policy_features.move_onto_critical_square[0] += 1.0;
-                } else if critical_square.neighbours::<S>().any(|sq| sq == *square) {
-                    // If the critical square has two neighbours of the same group,
-                    // and neither the origin square nor the critical square is a wall,
-                    // at least one of the spreads onto the critical square will be a road win
+                } else if our_squares_affected.len() == 1 {
                     if critical_square
                         .neighbours::<S>()
-                        .filter(|sq| group_data.groups[*sq] == group_data.groups[*square])
-                        .count()
-                        > 1
-                        && position[critical_square].top_stone().map(Piece::role) != Some(Wall)
-                        && role_id != 1
+                        .any(|sq| sq == our_squares_affected[0])
                     {
-                        policy_features.move_onto_critical_square[1] += 1.0
-                    } else {
-                        policy_features.move_onto_critical_square[3] += 1.0
+                        // If the critical square has two neighbours of the same group,
+                        // and neither the origin square nor the critical square is a wall,
+                        // at least one of the spreads onto the critical square will be a road win
+                        if critical_square
+                            .neighbours::<S>()
+                            .filter(|sq| {
+                                group_data.groups[*sq] == group_data.groups[our_squares_affected[0]]
+                            })
+                            .count()
+                            > 1
+                            && position[critical_square].top_stone().map(Piece::role) != Some(Wall)
+                        {
+                            policy_features.move_onto_critical_square[1] += 1.0
+                        } else {
+                            policy_features.move_onto_critical_square[3] += 1.0
+                        }
+                    } else if square_is_disposable_in_group(our_squares_affected[0], group_data) {
+                        // If the affected square is not a neighbour of the critical square,
+                        // and is disposable in its group, this is always a win
+                        policy_features.move_onto_critical_square[2] += 1.0
                     }
-                } else if our_squares_affected.len() == 1
-                    && square_is_disposable_in_group(our_squares_affected[0], group_data)
-                {
-                    // If the affected square is not a neighbour of the critical square,
-                    // and is disposable in its group, this is always a win
-                    policy_features.move_onto_critical_square[2] += 1.0
                 } else {
                     policy_features.move_onto_critical_square[3] += 1.0
                 }

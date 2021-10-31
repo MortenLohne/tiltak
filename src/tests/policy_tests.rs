@@ -120,3 +120,9 @@ fn false_positive_win_test3() {
     let tps = "1S,2S,21C,2S,12,x/22C,1S,212S,2S,1,x/11121,x2,21,x,1/122S,22S,2S,1,1,1S/2S,x,2S,2S,x2/1S,1,2S,2S,1121S,2 1 52";
     assert!(!sets_winning_flag::<6>(tps));
 }
+
+#[test]
+fn false_positive_win_test4() {
+    let tps = "2,2,1,22S,21C,2S/11,212,2,12212S,2,112C/2S,2,x,1S,12,x/1S,1S,2S,22S,21,1S/2S,1,x,1,1,1S/121S,x,112S,2S,12S,2 2 64";
+    assert!(!sets_winning_flag::<6>(tps));
+}
