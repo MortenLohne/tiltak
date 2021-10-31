@@ -60,6 +60,14 @@ impl<const S: usize> Position<S> {
                     (mv, sigmoid(total_value))
                 }),
         );
+
+        const EXTRA_EVAL: f32 = 0.1;
+        let score_sum: f32 = moves.iter().map(|(_mv, score)| *score).sum();
+
+        let score_factor = (1.0 - EXTRA_EVAL) / score_sum;
+        for (_mv, score) in moves.iter_mut() {
+            *score = *score * score_factor + (EXTRA_EVAL / num_moves as f32);
+        }
     }
 
     pub fn features_for_moves(
