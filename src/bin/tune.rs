@@ -201,6 +201,11 @@ fn main() {
                     delta: 0.05,
                     apply_factor: 0.005,
                 },
+                spsa::Variable {
+                    value: 0.05,
+                    delta: 0.005,
+                    apply_factor: 0.005,
+                },
             ];
             match size {
                 4 => spsa::tune::<4>(&mut variables, arg.value_of("book")),

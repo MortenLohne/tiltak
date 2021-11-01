@@ -1,6 +1,7 @@
 use crate::evaluation::parameters;
 use crate::evaluation::parameters::PolicyFeatures;
 use crate::position::{Move, Position};
+use crate::search::MctsSetting;
 use board_game_traits::Position as PositionTrait;
 use pgn_traits::PgnPosition as PgnPositionTrait;
 
@@ -19,6 +20,7 @@ fn correct_top_policy_move_property<const S: usize>(fen: &str, correct_move_stri
         &mut simple_moves,
         &mut legal_moves,
         &mut vec![],
+        MctsSetting::<S>::default().policy_baseline(),
     );
 
     for mv in &moves {

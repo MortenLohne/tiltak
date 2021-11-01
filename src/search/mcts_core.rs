@@ -171,6 +171,7 @@ impl Tree {
             &mut temp_vectors.simple_moves,
             &mut temp_vectors.moves,
             &mut temp_vectors.policy_score_sets,
+            settings.policy_baseline(),
         );
         let mut children_vec = Vec::with_capacity(temp_vectors.moves.len());
         let policy_sum: f32 = temp_vectors.moves.iter().map(|(_, score)| *score).sum();
@@ -251,6 +252,7 @@ pub fn rollout<const S: usize>(
             &mut temp_vectors.simple_moves,
             &mut temp_vectors.moves,
             &mut temp_vectors.policy_score_sets,
+            settings.policy_baseline(),
         );
 
         let mut rng = rand::thread_rng();

@@ -29,6 +29,7 @@ impl<const S: usize> Position<S> {
         simple_moves: &mut Vec<Move>,
         moves: &mut Vec<(Move, search::Score)>,
         feature_sets: &mut Vec<Box<[f32]>>,
+        policy_baseline: search::Score,
     ) {
         let num_moves = simple_moves.len();
 
@@ -61,12 +62,11 @@ impl<const S: usize> Position<S> {
                 }),
         );
 
-        const EXTRA_EVAL: f32 = 0.05;
         let score_sum: f32 = moves.iter().map(|(_mv, score)| *score).sum();
 
-        let score_factor = (1.0 - EXTRA_EVAL) / score_sum;
+        let score_factor = (1.0 - policy_baseline) / score_sum;
         for (_mv, score) in moves.iter_mut() {
-            *score = *score * score_factor + (EXTRA_EVAL / num_moves as f32);
+            *score = *score * score_factor + (policy_baseline / num_moves as f32);
         }
     }
 
