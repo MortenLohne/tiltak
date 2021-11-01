@@ -61,7 +61,7 @@ impl<const S: usize> Position<S> {
                 }),
         );
 
-        const EXTRA_EVAL: f32 = 0.1;
+        const EXTRA_EVAL: f32 = 0.05;
         let score_sum: f32 = moves.iter().map(|(_mv, score)| *score).sum();
 
         let score_factor = (1.0 - EXTRA_EVAL) / score_sum;
