@@ -81,27 +81,31 @@ impl Square {
     }
 
     pub fn go_direction<const S: usize>(self, direction: Direction) -> Option<Self> {
+        self.jump_direction::<S>(direction, 1)
+    }
+
+    pub fn jump_direction<const S: usize>(self, direction: Direction, len: u8) -> Option<Self> {
         match direction {
-            North => self.0.checked_sub(S as u8).map(Square),
+            North => self.0.checked_sub((S as u8) * len).map(Square),
             West => {
-                if self.file::<S>() == 0 {
+                if self.file::<S>() < len {
                     None
                 } else {
-                    Some(Square(self.0 - 1))
+                    Some(Square(self.0 - len))
                 }
             }
             East => {
-                if self.file::<S>() == S as u8 - 1 {
+                if self.file::<S>() >= S as u8 - len {
                     None
                 } else {
-                    Some(Square(self.0 + 1))
+                    Some(Square(self.0 + len))
                 }
             }
             South => {
-                if self.0 as usize + S >= S * S {
+                if self.0 + (S as u8) * len >= (S * S) as u8 {
                     None
                 } else {
-                    Some(Square(self.0 + S as u8))
+                    Some(Square(self.0 + len * S as u8))
                 }
             }
         }
