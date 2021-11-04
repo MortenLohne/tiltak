@@ -7,7 +7,7 @@ use crate::position::bitboard::BitBoard;
 use crate::position::color_trait::{BlackTr, ColorTr, WhiteTr};
 use crate::position::Direction::*;
 use crate::position::Role::{Cap, Flat, Wall};
-use crate::position::{square_symmetries, GroupData, Piece, Position};
+use crate::position::{square_symmetries, GroupData, Piece, Position, Role};
 use crate::position::{squares_iterator, Move};
 use crate::position::{GroupEdgeConnection, Square};
 use crate::search;
@@ -128,6 +128,54 @@ fn has_immediate_win(policy_features: &PolicyFeatures) -> bool {
     ]
     .iter()
     .any(|p| *p != 0.0)
+}
+
+struct MovementSynopsis {
+    origin: Square,
+    destination: Square,
+}
+
+fn our_last_placement<const S: usize>(position: &Position<S>) -> Option<(Role, Square)> {
+    position
+        .moves()
+        .get(position.moves().len() - 2)
+        .and_then(|mv| match mv {
+            Move::Place(role, square) => Some((*role, *square)),
+            Move::Move(_, _, _) => None,
+        })
+}
+
+fn their_last_placement<const S: usize>(position: &Position<S>) -> Option<(Role, Square)> {
+    position
+        .moves()
+        .get(position.moves().len() - 1)
+        .and_then(|mv| match mv {
+            Move::Place(role, square) => Some((*role, *square)),
+            Move::Move(_, _, _) => None,
+        })
+}
+
+fn our_last_movement<const S: usize>(position: &Position<S>) -> Option<MovementSynopsis> {
+    get_movement_in_history(position, 2)
+}
+
+fn their_last_movement<const S: usize>(position: &Position<S>) -> Option<MovementSynopsis> {
+    get_movement_in_history(position, 1)
+}
+
+fn get_movement_in_history<const S: usize>(position: &Position<S>, i: usize) -> Option<MovementSynopsis> {
+    position
+        .moves()
+        .get(position.moves().len().overflowing_sub(i).0)
+        .and_then(|mv| match mv {
+            Move::Place(_, _) => None,
+            Move::Move(origin, direction, stack_movement) => {
+                Some(MovementSynopsis {
+                    origin: *origin,
+                    destination: origin.jump_direction::<S>(*direction, stack_movement.len() as u8).unwrap(),
+                })
+            }
+        })
 }
 
 fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usize>(
@@ -404,6 +452,7 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usize>(
             // The groups where the move causes us to lose flats
             let mut our_groups_affected = <ArrayVec<u8, S>>::new();
             let mut our_squares_affected = <ArrayVec<Square, S>>::new();
+            let mut stack_recaptured_with = None;
             let mut our_pieces = 0;
             let mut their_pieces = 0;
             let mut their_pieces_captured = 0;
@@ -431,6 +480,11 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usize>(
                     }
                     if Them::is_critical_square(&*group_data, destination_square) {
                         captures_their_critical_square = Some(destination_square);
+                    }
+                    if let Some(MovementSynopsis { origin: _, destination: last_capture }) = their_last_movement(position) {
+                        if destination_square == last_capture {
+                            stack_recaptured_with = Some(piece.role());
+                        }
                     }
                 } else {
                     their_pieces += 1;
@@ -559,6 +613,23 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usize>(
             } else {
                 policy_features.stack_movement_that_gives_us_top_pieces[4] = 1.0;
                 policy_features.stack_movement_that_gives_us_top_pieces[5] = our_pieces as f32;
+            }
+
+            // Continue spreading the stack (the piece, that is) we spread last turn, if any
+            if let Some(MovementSynopsis { origin: _, destination }) = our_last_movement(position) {
+                if destination == *square {
+                    policy_features.continue_spread[role_id] = 1.0;
+                }
+            }
+
+            // Recapture the stack they moved on their last move
+            if let Some(role) = stack_recaptured_with {
+                if their_pieces == 0 {
+                    policy_features.recapture_stack_pure[role as u16 as usize] = 1.0;
+                }
+                else {
+                    policy_features.recapture_stack_impure[role as u16 as usize] = 1.0;
+                }
             }
 
             let their_open_critical_squares =

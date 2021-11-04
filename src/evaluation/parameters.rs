@@ -1,13 +1,13 @@
 use crate::position::num_square_symmetries;
 
 pub const NUM_VALUE_FEATURES_4S: usize = 51;
-pub const NUM_POLICY_FEATURES_4S: usize = 99;
+pub const NUM_POLICY_FEATURES_4S: usize = 108;
 
 pub const NUM_VALUE_FEATURES_5S: usize = 69;
-pub const NUM_POLICY_FEATURES_5S: usize = 118;
+pub const NUM_POLICY_FEATURES_5S: usize = 127;
 
 pub const NUM_VALUE_FEATURES_6S: usize = 72;
-pub const NUM_POLICY_FEATURES_6S: usize = 128;
+pub const NUM_POLICY_FEATURES_6S: usize = 137;
 
 #[derive(Debug)]
 pub struct ValueFeatures<'a> {
@@ -119,6 +119,9 @@ pub struct PolicyFeatures<'a> {
     pub stack_capture_in_strong_line_cap: &'a mut [f32],
     pub move_cap_onto_strong_line: &'a mut [f32],
     pub move_cap_onto_strong_line_with_critical_square: &'a mut [f32],
+    pub recapture_stack_pure: &'a mut [f32],
+    pub recapture_stack_impure: &'a mut [f32],
+    pub continue_spread: &'a mut [f32],
     pub move_onto_critical_square: &'a mut [f32],
     pub spread_that_connects_groups_to_win: &'a mut [f32],
 }
@@ -166,6 +169,9 @@ impl<'a> PolicyFeatures<'a> {
         let (move_cap_onto_strong_line, coefficients) = coefficients.split_at_mut(S - 3);
         let (move_cap_onto_strong_line_with_critical_square, coefficients) =
             coefficients.split_at_mut(S - 3);
+        let (recapture_stack_pure, coefficients) = coefficients.split_at_mut(3);
+        let (recapture_stack_impure, coefficients) = coefficients.split_at_mut(3);
+        let (continue_spread, coefficients) = coefficients.split_at_mut(3);
         let (move_onto_critical_square, coefficients) = coefficients.split_at_mut(3);
         let (spread_that_connects_groups_to_win, coefficients) = coefficients.split_at_mut(1);
 
@@ -208,6 +214,9 @@ impl<'a> PolicyFeatures<'a> {
             stack_capture_in_strong_line_cap,
             move_cap_onto_strong_line,
             move_cap_onto_strong_line_with_critical_square,
+            recapture_stack_pure,
+            recapture_stack_impure,
+            continue_spread,
             move_onto_critical_square,
             spread_that_connects_groups_to_win,
         }
@@ -383,6 +392,15 @@ pub const POLICY_PARAMS_4S: [f32; NUM_POLICY_FEATURES_4S] = [
     -0.002353027,
     0.008927224,
     0.009418681,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
     1.0977011,
     1.5067945,
     0.6087727,
@@ -578,6 +596,15 @@ pub const POLICY_PARAMS_5S: [f32; NUM_POLICY_FEATURES_5S] = [
     0.48239857,
     -0.06852308,
     -0.14015368,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
     0.865731,
     2.155251,
     0.894927,
@@ -786,6 +813,15 @@ pub const POLICY_PARAMS_6S: [f32; NUM_POLICY_FEATURES_6S] = [
     -0.30082047,
     -0.20660733,
     -0.07105595,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
     1.0446956,
     2.1992846,
     0.9547137,
