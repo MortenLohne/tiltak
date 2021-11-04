@@ -163,18 +163,21 @@ fn their_last_movement<const S: usize>(position: &Position<S>) -> Option<Movemen
     get_movement_in_history(position, 1)
 }
 
-fn get_movement_in_history<const S: usize>(position: &Position<S>, i: usize) -> Option<MovementSynopsis> {
+fn get_movement_in_history<const S: usize>(
+    position: &Position<S>,
+    i: usize,
+) -> Option<MovementSynopsis> {
     position
         .moves()
         .get(position.moves().len().overflowing_sub(i).0)
         .and_then(|mv| match mv {
             Move::Place(_, _) => None,
-            Move::Move(origin, direction, stack_movement) => {
-                Some(MovementSynopsis {
-                    origin: *origin,
-                    destination: origin.jump_direction::<S>(*direction, stack_movement.len() as u8).unwrap(),
-                })
-            }
+            Move::Move(origin, direction, stack_movement) => Some(MovementSynopsis {
+                origin: *origin,
+                destination: origin
+                    .jump_direction::<S>(*direction, stack_movement.len() as u8)
+                    .unwrap(),
+            }),
         })
 }
 
@@ -481,7 +484,11 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usize>(
                     if Them::is_critical_square(&*group_data, destination_square) {
                         captures_their_critical_square = Some(destination_square);
                     }
-                    if let Some(MovementSynopsis { origin: _, destination: last_capture }) = their_last_movement(position) {
+                    if let Some(MovementSynopsis {
+                        origin: _,
+                        destination: last_capture,
+                    }) = their_last_movement(position)
+                    {
                         if destination_square == last_capture {
                             stack_recaptured_with = Some(piece.role());
                         }
@@ -616,7 +623,11 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usize>(
             }
 
             // Continue spreading the stack (the piece, that is) we spread last turn, if any
-            if let Some(MovementSynopsis { origin: _, destination }) = our_last_movement(position) {
+            if let Some(MovementSynopsis {
+                origin: _,
+                destination,
+            }) = our_last_movement(position)
+            {
                 if destination == *square {
                     policy_features.continue_spread[role_id] = 1.0;
                 }
@@ -626,8 +637,7 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usize>(
             if let Some(role) = stack_recaptured_with {
                 if their_pieces == 0 {
                     policy_features.recapture_stack_pure[role as u16 as usize] = 1.0;
-                }
-                else {
+                } else {
                     policy_features.recapture_stack_impure[role as u16 as usize] = 1.0;
                 }
             }
