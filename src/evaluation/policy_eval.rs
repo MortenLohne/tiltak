@@ -408,9 +408,10 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usize>(
                 }
             }
             if *role == Wall || *role == Cap {
-                // If square has two or more opponent flatstones around it
                 for direction in square.directions::<S>() {
                     let neighbour = square.go_direction::<S>(direction).unwrap();
+
+                    // If square blocks an extension of two flats
                     if position[neighbour]
                         .top_stone()
                         .map(Them::is_road_stone)
@@ -422,6 +423,49 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usize>(
                             .unwrap_or_default()
                     {
                         policy_features.blocking_stone_blocks_extensions_of_two_flats[0] += 1.0;
+                    }
+
+                    if position[neighbour].len() > 2
+                        && Them::piece_is_ours(position[neighbour].top_stone().unwrap())
+                    {
+                        let stack = position[neighbour];
+                        let top_stone = stack.top_stone().unwrap();
+                        let mut captives = 0;
+                        let mut reserves = 0;
+                        for piece in stack.into_iter().take(stack.len() as usize - 1) {
+                            if Us::piece_is_ours(piece) {
+                                captives += 1;
+                            } else {
+                                reserves += 1;
+                            }
+                        }
+                        let index = top_stone.role().disc() * 2;
+                        match role {
+                            Flat => unreachable!(),
+                            Wall => {
+                                policy_features.attack_strong_stack_with_wall[index] +=
+                                    captives as f32;
+                                policy_features.attack_strong_stack_with_wall[index + 1] +=
+                                    reserves as f32;
+                            }
+                            Cap => {
+                                policy_features.attack_strong_stack_with_cap[index] +=
+                                    captives as f32;
+                                policy_features.attack_strong_stack_with_cap[index + 1] +=
+                                    reserves as f32;
+                            }
+                        }
+
+                        if let Some(MovementSynopsis {
+                            origin: _,
+                            destination,
+                        }) = their_last_movement(position)
+                        {
+                            if neighbour == destination {
+                                policy_features.attack_last_movement[0] += captives as f32;
+                                policy_features.attack_last_movement[1] += reserves as f32;
+                            }
+                        }
                     }
                 }
             }

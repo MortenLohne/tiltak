@@ -155,6 +155,12 @@ pub enum Role {
     Cap,
 }
 
+impl Role {
+    pub fn disc(self) -> usize {
+        self as u16 as usize
+    }
+}
+
 /// One of the 6 game pieces in Tak. Each piece has one variant for each color.
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Hash)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
