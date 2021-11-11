@@ -469,6 +469,17 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usize>(
                     }
                 }
             }
+
+            // Bonus for placing on the square left behind by their movement
+            if let Some(MovementSynopsis {
+                origin,
+                destination: _,
+            }) = their_last_movement(position)
+            {
+                if *square == origin {
+                    policy_features.place_last_movement[role_id] += 1.0;
+                }
+            }
         }
 
         Move::Move(square, direction, stack_movement) => {
