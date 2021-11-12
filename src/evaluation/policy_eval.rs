@@ -138,7 +138,7 @@ struct MovementSynopsis {
 fn our_last_placement<const S: usize>(position: &Position<S>) -> Option<(Role, Square)> {
     position
         .moves()
-        .get(position.moves().len() - 2)
+        .get(position.moves().len().overflowing_sub(2).0)
         .and_then(|mv| match mv {
             Move::Place(role, square) => Some((*role, *square)),
             Move::Move(_, _, _) => None,
@@ -148,7 +148,7 @@ fn our_last_placement<const S: usize>(position: &Position<S>) -> Option<(Role, S
 fn their_last_placement<const S: usize>(position: &Position<S>) -> Option<(Role, Square)> {
     position
         .moves()
-        .get(position.moves().len() - 1)
+        .get(position.moves().len().overflowing_sub(1).0)
         .and_then(|mv| match mv {
             Move::Place(role, square) => Some((*role, *square)),
             Move::Move(_, _, _) => None,
