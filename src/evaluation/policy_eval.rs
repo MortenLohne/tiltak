@@ -498,6 +498,13 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usize>(
                     *square
                 };
 
+            // Bonus for moving the piece we placed on our last turn
+            if let Some((role, last_square)) = our_last_placement(position) {
+                if *square == last_square && !position[destination_square].is_empty() {
+                    policy_features.move_last_placement[role.disc()] += 1.0;
+                }
+            }
+
             let mut captures_our_critical_square = None;
             let mut captures_their_critical_square = None;
 
