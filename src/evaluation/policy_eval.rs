@@ -340,12 +340,9 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usize>(
                 }
 
                 // If square is next to a road stone laid on our last turn
-                if let Some(Move::Place(last_role, last_square)) = position
-                    .moves()
-                    .get(position.moves().len().overflowing_sub(2).0)
-                {
-                    if *last_role == Flat || *last_role == Cap {
-                        if square.neighbours::<S>().any(|neigh| neigh == *last_square) {
+                if let Some((last_role, last_square)) = our_last_placement(position) {
+                    if last_role == Flat || last_role == Cap {
+                        if square.neighbours::<S>().any(|neigh| neigh == last_square) {
                             policy_features.next_to_our_last_stone[0] = 1.0;
                         } else if (square.rank::<S>() as i8 - last_square.rank::<S>() as i8).abs()
                             == 1
@@ -357,9 +354,9 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usize>(
                 }
 
                 // If square is next to a road stone laid on their last turn
-                if let Some(Move::Place(last_role, last_square)) = position.moves().last() {
-                    if *last_role == Flat {
-                        if square.neighbours::<S>().any(|neigh| neigh == *last_square) {
+                if let Some((last_role, last_square)) = their_last_placement(position) {
+                    if last_role == Flat {
+                        if square.neighbours::<S>().any(|neigh| neigh == last_square) {
                             policy_features.next_to_their_last_stone[0] = 1.0;
                         } else if (square.rank::<S>() as i8 - last_square.rank::<S>() as i8).abs()
                             == 1
