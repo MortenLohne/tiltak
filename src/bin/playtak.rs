@@ -230,10 +230,12 @@ pub fn main() -> Result<()> {
             None => SeekMode::OpenSeek(parse_tc(matches.value_of("tc").unwrap())),
         };
 
+        let (game_time, increment) = parse_tc(matches.value_of("tc").unwrap());
+
         let result = match size {
-            4 => session.seek_game::<4>(seekmode, playtak_settings),
-            5 => session.seek_game::<5>(seekmode, playtak_settings),
-            6 => session.seek_game::<6>(seekmode, playtak_settings),
+            4 => session.seek_playtak_games::<4>(playtak_settings, game_time, increment),
+            5 => session.seek_playtak_games::<5>(playtak_settings, game_time, increment),
+            6 => session.seek_playtak_games::<6>(playtak_settings, game_time, increment),
             s => panic!("Unsupported size {}", s),
         };
 
@@ -290,6 +292,24 @@ struct PlaytakGame<'a> {
     our_color: Color,
     time_left: Duration,
     increment: Duration,
+}
+
+impl<'a> PlaytakGame<'a> {
+    pub fn from_playtak_game_words(words: &[&'a str], increment: Duration) -> PlaytakGame<'a> {
+        PlaytakGame {
+            game_no: u64::from_str(words[2]).unwrap(),
+            _board_size: usize::from_str(words[3]).unwrap(),
+            white_player: words[4],
+            black_player: words[6],
+            our_color: match words[7] {
+                "white" => Color::White,
+                "black" => Color::Black,
+                color => panic!("Bad color \"{}\"", color),
+            },
+            time_left: Duration::from_secs(u64::from_str(words[8]).unwrap()),
+            increment,
+        }
+    }
 }
 
 impl PlaytakSession {
@@ -385,26 +405,18 @@ impl PlaytakSession {
         Ok(())
     }
 
-    /// Place a game seek (challenge) on playtak, and wait for somebody to accept
-    /// Mutually recursive with `play_game` when the challenge is accepted
-    pub fn seek_game<const S: usize>(
+    fn seek_playtak_games<const S: usize>(
         &mut self,
-        seek_mode: SeekMode,
         playtak_settings: PlaytakSettings,
-    ) -> io::Result<std::convert::Infallible> {
-        // The server doesn't send increment when the game starts
-        // We have to keep track of it ourselves, depending on the seekmode
-        let mut increment = Duration::from_secs(0);
-
-        if let SeekMode::OpenSeek((game_time, inc)) = seek_mode {
-            increment = inc;
-            self.send_line(&format!(
-                "Seek {} {} {}",
-                S,
-                game_time.as_secs(),
-                increment.as_secs()
-            ))?;
-        }
+        game_time: Duration,
+        increment: Duration,
+    ) -> io::Result<Infallible> {
+        self.send_line(&format!(
+            "Seek {} {} {}",
+            S,
+            game_time.as_secs(),
+            increment.as_secs()
+        ))?;
 
         loop {
             let input = self.read_line()?;
@@ -414,33 +426,46 @@ impl PlaytakSession {
             }
             match words[0] {
                 "Game" => {
-                    let playtak_game = PlaytakGame {
-                        game_no: u64::from_str(words[2]).unwrap(),
-                        _board_size: usize::from_str(words[3]).unwrap(),
-                        white_player: words[4],
-                        black_player: words[6],
-                        our_color: match words[7] {
-                            "white" => Color::White,
-                            "black" => Color::Black,
-                            color => panic!("Bad color \"{}\"", color),
-                        },
-                        time_left: Duration::from_secs(u64::from_str(words[8]).unwrap()),
-                        increment,
-                    };
-                    self.play_game::<S>(playtak_game, playtak_settings, seek_mode)?;
-                    unreachable!()
+                    let playtak_game = PlaytakGame::from_playtak_game_words(&words, increment);
+                    self.play_game::<S>(playtak_game, playtak_settings)?;
+                }
+                "NOK" => {
+                    warn!("Received NOK from server, ignoring. This may happen if the game was aborted while we were thinking");
+                }
+                _ => debug!("Ignoring server message \"{}\"", input.trim()),
+            }
+        }
+    }
+
+    pub fn accept_seek<const S: usize>(
+        &mut self,
+        playtak_settings: PlaytakSettings,
+        bot_name: &str,
+    ) -> io::Result<Infallible> {
+        // The server doesn't send increment when the game starts
+        // We have to keep track of it ourselves, depending on the seekmode
+        let mut increment = Duration::from_secs(0);
+
+        loop {
+            let input = self.read_line()?;
+            let words: Vec<&str> = input.split_whitespace().collect();
+            if words.is_empty() {
+                continue;
+            }
+            match words[0] {
+                "Game" => {
+                    let playtak_game = PlaytakGame::from_playtak_game_words(&words, increment);
+                    self.play_game::<S>(playtak_game, playtak_settings)?;
                 }
 
                 "Seek" => {
-                    if let SeekMode::PlayOtherBot(ref bot_name) = seek_mode {
-                        if words[1] == "new" {
-                            let number = u64::from_str(words[2]).unwrap();
-                            let name = words[3];
-                            let inc = Duration::from_secs(u64::from_str(words[6]).unwrap());
-                            if name.eq_ignore_ascii_case(bot_name) {
-                                self.send_line(&format!("Accept {}", number))?;
-                                increment = inc;
-                            }
+                    if words[1] == "new" {
+                        let number = u64::from_str(words[2]).unwrap();
+                        let name = words[3];
+                        let inc = Duration::from_secs(u64::from_str(words[6]).unwrap());
+                        if name.eq_ignore_ascii_case(bot_name) {
+                            self.send_line(&format!("Accept {}", number))?;
+                            increment = inc;
                         }
                     }
                 }
@@ -458,8 +483,7 @@ impl PlaytakSession {
         &mut self,
         game: PlaytakGame,
         playtak_settings: PlaytakSettings,
-        seek_mode: SeekMode,
-    ) -> io::Result<Infallible> {
+    ) -> io::Result<Game<Position<S>>> {
         info!(
             "Starting game #{}, {} vs {} as {}, {}+{:.1}",
             game.game_no,
@@ -606,46 +630,42 @@ impl PlaytakSession {
             }
         }
 
-        {
-            info!("Game finished. Pgn: ");
+        info!("Game finished. Pgn: ");
 
-            let date = Local::today();
+        let date = Local::today();
 
-            let tags = vec![
-                ("Event".to_string(), "Playtak challenge".to_string()),
-                ("Site".to_string(), "playtak.com".to_string()),
-                ("Player1".to_string(), game.white_player.to_string()),
-                ("Player2".to_string(), game.black_player.to_string()),
-                ("Size".to_string(), S.to_string()),
-                (
-                    "Date".to_string(),
-                    format!("{}.{:0>2}.{:0>2}", date.year(), date.month(), date.day()),
-                ),
-            ];
+        let tags = vec![
+            ("Event".to_string(), "Playtak challenge".to_string()),
+            ("Site".to_string(), "playtak.com".to_string()),
+            ("Player1".to_string(), game.white_player.to_string()),
+            ("Player2".to_string(), game.black_player.to_string()),
+            ("Size".to_string(), S.to_string()),
+            (
+                "Date".to_string(),
+                format!("{}.{:0>2}.{:0>2}", date.year(), date.month(), date.day()),
+            ),
+        ];
 
-            let game = Game {
-                start_position: <Position<S>>::start_position(),
-                moves: moves.clone(),
-                game_result: position.game_result(),
-                tags,
-            };
+        let game = Game {
+            start_position: <Position<S>>::start_position(),
+            moves: moves.clone(),
+            game_result: position.game_result(),
+            tags,
+        };
 
-            let mut ptn = Vec::new();
+        let mut ptn = Vec::new();
 
-            game.game_to_ptn(&mut ptn)?;
+        game.game_to_ptn(&mut ptn)?;
 
-            info!("{}", String::from_utf8(ptn).unwrap());
-        }
+        info!("{}", String::from_utf8(ptn).unwrap());
 
         let mut move_list = vec![];
-
         for PtnMove { mv, .. } in moves {
             move_list.push(mv.to_string::<S>());
         }
-
         info!("Move list: {}", move_list.join(" "));
 
-        self.seek_game::<S>(seek_mode, playtak_settings)
+        Ok(game)
     }
 }
 
