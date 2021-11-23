@@ -225,18 +225,22 @@ pub fn main() -> Result<()> {
             warn!("No username/password provided, logging in as guest");
             session.login_guest()?;
         }
-        let seekmode = match matches.value_of("playBot") {
-            Some(name) => SeekMode::PlayOtherBot(name.to_string()),
-            None => SeekMode::OpenSeek(parse_tc(matches.value_of("tc").unwrap())),
-        };
-
-        let (game_time, increment) = parse_tc(matches.value_of("tc").unwrap());
-
-        let result = match size {
-            4 => session.seek_playtak_games::<4>(playtak_settings, game_time, increment),
-            5 => session.seek_playtak_games::<5>(playtak_settings, game_time, increment),
-            6 => session.seek_playtak_games::<6>(playtak_settings, game_time, increment),
-            s => panic!("Unsupported size {}", s),
+        let result = match matches.value_of("playBot") {
+            Some(bot_name) => match size {
+                4 => session.accept_seek::<4>(playtak_settings, bot_name),
+                5 => session.accept_seek::<5>(playtak_settings, bot_name),
+                6 => session.accept_seek::<6>(playtak_settings, bot_name),
+                s => panic!("Unsupported size {}", s),
+            },
+            None => {
+                let (game_time, increment) = parse_tc(matches.value_of("tc").unwrap());
+                match size {
+                    4 => session.seek_playtak_games::<4>(playtak_settings, game_time, increment),
+                    5 => session.seek_playtak_games::<5>(playtak_settings, game_time, increment),
+                    6 => session.seek_playtak_games::<6>(playtak_settings, game_time, increment),
+                    s => panic!("Unsupported size {}", s),
+                }
+            }
         };
 
         match result {
@@ -275,12 +279,6 @@ struct PlaytakSession {
     // The server requires regular pings, to not kick the user
     // This thread does nothing but provide those pings
     ping_thread: Option<thread::JoinHandle<io::Result<()>>>,
-}
-
-#[derive(Debug, PartialEq, Eq)]
-enum SeekMode {
-    OpenSeek((Duration, Duration)),
-    PlayOtherBot(String),
 }
 
 #[derive(Debug, PartialEq, Eq)]
