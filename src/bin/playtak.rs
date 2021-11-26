@@ -414,12 +414,7 @@ impl PlaytakSession {
         game_time: Duration,
         increment: Duration,
     ) -> io::Result<Infallible> {
-        self.send_line(&format!(
-            "Seek {} {} {}",
-            S,
-            game_time.as_secs(),
-            increment.as_secs()
-        ))?;
+        let mut restoring_previous_session = true;
 
         loop {
             let input = self.read_line()?;
@@ -430,12 +425,35 @@ impl PlaytakSession {
             match words[0] {
                 "Game" => {
                     let playtak_game = PlaytakGame::from_playtak_game_words(&words, increment);
-                    self.play_game::<S>(playtak_game, playtak_settings)?;
+                    self.play_game::<S>(
+                        playtak_game,
+                        playtak_settings,
+                        restoring_previous_session,
+                    )?;
+                    restoring_previous_session = false;
+                    self.send_line(&format!(
+                        "Seek {} {} {}",
+                        S,
+                        game_time.as_secs(),
+                        increment.as_secs()
+                    ))?;
                 }
                 "NOK" => {
                     warn!("Received NOK from server, ignoring. This may happen if the game was aborted while we were thinking");
                 }
-                _ => debug!("Ignoring server message \"{}\"", input.trim()),
+                _ => {
+                    if restoring_previous_session {
+                        debug!("No longer restoring previous session");
+                        restoring_previous_session = false;
+                        self.send_line(&format!(
+                            "Seek {} {} {}",
+                            S,
+                            game_time.as_secs(),
+                            increment.as_secs()
+                        ))?;
+                    }
+                    debug!("Ignoring server message \"{}\"", input.trim())
+                }
             }
         }
     }
@@ -457,7 +475,7 @@ impl PlaytakSession {
             match words[0] {
                 "Game" => {
                     let playtak_game = PlaytakGame::from_playtak_game_words(&words, increment);
-                    self.play_game::<S>(playtak_game, playtak_settings)?;
+                    self.play_game::<S>(playtak_game, playtak_settings, false)?;
                     return Ok(());
                 }
 
@@ -486,6 +504,7 @@ impl PlaytakSession {
         &mut self,
         game: PlaytakGame,
         playtak_settings: PlaytakSettings,
+        mut restoring_previous_session: bool,
     ) -> io::Result<Game<Position<S>>> {
         info!(
             "Starting game #{}, {} vs {} as {}, {}+{:.1}",
@@ -503,7 +522,7 @@ impl PlaytakSession {
             if position.game_result().is_some() {
                 break;
             }
-            if position.side_to_move() == game.our_color {
+            if position.side_to_move() == game.our_color && !restoring_previous_session {
                 let (best_move, score) =
                     // On the very first move, always place instantly in a random corner
                     if squares_iterator::<S>().all(|square| position[square].is_empty()) {
@@ -600,7 +619,10 @@ impl PlaytakSession {
                     if words.is_empty() {
                         continue;
                     }
-                    if words[0] == format!("Game#{}", game.game_no) {
+                    if line.trim() == "Message Your game is resumed" {
+                        restoring_previous_session = false;
+                        break;
+                    } else if words[0] == format!("Game#{}", game.game_no) {
                         match words[1] {
                             "P" | "M" => {
                                 let move_string = words[1..].join(" ");
