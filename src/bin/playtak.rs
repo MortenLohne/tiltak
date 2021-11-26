@@ -225,13 +225,20 @@ pub fn main() -> Result<()> {
             warn!("No username/password provided, logging in as guest");
             session.login_guest()?;
         }
-        let result = match matches.value_of("playBot") {
-            Some(bot_name) => match size {
-                4 => session.accept_seek::<4>(playtak_settings, bot_name),
-                5 => session.accept_seek::<5>(playtak_settings, bot_name),
-                6 => session.accept_seek::<6>(playtak_settings, bot_name),
-                s => panic!("Unsupported size {}", s),
-            },
+
+        // Re-connect if we get disconnected from the server
+        let error = match matches.value_of("playBot") {
+            Some(bot_name) => {
+                match match size {
+                    4 => session.accept_seek::<4>(playtak_settings, bot_name),
+                    5 => session.accept_seek::<5>(playtak_settings, bot_name),
+                    6 => session.accept_seek::<6>(playtak_settings, bot_name),
+                    s => panic!("Unsupported size {}", s),
+                } {
+                    Ok(_game) => return Ok(()),
+                    Err(err) => err,
+                }
+            }
             None => {
                 let (game_time, increment) = parse_tc(matches.value_of("tc").unwrap());
                 match size {
@@ -240,20 +247,18 @@ pub fn main() -> Result<()> {
                     6 => session.seek_playtak_games::<6>(playtak_settings, game_time, increment),
                     s => panic!("Unsupported size {}", s),
                 }
+                .unwrap_err()
             }
         };
 
-        match result {
-            Err(err) => match err.kind() {
-                io::ErrorKind::ConnectionAborted | io::ErrorKind::ConnectionReset => {
-                    warn!("Server connection interrupted, caused by \"{}\". This may be due to a server restart, attempting to reconnect.", err)
-                }
-                _ => {
-                    error!("Fatal error: {}", err);
-                    return Err(err);
-                }
-            },
-            Ok(_) => unreachable!(),
+        match error.kind() {
+            io::ErrorKind::ConnectionAborted | io::ErrorKind::ConnectionReset => {
+                warn!("Server connection interrupted, caused by \"{}\". This may be due to a server restart, attempting to reconnect.", error)
+            }
+            _ => {
+                error!("Fatal error: {}", error);
+                return Err(error);
+            }
         }
     }
 }
@@ -439,11 +444,10 @@ impl PlaytakSession {
         &mut self,
         playtak_settings: PlaytakSettings,
         bot_name: &str,
-    ) -> io::Result<Infallible> {
+    ) -> io::Result<()> {
         // The server doesn't send increment when the game starts
         // We have to keep track of it ourselves, depending on the seekmode
         let mut increment = Duration::from_secs(0);
-
         loop {
             let input = self.read_line()?;
             let words: Vec<&str> = input.split_whitespace().collect();
@@ -454,6 +458,7 @@ impl PlaytakSession {
                 "Game" => {
                     let playtak_game = PlaytakGame::from_playtak_game_words(&words, increment);
                     self.play_game::<S>(playtak_game, playtak_settings)?;
+                    return Ok(());
                 }
 
                 "Seek" => {
