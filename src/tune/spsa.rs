@@ -75,6 +75,7 @@ fn tuning_iteration<R: rand::Rng, const S: usize>(
     rng: &mut R,
     opening: &[Move],
 ) -> Vec<SpsaDirection> {
+    #[allow(clippy::type_complexity)]
     let (player1_variables, player2_variables): (
         Vec<(SpsaDirection, f32)>,
         Vec<(SpsaDirection, f32)>,

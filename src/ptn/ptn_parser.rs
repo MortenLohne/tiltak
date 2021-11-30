@@ -92,6 +92,7 @@ fn parse_tag<'a>(input: &mut ParserData<'a>) -> Result<(&'a str, String), pgn_tr
     }
 }
 
+#[allow(clippy::type_complexity)]
 fn parse_moves<B: PgnPosition + Debug + Clone>(
     input: &mut ParserData,
     mut position: B,

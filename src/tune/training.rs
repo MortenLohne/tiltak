@@ -29,7 +29,7 @@ type MoveScoresForGame = Vec<Vec<MoveScore>>;
 
 pub fn train_from_scratch<const S: usize, const N: usize, const M: usize>(
     training_id: usize,
-) -> Result<(), Box<dyn error::Error + Send + Sync>> {
+) -> Result<(), DynError> {
     let mut rng = rand::rngs::StdRng::from_seed([0; 32]);
 
     let initial_value_params: [f32; N] = array_from_fn(|| rng.gen_range(-0.01..0.01));
@@ -43,7 +43,7 @@ pub fn train_perpetually<const S: usize, const N: usize, const M: usize>(
     training_id: usize,
     initial_value_params: &[f32; N],
     initial_policy_params: &[f32; M],
-) -> Result<(), Box<dyn error::Error + Send + Sync>> {
+) -> Result<(), DynError> {
     const BATCH_SIZE: usize = 100;
     // Only train from the last n batches
     const BATCHES_FOR_TRAINING: usize = 15;
@@ -256,7 +256,7 @@ impl GameStats {
 
 pub fn read_games_from_file<const S: usize>(
     file_name: &str,
-) -> Result<Vec<Game<Position<S>>>, Box<dyn error::Error + Send + Sync>> {
+) -> Result<Vec<Game<Position<S>>>, DynError> {
     let mut file = fs::File::open(file_name)?;
     let mut input = String::new();
     file.read_to_string(&mut input)?;
@@ -265,7 +265,7 @@ pub fn read_games_from_file<const S: usize>(
 
 pub fn tune_value_from_file<const S: usize, const N: usize>(
     file_name: &str,
-) -> Result<[f32; N], Box<dyn error::Error + Send + Sync>> {
+) -> Result<[f32; N], DynError> {
     let games = read_games_from_file::<S>(file_name)?;
 
     let (positions, results) = positions_and_results_from_games(games);
@@ -308,7 +308,7 @@ pub fn tune_value_and_policy<const S: usize, const N: usize, const M: usize>(
     move_scoress: &[MoveScoresForGame],
     initial_value_params: &[f32; N],
     initial_policy_params: &[f32; M],
-) -> Result<([f32; N], [f32; M]), Box<dyn error::Error + Send + Sync>> {
+) -> Result<([f32; N], [f32; M]), DynError> {
     let mut games_and_move_scoress: Vec<(&Game<Position<S>>, &MoveScoresForGame)> =
         games.iter().zip(move_scoress).collect();
 
@@ -395,7 +395,7 @@ pub fn tune_value_and_policy<const S: usize, const N: usize, const M: usize>(
 pub fn tune_value_and_policy_from_file<const S: usize, const N: usize, const M: usize>(
     value_file_name: &str,
     policy_file_name: &str,
-) -> Result<([f32; N], [f32; M]), Box<dyn error::Error + Send + Sync>> {
+) -> Result<([f32; N], [f32; M]), DynError> {
     let (games, move_scoress) =
         games_and_move_scoress_from_file::<S>(value_file_name, policy_file_name)?;
 
@@ -413,10 +413,12 @@ pub fn tune_value_and_policy_from_file<const S: usize, const N: usize, const M: 
     )
 }
 
+type DynError = Box<dyn error::Error + Send + Sync>;
+
 pub fn games_and_move_scoress_from_file<const S: usize>(
     value_file_name: &str,
     policy_file_name: &str,
-) -> Result<(Vec<Game<Position<S>>>, Vec<MoveScoresForGame>), Box<dyn error::Error + Send + Sync>> {
+) -> Result<(Vec<Game<Position<S>>>, Vec<MoveScoresForGame>), DynError> {
     let mut move_scoress = read_move_scores_from_file::<S>(policy_file_name)?;
     let mut games = read_games_from_file(value_file_name)?;
 
@@ -466,7 +468,7 @@ pub fn games_and_move_scoress_from_file<const S: usize>(
 
 pub fn read_move_scores_from_file<const S: usize>(
     file_name: &str,
-) -> Result<Vec<MoveScoresForGame>, Box<dyn error::Error + Send + Sync>> {
+) -> Result<Vec<MoveScoresForGame>, DynError> {
     let mut file = fs::File::open(file_name)?;
     let mut input = String::new();
     file.read_to_string(&mut input)?;
