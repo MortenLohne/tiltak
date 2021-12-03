@@ -3,11 +3,13 @@ use crate::position::Position;
 use crate::search;
 use crate::search::MctsSetting;
 use board_game_traits::Position as EvalPosition;
-use lambda_runtime::{error::HandlerError, Context};
+use lambda_runtime::Context;
 use std::time::Duration;
 
+type Error = Box<dyn std::error::Error + Sync + Send>;
+
 /// AWS serverside handler
-pub fn handle_aws_event(e: Event, c: Context) -> Result<Output, HandlerError> {
+pub async fn handle_aws_event(e: Event, c: Context) -> Result<Output, Error> {
     match e.size {
         4 => handle_aws_event_generic::<4>(e, c),
         5 => handle_aws_event_generic::<5>(e, c),
@@ -16,10 +18,7 @@ pub fn handle_aws_event(e: Event, c: Context) -> Result<Output, HandlerError> {
     }
 }
 
-pub fn handle_aws_event_generic<const S: usize>(
-    e: Event,
-    _c: Context,
-) -> Result<Output, HandlerError> {
+pub fn handle_aws_event_generic<const S: usize>(e: Event, _c: Context) -> Result<Output, Error> {
     let mut position = <Position<S>>::default();
     for mv in e.moves {
         position.do_move(mv);
