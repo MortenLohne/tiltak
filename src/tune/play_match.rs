@@ -52,7 +52,7 @@ pub fn play_game<const S: usize>(
             (*flat_moves.choose(&mut rng).unwrap()).clone()
         }
         // Turn off temperature in the middle-game, when all games are expected to be unique
-        else if position.half_moves_played() < 20 {
+        else if position.half_moves_played() < 10 {
             search::best_move(&mut rand::thread_rng(), temperature, &moves_scores[..])
         } else {
             search::best_move(&mut rand::thread_rng(), 0.1, &moves_scores[..])
