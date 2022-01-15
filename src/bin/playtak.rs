@@ -24,6 +24,8 @@ use tiltak::search::MctsSetting;
 
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub struct PlaytakSettings {
+    default_seek_color: Option<Color>,
+    allow_choosing_color: bool,
     fixed_nodes: Option<u64>,
     dirichlet_noise: Option<f32>,
     rollout_depth: u16,
@@ -101,6 +103,16 @@ pub fn main() -> Result<()> {
                  .takes_value(true)
                  .required(true),
         )
+        .arg(Arg::with_name("allowChoosingColor")
+            .long("allow-choosing-color")
+            .help("Allow users to change the bot's seek color through chat")
+            .takes_value(false))
+        .arg(Arg::with_name("seekColor")
+            .long("seek-color")
+            .help("Color of games to seek")
+            .takes_value(true)
+            .possible_values(&["white", "black", "either"])
+            .default_value("either"))
         .arg(Arg::with_name("policyNoise")
             .long("policy-noise")
             .help("Add dirichlet noise to the policy scores of the root node in search. This gives the bot a small amount of randomness in its play, especially on low nodecounts.")
@@ -172,6 +184,15 @@ pub fn main() -> Result<()> {
     }
 
     let size: usize = matches.value_of("size").unwrap().parse().unwrap();
+
+    let allow_choosing_color = matches.is_present("allowChoosingColor");
+    let default_seek_color = match matches.value_of("seekColor").unwrap() {
+        "white" => Some(Color::White),
+        "black" => Some(Color::Black),
+        "either" => None,
+        _ => unreachable!(),
+    };
+
     let dirichlet_noise: Option<f32> = match matches.value_of("policyNoise").unwrap() {
         "none" => None,
         "low" => Some(0.5),
@@ -191,6 +212,8 @@ pub fn main() -> Result<()> {
     let fixed_nodes: Option<u64> = matches.value_of("fixedNodes").map(|v| v.parse().unwrap());
 
     let playtak_settings = PlaytakSettings {
+        allow_choosing_color,
+        default_seek_color,
         fixed_nodes,
         dirichlet_noise,
         rollout_depth,
@@ -220,6 +243,7 @@ pub fn main() -> Result<()> {
         if let (Some(user), Some(pwd)) =
             (matches.value_of("username"), matches.value_of("password"))
         {
+            session.username = Some(user.to_string());
             session.login("Tiltak", user, pwd)?;
         } else {
             warn!("No username/password provided, logging in as guest");
@@ -300,9 +324,18 @@ impl<'a> ChatCommand<'a> {
             sender_name,
         })
     }
+
+    pub fn respond(&self, session: &mut PlaytakSession, response: &str) -> Result<()> {
+        let full_response = format!(
+            "{} {} {}",
+            self.response_command, self.sender_name, response
+        );
+        session.send_line(&full_response)
+    }
 }
 
 struct PlaytakSession {
+    username: Option<String>,
     #[cfg(feature = "aws-lambda-client")]
     aws_function_name: Option<String>,
     connection: BufStream<TcpStream>,
@@ -351,6 +384,7 @@ impl PlaytakSession {
             ping_thread_connection.flush()?;
         }));
         Ok(PlaytakSession {
+            username: None,
             #[cfg(feature = "aws-lambda-client")]
             aws_function_name: None,
             connection,
@@ -530,7 +564,7 @@ impl PlaytakSession {
         game: PlaytakGame,
         playtak_settings: PlaytakSettings,
         mut restoring_previous_session: bool,
-    ) -> io::Result<Game<Position<S>>> {
+    ) -> io::Result<(Game<Position<S>>, Option<Color>)> {
         info!(
             "Starting game #{}, {} vs {} as {}, {}+{:.1}",
             game.game_no,
@@ -540,6 +574,7 @@ impl PlaytakSession {
             game.time_left.as_secs(),
             game.increment.as_secs_f32()
         );
+        let mut next_game_color = playtak_settings.default_seek_color;
         let mut position = <Position<S>>::start_position();
         let mut moves = vec![];
         let mut our_time_left = game.time_left;
@@ -647,6 +682,34 @@ impl PlaytakSession {
                     if line.trim() == "Message Your game is resumed" {
                         restoring_previous_session = false;
                         break;
+                    } else if matches!(words[0], "Shout" | "Tell") {
+                        if let Some(chat_command) = self
+                            .username
+                            .as_ref()
+                            .and_then(|username| ChatCommand::parse_engine_command(username, &line))
+                        {
+                            if chat_command.command == "color" {
+                                next_game_color = match chat_command.argument {
+                                    Some("white") => Some(Color::White),
+                                    Some("black") => Some(Color::Black),
+                                    Some("either") => None,
+                                    s => {
+                                        chat_command.respond(
+                                            self,
+                                            &format!("Unknown color {}. Must be \"white\", \"black\" or \"either\"", s.unwrap_or_default()))?;
+                                        continue;
+                                    }
+                                };
+                                let color_string: String = next_game_color
+                                    .as_ref()
+                                    .map(ToString::to_string)
+                                    .unwrap_or_else(|| "either color".to_string());
+                                chat_command.respond(
+                                    self,
+                                    &format!("Seeking next game with {}", color_string),
+                                )?;
+                            }
+                        }
                     } else if words[0] == format!("Game#{}", game.game_no) {
                         match words[1] {
                             "P" | "M" => {
@@ -715,7 +778,7 @@ impl PlaytakSession {
         }
         info!("Move list: {}", move_list.join(" "));
 
-        Ok(game)
+        Ok((game, next_game_color))
     }
 }
 
