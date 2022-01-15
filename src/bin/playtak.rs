@@ -30,6 +30,8 @@ pub struct PlaytakSettings {
     dirichlet_noise: Option<f32>,
     rollout_depth: u16,
     rollout_temperature: f64,
+    seek_game_time: Duration,
+    seek_increment: Duration,
 }
 
 impl PlaytakSettings {
@@ -211,6 +213,8 @@ pub fn main() -> Result<()> {
 
     let fixed_nodes: Option<u64> = matches.value_of("fixedNodes").map(|v| v.parse().unwrap());
 
+    let tc = matches.value_of("tc").map(parse_tc);
+
     let playtak_settings = PlaytakSettings {
         allow_choosing_color,
         default_seek_color,
@@ -218,6 +222,8 @@ pub fn main() -> Result<()> {
         dirichlet_noise,
         rollout_depth,
         rollout_temperature,
+        seek_game_time: tc.unwrap_or_default().0,
+        seek_increment: tc.unwrap_or_default().1,
     };
 
     loop {
@@ -263,16 +269,13 @@ pub fn main() -> Result<()> {
                     Err(err) => err,
                 }
             }
-            None => {
-                let (game_time, increment) = parse_tc(matches.value_of("tc").unwrap());
-                match size {
-                    4 => session.seek_playtak_games::<4>(playtak_settings, game_time, increment),
-                    5 => session.seek_playtak_games::<5>(playtak_settings, game_time, increment),
-                    6 => session.seek_playtak_games::<6>(playtak_settings, game_time, increment),
-                    s => panic!("Unsupported size {}", s),
-                }
-                .unwrap_err()
+            None => match size {
+                4 => session.seek_playtak_games::<4>(playtak_settings),
+                5 => session.seek_playtak_games::<5>(playtak_settings),
+                6 => session.seek_playtak_games::<6>(playtak_settings),
+                s => panic!("Unsupported size {}", s),
             }
+            .unwrap_err(),
         };
 
         match error.kind() {
@@ -313,7 +316,9 @@ impl<'a> ChatCommand<'a> {
         let mut words_iterator = input.split_whitespace();
         let response_command = words_iterator.next().unwrap();
         assert!(response_command == "Tell" || response_command == "Shout");
-        let sender_name = words_iterator.next()?;
+        let raw_name = words_iterator.next()?;
+        // Strip < and > from name
+        let sender_name = &raw_name[1..raw_name.len() - 1];
         if !words_iterator.next()?.starts_with(engine_name) {
             return None;
         }
@@ -331,6 +336,33 @@ impl<'a> ChatCommand<'a> {
             self.response_command, self.sender_name, response
         );
         session.send_line(&full_response)
+    }
+
+    pub fn process_color_command(
+        &self,
+        session: &mut PlaytakSession,
+    ) -> Result<Option<Option<Color>>> {
+        let next_game_color = match self.argument {
+            Some("white") => Some(Color::White),
+            Some("black") => Some(Color::Black),
+            Some("either") => None,
+            s => {
+                self.respond(
+                    session,
+                    &format!(
+                        "Unknown color {}. Must be \"white\", \"black\" or \"either\"",
+                        s.unwrap_or_default()
+                    ),
+                )?;
+                return Ok(None);
+            }
+        };
+        let color_string: String = next_game_color
+            .as_ref()
+            .map(ToString::to_string)
+            .unwrap_or_else(|| "either color".to_string());
+        self.respond(session, &format!("Seeking next game with {}", color_string))?;
+        Ok(Some(next_game_color))
     }
 }
 
@@ -467,13 +499,30 @@ impl PlaytakSession {
         Ok(())
     }
 
+    fn send_seek<const S: usize>(
+        &mut self,
+        playtak_settings: PlaytakSettings,
+        color: Option<Color>,
+    ) -> Result<()> {
+        self.send_line(&format!(
+            "Seek {} {} {} {}",
+            S,
+            playtak_settings.seek_game_time.as_secs(),
+            playtak_settings.seek_increment.as_secs(),
+            match color {
+                Some(Color::White) => "W",
+                Some(Color::Black) => "B",
+                None => "",
+            }
+        ))
+    }
+
     fn seek_playtak_games<const S: usize>(
         &mut self,
         playtak_settings: PlaytakSettings,
-        game_time: Duration,
-        increment: Duration,
     ) -> io::Result<Infallible> {
         let mut restoring_previous_session = true;
+        let mut next_seek_color = playtak_settings.default_seek_color;
 
         loop {
             let input = self.read_line()?;
@@ -483,33 +532,49 @@ impl PlaytakSession {
             }
             match words[0] {
                 "Game" => {
-                    let playtak_game = PlaytakGame::from_playtak_game_words(&words, increment);
-                    self.play_game::<S>(
+                    let playtak_game = PlaytakGame::from_playtak_game_words(
+                        &words,
+                        playtak_settings.seek_increment,
+                    );
+                    let (_game, updated_seek_color) = self.play_game::<S>(
                         playtak_game,
                         playtak_settings,
                         restoring_previous_session,
                     )?;
+                    next_seek_color = updated_seek_color;
                     restoring_previous_session = false;
-                    self.send_line(&format!(
-                        "Seek {} {} {}",
-                        S,
-                        game_time.as_secs(),
-                        increment.as_secs()
-                    ))?;
+                    self.send_seek::<S>(playtak_settings, next_seek_color)?;
+                    next_seek_color = playtak_settings.default_seek_color;
                 }
                 "NOK" => {
                     warn!("Received NOK from server, ignoring. This may happen if the game was aborted while we were thinking");
+                }
+                "Tell" | "Shout" => {
+                    if let Some(chat_command) = self
+                        .username
+                        .as_ref()
+                        .and_then(|username| ChatCommand::parse_engine_command(username, &input))
+                    {
+                        if chat_command.command == "color" {
+                            if !playtak_settings.allow_choosing_color {
+                                chat_command.respond(self, "Cannot choose color for this bot")?
+                            } else if let Some(updated_seek_color) =
+                                chat_command.process_color_command(self)?
+                            {
+                                self.send_seek::<S>(playtak_settings, updated_seek_color)?;
+                                next_seek_color = playtak_settings.default_seek_color;
+                            }
+                        } else {
+                            chat_command.respond(self, "Unknown command")?
+                        }
+                    }
                 }
                 _ => {
                     if restoring_previous_session {
                         debug!("No longer restoring previous session");
                         restoring_previous_session = false;
-                        self.send_line(&format!(
-                            "Seek {} {} {}",
-                            S,
-                            game_time.as_secs(),
-                            increment.as_secs()
-                        ))?;
+                        self.send_seek::<S>(playtak_settings, next_seek_color)?;
+                        next_seek_color = playtak_settings.default_seek_color;
                     }
                     debug!("Ignoring server message \"{}\"", input.trim())
                 }
@@ -574,7 +639,7 @@ impl PlaytakSession {
             game.time_left.as_secs(),
             game.increment.as_secs_f32()
         );
-        let mut next_game_color = playtak_settings.default_seek_color;
+        let mut next_seek_color = playtak_settings.default_seek_color;
         let mut position = <Position<S>>::start_position();
         let mut moves = vec![];
         let mut our_time_left = game.time_left;
@@ -689,25 +754,16 @@ impl PlaytakSession {
                             .and_then(|username| ChatCommand::parse_engine_command(username, &line))
                         {
                             if chat_command.command == "color" {
-                                next_game_color = match chat_command.argument {
-                                    Some("white") => Some(Color::White),
-                                    Some("black") => Some(Color::Black),
-                                    Some("either") => None,
-                                    s => {
-                                        chat_command.respond(
-                                            self,
-                                            &format!("Unknown color {}. Must be \"white\", \"black\" or \"either\"", s.unwrap_or_default()))?;
-                                        continue;
-                                    }
-                                };
-                                let color_string: String = next_game_color
-                                    .as_ref()
-                                    .map(ToString::to_string)
-                                    .unwrap_or_else(|| "either color".to_string());
-                                chat_command.respond(
-                                    self,
-                                    &format!("Seeking next game with {}", color_string),
-                                )?;
+                                if !playtak_settings.allow_choosing_color {
+                                    chat_command
+                                        .respond(self, "Cannot choose color for this bot")?
+                                } else if let Some(updated_seek_color) =
+                                    chat_command.process_color_command(self)?
+                                {
+                                    next_seek_color = updated_seek_color;
+                                }
+                            } else {
+                                chat_command.respond(self, "Unknown command")?
                             }
                         }
                     } else if words[0] == format!("Game#{}", game.game_no) {
@@ -778,7 +834,7 @@ impl PlaytakSession {
         }
         info!("Move list: {}", move_list.join(" "));
 
-        Ok((game, next_game_color))
+        Ok((game, next_seek_color))
     }
 }
 
