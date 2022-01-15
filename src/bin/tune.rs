@@ -95,7 +95,7 @@ fn main() {
                 if !Path::new(&file_name).exists() {
                     match size {
                         4 => training::train_from_scratch::<
-                            5,
+                            4,
                             NUM_VALUE_FEATURES_4S,
                             NUM_POLICY_FEATURES_4S,
                         >(i)
