@@ -277,6 +277,31 @@ pub fn parse_tc(input: &str) -> (Duration, Duration) {
     (time, inc)
 }
 
+struct ChatCommand<'a> {
+    command: &'a str,
+    argument: Option<&'a str>,
+    response_command: &'a str,
+    sender_name: &'a str,
+}
+
+impl<'a> ChatCommand<'a> {
+    pub fn parse_engine_command(engine_name: &str, input: &'a str) -> Option<ChatCommand<'a>> {
+        let mut words_iterator = input.split_whitespace();
+        let response_command = words_iterator.next().unwrap();
+        assert!(response_command == "Tell" || response_command == "Shout");
+        let sender_name = words_iterator.next()?;
+        if !words_iterator.next()?.starts_with(engine_name) {
+            return None;
+        }
+        Some(ChatCommand {
+            command: words_iterator.next()?,
+            argument: words_iterator.next(),
+            response_command,
+            sender_name,
+        })
+    }
+}
+
 struct PlaytakSession {
     #[cfg(feature = "aws-lambda-client")]
     aws_function_name: Option<String>,
