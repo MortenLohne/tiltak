@@ -260,7 +260,9 @@ pub fn read_games_from_file<const S: usize>(
     let mut file = fs::File::open(file_name)?;
     let mut input = String::new();
     file.read_to_string(&mut input)?;
-    ptn_parser::parse_ptn(&input)
+    let games = ptn_parser::parse_ptn(&input)?;
+    println!("Read {} games from PTN", games.len());
+    Ok(games)
 }
 
 pub fn tune_value_from_file<const S: usize, const N: usize>(
@@ -500,11 +502,14 @@ pub fn read_move_scores_from_file<const S: usize>(
         }
         move_scoress.last_mut().unwrap().push(scores_for_this_move);
     }
-    // Extra empty lines may be interpreted as empty games, remove them
-    Ok(move_scoress
+    move_scoress = move_scoress
         .into_iter()
         .filter(|move_scores| !move_scores.is_empty())
-        .collect())
+        .collect();
+
+    println!("Read {} move scores from {} games", move_scoress.iter().map(Vec::len).sum::<usize>(), move_scoress.len());
+    // Extra empty lines may be interpreted as empty games, remove them
+    Ok(move_scoress)
 }
 
 pub fn positions_and_results_from_games<const S: usize>(
