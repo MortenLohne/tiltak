@@ -453,7 +453,10 @@ pub fn games_and_move_scoress_from_file<const S: usize>(
                 "Played move {} in game {} not among move scores {:?}\nGame: {:?}\nBoard:\n{:?}",
                 mv.to_string::<S>(),
                 i,
-                move_score,
+                move_score
+                    .iter()
+                    .map(|(mv, score)| format!("{}: {:.2}%", mv.to_string::<S>(), score * 100.0))
+                    .collect::<Vec<_>>(),
                 game.moves
                     .iter()
                     .map(|PtnMove { mv, .. }| mv.to_string::<S>())
@@ -497,7 +500,11 @@ pub fn read_move_scores_from_file<const S: usize>(
         }
         move_scoress.last_mut().unwrap().push(scores_for_this_move);
     }
-    Ok(move_scoress)
+    // Extra empty lines may be interpreted as empty games, remove them
+    Ok(move_scoress
+        .into_iter()
+        .filter(|move_scores| !move_scores.is_empty())
+        .collect())
 }
 
 pub fn positions_and_results_from_games<const S: usize>(
