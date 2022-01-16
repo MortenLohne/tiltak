@@ -381,7 +381,7 @@ impl<const S: usize> fmt::Debug for Position<S> {
             for print_row in 0..3 {
                 for x in 0..S {
                     for print_column in 0..3 {
-                        match self.cells[Square::from_rank_file::<S>(x as u8, y as u8)]
+                        match self.cells[Square::from_rank_file::<S>(y as u8, x as u8)]
                             .get(print_column * 3 + print_row)
                         {
                             None => write!(f, "[.]")?,
