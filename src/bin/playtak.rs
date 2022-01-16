@@ -283,7 +283,7 @@ pub fn main() -> Result<()> {
                 warn!("Server connection interrupted, caused by \"{}\". This may be due to a server restart, attempting to reconnect.", error)
             }
             _ => {
-                error!("Fatal error: {}", error);
+                error!("Fatal error of kind {:?}: {}", error.kind(), error);
                 return Err(error);
             }
         }
