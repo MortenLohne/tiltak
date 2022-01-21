@@ -38,10 +38,9 @@ pub(crate) fn static_eval_game_phase<const S: usize>(
                 let color_factor = piece.color().multiplier() as f32;
                 for piece in stack.into_iter().take(stack.height as usize - 1) {
                     if piece.color() == controlling_player {
-                        value_features.our_stack_psqt[square_symmetries::<S>()[i]] += color_factor;
+                        value_features.supports_psqt[square_symmetries::<S>()[i]] += color_factor;
                     } else {
-                        value_features.their_stack_psqt[square_symmetries::<S>()[i]] -=
-                            color_factor;
+                        value_features.captives_psqt[square_symmetries::<S>()[i]] -= color_factor;
                     }
                 }
             }
@@ -115,13 +114,13 @@ pub(crate) fn static_eval_game_phase<const S: usize>(
             if top_stone.role() == Cap
                 && stack.get(stack.len() - 2).unwrap().color() == controlling_player
             {
-                value_features.capstone_over_own_piece[0] += color_factor;
+                value_features.hard_cap[0] += color_factor;
             }
 
             match top_stone.role() {
-                Cap => value_features.capstone_on_stack[0] += color_factor,
+                Cap => value_features.cap_on_stack[0] += color_factor,
                 Flat => (),
-                Wall => value_features.standing_stone_on_stack[0] += color_factor,
+                Wall => value_features.wall_on_stack[0] += color_factor,
             }
 
             // Malus for them having stones next to our stack with flat stones on top
@@ -131,15 +130,15 @@ pub(crate) fn static_eval_game_phase<const S: usize>(
                     {
                         match neighbour_top_stone.role() {
                             Flat => {
-                                value_features.flat_stone_next_to_our_stack[0] +=
+                                value_features.flat_next_to_our_stack[0] +=
                                     color_factor * stack.len() as f32
                             }
                             Wall => {
-                                value_features.standing_stone_next_to_our_stack[0] +=
+                                value_features.wall_next_to_our_stack[0] +=
                                     color_factor * stack.len() as f32
                             }
                             Cap => {
-                                value_features.capstone_next_to_our_stack[0] +=
+                                value_features.cap_next_to_our_stack[0] +=
                                     color_factor * stack.len() as f32
                             }
                         }

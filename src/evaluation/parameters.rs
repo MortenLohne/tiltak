@@ -14,18 +14,18 @@ pub struct ValueFeatures<'a> {
     pub flat_psqt: &'a mut [f32],
     pub wall_psqt: &'a mut [f32],
     pub cap_psqt: &'a mut [f32],
-    pub our_stack_psqt: &'a mut [f32],
-    pub their_stack_psqt: &'a mut [f32],
+    pub supports_psqt: &'a mut [f32],
+    pub captives_psqt: &'a mut [f32],
     pub side_to_move: &'a mut [f32],
     pub flatstone_lead: &'a mut [f32],
     pub i_number_of_groups: &'a mut [f32],
     pub critical_squares: &'a mut [f32],
-    pub capstone_over_own_piece: &'a mut [f32],
-    pub capstone_on_stack: &'a mut [f32],
-    pub standing_stone_on_stack: &'a mut [f32],
-    pub flat_stone_next_to_our_stack: &'a mut [f32],
-    pub standing_stone_next_to_our_stack: &'a mut [f32],
-    pub capstone_next_to_our_stack: &'a mut [f32],
+    pub hard_cap: &'a mut [f32],
+    pub cap_on_stack: &'a mut [f32],
+    pub wall_on_stack: &'a mut [f32],
+    pub flat_next_to_our_stack: &'a mut [f32],
+    pub wall_next_to_our_stack: &'a mut [f32],
+    pub cap_next_to_our_stack: &'a mut [f32],
     pub num_lines_occupied: &'a mut [f32],
     pub line_control: &'a mut [f32],
     pub block_their_line: &'a mut [f32],
@@ -38,20 +38,18 @@ impl<'a> ValueFeatures<'a> {
         let (flat_psqt, coefficients) = coefficients.split_at_mut(num_square_symmetries::<S>());
         let (wall_psqt, coefficients) = coefficients.split_at_mut(num_square_symmetries::<S>());
         let (cap_psqt, coefficients) = coefficients.split_at_mut(num_square_symmetries::<S>());
-        let (our_stack_psqt, coefficients) =
-            coefficients.split_at_mut(num_square_symmetries::<S>());
-        let (their_stack_psqt, coefficients) =
-            coefficients.split_at_mut(num_square_symmetries::<S>());
+        let (supports_psqt, coefficients) = coefficients.split_at_mut(num_square_symmetries::<S>());
+        let (captives_psqt, coefficients) = coefficients.split_at_mut(num_square_symmetries::<S>());
         let (side_to_move, coefficients) = coefficients.split_at_mut(3);
         let (flatstone_lead, coefficients) = coefficients.split_at_mut(3);
         let (i_number_of_groups, coefficients) = coefficients.split_at_mut(3);
         let (critical_squares, coefficients) = coefficients.split_at_mut(6);
-        let (capstone_over_own_piece, coefficients) = coefficients.split_at_mut(1);
-        let (capstone_on_stack, coefficients) = coefficients.split_at_mut(1);
-        let (standing_stone_on_stack, coefficients) = coefficients.split_at_mut(1);
-        let (flat_stone_next_to_our_stack, coefficients) = coefficients.split_at_mut(1);
-        let (standing_stone_next_to_our_stack, coefficients) = coefficients.split_at_mut(1);
-        let (capstone_next_to_our_stack, coefficients) = coefficients.split_at_mut(1);
+        let (hard_cap, coefficients) = coefficients.split_at_mut(1);
+        let (cap_on_stack, coefficients) = coefficients.split_at_mut(1);
+        let (wall_on_stack, coefficients) = coefficients.split_at_mut(1);
+        let (flat_next_to_our_stack, coefficients) = coefficients.split_at_mut(1);
+        let (wall_next_to_our_stack, coefficients) = coefficients.split_at_mut(1);
+        let (cap_next_to_our_stack, coefficients) = coefficients.split_at_mut(1);
         let (num_lines_occupied, coefficients) = coefficients.split_at_mut(S + 1);
         let (line_control, coefficients) = coefficients.split_at_mut(S + 1);
         let (block_their_line, coefficients) = coefficients.split_at_mut(S + 1);
@@ -62,18 +60,18 @@ impl<'a> ValueFeatures<'a> {
             flat_psqt,
             wall_psqt,
             cap_psqt,
-            our_stack_psqt,
-            their_stack_psqt,
+            supports_psqt,
+            captives_psqt,
             side_to_move,
             flatstone_lead,
             i_number_of_groups,
             critical_squares,
-            capstone_over_own_piece,
-            capstone_on_stack,
-            standing_stone_on_stack,
-            flat_stone_next_to_our_stack,
-            standing_stone_next_to_our_stack,
-            capstone_next_to_our_stack,
+            hard_cap,
+            cap_on_stack,
+            wall_on_stack,
+            flat_next_to_our_stack,
+            wall_next_to_our_stack,
+            cap_next_to_our_stack,
             num_lines_occupied,
             line_control,
             block_their_line,
