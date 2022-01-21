@@ -36,8 +36,43 @@ pub(crate) fn static_eval_game_phase<const S: usize>(
             if stack.height > 1 {
                 let controlling_player = piece.color();
                 let color_factor = piece.color().multiplier() as f32;
-                for piece in stack.into_iter().take(stack.height as usize - 1) {
-                    if piece.color() == controlling_player {
+                for (stack_index, stack_piece) in stack
+                    .into_iter()
+                    .enumerate()
+                    .take(stack.height as usize - 1)
+                {
+                    // Position in the stack. Top stone is 1
+                    let depth = stack.height as usize - stack_index;
+                    let is_support = stack_piece.color() == controlling_player;
+                    let top_role_index = match piece.role() {
+                        Flat => 0,
+                        Wall => 1,
+                        Cap if stack.get(stack.height - 2).unwrap().color()
+                            == controlling_player =>
+                        {
+                            2
+                        }
+                        Cap => 3,
+                    };
+                    // Separate non-psqt bonus based on the role of the top stone,
+                    // and whether the stack piece is below the carry limit in the stack
+                    match (is_support, depth > S + 1) {
+                        (true, true) => {
+                            value_features.deep_supports_per_piece[top_role_index] += color_factor
+                        }
+                        (true, false) => {
+                            value_features.shallow_supports_per_piece[top_role_index] +=
+                                color_factor
+                        }
+                        (false, true) => {
+                            value_features.deep_captives_per_piece[top_role_index] += color_factor
+                        }
+                        (false, false) => {
+                            value_features.shallow_captives_per_piece[top_role_index] +=
+                                color_factor
+                        }
+                    }
+                    if is_support {
                         value_features.supports_psqt[square_symmetries::<S>()[i]] += color_factor;
                     } else {
                         value_features.captives_psqt[square_symmetries::<S>()[i]] -= color_factor;
@@ -109,19 +144,6 @@ pub(crate) fn static_eval_game_phase<const S: usize>(
             let top_stone = stack.top_stone().unwrap();
             let controlling_player = top_stone.color();
             let color_factor = top_stone.color().multiplier() as f32;
-
-            // Extra bonus for having your capstone over your own piece
-            if top_stone.role() == Cap
-                && stack.get(stack.len() - 2).unwrap().color() == controlling_player
-            {
-                value_features.hard_cap[0] += color_factor;
-            }
-
-            match top_stone.role() {
-                Cap => value_features.cap_on_stack[0] += color_factor,
-                Flat => (),
-                Wall => value_features.wall_on_stack[0] += color_factor,
-            }
 
             // Malus for them having stones next to our stack with flat stones on top
             for neighbour in square.neighbours::<S>() {
