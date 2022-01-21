@@ -135,6 +135,27 @@ fn flatten_our_wall_to_win_test() {
 }
 
 #[test]
+fn plus_two_fcd_move_in_endgame() {
+    // c4 f5 f2 c3 f3 f4 e4 c2 f6 Ce3 e2 b2 e4> e3> e3 c5 Cd4 d3 f1 2f3+ e5 4f4-13 d2 4f2< f2 a2 d4- e4 f4 5e2+ d4 c1 2d3< b4 b3 a4 a3 d5 f2+ e4> d3 e4 2f3+ 6e3< f3 f2 e2 f2- e3 e4> f3+ Se4 5f4-32 e4> e4 2f4< f4 3e4-12 e1 2f1+ e4 4f2+112 e3> 3f5< e4+ d5> Se4 d1 e4+ Sf2 e4 f2+ e6 6f3+222 f3 Sd5 f3+ 3f6-12 f6 c6 d6 4f4<13 e3+ d1+ 3c3+21 e3 5e5-14 4d4> 2c5- 6e4+ 5e3+ e3 6e4- a5 b3- a1
+    let move_strings = [
+        "c4", "f5", "f2", "c3", "f3", "f4", "e4", "c2", "f6", "Ce3", "e2", "b2", "e4>", "e3>",
+        "e3", "c5", "Cd4", "d3", "f1", "2f3+", "e5", "4f4-13", "d2", "4f2<", "f2", "a2", "d4-",
+        "e4", "f4", "5e2+", "d4", "c1", "2d3<", "b4", "b3", "a4", "a3", "d5", "f2+", "e4>", "d3",
+        "e4", "2f3+", "6e3<", "f3", "f2", "e2", "f2-", "e3", "e4>", "f3+", "Se4", "5f4-32", "e4>",
+        "e4", "2f4<", "f4", "3e4-12", "e1", "2f1+", "e4", "4f2+112", "e3>", "3f5<", "e4+", "d5>",
+        "Se4", "d1", "e4+", "Sf2", "e4", "f2+", "e6", "6f3+222", "f3", "Sd5", "f3+", "3f6-12",
+        "f6", "c6", "d6", "4f4<13", "e3+", "d1+", "3c3+21", "e3", "5e5-14", "4d4>", "2c5-", "6e4+",
+        "5e3+", "e3", "6e4-", "a5", "b3-", "a1",
+    ];
+
+    let mut position = <Position<6>>::start_position();
+
+    do_moves_and_check_validity(&mut position, &move_strings);
+
+    plays_correct_hard_move_property::<6>(&move_strings, &["2f5-"])
+}
+
+#[test]
 fn play_instant_road_win_test() {
     let tps = "1,2S,x,2,2,2/1,2,21,112,11121112,12S/12C,2,1121C,x,2,1/x,212211112112,x2,1,1/2,2S,x3,1/x,21S,x,2,21,2221S 2 53";
     plays_correct_move_easy_tps_property::<6>(tps, &["6e5<24"]);
