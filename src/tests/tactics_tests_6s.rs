@@ -156,6 +156,23 @@ fn plus_two_fcd_move_in_endgame() {
 }
 
 #[test]
+fn double_tak_threat_to_win() {
+    // c4 f5 f2 c3 Cc2 b3 d2 b2 e2 b1 b4 c5 c2+ b5 d3 b6 b4- Ca3 Sb4 a3> f4 a5 a4 f6 d5 e5 d4 d6 e6 e5+ f5+ f5 e5 f5+ Sc6 e4 f4< a3 d1 f5 e3 c2 e1 a2 b4+ 2b3+ a1 a6 a4+ c1 2c3+ f5< 2e4+ 2e6- d5> Sd5
+    let move_strings = [
+        "c4", "f5", "f2", "c3", "Cc2", "b3", "d2", "b2", "e2", "b1", "b4", "c5", "c2+", "b5", "d3",
+        "b6", "b4-", "Ca3", "Sb4", "a3>", "f4", "a5", "a4", "f6", "d5", "e5", "d4", "d6", "e6",
+        "e5+", "f5+", "f5", "e5", "f5+", "Sc6", "e4", "f4<", "a3", "d1", "f5", "e3", "c2", "e1",
+        "a2", "b4+", "2b3+", "a1", "a6", "a4+", "c1", "2c3+", "f5<", "2e4+", "2e6-", "d5>", "Sd5",
+    ];
+
+    let mut position = <Position<6>>::start_position();
+
+    do_moves_and_check_validity(&mut position, &move_strings);
+
+    plays_correct_hard_move_property::<6>(&move_strings, &["6e5-15"])
+}
+
+#[test]
 fn play_instant_road_win_test() {
     let tps = "1,2S,x,2,2,2/1,2,21,112,11121112,12S/12C,2,1121C,x,2,1/x,212211112112,x2,1,1/2,2S,x3,1/x,21S,x,2,21,2221S 2 53";
     plays_correct_move_easy_tps_property::<6>(tps, &["6e5<24"]);
