@@ -1,3 +1,4 @@
+use std::convert::TryFrom;
 use std::io::Read;
 use std::io::Write;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -36,20 +37,75 @@ pub fn train_from_scratch<const S: usize, const N: usize, const M: usize>(
 
     let initial_policy_params: [f32; M] = array_from_fn(|| rng.gen_range(-0.01..0.01));
 
-    train_perpetually::<S, N, M>(training_id, &initial_value_params, &initial_policy_params)
+    train_perpetually::<S, N, M>(
+        training_id,
+        &initial_value_params,
+        &initial_policy_params,
+        vec![],
+        vec![],
+        0,
+    )
+}
+
+pub fn continue_training<const S: usize, const N: usize, const M: usize>(
+    training_id: usize,
+) -> Result<(), DynError> {
+    let mut games = vec![];
+    let mut move_scores = vec![];
+    let mut batch_id = 0;
+    loop {
+        match read_games_from_file::<S>(&format!(
+            "games{}_{}s_batch{}.ptn",
+            training_id, S, batch_id
+        )) {
+            Ok(mut game_batch) => {
+                games.extend(game_batch.drain(100..));
+            }
+            Err(error) => {
+                let io_error = error.downcast::<io::Error>()?;
+                if io_error.kind() == io::ErrorKind::NotFound {
+                    break;
+                } else {
+                    return Err(io_error);
+                }
+            }
+        }
+        let mut move_scores_batch = read_move_scores_from_file::<S>(&format!(
+            "move_scores{}_{}s_batch{}.ptn",
+            training_id, S, batch_id
+        ))?;
+        move_scores.extend(move_scores_batch.drain(100..));
+        batch_id += 1;
+    }
+
+    assert_eq!(games.len(), move_scores.len());
+    println!(
+        "Resumed training with {} games and {} moves",
+        games.len(),
+        move_scores.iter().map(Vec::len).sum::<usize>()
+    );
+
+    train_perpetually::<S, N, M>(
+        training_id,
+        &<[f32; N]>::try_from(<Position<S>>::value_params())?,
+        &<[f32; M]>::try_from(<Position<S>>::policy_params())?,
+        games,
+        move_scores,
+        batch_id,
+    )
 }
 
 pub fn train_perpetually<const S: usize, const N: usize, const M: usize>(
     training_id: usize,
     initial_value_params: &[f32; N],
     initial_policy_params: &[f32; M],
+    mut all_games: Vec<Game<Position<S>>>,
+    mut all_move_scores: Vec<MoveScoresForGame>,
+    mut batch_id: usize,
 ) -> Result<(), DynError> {
-    const BATCH_SIZE: usize = 100;
+    const BATCH_SIZE: usize = 1000;
     // Only train from the last n batches
-    const BATCHES_FOR_TRAINING: usize = 100;
-
-    let mut all_games = vec![];
-    let mut all_move_scores = vec![];
+    const BATCHES_FOR_TRAINING: usize = 10;
 
     let mut last_value_params = *initial_value_params;
     let mut last_policy_params = *initial_policy_params;
@@ -57,7 +113,6 @@ pub fn train_perpetually<const S: usize, const N: usize, const M: usize>(
     let mut value_params = *initial_value_params;
     let mut policy_params = *initial_policy_params;
 
-    let mut batch_id = 0;
     let start_time = time::Instant::now();
     let mut playing_time = time::Duration::default();
     let mut tuning_time = time::Duration::default();
@@ -507,7 +562,11 @@ pub fn read_move_scores_from_file<const S: usize>(
         .filter(|move_scores| !move_scores.is_empty())
         .collect();
 
-    println!("Read {} move scores from {} games", move_scoress.iter().map(Vec::len).sum::<usize>(), move_scoress.len());
+    println!(
+        "Read {} move scores from {} games",
+        move_scoress.iter().map(Vec::len).sum::<usize>(),
+        move_scoress.len()
+    );
     // Extra empty lines may be interpreted as empty games, remove them
     Ok(move_scoress)
 }
