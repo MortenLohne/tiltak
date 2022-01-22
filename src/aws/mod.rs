@@ -1,4 +1,3 @@
-use crate::position::Move;
 use serde::Deserialize;
 use serde::Serialize;
 use std::time::Duration;
@@ -17,7 +16,8 @@ pub enum TimeControl {
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 pub struct Event {
     pub size: usize,
-    pub moves: Vec<Move>,
+    pub tps: Option<String>,
+    pub moves: Vec<String>,
     pub time_control: TimeControl,
     pub dirichlet_noise: Option<f32>,
     pub rollout_depth: u16,
@@ -26,6 +26,6 @@ pub struct Event {
 
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 pub struct Output {
-    pub pv: Vec<Move>,
+    pub pv: Vec<String>,
     pub score: f32,
 }

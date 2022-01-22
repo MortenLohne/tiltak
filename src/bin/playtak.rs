@@ -12,6 +12,7 @@ use clap::{App, Arg};
 use log::error;
 use log::{debug, info, warn};
 
+use pgn_traits::PgnPosition;
 use rand::seq::SliceRandom;
 use rand::Rng;
 #[cfg(feature = "aws-lambda-client")]
@@ -678,9 +679,10 @@ impl PlaytakSession {
                             let aws_function_name = self.aws_function_name.as_ref().unwrap();
                             let event = aws::Event {
                                 size: S,
+                                tps: None,
                                 moves: moves
                                     .iter()
-                                    .map(|PtnMove { mv, .. }: &PtnMove<Move>| mv.clone())
+                                    .map(|PtnMove { mv, .. }: &PtnMove<Move>| mv.to_string::<S>())
                                     .collect(),
                                 time_control: aws::TimeControl::Time(our_time_left, game.increment),
                                 dirichlet_noise: playtak_settings.dirichlet_noise,
@@ -689,7 +691,7 @@ impl PlaytakSession {
                             };
                             let aws::Output { pv, score } =
                                 aws::client::best_move_aws(aws_function_name, &event)?;
-                            (pv[0].clone(), score)
+                            (position.move_from_san(&pv[0]).unwrap(), score)
                         }
 
                         #[cfg(not(feature = "aws-lambda-client"))]
