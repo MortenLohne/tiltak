@@ -2,7 +2,7 @@ use crate::aws::{Event, Output, TimeControl};
 use crate::position::Position;
 use crate::search;
 use crate::search::MctsSetting;
-use board_game_traits::Position as EvalPosition;
+use board_game_traits::{GameResult, Position as EvalPosition};
 use lambda_runtime::Context;
 use pgn_traits::PgnPosition;
 use std::time::Duration;
@@ -32,6 +32,22 @@ pub fn handle_aws_event_generic<const S: usize>(e: Event, _c: Context) -> Result
             return Err(format!("Illegal {}s move {}", S, move_string).into());
         }
         position.do_move(mv);
+    }
+
+    match position.game_result() {
+        Some(GameResult::Draw) => {
+            return Ok(Output {
+                pv: vec![],
+                score: 0.5,
+            })
+        }
+        Some(GameResult::WhiteWin | GameResult::BlackWin) => {
+            return Ok(Output {
+                pv: vec![],
+                score: 1.0,
+            })
+        }
+        None => (),
     }
 
     let settings = if let Some(dirichlet) = e.dirichlet_noise {
