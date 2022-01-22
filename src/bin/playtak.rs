@@ -12,6 +12,7 @@ use clap::{App, Arg};
 use log::error;
 use log::{debug, info, warn};
 
+#[cfg(feature = "aws-lambda-client")]
 use pgn_traits::PgnPosition;
 use rand::seq::SliceRandom;
 use rand::Rng;
