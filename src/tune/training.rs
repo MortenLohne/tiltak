@@ -59,7 +59,7 @@ pub fn continue_training<const S: usize, const N: usize, const M: usize>(
             training_id, S, batch_id
         )) {
             Ok(mut game_batch) => {
-                games.extend(game_batch.drain(..));
+                games.append(&mut game_batch);
             }
             Err(error) => {
                 let io_error = error.downcast::<io::Error>()?;
@@ -74,7 +74,7 @@ pub fn continue_training<const S: usize, const N: usize, const M: usize>(
             "move_scores{}_{}s_batch{}.ptn",
             training_id, S, batch_id
         ))?;
-        move_scores.extend(move_scores_batch.drain(..));
+        move_scores.append(&mut move_scores_batch);
         batch_id += 1;
     }
 
