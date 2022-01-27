@@ -189,6 +189,26 @@ impl<const S: usize> MonteCarloTree<S> {
             .unwrap_or_else(|| panic!("Couldn't find best move"))
     }
 
+    pub fn node_edge_sizes(&self) -> (usize, usize) {
+        pub fn edge_sizes(edge: &TreeEdge) -> (usize, usize) {
+            if let Some(child) = &edge.child {
+                let (child_nodes, child_edges) = node_sizes(child);
+                (child_nodes, child_edges + 1)
+            } else {
+                (0, 1)
+            }
+        }
+        pub fn node_sizes(node: &Tree) -> (usize, usize) {
+            node.children.iter().map(edge_sizes).fold(
+                (1, 0),
+                |(acc_nodes, acc_edges), (child_nodes, child_edges)| {
+                    (acc_nodes + child_nodes, acc_edges + child_edges)
+                },
+            )
+        }
+        edge_sizes(&self.edge)
+    }
+
     fn children(&self) -> &[TreeEdge] {
         &self.edge.child.as_ref().unwrap().children
     }
