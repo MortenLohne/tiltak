@@ -4,7 +4,7 @@ use crate::evaluation::parameters::ValueFeatures;
 use crate::position::bitboard::BitBoard;
 use crate::position::color_trait::{BlackTr, ColorTr, WhiteTr};
 use crate::position::{
-    square_symmetries, squares_iterator, GroupData, Piece::*, Position, Role::*, Square,
+    square_symmetries, squares_iterator, GroupData, Piece, Piece::*, Position, Role::*, Square,
 };
 
 pub(crate) fn static_eval_game_phase<const S: usize>(
@@ -30,8 +30,14 @@ pub(crate) fn static_eval_game_phase<const S: usize>(
                 }
                 WhiteWall => value_features.wall_psqt[square_symmetries::<S>()[i]] += 1.0,
                 BlackWall => value_features.wall_psqt[square_symmetries::<S>()[i]] -= 1.0,
-                WhiteCap => value_features.cap_psqt[square_symmetries::<S>()[i]] += 1.0,
-                BlackCap => value_features.cap_psqt[square_symmetries::<S>()[i]] -= 1.0,
+                WhiteCap => {
+                    value_features.cap_psqt[square_symmetries::<S>()[i]] += 1.0;
+                    cap_activity::<WhiteTr, BlackTr, S>(position, square, value_features);
+                }
+                BlackCap => {
+                    value_features.cap_psqt[square_symmetries::<S>()[i]] -= 1.0;
+                    cap_activity::<BlackTr, WhiteTr, S>(position, square, value_features);
+                }
             }
             if stack.height > 1 {
                 let controlling_player = piece.color();
@@ -201,6 +207,45 @@ pub(crate) fn static_eval_game_phase<const S: usize>(
     value_features.num_lines_occupied[num_files_occupied_white] += 1.0;
     value_features.num_lines_occupied[num_ranks_occupied_black] -= 1.0;
     value_features.num_lines_occupied[num_files_occupied_black] -= 1.0;
+}
+
+fn cap_activity<Us: ColorTr, Them: ColorTr, const S: usize>(
+    position: &Position<S>,
+    square: Square,
+    value_features: &mut ValueFeatures,
+) {
+    let stack = position[square];
+    let height_index = stack.height.min(3) as usize - 1;
+
+    // Malus if our capstone's line towards the center is blocked
+    if square.neighbours::<S>().any(|neighbour| {
+        square_symmetries::<S>()[neighbour.0 as usize] > square_symmetries::<S>()[square.0 as usize]
+            && position[neighbour].top_stone().map(Piece::role) == Some(Cap)
+    }) {
+        value_features.sidelined_cap[height_index] += Us::color().multiplier() as f32
+    }
+
+    let is_soft_cap = stack.get(stack.height - 2).map(Them::piece_is_ours) == Some(true);
+    if square.neighbours::<S>().all(|neighbour| {
+        matches!(
+            position[neighbour].top_stone(),
+            Some(WhiteCap) | Some(BlackCap) | None
+        )
+    }) {
+        value_features.fully_isolated_cap[height_index] += Us::color().multiplier() as f32
+    } else if square.neighbours::<S>().all(|neighbour| {
+        if let Some(neighbour_top_stone) = position[neighbour].top_stone() {
+            if neighbour_top_stone == Them::wall_piece() {
+                is_soft_cap
+            } else {
+                neighbour_top_stone != Them::flat_piece()
+            }
+        } else {
+            true
+        }
+    }) {
+        value_features.semi_isolated_cap[height_index] += Us::color().multiplier() as f32
+    }
 }
 
 /// Give bonus for our critical squares
