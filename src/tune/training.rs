@@ -485,12 +485,12 @@ pub fn games_and_move_scoress_from_file<const S: usize>(
 
     match S {
         5 => {
-            move_scoress.truncate(4000);
-            games.truncate(4000);
+            move_scoress.truncate(10_000);
+            games.truncate(10_000);
         }
         6 => {
-            move_scoress.truncate(3000);
-            games.truncate(3000);
+            move_scoress.truncate(8000);
+            games.truncate(8000);
         }
         _ => (),
     }
