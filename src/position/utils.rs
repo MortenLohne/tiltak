@@ -1,9 +1,11 @@
-use std::fmt::Write;
+use std::convert::TryFrom;
+use std::fmt::{self, Write};
 use std::iter::FromIterator;
 use std::ops;
 use std::ops::{Index, IndexMut};
+use std::str::FromStr;
 
-use board_game_traits::Color;
+use board_game_traits::{Color, GameResult};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
@@ -144,6 +146,65 @@ impl Square {
 /// Iterates over all board squares.
 pub fn squares_iterator<const S: usize>() -> impl Iterator<Item = Square> {
     (0..(S * S)).map(|i| Square(i as u8))
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
+pub struct Komi {
+    half_komi: i8,
+}
+
+impl Komi {
+    fn game_result_with_flatcounts(self, white_flats: i8, black_flats: i8) -> GameResult {
+        match (2 * (white_flats - black_flats) - self.half_komi).signum() {
+            -1 => GameResult::BlackWin,
+            0 => GameResult::Draw,
+            1 => GameResult::WhiteWin,
+            _ => unreachable!(),
+        }
+    }
+}
+
+impl TryFrom<f64> for Komi {
+    type Error = String;
+
+    fn try_from(value: f64) -> Result<Self, Self::Error> {
+        if let Some((_, half_komi)) = [
+            -5.0, -4.5, -4.0, -3.5, -3.0, -2.5, -2.0, -1.5, -1.0, -0.5, 0.0, 0.5, 1.0, 1.5, 2.0,
+            2.5, 3.0, 3.5, 4.0, 4.5, 5.0,
+        ]
+        .iter()
+        .zip(-10..=10)
+        .find(|(komi, _)| **komi == value)
+        {
+            Ok(Komi { half_komi })
+        } else {
+            Err(format!("Invalid komi {}", value))
+        }
+    }
+}
+
+impl TryFrom<f32> for Komi {
+    type Error = String;
+
+    fn try_from(value: f32) -> Result<Self, Self::Error> {
+        Self::try_from(value as f64)
+    }
+}
+
+impl TryFrom<&str> for Komi {
+    type Error = String;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        f64::from_str(value)
+            .map_err(|err| err.to_string())
+            .and_then(Self::try_from)
+    }
+}
+
+impl fmt::Display for Komi {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        ((self.half_komi as f64) / 2.0).fmt(f)
+    }
 }
 
 /// One of the 3 piece roles in Tak. The same as piece, but without different variants for each color.
