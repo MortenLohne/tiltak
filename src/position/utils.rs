@@ -148,13 +148,13 @@ pub fn squares_iterator<const S: usize>() -> impl Iterator<Item = Square> {
     (0..(S * S)).map(|i| Square(i as u8))
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, Default, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Komi {
     half_komi: i8,
 }
 
 impl Komi {
-    fn game_result_with_flatcounts(self, white_flats: i8, black_flats: i8) -> GameResult {
+    pub fn game_result_with_flatcounts(self, white_flats: i8, black_flats: i8) -> GameResult {
         match (2 * (white_flats - black_flats) - self.half_komi).signum() {
             -1 => GameResult::BlackWin,
             0 => GameResult::Draw,
@@ -168,6 +168,8 @@ impl TryFrom<f64> for Komi {
     type Error = String;
 
     fn try_from(value: f64) -> Result<Self, Self::Error> {
+        // Match against a list of floats literals to convert, 
+        // to avoid any float math shenanigans
         if let Some((_, half_komi)) = [
             -5.0, -4.5, -4.0, -3.5, -3.0, -2.5, -2.0, -1.5, -1.0, -0.5, 0.0, 0.5, 1.0, 1.5, 2.0,
             2.5, 3.0, 3.5, 4.0, 4.5, 5.0,

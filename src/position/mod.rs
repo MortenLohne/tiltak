@@ -1,16 +1,15 @@
 //! Tak move generation, along with all required data types.
 
-use std::cmp::Ordering;
 use std::fmt::Write;
 use std::hash::{Hash, Hasher};
 use std::mem;
 use std::ops::{Index, IndexMut};
 use std::{fmt, ops};
 
-use board_game_traits::GameResult::{BlackWin, Draw, WhiteWin};
 use board_game_traits::{Color, GameResult};
 use board_game_traits::{EvalPosition as EvalPositionTrait, Position as PositionTrait};
 use lazy_static::lazy_static;
+use pgn_traits::PgnPosition;
 use rand::{Rng, SeedableRng};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
@@ -20,7 +19,7 @@ use color_trait::{BlackTr, WhiteTr};
 
 use utils::AbstractBoard;
 pub use utils::{
-    squares_iterator, Direction, Movement, Piece, Piece::*, Role, Role::*, Square, Stack,
+    squares_iterator, Direction, Komi, Movement, Piece, Piece::*, Role, Role::*, Square, Stack,
     StackMovement,
 };
 
@@ -314,6 +313,7 @@ pub struct Position<const S: usize> {
     black_caps_left: u8,
     half_moves_played: usize,
     moves: Vec<Move>,
+    komi: Komi,
     hash: u64,              // Zobrist hash of current position
     hash_history: Vec<u64>, // Zobrist hashes of previous board states, up to the last irreversible move. Does not include the corrent position
 }
@@ -327,6 +327,7 @@ impl<const S: usize> PartialEq for Position<S> {
             && self.white_caps_left == other.white_caps_left
             && self.black_caps_left == other.black_caps_left
             && self.half_moves_played == other.half_moves_played
+            && self.komi == other.komi
     }
 }
 
@@ -341,6 +342,7 @@ impl<const S: usize> Hash for Position<S> {
         self.white_caps_left.hash(state);
         self.black_caps_left.hash(state);
         self.half_moves_played.hash(state);
+        self.komi.hash(state);
     }
 }
 
@@ -360,18 +362,7 @@ impl<const S: usize> IndexMut<Square> for Position<S> {
 
 impl<const S: usize> Default for Position<S> {
     fn default() -> Self {
-        Position {
-            cells: Default::default(),
-            to_move: Color::White,
-            white_stones_left: starting_stones::<S>(),
-            black_stones_left: starting_stones::<S>(),
-            white_caps_left: starting_capstones::<S>(),
-            black_caps_left: starting_capstones::<S>(),
-            half_moves_played: 0,
-            moves: vec![],
-            hash: zobrist_to_move::<S>(Color::White),
-            hash_history: vec![],
-        }
+        Self::start_position_with_komi(Komi::default())
     }
 }
 
@@ -419,6 +410,28 @@ impl<const S: usize> fmt::Debug for Position<S> {
 }
 
 impl<const S: usize> Position<S> {
+    pub fn start_position_with_komi(komi: Komi) -> Self {
+        Position {
+            cells: Default::default(),
+            to_move: Color::White,
+            white_stones_left: starting_stones::<S>(),
+            black_stones_left: starting_stones::<S>(),
+            white_caps_left: starting_capstones::<S>(),
+            black_caps_left: starting_capstones::<S>(),
+            half_moves_played: 0,
+            moves: vec![],
+            komi,
+            hash: zobrist_to_move::<S>(Color::White),
+            hash_history: vec![],
+        }
+    }
+
+    pub fn from_fen_with_komi(fen: &str, komi: Komi) -> Result<Self, pgn_traits::Error> {
+        let mut position = Self::from_fen(fen)?;
+        position.komi = komi;
+        Ok(position)
+    }
+
     pub fn white_reserves_left(&self) -> u8 {
         self.white_stones_left
     }
@@ -438,6 +451,14 @@ impl<const S: usize> Position<S> {
     #[cfg(test)]
     pub fn zobrist_hash(&self) -> u64 {
         self.hash
+    }
+
+    pub fn komi(&self) -> Komi {
+        self.komi
+    }
+
+    pub fn set_komi(&mut self, komi: Komi) {
+        self.komi = komi
     }
 
     /// Number of moves/plies played in the game
@@ -707,23 +728,16 @@ impl<const S: usize> Position<S> {
 
         if (self.white_stones_left == 0 && self.white_caps_left == 0)
             || (self.black_stones_left == 0 && self.black_caps_left == 0)
-            || utils::squares_iterator::<S>().all(|square| !self[square].is_empty())
+            || group_data.all_pieces().count() as usize == S * S
         {
             // Count points
-            let mut white_points = 0;
-            let mut black_points = 0;
-            for square in utils::squares_iterator::<S>() {
-                match self[square].top_stone() {
-                    Some(WhiteFlat) => white_points += 1,
-                    Some(BlackFlat) => black_points += 1,
-                    _ => (),
-                }
-            }
-            match white_points.cmp(&black_points) {
-                Ordering::Greater => Some(WhiteWin),
-                Ordering::Less => Some(BlackWin),
-                Ordering::Equal => Some(Draw),
-            }
+            let white_points = group_data.white_road_pieces().count() as i8;
+            let black_points = group_data.black_road_pieces().count() as i8;
+
+            Some(
+                self.komi
+                    .game_result_with_flatcounts(white_points, black_points),
+            )
         } else {
             None
         }
