@@ -202,13 +202,7 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usize>(
                 Wall | Cap => our_flatcount,
             };
 
-            let our_flat_lead = our_flatcount as i8 - their_flatcount as i8;
-
-            let our_flat_lead_after_move = match *role {
-                Flat => our_flat_lead + 1,
-                Wall => our_flat_lead,
-                Cap => our_flat_lead,
-            };
+            let our_flat_lead_after_move = our_flatcount_after_move as i8 - their_flatcount as i8;
 
             // Apply special bonuses if the game ends on this move
             if Us::stones_left(position) == 1 && Us::caps_left(position) == 0
@@ -238,13 +232,36 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usize>(
             else if Them::stones_left(position) == 1 && Them::caps_left(position) == 0
                 || group_data.all_pieces().count() as usize == S * S - 2
             {
-                match our_flat_lead_after_move {
-                    n if n < 1 => policy_features.place_to_allow_opponent_to_end[0] = 1.0,
-                    1 => policy_features.place_to_allow_opponent_to_end[1] = 1.0,
-                    n if n > 1 => policy_features.place_to_allow_opponent_to_end[2] = 1.0,
-                    _ => unreachable!(),
+                if Us::color() == Color::White {
+                    match position.komi().game_result_with_flatcounts(
+                        our_flatcount_after_move as i8,
+                        their_flatcount as i8 + 1,
+                    ) {
+                        GameResult::WhiteWin => {
+                            policy_features.place_to_allow_opponent_to_end[2] = 1.0
+                        }
+                        GameResult::BlackWin => {
+                            policy_features.place_to_allow_opponent_to_end[0] = 1.0
+                        }
+                        GameResult::Draw => policy_features.place_to_allow_opponent_to_end[1] = 1.0,
+                    }
+                } else {
+                    match position.komi().game_result_with_flatcounts(
+                        their_flatcount as i8 + 1,
+                        our_flatcount_after_move as i8,
+                    ) {
+                        GameResult::WhiteWin => {
+                            policy_features.place_to_allow_opponent_to_end[0] = 1.0
+                        }
+                        GameResult::BlackWin => {
+                            policy_features.place_to_allow_opponent_to_end[2] = 1.0
+                        }
+                        GameResult::Draw => policy_features.place_to_allow_opponent_to_end[1] = 1.0,
+                    }
                 }
-            } else if Us::stones_left(position) == 2 && Us::caps_left(position) == 0 {
+            } 
+            // TODO: These two bonuses don't take komi into account, but they should
+            else if Us::stones_left(position) == 2 && Us::caps_left(position) == 0 {
                 policy_features.two_flats_left[0] = 1.0;
                 policy_features.two_flats_left[1] = our_flat_lead_after_move as f32;
             } else if Us::stones_left(position) == 3 && Us::caps_left(position) == 0 {
