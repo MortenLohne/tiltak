@@ -168,7 +168,7 @@ impl TryFrom<f64> for Komi {
     type Error = String;
 
     fn try_from(value: f64) -> Result<Self, Self::Error> {
-        // Match against a list of floats literals to convert, 
+        // Match against a list of float literals to convert,
         // to avoid any float math shenanigans
         if let Some((_, half_komi)) = [
             -5.0, -4.5, -4.0, -3.5, -3.0, -2.5, -2.0, -1.5, -1.0, -0.5, 0.0, 0.5, 1.0, 1.5, 2.0,
