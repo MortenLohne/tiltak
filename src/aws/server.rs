@@ -1,10 +1,11 @@
 use crate::aws::{Event, Output, TimeControl};
-use crate::position::Position;
+use crate::position::{Komi, Position};
 use crate::search;
 use crate::search::MctsSetting;
 use board_game_traits::{GameResult, Position as EvalPosition};
 use lambda_runtime::Context;
 use pgn_traits::PgnPosition;
+use std::convert::TryFrom;
 use std::time::Duration;
 
 type Error = Box<dyn std::error::Error + Sync + Send>;
@@ -20,9 +21,10 @@ pub async fn handle_aws_event(e: Event, c: Context) -> Result<Output, Error> {
 }
 
 pub fn handle_aws_event_generic<const S: usize>(e: Event, _c: Context) -> Result<Output, Error> {
+    let komi = Komi::try_from(e.komi)?;
     let mut position = match e.tps {
-        Some(tps) => <Position<S>>::from_fen(&tps)?,
-        None => <Position<S>>::default(),
+        Some(tps) => <Position<S>>::from_fen_with_komi(&tps, komi)?,
+        None => <Position<S>>::start_position_with_komi(komi),
     };
     for move_string in e.moves {
         let mv = position.move_from_san(&move_string)?;

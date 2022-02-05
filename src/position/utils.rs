@@ -203,9 +203,22 @@ impl TryFrom<&str> for Komi {
     }
 }
 
+impl From<Komi> for f64 {
+    fn from(komi: Komi) -> Self {
+        komi.half_komi as f64 / 2.0
+    }
+}
+
+impl From<Komi> for f32 {
+    fn from(komi: Komi) -> Self {
+        komi.half_komi as f32 / 2.0
+    }
+}
+
 impl fmt::Display for Komi {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        ((self.half_komi as f64) / 2.0).fmt(f)
+        let f64_komi: f64 = (*self).into();
+        f64_komi.fmt(f)
     }
 }
 

@@ -19,6 +19,7 @@ pub struct Event {
     pub tps: Option<String>,
     pub moves: Vec<String>,
     pub time_control: TimeControl,
+    pub komi: f64,
     pub dirichlet_noise: Option<f32>,
     pub rollout_depth: u16,
     pub rollout_temperature: f64,
