@@ -180,12 +180,12 @@ pub struct GroupData<const S: usize> {
     pub(crate) amount_in_group: Box<[(u8, GroupEdgeConnection)]>,
     pub(crate) white_critical_squares: BitBoard,
     pub(crate) black_critical_squares: BitBoard,
-    white_flat_stones: BitBoard,
-    black_flat_stones: BitBoard,
-    white_caps: BitBoard,
-    black_caps: BitBoard,
-    white_walls: BitBoard,
-    black_walls: BitBoard,
+    pub(crate) white_flat_stones: BitBoard,
+    pub(crate) black_flat_stones: BitBoard,
+    pub(crate) white_caps: BitBoard,
+    pub(crate) black_caps: BitBoard,
+    pub(crate) white_walls: BitBoard,
+    pub(crate) black_walls: BitBoard,
 }
 
 impl<const S: usize> Default for GroupData<S> {

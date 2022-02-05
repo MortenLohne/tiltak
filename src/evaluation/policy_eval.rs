@@ -1,6 +1,6 @@
 use crate::evaluation::parameters;
 use arrayvec::ArrayVec;
-use board_game_traits::{Color, Position as PositionTrait};
+use board_game_traits::{Color, GameResult, Position as PositionTrait};
 
 use crate::evaluation::parameters::PolicyFeatures;
 use crate::position::bitboard::BitBoard;
@@ -194,8 +194,15 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usize>(
 
     match mv {
         Move::Place(role, square) => {
-            let our_flat_lead =
-                Us::flats(group_data).count() as i8 - Them::flats(group_data).count() as i8;
+            let our_flatcount = Us::flats(group_data).count();
+            let their_flatcount = Them::flats(group_data).count();
+
+            let our_flatcount_after_move = match *role {
+                Flat => our_flatcount + 1,
+                Wall | Cap => our_flatcount,
+            };
+
+            let our_flat_lead = our_flatcount as i8 - their_flatcount as i8;
 
             let our_flat_lead_after_move = match *role {
                 Flat => our_flat_lead + 1,
@@ -207,11 +214,24 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usize>(
             if Us::stones_left(position) == 1 && Us::caps_left(position) == 0
                 || group_data.all_pieces().count() as usize == S * S - 1
             {
-                match our_flat_lead_after_move {
-                    n if n < 0 => policy_features.place_to_loss[0] = 1.0,
-                    0 => policy_features.place_to_draw[0] = 1.0,
-                    n if n > 0 => policy_features.place_to_win[0] = 1.0,
-                    _ => unreachable!(),
+                if Us::color() == Color::White {
+                    match position.komi().game_result_with_flatcounts(
+                        our_flatcount_after_move as i8,
+                        their_flatcount as i8,
+                    ) {
+                        GameResult::WhiteWin => policy_features.place_to_win[0] = 1.0,
+                        GameResult::BlackWin => policy_features.place_to_loss[0] = 1.0,
+                        GameResult::Draw => policy_features.place_to_draw[0] = 1.0,
+                    }
+                } else {
+                    match position.komi().game_result_with_flatcounts(
+                        their_flatcount as i8,
+                        our_flatcount_after_move as i8,
+                    ) {
+                        GameResult::WhiteWin => policy_features.place_to_loss[0] = 1.0,
+                        GameResult::BlackWin => policy_features.place_to_win[0] = 1.0,
+                        GameResult::Draw => policy_features.place_to_draw[0] = 1.0,
+                    }
                 }
             }
             // Bonuses if our opponent can finish on flats next turn
