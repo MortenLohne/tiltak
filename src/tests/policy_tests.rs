@@ -1,39 +1,27 @@
 use crate::evaluation::parameters;
 use crate::evaluation::parameters::PolicyFeatures;
 use crate::position::{Move, Position};
-use crate::search::MctsSetting;
+use crate::tests::moves_sorted_by_policy;
 use board_game_traits::Position as PositionTrait;
 use pgn_traits::PgnPosition as PgnPositionTrait;
 
 fn correct_top_policy_move_property<const S: usize>(fen: &str, correct_move_strings: &[&str]) {
     let position: Position<S> = Position::from_fen(fen).unwrap();
-    let moves: Vec<Move> = correct_move_strings
+    let correct_moves: Vec<Move> = correct_move_strings
         .iter()
         .map(|move_string| position.move_from_san(move_string).unwrap())
         .collect();
 
-    let mut simple_moves = vec![];
-    let mut legal_moves = vec![];
-    let group_data = position.group_data();
-    position.generate_moves_with_probabilities(
-        &group_data,
-        &mut simple_moves,
-        &mut legal_moves,
-        &mut vec![],
-        MctsSetting::<S>::default().policy_baseline(),
-    );
+    let policy_moves = moves_sorted_by_policy(&position);
 
-    for mv in &moves {
-        assert!(legal_moves.iter().any(|(legal_move, _)| legal_move == mv));
+    for mv in &correct_moves {
+        assert!(policy_moves.iter().any(|(legal_move, _)| legal_move == mv));
     }
 
-    let (highest_policy_move, score) = legal_moves
-        .iter()
-        .max_by_key(|(_mv, score)| (score * 1000.0) as i64)
-        .unwrap();
+    let (highest_policy_move, score) = &policy_moves[0];
 
     assert!(
-        moves.contains(highest_policy_move),
+        correct_moves.contains(highest_policy_move),
         "Expected {:?}, got {:?} with score {:.3}",
         correct_move_strings,
         highest_policy_move.to_string::<S>(),

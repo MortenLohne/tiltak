@@ -9,8 +9,8 @@ mod ptn_tests;
 mod tactics_tests_5s;
 mod tactics_tests_6s;
 
-use crate::position::Position;
-use crate::search;
+use crate::position::{Move, Position};
+use crate::search::{self, MctsSetting};
 use board_game_traits::Position as PositionTrait;
 use pgn_traits::PgnPosition;
 
@@ -29,6 +29,21 @@ fn do_moves_and_check_validity<const S: usize>(position: &mut Position<S>, move_
         position.do_move(mv);
         moves.clear();
     }
+}
+
+fn moves_sorted_by_policy<const S: usize>(position: &Position<S>) -> Vec<(Move, f32)> {
+    let mut simple_moves = vec![];
+    let mut legal_moves = vec![];
+    let group_data = position.group_data();
+    position.generate_moves_with_probabilities(
+        &group_data,
+        &mut simple_moves,
+        &mut legal_moves,
+        &mut vec![],
+        MctsSetting::<S>::default().policy_baseline(),
+    );
+    legal_moves.sort_by(|(_, score1), (_, score2)| score1.partial_cmp(score2).unwrap().reverse());
+    legal_moves
 }
 
 fn plays_correct_hard_move_property<const S: usize>(move_strings: &[&str], correct_moves: &[&str]) {
