@@ -225,7 +225,10 @@ fn cap_activity<Us: ColorTr, Them: ColorTr, const S: usize>(
         value_features.sidelined_cap[height_index] += Us::color().multiplier() as f32
     }
 
-    let is_soft_cap = stack.get(stack.height - 2).map(Them::piece_is_ours) == Some(true);
+    let is_soft_cap = stack
+        .get(stack.height.overflowing_sub(2).0)
+        .map(Them::piece_is_ours)
+        == Some(true);
     if square.neighbours::<S>().all(|neighbour| {
         matches!(
             position[neighbour].top_stone(),
