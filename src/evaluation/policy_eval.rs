@@ -259,7 +259,7 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usize>(
                         GameResult::Draw => policy_features.place_to_allow_opponent_to_end[1] = 1.0,
                     }
                 }
-            } 
+            }
             // TODO: These two bonuses don't take komi into account, but they should
             else if Us::stones_left(position) == 2 && Us::caps_left(position) == 0 {
                 policy_features.two_flats_left[0] = 1.0;
