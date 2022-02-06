@@ -552,9 +552,14 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usize>(
             let mut our_groups_affected = <ArrayVec<u8, S>>::new();
             let mut our_squares_affected = <ArrayVec<Square, S>>::new();
             let mut stack_recaptured_with = None;
+
+            // Number of squares captured by us
             let mut our_pieces = 0;
+            // Number of squares given to them
             let mut their_pieces = 0;
+            // Number of squares captured by us, that were previously held by them
             let mut their_pieces_captured = 0;
+            let mut fcd = 0;
 
             // Special case for when we spread the whole stack
             if position[*square].len() == stack_movement.get(0).pieces_to_take {
@@ -563,6 +568,7 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usize>(
                     our_squares_affected.push(*square);
                     our_groups_affected.push(group_data.groups[*square]);
                 }
+                fcd -= 1;
             }
 
             // This iterator skips the first square if we move the whole stack
@@ -570,8 +576,24 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usize>(
                 .top_stones_left_behind_by_move(*square, stack_movement)
                 .flatten()
             {
+                let destination_stack = &position[destination_square];
+
+                if let Some(captured_piece) = destination_stack.top_stone() {
+                    if captured_piece.is_road_piece() {
+                        if Us::piece_is_ours(captured_piece) {
+                            fcd -= 1;
+                        } else {
+                            fcd += 1;
+                        }
+                    }
+                }
+
                 if Us::piece_is_ours(piece) {
                     our_pieces += 1;
+                    if piece.is_road_piece() {
+                        fcd += 1;
+                    }
+
                     if Us::is_critical_square(&*group_data, destination_square)
                         && piece.is_road_piece()
                     {
@@ -591,6 +613,9 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usize>(
                     }
                 } else {
                     their_pieces += 1;
+                    if piece.is_road_piece() {
+                        fcd -= 1;
+                    }
                 }
 
                 if Us::piece_is_ours(piece) && piece.is_road_piece() {
@@ -664,7 +689,6 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usize>(
                     }
                 }
 
-                let destination_stack = &position[destination_square];
                 if let Some(destination_top_stone) = destination_stack.top_stone() {
                     // When a stack gets captured, give a linear bonus or malus depending on
                     // whether it's captured by us or them
@@ -706,6 +730,8 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usize>(
                     .go_direction::<S>(*direction)
                     .unwrap_or(destination_square);
             }
+
+            policy_features.fcd[fcd.clamp(-2, 5) as usize + 2] = 1.0;
 
             if their_pieces == 0 {
                 policy_features.stack_movement_that_gives_us_top_pieces[0] = 1.0;
