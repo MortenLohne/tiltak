@@ -1,4 +1,4 @@
-use std::convert::Infallible;
+use std::convert::{Infallible, TryInto};
 use std::io::{BufRead, Result, Write};
 use std::net::TcpStream;
 use std::str::FromStr;
@@ -18,8 +18,9 @@ use rand::seq::SliceRandom;
 use rand::Rng;
 #[cfg(feature = "aws-lambda-client")]
 use tiltak::aws;
-use tiltak::position::Position;
+use tiltak::position;
 use tiltak::position::{squares_iterator, Move, Role, Square};
+use tiltak::position::{Komi, Position};
 use tiltak::ptn::{Game, PtnMove};
 use tiltak::search;
 use tiltak::search::MctsSetting;
@@ -34,6 +35,7 @@ pub struct PlaytakSettings {
     rollout_temperature: f64,
     seek_game_time: Duration,
     seek_increment: Duration,
+    komi: Komi,
 }
 
 impl PlaytakSettings {
@@ -138,7 +140,12 @@ pub fn main() -> Result<()> {
             .long("fixed-nodes")
             .conflicts_with("aws-function-name")
             .help("Normally, the bot will search a variable number of nodes, depending on hardware on time control. This option overrides that to calculate a fixed amount of nodes each move")
-            .takes_value(true));
+            .takes_value(true))
+        .arg(Arg::with_name("komi")
+            .long("komi")
+            .help("Seek games with komi")
+            .takes_value(true)
+            .default_value("0"));
 
     if cfg!(feature = "aws-lambda-client") {
         app = app.arg(
@@ -217,6 +224,8 @@ pub fn main() -> Result<()> {
 
     let tc = matches.value_of("tc").map(parse_tc);
 
+    let komi = matches.value_of("komi").unwrap().try_into().unwrap();
+
     let playtak_settings = PlaytakSettings {
         allow_choosing_color,
         default_seek_color,
@@ -226,6 +235,7 @@ pub fn main() -> Result<()> {
         rollout_temperature,
         seek_game_time: tc.unwrap_or_default().0,
         seek_increment: tc.unwrap_or_default().1,
+        komi,
     };
 
     loop {
@@ -387,6 +397,7 @@ struct PlaytakGame<'a> {
     our_color: Color,
     time_left: Duration,
     increment: Duration,
+    komi: Komi,
 }
 
 impl<'a> PlaytakGame<'a> {
@@ -403,6 +414,10 @@ impl<'a> PlaytakGame<'a> {
             },
             time_left: Duration::from_secs(u64::from_str(words[8]).unwrap()),
             increment,
+            komi: words
+                .get(9)
+                .map(|komi_str| Komi::from_half_komi(i8::from_str(komi_str).unwrap()).unwrap())
+                .unwrap_or_default(),
         }
     }
 }
@@ -507,15 +522,18 @@ impl PlaytakSession {
         color: Option<Color>,
     ) -> Result<()> {
         self.send_line(&format!(
-            "Seek {} {} {} {}",
+            "Seek {} {} {} {} {} {} {} 0 0 ",
             S,
             playtak_settings.seek_game_time.as_secs(),
             playtak_settings.seek_increment.as_secs(),
             match color {
                 Some(Color::White) => "W",
                 Some(Color::Black) => "B",
-                None => "",
-            }
+                None => "A",
+            },
+            playtak_settings.komi.half_komi(),
+            position::starting_stones::<S>(),
+            position::starting_capstones::<S>(),
         ))
     }
 
@@ -633,16 +651,17 @@ impl PlaytakSession {
         mut restoring_previous_session: bool,
     ) -> io::Result<(Game<Position<S>>, Option<Color>)> {
         info!(
-            "Starting game #{}, {} vs {} as {}, {}+{:.1}",
+            "Starting game #{}, {} vs {} as {}, {}+{:.1}, {} komi",
             game.game_no,
             game.white_player,
             game.black_player,
             game.our_color,
             game.time_left.as_secs(),
-            game.increment.as_secs_f32()
+            game.increment.as_secs_f32(),
+            game.komi
         );
         let mut next_seek_color = playtak_settings.default_seek_color;
-        let mut position = <Position<S>>::start_position();
+        let mut position = <Position<S>>::start_position_with_komi(game.komi);
         let mut moves = vec![];
         let mut our_time_left = game.time_left;
         'gameloop: loop {

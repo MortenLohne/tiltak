@@ -154,6 +154,18 @@ pub struct Komi {
 }
 
 impl Komi {
+    pub fn from_half_komi(half_komi: i8) -> Option<Self> {
+        if half_komi >= -10 && half_komi <= 10 {
+            Some(Komi { half_komi })
+        } else {
+            None
+        }
+    }
+
+    pub fn half_komi(self) -> i8 {
+        self.half_komi
+    }
+
     pub fn game_result_with_flatcounts(self, white_flats: i8, black_flats: i8) -> GameResult {
         match (2 * (white_flats - black_flats) - self.half_komi).signum() {
             -1 => GameResult::BlackWin,
