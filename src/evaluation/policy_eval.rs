@@ -568,7 +568,9 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usize>(
                     our_squares_affected.push(*square);
                     our_groups_affected.push(group_data.groups[*square]);
                 }
-                fcd -= 1;
+                if top_stone.role() == Flat {
+                    fcd -= 1;
+                }
             }
 
             // This iterator skips the first square if we move the whole stack
@@ -579,7 +581,7 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usize>(
                 let destination_stack = &position[destination_square];
 
                 if let Some(captured_piece) = destination_stack.top_stone() {
-                    if captured_piece.is_road_piece() {
+                    if captured_piece.role() == Flat {
                         if Us::piece_is_ours(captured_piece) {
                             fcd -= 1;
                         } else {
@@ -590,7 +592,7 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usize>(
 
                 if Us::piece_is_ours(piece) {
                     our_pieces += 1;
-                    if piece.is_road_piece() {
+                    if piece.role() == Flat {
                         fcd += 1;
                     }
 
@@ -613,7 +615,7 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usize>(
                     }
                 } else {
                     their_pieces += 1;
-                    if piece.is_road_piece() {
+                    if piece.role() == Flat {
                         fcd -= 1;
                     }
                 }
