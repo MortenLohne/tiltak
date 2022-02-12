@@ -411,7 +411,7 @@ fn perft_from_tps<const S: usize>() {
 
 fn perft<const S: usize>(position: &mut Position<S>) {
     for depth in 0.. {
-        println!("{}: {}", depth, position.perft(depth));
+        println!("{}: {}", depth, position.bulk_perft(depth));
     }
 }
 
