@@ -8,6 +8,7 @@ use board_game_traits::GameResult;
 use rand::SeedableRng;
 use rayon::prelude::*;
 use std::sync::Mutex;
+use std::time::Duration;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Variable {
@@ -100,7 +101,7 @@ fn tuning_iteration<R: rand::Rng, const S: usize>(
         &player2_settings,
         opening,
         0.2,
-        &TimeControl::FixedNodes(100_000),
+        &TimeControl::Time(Duration::from_secs(60), Duration::from_millis(600)),
     );
     match game.game_result {
         Some(GameResult::WhiteWin) => player1_variables.iter().map(|(a, _)| *a).collect(),

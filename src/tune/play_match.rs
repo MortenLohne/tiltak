@@ -1,3 +1,6 @@
+use std::time::Duration;
+use std::time::Instant;
+
 use board_game_traits::{Color, Position as PositionTrait};
 use rand::seq::SliceRandom;
 
@@ -25,20 +28,48 @@ pub fn play_game<const S: usize>(
     }
     let mut rng = rand::thread_rng();
 
+    let (mut white_time_left, mut black_time_left, increment) = match time_control {
+        TimeControl::FixedNodes(_) => (Duration::MAX, Duration::MAX, Duration::ZERO),
+        TimeControl::Time(time, increment) => (*time, *time, *increment),
+    };
+
     while position.game_result().is_none() {
         let num_plies = game_moves.len();
         if num_plies > 400 {
             break;
         }
 
-        let moves_scores = match position.side_to_move() {
-            Color::White => {
+        let start_time = Instant::now();
+
+        let moves_scores = match (time_control, position.side_to_move()) {
+            (TimeControl::FixedNodes(_), Color::White) => {
                 search::mcts_training::<S>(position.clone(), time_control, white_settings.clone())
             }
-            Color::Black => {
+            (TimeControl::FixedNodes(_), Color::Black) => {
                 search::mcts_training::<S>(position.clone(), time_control, black_settings.clone())
             }
+            (TimeControl::Time(_, _), Color::White) => search::mcts_training::<S>(
+                position.clone(),
+                &TimeControl::Time(white_time_left, increment),
+                white_settings.clone(),
+            ),
+            (TimeControl::Time(_, _), Color::Black) => search::mcts_training::<S>(
+                position.clone(),
+                &TimeControl::Time(black_time_left, increment),
+                white_settings.clone(),
+            ),
         };
+
+        match position.side_to_move() {
+            Color::White => {
+                white_time_left -= start_time.elapsed();
+                white_time_left += increment;
+            }
+            Color::Black => {
+                black_time_left -= start_time.elapsed();
+                black_time_left += increment;
+            }
+        }
 
         // For white's first and second move, choose a random flatstone move
         // This reduces white's first move advantage, and prevents white from "cheesing"
