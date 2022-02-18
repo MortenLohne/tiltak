@@ -704,7 +704,7 @@ impl PlaytakSession {
                                     .iter()
                                     .map(|PtnMove { mv, .. }: &PtnMove<Move>| mv.to_string::<S>())
                                     .collect(),
-                                time_control: aws::TimeControl::Time(our_time_left, game.increment),
+                                time_control: search::TimeControl::Time(our_time_left, game.increment),
                                 komi: position.komi().into(),
                                 dirichlet_noise: playtak_settings.dirichlet_noise,
                                 rollout_depth: playtak_settings.rollout_depth,

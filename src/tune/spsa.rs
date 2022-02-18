@@ -1,5 +1,5 @@
 use crate::position::Move;
-use crate::search::MctsSetting;
+use crate::search::{MctsSetting, TimeControl};
 use crate::tune::openings::openings_from_file;
 /// Tune search variable using a version of SPSA (Simultaneous perturbation stochastic approximation),
 /// similar to [Stockfish's tuning method](https://www.chessprogramming.org/Stockfish%27s_Tuning_Method)
@@ -95,7 +95,13 @@ fn tuning_iteration<R: rand::Rng, const S: usize>(
     let player2_settings = <MctsSetting<S>>::default()
         .add_search_params(player2_variables.iter().map(|(_, a)| *a).collect());
 
-    let (game, _) = play_game::<S>(&player1_settings, &player2_settings, opening, 0.2);
+    let (game, _) = play_game::<S>(
+        &player1_settings,
+        &player2_settings,
+        opening,
+        0.2,
+        &TimeControl::FixedNodes(100_000),
+    );
     match game.game_result {
         Some(GameResult::WhiteWin) => player1_variables.iter().map(|(a, _)| *a).collect(),
         Some(GameResult::BlackWin) => player2_variables.iter().map(|(a, _)| *a).collect(),

@@ -6,6 +6,7 @@ use crate::position::Position;
 use crate::position::Role;
 use crate::ptn::{Game, PtnMove};
 use crate::search;
+use crate::search::TimeControl;
 use crate::search::{MctsSetting, Score};
 
 /// Play a single training game between two parameter sets
@@ -14,9 +15,8 @@ pub fn play_game<const S: usize>(
     black_settings: &MctsSetting<S>,
     opening: &[Move],
     temperature: f64,
+    time_control: &TimeControl,
 ) -> (Game<Position<S>>, Vec<Vec<(Move, Score)>>) {
-    const MCTS_NODES: u64 = 100_000;
-
     let mut position = Position::start_position();
     let mut game_moves = opening.to_vec();
     let mut move_scores = vec![vec![]; opening.len()];
@@ -33,10 +33,10 @@ pub fn play_game<const S: usize>(
 
         let moves_scores = match position.side_to_move() {
             Color::White => {
-                search::mcts_training::<S>(position.clone(), MCTS_NODES, white_settings.clone())
+                search::mcts_training::<S>(position.clone(), time_control, white_settings.clone())
             }
             Color::Black => {
-                search::mcts_training::<S>(position.clone(), MCTS_NODES, black_settings.clone())
+                search::mcts_training::<S>(position.clone(), time_control, black_settings.clone())
             }
         };
 

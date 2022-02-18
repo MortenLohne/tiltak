@@ -1,17 +1,12 @@
 use serde::Deserialize;
 use serde::Serialize;
-use std::time::Duration;
+
+use crate::search::TimeControl;
 
 #[cfg(feature = "aws-lambda-client")]
 pub mod client;
 #[cfg(feature = "aws-lambda-runtime")]
 pub mod server;
-
-#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
-pub enum TimeControl {
-    FixedNodes(u64),
-    Time(Duration, Duration), // Total time left, increment
-}
 
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 pub struct Event {

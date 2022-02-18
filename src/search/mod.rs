@@ -2,6 +2,8 @@
 //!
 //! This implementation does not use full Monte Carlo rollouts, relying on a heuristic evaluation when expanding new nodes instead.
 
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
 use std::{mem, time};
 
 use crate::position::Move;
@@ -15,6 +17,13 @@ use self::mcts_core::{Pv, TreeEdge};
 /// This module contains the public-facing convenience API for the search.
 /// The implementation itself in in mcts_core.
 mod mcts_core;
+
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[derive(Debug, PartialEq, Clone)]
+pub enum TimeControl {
+    FixedNodes(u64),
+    Time(time::Duration, time::Duration), // Total time left, increment
+}
 
 #[derive(Clone, PartialEq, Debug)]
 pub struct MctsSetting<const S: usize> {
@@ -166,6 +175,52 @@ impl<const S: usize> MonteCarloTree<S> {
         tree
     }
 
+    pub fn search_for_time(&mut self, max_time: time::Duration) {
+        let nodes_per_iteration = if self.settings.rollout_depth == 0 {
+            200
+        } else if self.settings.rollout_depth < 10 {
+            40
+        } else {
+            20
+        };
+
+        let start_time = time::Instant::now();
+
+        for i in 1.. {
+            for _ in 0..i * nodes_per_iteration {
+                self.select();
+            }
+
+            let (best_move, best_score) = self.best_move();
+
+            if max_time < (time::Duration::from_millis(10))
+                || start_time.elapsed() > max_time - (time::Duration::from_millis(10))
+                || self.children().len() == 1
+            {
+                return;
+            }
+
+            let mut child_refs: Vec<&TreeEdge> = self.children().iter().collect();
+            child_refs.sort_by_key(|edge| edge.visits);
+            child_refs.reverse();
+
+            let node_ratio = child_refs[1].visits as f32 / child_refs[0].visits as f32;
+            let time_ratio = start_time.elapsed().as_secs_f32() / max_time.as_secs_f32();
+
+            if time_ratio.powf(2.0) > node_ratio / 2.0 {
+                // Do not stop if any other child nodes have better action value
+                if self
+                    .children()
+                    .iter()
+                    .any(|edge| edge.mv != best_move && 1.0 - edge.mean_action_value > best_score)
+                {
+                    continue;
+                }
+                return;
+            }
+        }
+    }
+
     /// Run one iteration of MCTS
     pub fn select(&mut self) -> f32 {
         self.edge.select::<S>(
@@ -272,64 +327,32 @@ pub fn play_move_time<const S: usize>(
     max_time: time::Duration,
     settings: MctsSetting<S>,
 ) -> (Move, Score) {
-    let nodes_per_iteration = if settings.rollout_depth == 0 {
-        200
-    } else if settings.rollout_depth < 10 {
-        40
-    } else {
-        20
-    };
     let mut tree = MonteCarloTree::with_settings(board, settings);
-    let start_time = time::Instant::now();
-
-    for i in 1.. {
-        for _ in 0..i * nodes_per_iteration {
-            tree.select();
-        }
-
-        let (best_move, best_score) = tree.best_move();
-
-        if max_time < (time::Duration::from_millis(10))
-            || start_time.elapsed() > max_time - (time::Duration::from_millis(10))
-            || tree.children().len() == 1
-        {
-            return tree.best_move();
-        }
-
-        let mut child_refs: Vec<&TreeEdge> = tree.children().iter().collect();
-        child_refs.sort_by_key(|edge| edge.visits);
-        child_refs.reverse();
-
-        let node_ratio = child_refs[1].visits as f32 / child_refs[0].visits as f32;
-        let time_ratio = start_time.elapsed().as_secs_f32() / max_time.as_secs_f32();
-
-        if time_ratio.powf(2.0) > node_ratio / 2.0 {
-            // Do not stop if any other child nodes have better action value
-            if tree
-                .children()
-                .iter()
-                .any(|edge| edge.mv != best_move && 1.0 - edge.mean_action_value > best_score)
-            {
-                continue;
-            }
-            return (best_move, best_score);
-        }
-    }
-    unreachable!()
+    tree.search_for_time(max_time);
+    tree.best_move()
 }
 
 /// Run mcts with specific static evaluation parameters, for optimization the parameter set.
 /// Also applies Dirichlet noise to the root node
 pub fn mcts_training<const S: usize>(
     position: Position<S>,
-    nodes: u64,
+    time_control: &TimeControl,
     settings: MctsSetting<S>,
 ) -> Vec<(Move, Score)> {
     let mut tree = MonteCarloTree::with_settings(position, settings);
 
-    for _ in 0..nodes {
-        tree.select();
+    match time_control {
+        TimeControl::FixedNodes(nodes) => {
+            for _ in 0..*nodes {
+                tree.select();
+            }
+        }
+        TimeControl::Time(time, increment) => {
+            let max_time = *time / 5 + *increment / 2;
+            tree.search_for_time(max_time);
+        }
     }
+
     let child_visits: u64 = tree.children().iter().map(|edge| edge.visits).sum();
     tree.children()
         .iter()

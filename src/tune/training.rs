@@ -6,6 +6,7 @@ use std::time;
 use std::{error, fs, io};
 
 use crate::evaluation::parameters::PolicyFeatures;
+use crate::search::TimeControl;
 use board_game_traits::GameResult;
 use board_game_traits::Position as PositionTrait;
 use pgn_traits::PgnPosition;
@@ -260,7 +261,13 @@ fn play_game_pair<const S: usize>(
         .add_policy_params(last_policy_params.to_vec())
         .add_dirichlet(0.2);
     if i % 2 == 0 {
-        let game = play_game::<S>(&settings, &last_settings, &[], 1.0);
+        let game = play_game::<S>(
+            &settings,
+            &last_settings,
+            &[],
+            1.0,
+            &TimeControl::FixedNodes(100_000),
+        );
         match game.0.game_result {
             Some(GameResult::WhiteWin) => {
                 current_params_wins.fetch_add(1, Ordering::Relaxed);
@@ -272,7 +279,13 @@ fn play_game_pair<const S: usize>(
         };
         game
     } else {
-        let game = play_game::<S>(&last_settings, &settings, &[], 1.0);
+        let game = play_game::<S>(
+            &last_settings,
+            &settings,
+            &[],
+            1.0,
+            &TimeControl::FixedNodes(100_000),
+        );
         match game.0.game_result {
             Some(GameResult::BlackWin) => {
                 current_params_wins.fetch_add(1, Ordering::Relaxed);
