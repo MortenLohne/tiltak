@@ -101,7 +101,7 @@ fn tuning_iteration<R: rand::Rng, const S: usize>(
         &player2_settings,
         opening,
         0.2,
-        &TimeControl::Time(Duration::from_secs(60), Duration::from_millis(600)),
+        &TimeControl::Time(Duration::from_secs(20), Duration::from_millis(200)),
     );
     match game.game_result {
         Some(GameResult::WhiteWin) => player1_variables.iter().map(|(a, _)| *a).collect(),
