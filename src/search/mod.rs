@@ -41,7 +41,7 @@ impl<const S: usize> Default for MctsSetting<S> {
         MctsSetting {
             value_params: Vec::from(<Position<S>>::value_params()),
             policy_params: Vec::from(<Position<S>>::policy_params()),
-            search_params: vec![2.09, 3300.0, -0.24, 0.87, 0.05],
+            search_params: vec![2.27, 3300.0, -0.15, 0.84, 0.05],
             dirichlet: None,
             excluded_moves: vec![],
             rollout_depth: 0,
