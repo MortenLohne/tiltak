@@ -31,6 +31,9 @@ fn main() {
     println!("analyze <size>: Analyze a given position, provided from a PTN or a simple move list");
     println!("tps <size>: Analyze a given position, provided from a tps string");
     println!("game <size>: Analyze a whole game, provided from a PTN or a simple move list");
+    println!(
+        "perft <size>: Generate perft numbers of a given position, provided from a tps string"
+    );
     loop {
         let mut input = String::new();
         io::stdin().read_line(&mut input).unwrap();
@@ -63,6 +66,14 @@ fn main() {
                 Some(&"7") => analyze_position_from_tps::<7>(),
                 Some(&"8") => analyze_position_from_tps::<8>(),
                 _ => analyze_position_from_tps::<5>(),
+            },
+            "perft" => match words.get(1) {
+                Some(&"4") => perft_from_tps::<4>(),
+                Some(&"5") => perft_from_tps::<5>(),
+                Some(&"6") => perft_from_tps::<6>(),
+                Some(&"7") => perft_from_tps::<7>(),
+                Some(&"8") => perft_from_tps::<8>(),
+                _ => perft_from_tps::<5>(),
             },
             #[cfg(feature = "constant-tuning")]
             "openings" => {
@@ -381,8 +392,27 @@ fn analyze_position<const S: usize>(position: &Position<S>) {
                 start_time.elapsed().as_secs_f64()
             );
             tree.print_info();
-            println!("Best move: {:?}", tree.best_move())
+            let (mv, value) = tree.best_move();
+            println!("Best move: ({}, {})", mv.to_string::<S>(), value);
         }
+    }
+}
+
+fn perft_from_tps<const S: usize>() {
+    println!("Enter TPS (or leave empty for initial)");
+    let mut input = String::new();
+    io::stdin().read_line(&mut input).unwrap();
+    let mut position = if input.trim().is_empty() {
+        <Position<S>>::default()
+    } else {
+        <Position<S>>::from_fen(&input).unwrap()
+    };
+    perft(&mut position);
+}
+
+fn perft<const S: usize>(position: &mut Position<S>) {
+    for depth in 0.. {
+        println!("{}: {}", depth, position.bulk_perft(depth));
     }
 }
 
