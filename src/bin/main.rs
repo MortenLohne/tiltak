@@ -381,7 +381,8 @@ fn analyze_position<const S: usize>(position: &Position<S>) {
                 start_time.elapsed().as_secs_f64()
             );
             tree.print_info();
-            println!("Best move: {:?}", tree.best_move())
+            let (mv, value) = tree.best_move();
+            println!("Best move: ({}, {})", mv.to_string::<S>(), value);
         }
     }
 }
