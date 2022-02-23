@@ -869,6 +869,59 @@ impl<const S: usize> Position<S> {
             policy_baseline,
         )
     }
+
+    pub fn perft(&mut self, depth: u16) -> u64 {
+        if depth == 0 || self.game_result().is_some() {
+            1
+        } else {
+            let mut moves = vec![];
+            self.generate_moves(&mut moves);
+            moves
+                .into_iter()
+                .map(|mv| {
+                    let old_position = self.clone();
+                    let reverse_move = self.do_move(mv.clone());
+                    let num_moves = self.perft(depth - 1);
+                    self.reverse_move(reverse_move);
+                    debug_assert_eq!(
+                        *self, old_position,
+                        "Failed to restore old board after {:?} on\n{:?}",
+                        mv, old_position
+                    );
+                    num_moves
+                })
+                .sum()
+        }
+    }
+
+    pub fn bulk_perft(&mut self, depth: u16) -> u64 {
+        if depth == 0 || self.game_result().is_some() {
+            1
+        } else {
+            let mut moves = vec![];
+            self.generate_moves(&mut moves);
+
+            if depth == 1 {
+                moves.len() as u64
+            } else {
+                moves
+                    .into_iter()
+                    .map(|mv| {
+                        let old_position = self.clone();
+                        let reverse_move = self.do_move(mv.clone());
+                        let num_moves = self.bulk_perft(depth - 1);
+                        self.reverse_move(reverse_move);
+                        debug_assert_eq!(
+                            *self, old_position,
+                            "Failed to restore old board after {:?} on\n{:?}",
+                            mv, old_position
+                        );
+                        num_moves
+                    })
+                    .sum()
+            }
+        }
+    }
 }
 
 impl<const S: usize> PositionTrait for Position<S> {
