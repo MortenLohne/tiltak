@@ -12,6 +12,8 @@ use crate::position::{squares_iterator, Move};
 use crate::position::{GroupEdgeConnection, Square};
 use crate::search;
 
+const POLICY_BASELINE: f32 = 0.05;
+
 pub fn sigmoid(x: f32) -> f32 {
     1.0 / (1.0 + f32::exp(-x))
 }
@@ -29,7 +31,6 @@ impl<const S: usize> Position<S> {
         simple_moves: &mut Vec<Move>,
         moves: &mut Vec<(Move, search::Score)>,
         feature_sets: &mut Vec<Box<[f32]>>,
-        policy_baseline: search::Score,
     ) {
         let num_moves = simple_moves.len();
 
@@ -64,9 +65,9 @@ impl<const S: usize> Position<S> {
 
         let score_sum: f32 = moves.iter().map(|(_mv, score)| *score).sum();
 
-        let score_factor = (1.0 - policy_baseline) / score_sum;
+        let score_factor = (1.0 - POLICY_BASELINE) / score_sum;
         for (_mv, score) in moves.iter_mut() {
-            *score = *score * score_factor + (policy_baseline / num_moves as f32);
+            *score = *score * score_factor + (POLICY_BASELINE / num_moves as f32);
         }
     }
 

@@ -822,7 +822,6 @@ impl<const S: usize> Position<S> {
         simple_moves: &mut Vec<<Self as PositionTrait>::Move>,
         moves: &mut Vec<(<Self as PositionTrait>::Move, f32)>,
         features: &mut Vec<Box<[f32]>>,
-        policy_baseline: f32,
     ) {
         debug_assert!(simple_moves.is_empty());
         self.generate_moves(simple_moves);
@@ -833,7 +832,6 @@ impl<const S: usize> Position<S> {
                 simple_moves,
                 moves,
                 features,
-                policy_baseline,
             ),
             Color::Black => self.generate_moves_with_probabilities_colortr::<BlackTr, WhiteTr>(
                 params,
@@ -841,7 +839,6 @@ impl<const S: usize> Position<S> {
                 simple_moves,
                 moves,
                 features,
-                policy_baseline,
             ),
         }
     }
@@ -858,7 +855,6 @@ impl<const S: usize> Position<S> {
         simple_moves: &mut Vec<Move>,
         moves: &mut Vec<(Move, search::Score)>,
         features: &mut Vec<Box<[f32]>>,
-        policy_baseline: search::Score,
     ) {
         self.generate_moves_with_params(
             Self::policy_params(),
@@ -866,7 +862,6 @@ impl<const S: usize> Position<S> {
             simple_moves,
             moves,
             features,
-            policy_baseline,
         )
     }
 

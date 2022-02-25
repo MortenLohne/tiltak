@@ -353,7 +353,6 @@ fn analyze_position<const S: usize>(position: &Position<S>) {
         &mut simple_moves,
         &mut moves,
         &mut vec![],
-        search::MctsSetting::<S>::default().policy_baseline(),
     );
     moves.sort_by(|(_mv, score1), (_, score2)| score1.partial_cmp(score2).unwrap().reverse());
 

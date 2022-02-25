@@ -86,13 +86,7 @@ impl TreeEdge {
             // Only generate child moves on the 2nd visit
             if self.visits == 1 {
                 let group_data = position.group_data();
-                node.init_children(
-                    position,
-                    self.mean_action_value,
-                    &group_data,
-                    settings,
-                    temp_vectors,
-                );
+                node.init_children(position, &group_data, settings, temp_vectors);
             }
 
             let visits_sqrt = (self.visits as Score).sqrt();
@@ -167,7 +161,6 @@ impl Tree {
     fn init_children<const S: usize>(
         &mut self,
         position: &Position<S>,
-        mean_action_value: Score,
         group_data: &GroupData<S>,
         settings: &MctsSetting<S>,
         temp_vectors: &mut TempVectors,
@@ -178,21 +171,16 @@ impl Tree {
             &mut temp_vectors.simple_moves,
             &mut temp_vectors.moves,
             &mut temp_vectors.policy_score_sets,
-            settings.policy_baseline(),
         );
         let mut children_vec = Vec::with_capacity(temp_vectors.moves.len());
         let policy_sum: f32 = temp_vectors.moves.iter().map(|(_, score)| *score).sum();
         let inv_sum = 1.0 / policy_sum;
-        
-        let child_mean_action_value = Score::min(
-            1.0 - mean_action_value - settings.initial_mean_action_value(),
-            settings.max_initial_mean_action_value(),
-        );
+
         for (mv, heuristic_score) in temp_vectors.moves.drain(..) {
             children_vec.push(TreeEdge::new(
                 mv.clone(),
                 heuristic_score * inv_sum,
-                child_mean_action_value,
+                settings.initial_mean_action_value(),
             ));
         }
         self.children = children_vec.into_boxed_slice();
@@ -264,7 +252,6 @@ pub fn rollout<const S: usize>(
             &mut temp_vectors.simple_moves,
             &mut temp_vectors.moves,
             &mut temp_vectors.policy_score_sets,
-            settings.policy_baseline(),
         );
 
         let mut rng = rand::thread_rng();
