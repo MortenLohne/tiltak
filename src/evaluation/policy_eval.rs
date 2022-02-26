@@ -734,7 +734,7 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usize>(
                     .unwrap_or(destination_square);
             }
 
-            policy_features.fcd[fcd.clamp(-2, 5) as usize + 2] = 1.0;
+            policy_features.fcd[(fcd.clamp(-2, 5) + 2) as usize] = 1.0;
 
             if their_pieces == 0 {
                 policy_features.stack_movement_that_gives_us_top_pieces[0] = 1.0;
