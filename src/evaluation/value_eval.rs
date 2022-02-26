@@ -4,7 +4,8 @@ use crate::evaluation::parameters::ValueFeatures;
 use crate::position::bitboard::BitBoard;
 use crate::position::color_trait::{BlackTr, ColorTr, WhiteTr};
 use crate::position::{
-    square_symmetries, squares_iterator, GroupData, Piece, Piece::*, Position, Role::*, Square,
+    line_symmetries, square_symmetries, squares_iterator, GroupData, Piece, Piece::*, Position,
+    Role::*, Square,
 };
 
 pub(crate) fn static_eval_game_phase<const S: usize>(
@@ -180,9 +181,13 @@ pub(crate) fn static_eval_game_phase<const S: usize>(
     let mut num_ranks_occupied_black = 0;
     let mut num_files_occupied_black = 0;
 
-    for line in BitBoard::all_lines::<S>().iter() {
-        line_score::<WhiteTr, BlackTr, S>(group_data, *line, value_features);
-        line_score::<BlackTr, WhiteTr, S>(group_data, *line, value_features);
+    for i in 0..(S as u8) {
+        let rank = BitBoard::full().rank::<S>(i);
+        let file = BitBoard::full().file::<S>(i);
+        line_score::<WhiteTr, BlackTr, S>(group_data, rank, i, value_features);
+        line_score::<BlackTr, WhiteTr, S>(group_data, rank, i, value_features);
+        line_score::<WhiteTr, BlackTr, S>(group_data, file, i, value_features);
+        line_score::<BlackTr, WhiteTr, S>(group_data, file, i, value_features);
     }
 
     for i in 0..S as u8 {
@@ -287,19 +292,17 @@ fn critical_squares_eval<Us: ColorTr, Them: ColorTr, const S: usize>(
 fn line_score<Us: ColorTr, Them: ColorTr, const S: usize>(
     group_data: &GroupData<S>,
     line: BitBoard,
+    i: u8,
     value_features: &mut ValueFeatures,
 ) {
-    let road_pieces_in_line = (Us::road_stones(group_data) & line).count();
+    let road_pieces_in_line = (Us::road_stones(group_data) & line).count() as usize;
+    let index = road_pieces_in_line + line_symmetries::<S>()[i as usize] * S;
 
-    value_features.line_control[road_pieces_in_line as usize] += Us::color().multiplier() as f32;
-
-    // Bonus for blocking their lines
-    if road_pieces_in_line >= 3 {
-        value_features.block_their_line[road_pieces_in_line as usize - 3] +=
-            ((Them::flats(group_data) & line).count() as isize * Them::color().multiplier()) as f32;
-        value_features.block_their_line[2 + road_pieces_in_line as usize - 3] +=
-            ((Them::walls(group_data) & line).count() as isize * Them::color().multiplier()) as f32;
-        value_features.block_their_line[4 + road_pieces_in_line as usize - 3] +=
-            ((Them::caps(group_data) & line).count() as isize * Them::color().multiplier()) as f32;
+    if !(Them::blocking_stones(group_data) & line).is_empty() {
+        value_features.line_control_their_blocking_piece[index] += Us::color().multiplier() as f32;
+    } else if !((Us::walls(group_data) | Them::flats(group_data)) & line).is_empty() {
+        value_features.line_control_other[index] += Us::color().multiplier() as f32;
+    } else {
+        value_features.line_control_empty[index] += Us::color().multiplier() as f32;
     }
 }

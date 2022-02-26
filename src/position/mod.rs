@@ -95,6 +95,24 @@ pub(crate) const fn square_symmetries<const S: usize>() -> &'static [usize] {
     }
 }
 
+pub(crate) const fn num_line_symmetries<const S: usize>() -> usize {
+    match S {
+        4 => 2,
+        5 => 3,
+        6 => 3,
+        _ => 0,
+    }
+}
+
+pub(crate) const fn line_symmetries<const S: usize>() -> &'static [usize] {
+    match S {
+        4 => &[0, 1, 1, 0],
+        5 => &[0, 1, 2, 1, 0],
+        6 => &[0, 1, 2, 2, 1, 0],
+        _ => &[],
+    }
+}
+
 #[derive(Default, Clone, Copy, PartialEq, Eq, Debug)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct GroupEdgeConnection {

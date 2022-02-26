@@ -59,16 +59,6 @@ impl BitBoard {
         }
     }
 
-    pub fn all_lines<const S: usize>() -> Vec<Self> {
-        let mut result = Vec::with_capacity(S * 2);
-        let full = BitBoard::full();
-        for i in 0..S {
-            result.push(full.rank::<S>(i as u8));
-            result.push(full.file::<S>(i as u8));
-        }
-        result
-    }
-
     pub fn lines_for_square<const S: usize>(square: Square) -> [Self; 2] {
         [
             Self::full().rank::<S>(square.rank::<S>()),
