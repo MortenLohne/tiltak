@@ -1,4 +1,4 @@
-use std::convert::{Infallible, TryInto};
+use std::convert::Infallible;
 use std::io::{BufRead, Result, Write};
 use std::net::TcpStream;
 use std::str::FromStr;
@@ -224,7 +224,7 @@ pub fn main() -> Result<()> {
 
     let tc = matches.value_of("tc").map(parse_tc);
 
-    let komi = matches.value_of("komi").unwrap().try_into().unwrap();
+    let komi = matches.value_of("komi").unwrap().parse().unwrap();
 
     let playtak_settings = PlaytakSettings {
         allow_choosing_color,

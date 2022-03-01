@@ -205,10 +205,10 @@ impl TryFrom<f32> for Komi {
     }
 }
 
-impl TryFrom<&str> for Komi {
-    type Error = String;
+impl FromStr for Komi {
+    type Err = String;
 
-    fn try_from(value: &str) -> Result<Self, Self::Error> {
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
         f64::from_str(value)
             .map_err(|err| err.to_string())
             .and_then(Self::try_from)
