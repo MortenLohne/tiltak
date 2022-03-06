@@ -82,6 +82,7 @@ impl<B: PgnPosition + Clone> Game<B> {
             }
 
             if i == self.moves.len() - 1 {
+                buffer.push(' ');
                 buffer.push_str(self.game_result_str.unwrap_or("*"));
             }
 

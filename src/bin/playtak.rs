@@ -835,6 +835,7 @@ impl PlaytakSession {
                 "Date".to_string(),
                 format!("{}.{:0>2}.{:0>2}", date.year(), date.month(), date.day()),
             ),
+            ("Komi".to_string(), position.komi().to_string()),
         ];
 
         let game = Game {
