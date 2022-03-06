@@ -413,8 +413,14 @@ fn perft_from_tps<const S: usize>() {
 }
 
 fn perft<const S: usize>(position: &mut Position<S>) {
+    let start_time = time::Instant::now();
     for depth in 0.. {
-        println!("{}: {}", depth, position.bulk_perft(depth));
+        println!(
+            "{}: {}, {:.2}s",
+            depth,
+            position.bulk_perft(depth),
+            start_time.elapsed().as_secs_f32()
+        );
     }
 }
 
