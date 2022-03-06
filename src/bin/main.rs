@@ -36,7 +36,10 @@ fn main() {
     );
     loop {
         let mut input = String::new();
-        io::stdin().read_line(&mut input).unwrap();
+        let bytes_read = io::stdin().read_line(&mut input).unwrap();
+        if bytes_read == 0 {
+            break;
+        }
         let words = input.split_whitespace().collect::<Vec<_>>();
         if words.is_empty() {
             continue;
