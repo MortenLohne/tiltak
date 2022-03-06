@@ -320,6 +320,11 @@ impl<const S: usize> ZobristKeys<S> {
     }
 }
 
+#[derive(Clone, Copy, Default, PartialEq, Eq, Debug)]
+pub struct Settings {
+    pub komi: Komi,
+}
+
 /// Complete representation of a Tak position
 #[derive(Clone)]
 pub struct Position<const S: usize> {
@@ -940,9 +945,10 @@ impl<const S: usize> Position<S> {
 impl<const S: usize> PositionTrait for Position<S> {
     type Move = Move;
     type ReverseMove = ReverseMove;
+    type Settings = Settings;
 
-    fn start_position() -> Self {
-        Self::default()
+    fn start_position_with_settings(settings: &Self::Settings) -> Self {
+        Self::start_position_with_komi(settings.komi)
     }
 
     fn side_to_move(&self) -> Color {
@@ -957,18 +963,16 @@ impl<const S: usize> PositionTrait for Position<S> {
     /// * Capstones are not counted towards a flat win, but all capstones must also be placed to trigger a flat win.
     ///
     /// * A game is considered a draw after a three-fold repetition of the same position.
-    fn generate_moves(&self, moves: &mut Vec<Self::Move>) {
+    fn generate_moves<E: Extend<Self::Move>>(&self, moves: &mut E) {
         match self.half_moves_played() {
-            0 | 1 => {
-                for square in utils::squares_iterator::<S>() {
-                    if self[square].is_empty() {
-                        moves.push(Move::Place(Flat, square));
-                    }
-                }
-            }
+            0 | 1 => moves.extend(
+                utils::squares_iterator::<S>()
+                    .filter(|square| self[*square].is_empty())
+                    .map(|square| Move::Place(Flat, square)),
+            ),
             _ => match self.side_to_move() {
-                Color::White => self.generate_moves_colortr::<WhiteTr, BlackTr>(moves),
-                Color::Black => self.generate_moves_colortr::<BlackTr, WhiteTr>(moves),
+                Color::White => self.generate_moves_colortr::<E, WhiteTr, BlackTr>(moves),
+                Color::Black => self.generate_moves_colortr::<E, BlackTr, WhiteTr>(moves),
             },
         }
     }
@@ -1209,7 +1213,10 @@ impl<const S: usize> pgn_traits::PgnPosition for Position<S> {
 
     const POSSIBLE_MOVE_ANNOTATIONS: &'static [&'static str] = &["''", "'", "*", "!", "?"];
 
-    fn from_fen(fen: &str) -> Result<Self, pgn_traits::Error> {
+    fn from_fen_with_settings(
+        fen: &str,
+        settings: &Self::Settings,
+    ) -> Result<Self, pgn_traits::Error> {
         let fen_words: Vec<&str> = fen.split_whitespace().collect();
 
         if fen_words.len() < 3 {
@@ -1246,7 +1253,7 @@ impl<const S: usize> pgn_traits::PgnPosition for Position<S> {
                     e,
                 )
             })?;
-        let mut position = Position::default();
+        let mut position = Position::start_position_with_settings(settings);
         for square in utils::squares_iterator::<S>() {
             let (file, rank) = (square.file::<S>(), square.rank::<S>());
             let stack = rows[rank as usize][file as usize];

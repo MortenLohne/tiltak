@@ -25,8 +25,8 @@ name = "tune"
 required-features = ["constant-tuning"]
 
 [dependencies]
-board-game-traits = "0.2"
-pgn-traits = "0.2.2"
+board-game-traits = { git = "https://github.com/MortenLohne/board-game-traits", branch = "f-settings-type" }
+pgn-traits = { git = "https://github.com/MortenLohne/pgn-traits", branch = "f-settings-type" }
 arrayvec = "0.7"
 rand = "0.8"
 rayon = { version = "1.5", optional = true }

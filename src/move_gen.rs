@@ -3,21 +3,27 @@ use crate::position::Move;
 use crate::position::{
     squares_iterator, Direction, Movement, Piece, Position, Role::*, Square, StackMovement,
 };
+use board_game_traits::Position as PositionTrait;
+use std::iter;
 
 impl<const S: usize> Position<S> {
-    pub(crate) fn generate_moves_colortr<Us: ColorTr, Them: ColorTr>(
+    pub(crate) fn generate_moves_colortr<
+        E: Extend<<Self as PositionTrait>::Move>,
+        Us: ColorTr,
+        Them: ColorTr,
+    >(
         &self,
-        moves: &mut Vec<<Position<S> as board_game_traits::Position>::Move>,
+        moves: &mut E,
     ) {
         for square in squares_iterator::<S>() {
             match self[square].top_stone() {
                 None => {
                     if Us::stones_left(self) > 0 {
-                        moves.push(Move::Place(Flat, square));
-                        moves.push(Move::Place(Wall, square));
+                        moves.extend(iter::once(Move::Place(Flat, square)));
+                        moves.extend(iter::once(Move::Place(Wall, square)));
                     }
                     if Us::caps_left(self) > 0 {
-                        moves.push(Move::Place(Cap, square));
+                        moves.extend(iter::once(Move::Place(Cap, square)));
                     }
                 }
                 Some(piece) if Us::piece_is_ours(piece) => {
@@ -44,7 +50,7 @@ impl<const S: usize> Position<S> {
                         }
                         for movements in movements.into_iter().filter(|mv| !mv.is_empty()) {
                             let mv = Move::Move(square, direction, movements);
-                            moves.push(mv);
+                            moves.extend(iter::once(mv));
                         }
                     }
                 }
