@@ -325,6 +325,36 @@ pub struct Settings {
     pub komi: Komi,
 }
 
+enum DetailedGameResult {
+    WhiteRoadWin,
+    BlackRoadWin,
+    WhiteFlatWin,
+    BlackFlatWin,
+    Draw,
+}
+
+impl DetailedGameResult {
+    fn game_result(&self) -> GameResult {
+        match self {
+            DetailedGameResult::WhiteRoadWin => GameResult::WhiteWin,
+            DetailedGameResult::BlackRoadWin => GameResult::BlackWin,
+            DetailedGameResult::WhiteFlatWin => GameResult::WhiteWin,
+            DetailedGameResult::BlackFlatWin => GameResult::BlackWin,
+            DetailedGameResult::Draw => GameResult::Draw,
+        }
+    }
+
+    fn result_str(&self) -> &'static str {
+        match self {
+            DetailedGameResult::WhiteRoadWin => "R-0",
+            DetailedGameResult::BlackRoadWin => "0-R",
+            DetailedGameResult::WhiteFlatWin => "F-0",
+            DetailedGameResult::BlackFlatWin => "0-F",
+            DetailedGameResult::Draw => "1/2-1/2",
+        }
+    }
+}
+
 /// Complete representation of a Tak position
 #[derive(Clone)]
 pub struct Position<const S: usize> {
@@ -711,6 +741,11 @@ impl<const S: usize> Position<S> {
         &self,
         group_data: &GroupData<S>,
     ) -> Option<GameResult> {
+        self.detailed_game_result(group_data)
+            .map(|result| result.game_result())
+    }
+
+    fn detailed_game_result(&self, group_data: &GroupData<S>) -> Option<DetailedGameResult> {
         let repetitions = self
             .hash_history
             .iter()
@@ -718,7 +753,7 @@ impl<const S: usize> Position<S> {
             .count();
 
         if repetitions >= 2 {
-            return Some(GameResult::Draw);
+            return Some(DetailedGameResult::Draw);
         }
 
         if group_data
@@ -738,9 +773,9 @@ impl<const S: usize> Position<S> {
             if let Some(square) = self.is_win_by_road(&group_data.groups, highest_component_id) {
                 debug_assert!(self[square].top_stone().unwrap().is_road_piece());
                 return if self[square].top_stone().unwrap().color() == Color::White {
-                    Some(GameResult::WhiteWin)
+                    Some(DetailedGameResult::WhiteRoadWin)
                 } else {
-                    Some(GameResult::BlackWin)
+                    Some(DetailedGameResult::BlackRoadWin)
                 };
             };
             unreachable!(
@@ -757,10 +792,14 @@ impl<const S: usize> Position<S> {
             let white_points = group_data.white_road_pieces().count() as i8;
             let black_points = group_data.black_road_pieces().count() as i8;
 
-            Some(
-                self.komi
-                    .game_result_with_flatcounts(white_points, black_points),
-            )
+            let result = self
+                .komi
+                .game_result_with_flatcounts(white_points, black_points);
+            Some(match result {
+                GameResult::WhiteWin => DetailedGameResult::WhiteFlatWin,
+                GameResult::BlackWin => DetailedGameResult::BlackFlatWin,
+                GameResult::Draw => DetailedGameResult::Draw,
+            })
         } else {
             None
         }
@@ -1212,6 +1251,11 @@ impl<const S: usize> pgn_traits::PgnPosition for Position<S> {
     ];
 
     const POSSIBLE_MOVE_ANNOTATIONS: &'static [&'static str] = &["''", "'", "*", "!", "?"];
+
+    fn pgn_game_result(&self) -> Option<&'static str> {
+        let group_data = self.group_data();
+        self.detailed_game_result(&group_data).map(|result| result.result_str())
+    }
 
     fn from_fen_with_settings(
         fen: &str,
