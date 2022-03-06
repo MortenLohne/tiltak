@@ -2,6 +2,8 @@ use std::time::Duration;
 use std::time::Instant;
 
 use board_game_traits::{Color, Position as PositionTrait};
+use chrono::Datelike;
+use pgn_traits::PgnPosition;
 use rand::seq::SliceRandom;
 
 use crate::position::Move;
@@ -92,6 +94,21 @@ pub fn play_game<const S: usize>(
         game_moves.push(best_move);
         move_scores.push(moves_scores);
     }
+
+    let date = chrono::Local::today();
+
+    let tags = vec![
+            ("Event".to_string(), "Tiltak training".to_string()),
+            ("Site".to_string(), "Tiltak".to_string()),
+            ("Player1".to_string(), "Tiltak".to_string()),
+            ("Player2".to_string(), "Tiltak".to_string()),
+            ("Size".to_string(), S.to_string()),
+            (
+                "Date".to_string(),
+                format!("{}.{:0>2}.{:0>2}", date.year(), date.month(), date.day()),
+            ),
+        ];
+
     (
         Game {
             start_position: Position::default(),
@@ -103,8 +120,8 @@ pub fn play_game<const S: usize>(
                     comment: String::new(),
                 })
                 .collect::<Vec<_>>(),
-            game_result: position.game_result(),
-            tags: vec![],
+            game_result_str: position.pgn_game_result(),
+            tags,
         },
         move_scores,
     )

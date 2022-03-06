@@ -11,9 +11,8 @@ use chrono::{Datelike, Local};
 use clap::{App, Arg};
 use log::error;
 use log::{debug, info, warn};
-
-#[cfg(feature = "aws-lambda-client")]
 use pgn_traits::PgnPosition;
+
 use rand::seq::SliceRandom;
 use rand::Rng;
 #[cfg(feature = "aws-lambda-client")]
@@ -841,7 +840,7 @@ impl PlaytakSession {
         let game = Game {
             start_position: <Position<S>>::start_position(),
             moves: moves.clone(),
-            game_result: position.game_result(),
+            game_result_str: position.pgn_game_result(),
             tags,
         };
 

@@ -1,5 +1,4 @@
 use crate::ptn::{Game, ParseError, PtnMove};
-use board_game_traits::GameResult;
 use pgn_traits::PgnPosition;
 use std::fmt::Debug;
 use std::str::FromStr;
@@ -38,12 +37,12 @@ fn parse_game<B: PgnPosition + Debug + Clone>(
     }
     let position = B::start_position();
 
-    let (moves, game_result) = parse_moves(input, position.clone())?;
+    let (moves, game_result_str) = parse_moves(input, position.clone())?;
 
     Ok(Game {
         start_position: position,
         moves,
-        game_result,
+        game_result_str,
         tags,
     })
 }
@@ -96,7 +95,7 @@ fn parse_tag<'a>(input: &mut ParserData<'a>) -> Result<(&'a str, String), pgn_tr
 fn parse_moves<B: PgnPosition + Debug + Clone>(
     input: &mut ParserData,
     mut position: B,
-) -> Result<(Vec<PtnMove<B::Move>>, Option<GameResult>), ParseError> {
+) -> Result<(Vec<PtnMove<B::Move>>, Option<&'static str>), ParseError> {
     let mut moves: Vec<PtnMove<B::Move>> = vec![];
     let mut _ply_counter = 0; // Last ply seen
     loop {
@@ -122,11 +121,11 @@ fn parse_moves<B: PgnPosition + Debug + Clone>(
         } else if let Some(num_string) = word.strip_suffix('.') {
             let _num = u64::from_str(num_string)?;
             _ply_counter = _num * 2 - 2;
-        } else if let Some((_, result)) = B::POSSIBLE_GAME_RESULTS
+        } else if let Some((result_str, _)) = B::POSSIBLE_GAME_RESULTS
             .iter()
             .find(|(s, _result)| *s == word)
         {
-            return Ok((moves, *result));
+            return Ok((moves, Some(*result_str)));
         } else {
             let mut move_string = word;
             let mut annotations = vec![];

@@ -1,5 +1,5 @@
 use crate::ptn::{Game, PtnMove};
-use board_game_traits::{Color, GameResult};
+use board_game_traits::Color;
 use pgn_traits::PgnPosition;
 use std::io;
 use std::io::Write;
@@ -24,13 +24,7 @@ impl<B: PgnPosition + Clone> Game<B> {
             } else {
                 // If the result tag is required, but not provided, manually write it
                 if required_tag.eq_ignore_ascii_case("Result") {
-                    let result_string = match self.game_result {
-                        Some(GameResult::WhiteWin) => "1-0",
-                        Some(GameResult::BlackWin) => "0-1",
-                        Some(GameResult::Draw) => "1/2-1/2",
-                        None => "*",
-                    }
-                    .to_string();
+                    let result_string = self.game_result_str.unwrap_or("*").to_string();
 
                     writeln!(f, "[{} \"{}\"]", required_tag, result_string)?;
                 } else {
@@ -88,12 +82,7 @@ impl<B: PgnPosition + Clone> Game<B> {
             }
 
             if i == self.moves.len() - 1 {
-                match self.game_result {
-                    None => buffer.push_str(" *"),
-                    Some(GameResult::WhiteWin) => buffer.push_str(" 1-0"),
-                    Some(GameResult::BlackWin) => buffer.push_str(" 0-1"),
-                    Some(GameResult::Draw) => buffer.push_str(" 1/2-1/2"),
-                }
+                buffer.push_str(self.game_result_str.unwrap_or("*"));
             }
 
             if position.side_to_move() == Color::Black || i == self.moves.len() - 1 {

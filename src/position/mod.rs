@@ -1235,7 +1235,18 @@ impl<const S: usize> pgn_traits::PgnPosition for Position<S> {
         ("Player1", "?"),
         ("Player2", "?"),
         ("Date", "????.??.??"),
-        ("Size", "5"),
+        (
+            "Size",
+            match S {
+                3 => "3",
+                4 => "4",
+                5 => "5",
+                6 => "6",
+                7 => "7",
+                8 => "8",
+                _ => "",
+            },
+        ),
         ("Result", "*"),
     ];
 
@@ -1254,7 +1265,8 @@ impl<const S: usize> pgn_traits::PgnPosition for Position<S> {
 
     fn pgn_game_result(&self) -> Option<&'static str> {
         let group_data = self.group_data();
-        self.detailed_game_result(&group_data).map(|result| result.result_str())
+        self.detailed_game_result(&group_data)
+            .map(|result| result.result_str())
     }
 
     fn from_fen_with_settings(

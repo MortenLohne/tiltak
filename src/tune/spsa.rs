@@ -103,7 +103,7 @@ fn tuning_iteration<R: rand::Rng, const S: usize>(
         0.2,
         &TimeControl::Time(Duration::from_secs(20), Duration::from_millis(200)),
     );
-    match game.game_result {
+    match game.game_result() {
         Some(GameResult::WhiteWin) => player1_variables.iter().map(|(a, _)| *a).collect(),
         Some(GameResult::BlackWin) => player2_variables.iter().map(|(a, _)| *a).collect(),
         None | Some(GameResult::Draw) => vec![SpsaDirection::NoChange; variables.len()],

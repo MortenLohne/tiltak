@@ -268,7 +268,7 @@ fn play_game_pair<const S: usize>(
             1.0,
             &TimeControl::FixedNodes(100_000),
         );
-        match game.0.game_result {
+        match game.0.game_result() {
             Some(GameResult::WhiteWin) => {
                 current_params_wins.fetch_add(1, Ordering::Relaxed);
             }
@@ -286,7 +286,7 @@ fn play_game_pair<const S: usize>(
             1.0,
             &TimeControl::FixedNodes(100_000),
         );
-        match game.0.game_result {
+        match game.0.game_result() {
             Some(GameResult::BlackWin) => {
                 current_params_wins.fetch_add(1, Ordering::Relaxed);
             }
@@ -311,7 +311,7 @@ impl GameStats {
     pub fn from_games<const N: usize>(games: &[Game<Position<N>>]) -> Self {
         let mut stats = GameStats::default();
         for game in games {
-            match game.game_result {
+            match game.game_result() {
                 Some(GameResult::WhiteWin) => stats.white_wins += 1,
                 Some(GameResult::BlackWin) => stats.black_wins += 1,
                 Some(GameResult::Draw) => stats.draws += 1,
@@ -590,14 +590,15 @@ pub fn positions_and_results_from_games<const S: usize>(
     let mut positions = vec![];
     let mut results = vec![];
     for game in games.into_iter() {
+        let game_result = game.game_result();
         let mut position = game.start_position;
         for PtnMove { mv, .. } in game.moves {
             if position.game_result().is_some() {
                 break;
             }
             positions.push(position.clone());
-            results.push(game.game_result.unwrap_or(GameResult::Draw));
-            position.do_move(mv);
+            results.push(game_result.unwrap_or(GameResult::Draw));
+            position.do_move(mv.clone());
             // Deliberately skip the final position
         }
     }
