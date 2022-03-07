@@ -4,7 +4,7 @@ use std::io;
 use std::io::{BufRead, BufReader};
 use std::str::FromStr;
 use std::time::{Duration, Instant};
-use tiltak::position::Position;
+use tiltak::position::{Komi, Position};
 
 use std::any::Any;
 use tiltak::search;
@@ -21,18 +21,42 @@ pub fn main() {
 
     println!("id name tiltak");
     println!("id author Morten Lohne");
+    println!("option name Half Komi type spin default 0 min -10 max 10");
     println!("teiok");
 
     // Position stored in a `dyn Any` variable, because it can be any size
     let mut position: Option<Box<dyn Any>> = None;
     let mut size: Option<usize> = None;
+    let mut komi = Komi::default();
 
     for line in BufReader::new(io::stdin()).lines().map(Result::unwrap) {
         let mut words = line.split_whitespace();
         match words.next().unwrap() {
             "quit" => break,
             "isready" => println!("readyok"),
-            "setoption" => panic!("Unknown option \"{}\"", line),
+            "setoption" => {
+                if [
+                    words.next().unwrap_or_default(),
+                    words.next().unwrap_or_default(),
+                    words.next().unwrap_or_default(),
+                    words.next().unwrap_or_default(),
+                ]
+                .join(" ")
+                    == "name Half Komi value"
+                {
+                    if let Some(k) = words
+                        .next()
+                        .and_then(|komi_string| komi_string.parse::<i8>().ok())
+                        .and_then(Komi::from_half_komi)
+                    {
+                        komi = k;
+                    } else {
+                        panic!("Invalid komi setting \"{}\"", line);
+                    }
+                } else {
+                    panic!("Invalid setoption string \"{}\"", line);
+                }
+            }
             "teinewgame" => {
                 let size_string = words.next();
                 size = size_string.and_then(|s| usize::from_str(s).ok());
@@ -46,9 +70,9 @@ pub fn main() {
             "position" => {
                 position = match size {
                     None => panic!("Received position without receiving teinewgame string"),
-                    Some(4) => Some(Box::new(parse_position_string::<4>(&line))),
-                    Some(5) => Some(Box::new(parse_position_string::<5>(&line))),
-                    Some(6) => Some(Box::new(parse_position_string::<6>(&line))),
+                    Some(4) => Some(Box::new(parse_position_string::<4>(&line, komi))),
+                    Some(5) => Some(Box::new(parse_position_string::<5>(&line, komi))),
+                    Some(6) => Some(Box::new(parse_position_string::<6>(&line, komi))),
                     Some(s) => panic!("Unsupported size {}", s),
                 }
             }
@@ -73,14 +97,14 @@ pub fn main() {
     }
 }
 
-fn parse_position_string<const S: usize>(line: &str) -> Position<S> {
+fn parse_position_string<const S: usize>(line: &str, komi: Komi) -> Position<S> {
     let mut words_iter = line.split_whitespace();
     words_iter.next(); // position
     let mut position = match words_iter.next() {
-        Some("startpos") => Position::default(),
+        Some("startpos") => Position::start_position_with_komi(komi),
         Some("tps") => {
             let tps: String = (&mut words_iter).take(3).collect::<Vec<_>>().join(" ");
-            <Position<S>>::from_fen(&tps).unwrap()
+            <Position<S>>::from_fen_with_komi(&tps, komi).unwrap()
         }
         _ => panic!("Expected \"startpos\" or \"tps\" to specify position."),
     };

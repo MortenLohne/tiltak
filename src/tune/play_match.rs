@@ -98,17 +98,17 @@ pub fn play_game<const S: usize>(
     let date = chrono::Local::today();
 
     let tags = vec![
-            ("Event".to_string(), "Tiltak training".to_string()),
-            ("Site".to_string(), "Tiltak".to_string()),
-            ("Player1".to_string(), "Tiltak".to_string()),
-            ("Player2".to_string(), "Tiltak".to_string()),
-            ("Size".to_string(), S.to_string()),
-            (
-                "Date".to_string(),
-                format!("{}.{:0>2}.{:0>2}", date.year(), date.month(), date.day()),
-            ),
-            ("Komi".to_string(), position.komi().to_string()),
-        ];
+        ("Event".to_string(), "Tiltak training".to_string()),
+        ("Site".to_string(), "Tiltak".to_string()),
+        ("Player1".to_string(), "Tiltak".to_string()),
+        ("Player2".to_string(), "Tiltak".to_string()),
+        ("Size".to_string(), S.to_string()),
+        (
+            "Date".to_string(),
+            format!("{}.{:0>2}.{:0>2}", date.year(), date.month(), date.day()),
+        ),
+        ("Komi".to_string(), position.komi().to_string()),
+    ];
 
     (
         Game {
