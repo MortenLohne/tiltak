@@ -21,7 +21,7 @@ pub fn main() {
 
     println!("id name tiltak");
     println!("id author Morten Lohne");
-    println!("option name Half Komi type spin default 0 min -10 max 10");
+    println!("option name HalfKomi type spin default 0 min -10 max 10");
     println!("teiok");
 
     // Position stored in a `dyn Any` variable, because it can be any size
@@ -39,10 +39,9 @@ pub fn main() {
                     words.next().unwrap_or_default(),
                     words.next().unwrap_or_default(),
                     words.next().unwrap_or_default(),
-                    words.next().unwrap_or_default(),
                 ]
                 .join(" ")
-                    == "name Half Komi value"
+                    == "name HalfKomi value"
                 {
                     if let Some(k) = words
                         .next()
