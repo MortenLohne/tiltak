@@ -10,6 +10,7 @@ default-run = "main"
 
 [profile.release]
 debug = true
+lto = true
 
 [features]
 constant-tuning = ["rayon"]
