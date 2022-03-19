@@ -5,6 +5,7 @@ use board_game_traits::{Color, GameResult, Position as PositionTrait};
 use crate::evaluation::parameters::PolicyFeatures;
 use crate::position::bitboard::BitBoard;
 use crate::position::color_trait::{BlackTr, ColorTr, WhiteTr};
+use crate::position::AbstractBoard;
 use crate::position::Direction::*;
 use crate::position::Role::{Cap, Flat, Wall};
 use crate::position::{square_symmetries, GroupData, Piece, Position, Role};
@@ -81,8 +82,36 @@ impl<const S: usize> Position<S> {
 
         let mut immediate_win_exists = false;
 
-        for (features_set, mv) in feature_sets.iter_mut().zip(moves) {
+        let mut fcd_per_move = Vec::with_capacity(moves.len());
+        let mut highest_fcd_per_square = <AbstractBoard<i8, S>>::new_with_value(-1);
+        let mut highest_fcd = -1;
+
+        for mv in moves.iter() {
+            let fcd = self.fcd_for_move(mv.clone());
+            if fcd > highest_fcd {
+                highest_fcd = fcd;
+            }
+            if fcd > highest_fcd_per_square[mv.origin_square()] {
+                highest_fcd_per_square[mv.origin_square()] = fcd;
+            }
+            fcd_per_move.push(fcd);
+        }
+
+        for (features_set, (mv, fcd)) in feature_sets.iter_mut().zip(moves.iter().zip(fcd_per_move))
+        {
             self.features_for_move(features_set, mv, group_data);
+
+            // FCD bonus for all movements
+            if let Move::Move(square, _, _) = mv {
+                if fcd >= highest_fcd {
+                    features_set.fcd_highest_board[fcd.clamp(1, 6) as usize - 1] = 1.0;
+                } else if fcd >= highest_fcd_per_square[*square] {
+                    features_set.fcd_highest_stack[(fcd.clamp(-1, 4) + 1) as usize] = 1.0;
+                } else {
+                    features_set.fcd_other[(fcd.clamp(-3, 4) + 3) as usize] = 1.0;
+                }
+            }
+
             if has_immediate_win(features_set) {
                 immediate_win_exists = true;
             }
@@ -554,13 +583,10 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usize>(
             let mut our_squares_affected = <ArrayVec<Square, S>>::new();
             let mut stack_recaptured_with = None;
 
-            // Number of squares captured by us
-            let mut our_pieces = 0;
             // Number of squares given to them
             let mut their_pieces = 0;
             // Number of squares captured by us, that were previously held by them
             let mut their_pieces_captured = 0;
-            let mut fcd = 0;
 
             // Special case for when we spread the whole stack
             if position[*square].len() == stack_movement.get(0).pieces_to_take {
@@ -568,9 +594,6 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usize>(
                 if top_stone.is_road_piece() {
                     our_squares_affected.push(*square);
                     our_groups_affected.push(group_data.groups[*square]);
-                }
-                if top_stone.role() == Flat {
-                    fcd -= 1;
                 }
             }
 
@@ -581,22 +604,7 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usize>(
             {
                 let destination_stack = &position[destination_square];
 
-                if let Some(captured_piece) = destination_stack.top_stone() {
-                    if captured_piece.role() == Flat {
-                        if Us::piece_is_ours(captured_piece) {
-                            fcd -= 1;
-                        } else {
-                            fcd += 1;
-                        }
-                    }
-                }
-
                 if Us::piece_is_ours(piece) {
-                    our_pieces += 1;
-                    if piece.role() == Flat {
-                        fcd += 1;
-                    }
-
                     if Us::is_critical_square(&*group_data, destination_square)
                         && piece.is_road_piece()
                     {
@@ -616,9 +624,6 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usize>(
                     }
                 } else {
                     their_pieces += 1;
-                    if piece.role() == Flat {
-                        fcd -= 1;
-                    }
                 }
 
                 if Us::piece_is_ours(piece) && piece.is_road_piece() {
@@ -734,17 +739,10 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usize>(
                     .unwrap_or(destination_square);
             }
 
-            policy_features.fcd[(fcd.clamp(-2, 5) + 2) as usize] = 1.0;
-
             if their_pieces == 0 {
-                policy_features.stack_movement_that_gives_us_top_pieces[0] = 1.0;
-                policy_features.stack_movement_that_gives_us_top_pieces[1] = our_pieces as f32;
-            } else if their_pieces == 1 {
-                policy_features.stack_movement_that_gives_us_top_pieces[2] = 1.0;
-                policy_features.stack_movement_that_gives_us_top_pieces[3] = our_pieces as f32;
+                policy_features.pure_spread[0] = 1.0;
             } else {
-                policy_features.stack_movement_that_gives_us_top_pieces[4] = 1.0;
-                policy_features.stack_movement_that_gives_us_top_pieces[5] = our_pieces as f32;
+                policy_features.pure_spread[1] = 1.0;
             }
 
             // Continue spreading the stack (the piece, that is) we spread last turn, if any

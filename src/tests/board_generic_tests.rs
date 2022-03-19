@@ -1,11 +1,11 @@
 use crate::evaluation::parameters;
 use crate::evaluation::parameters::PolicyFeatures;
-use board_game_traits::{EvalPosition, GameResult::*, Position as PositionTrait};
+use board_game_traits::{Color, EvalPosition, GameResult::*, Position as PositionTrait};
 use pgn_traits::PgnPosition;
 use rand::seq::SliceRandom;
 
-use crate::position::Move;
 use crate::position::{squares_iterator, Role, Square};
+use crate::position::{GroupData, Move};
 use crate::position::{GroupEdgeConnection, Position};
 use crate::tests::do_moves_and_check_validity;
 
@@ -66,7 +66,7 @@ fn play_random_games_prop<const S: usize>(num_games: usize) {
 
             assert_eq!(Position::from_fen(&position.to_fen()).unwrap(), position);
 
-            let group_data = position.group_data();
+            let group_data: GroupData<S> = position.group_data();
 
             assert!((group_data.white_road_pieces() & group_data.black_road_pieces()).is_empty());
             assert!(
@@ -121,7 +121,23 @@ fn play_random_games_prop<const S: usize>(num_games: usize) {
                 mv,
                 position.move_from_san(&position.move_to_san(&mv)).unwrap()
             );
-            position.do_move(mv);
+
+            let white_flat_lead_before = group_data.white_flat_stones.count() as i8
+                - group_data.black_flat_stones.count() as i8;
+
+            let fcd = position.fcd_for_move(mv.clone());
+
+            position.do_move(mv.clone());
+
+            let new_group_data = position.group_data();
+
+            let white_flat_lead_after = new_group_data.white_flat_stones.count() as i8
+                - new_group_data.black_flat_stones.count() as i8;
+
+            match !position.side_to_move() {
+                Color::White => assert_eq!(white_flat_lead_after, white_flat_lead_before + fcd),
+                Color::Black => assert_eq!(white_flat_lead_after, white_flat_lead_before - fcd),
+            }
 
             assert_ne!(hash_from_scratch, position.zobrist_hash_from_scratch());
 

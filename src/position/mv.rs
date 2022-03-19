@@ -20,6 +20,13 @@ pub enum Move {
 }
 
 impl Move {
+    pub fn origin_square(&self) -> Square {
+        match self {
+            Move::Place(_, square) => *square,
+            Move::Move(square, _, _) => *square,
+        }
+    }
+
     pub fn to_string<const S: usize>(&self) -> String {
         let mut string = String::new();
         match self {

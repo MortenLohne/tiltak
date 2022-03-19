@@ -17,11 +17,12 @@ use serde::{Deserialize, Serialize};
 use bitboard::BitBoard;
 use color_trait::{BlackTr, WhiteTr};
 
-use utils::AbstractBoard;
 pub use utils::{
     squares_iterator, Direction, Komi, Movement, Piece, Piece::*, Role, Role::*, Square, Stack,
     StackMovement,
 };
+
+pub(crate) use utils::AbstractBoard;
 
 pub use mv::{Move, ReverseMove};
 
@@ -735,6 +736,63 @@ impl<const S: usize> Position<S> {
                 }
             })
             .chain(std::iter::once(self[square].top_stone()))
+    }
+
+    pub(crate) fn fcd_for_move(&self, mv: Move) -> i8 {
+        match mv {
+            Move::Place(Role::Flat, _) if self.half_moves_played() > 1 => 1,
+            Move::Place(Role::Flat, _) => -1,
+            Move::Place(_, _) => 0,
+            Move::Move(square, direction, stack_movement) => {
+                let mut destination_square =
+                    if stack_movement.get(0).pieces_to_take == self[square].len() {
+                        square.go_direction::<S>(direction).unwrap()
+                    } else {
+                        square
+                    };
+
+                let mut fcd = 0;
+
+                if self[square].len() == stack_movement.get(0).pieces_to_take {
+                    let top_stone = self[square].top_stone.unwrap();
+                    if top_stone.role() == Flat {
+                        fcd -= 1;
+                    }
+                }
+
+                // This iterator skips the first square if we move the whole stack
+                for piece in self
+                    .top_stones_left_behind_by_move(square, &stack_movement)
+                    .flatten()
+                {
+                    let destination_stack = &self[destination_square];
+
+                    if let Some(captured_piece) = destination_stack.top_stone() {
+                        if captured_piece.role() == Flat {
+                            if captured_piece.color() == self.side_to_move() {
+                                fcd -= 1;
+                            } else {
+                                fcd += 1;
+                            }
+                        }
+                    }
+
+                    if piece.role() == Flat {
+                        if piece.color() == self.side_to_move() {
+                            fcd += 1;
+                        } else {
+                            fcd -= 1;
+                        }
+                    }
+
+                    destination_square = destination_square
+                        .go_direction::<S>(direction)
+                        .unwrap_or(destination_square);
+                }
+
+                fcd
+            }
+        }
     }
 
     pub(crate) fn game_result_with_group_data(

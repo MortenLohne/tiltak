@@ -568,6 +568,14 @@ pub(crate) struct AbstractBoard<T, const S: usize> {
     pub(crate) raw: [[T; S]; S],
 }
 
+impl<T: Copy, const S: usize> AbstractBoard<T, S> {
+    pub fn new_with_value(value: T) -> Self {
+        AbstractBoard {
+            raw: [[value; S]; S],
+        }
+    }
+}
+
 impl<T: Default + Copy, const S: usize> Default for AbstractBoard<T, S> {
     fn default() -> Self {
         AbstractBoard {
