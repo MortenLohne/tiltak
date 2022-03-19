@@ -555,6 +555,25 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usize>(
 
             policy_features.move_role_bonus[role_id] += 1.0;
 
+            if stack_movement.len() == 1
+                && stack_movement.get(0).pieces_to_take == 1
+                && position[*square].len() == 1
+            {
+                if let Some(piece) =
+                    position[square.go_direction::<S>(*direction).unwrap()].top_stone()
+                {
+                    match (piece.role(), piece.color() == Us::color()) {
+                        (Flat, true) => policy_features.simple_self_capture[role_id] = 1.0,
+                        (Flat, false) => policy_features.simple_capture[role_id] = 1.0,
+                        (Wall, true) => policy_features.simple_self_capture[3] = 1.0,
+                        (Wall, false) => policy_features.simple_capture[3] = 1.0,
+                        _ => unreachable!(),
+                    }
+                } else {
+                    policy_features.simple_movement[role_id] = 1.0;
+                }
+            }
+
             let mut destination_square =
                 if stack_movement.get(0).pieces_to_take == position[*square].len() {
                     square.go_direction::<S>(*direction).unwrap()
