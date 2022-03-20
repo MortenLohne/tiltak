@@ -11,17 +11,17 @@ use crate::tests::do_moves_and_check_validity;
 
 #[test]
 fn play_random_4s_games_test() {
-    play_random_games_prop::<4>(500)
+    play_random_games_prop::<4>(200)
 }
 
 #[test]
 fn play_random_5s_games_test() {
-    play_random_games_prop::<5>(500)
+    play_random_games_prop::<5>(200)
 }
 
 #[test]
 fn play_random_6s_games_test() {
-    play_random_games_prop::<6>(500)
+    play_random_games_prop::<6>(200)
 }
 
 #[test]
