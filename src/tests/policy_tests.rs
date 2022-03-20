@@ -116,3 +116,9 @@ fn false_positive_win_test4() {
     let tps = "2,2,1,22S,21C,2S/11,212,2,12212S,2,112C/2S,2,x,1S,12,x/1S,1S,2S,22S,21,1S/2S,1,x,1,1,1S/121S,x,112S,2S,12S,2 2 64";
     assert!(!sets_winning_flag::<6>(tps));
 }
+
+#[test]
+fn impure_spread_inside_group_win_test() {
+    let tps = "x,1,x,12112S,x,2/1,1,2211,212222212,12121121C,2/x,1,x,212,x2/2S,1,x,2,x2/21,12S,x,222,21212C,x/x,2,21,x,1,x 1 56";
+    correct_top_policy_move_property::<6>(tps, &["3c5-111", "4c5-121"]);
+}

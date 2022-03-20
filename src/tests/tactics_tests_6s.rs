@@ -179,7 +179,95 @@ fn play_instant_road_win_test() {
 }
 
 #[test]
-fn play_instead_road_win_test2() {
+fn play_instant_road_win_test2() {
     let tps = "1,1,2,1,1,1/x2,2,2,1,x/x,2,2,1,2221S,x/1,x,2222221C,11112C,2,x/x,2121,2,1,21,2/21,2,2,1,12,x 1 36";
     plays_correct_move_easy_tps_property::<6>(tps, &["6c3+114"]);
+}
+
+#[test]
+fn smash_to_create_two_vulnerable_critical_squares() {
+    let tps = "x,221,221,x,2S,2/x,2,2,2S,1,x/x2,2C,1,1,1/1,12S,x,1222221C,2,2/x,12,21,1,1,1/x,2,2,x2,1 1 26";
+    plays_correct_move_easy_tps_property::<6>(tps, &["6d3<51"]);
+}
+
+#[test]
+fn setup_smash_in_strong_line_tinue() {
+    // x,1,1,112C,x,1/1,1,2,2,1,1/x,2,21S,2,2,2/2,2,2,1C,2,2/x,2,1,2,1,1/1,2,1,1,1,x 2 19
+    let move_strings = [
+        "c5", "b6", "f5", "c4", "c6", "d5", "d6", "c3", "e6", "Ce5", "f6", "e5+", "e5", "d4", "c2",
+        "b3", "Cd3", "b2", "Sb4", "2e6<", "b4>", "e4", "b5", "e3", "e2", "b4", "a5", "f3", "f2",
+        "d2", "e1", "f4", "d1", "b1", "c1", "a3", "a1",
+    ];
+    plays_correct_hard_move_property::<6>(&move_strings, &["3d6<"]);
+}
+
+#[test]
+fn smash_followed_by_negative_fcd_throw_tinue() {
+    // 1S,2,2,2,12,2/2,21S,111112C,12,112,x/1,21C,x,2S,1,1/x2,12,11221S,x2/x2,1111212,1S,112,112/x6 1 47
+    let move_strings = [
+        "b5", "f6", "f2", "b4", "f3", "b3", "f4", "Cf5", "Cc4", "e5", "d5", "e4", "d4", "e3", "d3",
+        "e2", "d2", "b2", "d1", "d6", "c6", "e3<", "c5", "b1", "c4<", "e3", "c3", "b3>", "f3<",
+        "e2+", "Sb3", "2e3<", "d4-", "2c3>", "d2+", "e3<", "Sd4", "5d3-", "d4-", "5d2>32", "d2",
+        "e6", "d4", "b5>", "c6>", "e6<", "d5+", "e6", "d5", "e6<", "d5+", "f5+", "d5", "2f6<11",
+        "4d3+22", "f6", "c4", "e5+", "Sa6", "e4<", "c2", "c6", "c3", "a5", "3d5<12", "4d4-22",
+        "c1", "b1>", "d1<", "6d6<", "Sd1", "6c6-2112", "d1+", "c2>", "c2<", "5c5>23", "b3>", "b6",
+        "2c3>", "Sd4", "c5", "5d2<14", "e4", "5b2>32", "2c1+", "2d2<", "a4", "4c2+13", "c1+",
+        "b2>", "Sd2", "5c4+", "a4+",
+    ];
+    plays_correct_hard_move_property::<6>(&move_strings, &["c5<"]);
+}
+
+#[test]
+fn impure_stack_throw_onto_strong_line_tinue() {
+    // x6/2,2,2,2,1,1/x3,2,1,x/x3,1C,1,11212C/x3,1,x2/x5,1 2 11
+    let move_strings = [
+        "b5", "f4", "f1", "c5", "f3", "f2", "e2", "d5", "e5", "Ce4", "f5", "d4", "e3", "a5", "e2>",
+        "e4>", "e4", "2f4-11", "Cd3", "3f2+", "d2",
+    ];
+    plays_correct_hard_move_property::<6>(&move_strings, &["5f3+14"]);
+}
+
+#[test]
+fn flat_capture_to_create_double_critical_square_tinue() {
+    // 1,1,x,2,2,1/1,2,2,2,1,1/112C,2,2,x,1C,1/x2,21,212,x2/1,1,1S,21,12,2/x3,2,x2 2 20
+    let move_strings = [
+        "b5", "b6", "a4", "c5", "a5", "d5", "a6", "b4", "a3", "Cb3", "a2", "b3<", "b3", "c4", "e5",
+        "d4", "Ce4", "c3", "Sc2", "d6", "e3", "e6", "f6", "d2", "e2", "d1", "e2<", "d3", "e2",
+        "e1", "b2", "2a3+", "f5", "f2", "f4", "e1+", "e3<", "d4-", "b3>",
+    ];
+    plays_correct_hard_move_property::<6>(&move_strings, &["d1+"]);
+}
+
+#[test]
+fn create_hard_cap_next_to_critical_square_tinue() {
+    // 21S,12C,x4/21,2,2,2,2,2/1,x,2,x3/x,1C,2,x3/1,x,12,1,1,1/x2,1,1,2,1 2 16
+    let move_strings = [
+        "c5", "a5", "f1", "c4", "c2", "c3", "d2", "b2", "Cb3", "b4", "d1", "e1", "e2", "d5", "a4",
+        "e5", "a2", "f5", "f2", "b2>", "c1", "b4<", "a5-", "Cb5", "Sa5", "a6", "b6", "b5+", "a5+",
+        "b5", "a5",
+    ];
+
+    plays_correct_hard_move_property::<6>(&move_strings, &["b6-"]);
+}
+
+#[test]
+fn pure_cap_spread_onto_strong_line_tinue() {
+    // 1,21,21,x3/2,2,12,2,x2/x,2,x,1,x2/x,2,2,1C,1,x/x,1,1,12C,1,1/x,2,x4 2 14
+    let move_strings = [
+        "b5", "a6", "f2", "b4", "c2", "b3", "b2", "c3", "d2", "Cd3", "e2", "d3-", "Cd3", "b6",
+        "c5", "c4", "d4", "b1", "a6>", "a5", "a6", "c6", "d6", "d5", "e3", "c4+", "d6<",
+    ];
+    plays_correct_hard_move_property::<6>(&move_strings, &["2d2<11"]);
+}
+
+#[test]
+fn pure_stack_spread_setting_up_fortress_smash_tinue() {
+    // 2,2,x3,1/x,2,2,1,2,1/1S,2,2,x,1C,x/2,21S,2,2,1S,x/2,21,1,1,1,121112C/112,x,1S,1,1,1 2 25
+    let move_strings = [
+        "b5", "f6", "f3", "c5", "f5", "Cf4", "Ce4", "e5", "d5", "c4", "e3", "c3", "e1", "f4-",
+        "f4", "2f3<", "f3", "f2", "e2", "c2", "d2", "b6", "d2<", "b3", "f1", "f2+", "b1", "d3",
+        "f4-", "d2", "d1", "d2<", "Sc1", "3c2<12", "a1", "3e3>", "Se3", "2a2-", "b1+", "a2", "Sa3",
+        "a6", "c2", "b4", "d2", "6f3-", "a3>", "a3", "Sa4",
+    ];
+    plays_correct_hard_move_property::<6>(&move_strings, &["6f2<1113", "6f2<2211"]);
 }
