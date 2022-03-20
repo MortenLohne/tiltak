@@ -8,7 +8,7 @@ use crate::position::{
     Role::*, Square,
 };
 
-pub(crate) fn static_eval_game_phase<const S: usize>(
+pub fn static_eval_game_phase<const S: usize>(
     position: &Position<S>,
     group_data: &GroupData<S>,
     value_features: &mut ValueFeatures,

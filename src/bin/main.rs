@@ -9,7 +9,7 @@ use pgn_traits::PgnPosition;
 #[cfg(feature = "constant-tuning")]
 use rayon::prelude::*;
 
-use tiltak::evaluation::parameters;
+use tiltak::evaluation::{parameters, value_eval};
 use tiltak::minmax;
 use tiltak::position::Move;
 #[cfg(feature = "constant-tuning")]
@@ -348,6 +348,25 @@ fn analyze_position<const S: usize>(position: &Position<S>) {
 
     assert_eq!(position.game_result(), None, "Cannot analyze finished game");
 
+    let group_data = position.group_data();
+
+    let mut coefficients = vec![0.0; parameters::num_value_features::<S>()];
+    {
+        let mut value_features = parameters::ValueFeatures::new::<S>(&mut coefficients);
+        value_eval::static_eval_game_phase::<S>(position, &group_data, &mut value_features);
+    }
+    for (feature, param) in coefficients.iter_mut().zip(<Position<S>>::value_params()) {
+        *feature *= param;
+    }
+
+    let value_features = parameters::ValueFeatures::new::<S>(&mut coefficients);
+    let value_features_string = format!("{:?}", value_features);
+
+    for line in value_features_string.split("],") {
+        let (name, values) = line.split_once(": ").unwrap();
+        println!("{:32}: {}],", name, values);
+    }
+
     let mut simple_moves = vec![];
     let mut moves = vec![];
 
@@ -359,7 +378,6 @@ fn analyze_position<const S: usize>(position: &Position<S>) {
     );
     moves.sort_by(|(_mv, score1), (_, score2)| score1.partial_cmp(score2).unwrap().reverse());
 
-    let group_data = position.group_data();
     let mut feature_sets = vec![vec![0.0; parameters::num_policy_features::<S>()]; moves.len()];
     let mut policy_feature_sets: Vec<_> = feature_sets
         .iter_mut()
