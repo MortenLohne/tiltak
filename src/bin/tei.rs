@@ -1,9 +1,9 @@
 use board_game_traits::{Color, Position as PositionTrait};
 use pgn_traits::PgnPosition;
-use std::io;
 use std::io::{BufRead, BufReader};
 use std::str::FromStr;
 use std::time::{Duration, Instant};
+use std::{env, io};
 use tiltak::position::{Komi, Position};
 
 use std::any::Any;
@@ -11,6 +11,8 @@ use tiltak::search;
 use tiltak::search::MctsSetting;
 
 pub fn main() {
+    let is_slatebot = env::args().any(|arg| arg == "--slatebot");
+
     loop {
         let mut input = String::new();
         io::stdin().read_line(&mut input).unwrap();
@@ -79,14 +81,17 @@ pub fn main() {
                 Some(4) => parse_go_string::<4>(
                     &line,
                     position.as_ref().and_then(|p| p.downcast_ref()).unwrap(),
+                    is_slatebot,
                 ),
                 Some(5) => parse_go_string::<5>(
                     &line,
                     position.as_ref().and_then(|p| p.downcast_ref()).unwrap(),
+                    is_slatebot,
                 ),
                 Some(6) => parse_go_string::<6>(
                     &line,
                     position.as_ref().and_then(|p| p.downcast_ref()).unwrap(),
+                    is_slatebot,
                 ),
                 Some(s) => panic!("Error: Unsupported size {}", s),
                 None => panic!("Error: Received go without receiving teinewgame string"),
@@ -120,11 +125,15 @@ fn parse_position_string<const S: usize>(line: &str, komi: Komi) -> Position<S> 
     position
 }
 
-fn parse_go_string<const S: usize>(line: &str, position: &Position<S>) {
+fn parse_go_string<const S: usize>(line: &str, position: &Position<S>, is_slatebot: bool) {
     let mut words = line.split_whitespace();
     words.next(); // go
 
-    let mcts_settings = MctsSetting::default();
+    let mcts_settings = if is_slatebot {
+        MctsSetting::default().add_rollout_depth(200)
+    } else {
+        MctsSetting::default()
+    };
 
     match words.next() {
         Some("movetime") => {
