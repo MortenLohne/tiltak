@@ -40,6 +40,7 @@ mod mv;
 mod utils;
 
 lazy_static! {
+    pub(crate) static ref ZOBRIST_KEYS_3S: Box<ZobristKeys<3>> = ZobristKeys::new();
     pub(crate) static ref ZOBRIST_KEYS_4S: Box<ZobristKeys<4>> = ZobristKeys::new();
     pub(crate) static ref ZOBRIST_KEYS_5S: Box<ZobristKeys<5>> = ZobristKeys::new();
     pub(crate) static ref ZOBRIST_KEYS_6S: Box<ZobristKeys<6>> = ZobristKeys::new();
@@ -272,6 +273,7 @@ pub struct ZobristKeys<const S: usize> {
 
 pub fn zobrist_top_stones<const S: usize>(square: Square, piece: Piece) -> u64 {
     match S {
+        3 => ZOBRIST_KEYS_3S.top_stones[square][piece as u16 as usize],
         4 => ZOBRIST_KEYS_4S.top_stones[square][piece as u16 as usize],
         5 => ZOBRIST_KEYS_5S.top_stones[square][piece as u16 as usize],
         6 => ZOBRIST_KEYS_6S.top_stones[square][piece as u16 as usize],
@@ -287,6 +289,7 @@ pub fn zobrist_stones_in_stack<const S: usize>(
     stack_slice: usize,
 ) -> u64 {
     match S {
+        3 => ZOBRIST_KEYS_3S.stones_in_stack[place_in_stack][square][stack_slice],
         4 => ZOBRIST_KEYS_4S.stones_in_stack[place_in_stack][square][stack_slice],
         5 => ZOBRIST_KEYS_5S.stones_in_stack[place_in_stack][square][stack_slice],
         6 => ZOBRIST_KEYS_6S.stones_in_stack[place_in_stack][square][stack_slice],
@@ -298,6 +301,7 @@ pub fn zobrist_stones_in_stack<const S: usize>(
 
 pub fn zobrist_to_move<const S: usize>(color: Color) -> u64 {
     match S {
+        3 => ZOBRIST_KEYS_3S.to_move[color.disc()],
         4 => ZOBRIST_KEYS_4S.to_move[color.disc()],
         5 => ZOBRIST_KEYS_5S.to_move[color.disc()],
         6 => ZOBRIST_KEYS_6S.to_move[color.disc()],
