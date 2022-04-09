@@ -1,5 +1,6 @@
 #[cfg(feature = "constant-tuning")]
 use std::collections::HashSet;
+use std::convert::TryFrom;
 use std::io::{Read, Write};
 use std::{io, time};
 
@@ -11,9 +12,9 @@ use rayon::prelude::*;
 
 use tiltak::evaluation::{parameters, value_eval};
 use tiltak::minmax;
-use tiltak::position::Move;
 #[cfg(feature = "constant-tuning")]
 use tiltak::position::Role;
+use tiltak::position::{Komi, Move};
 use tiltak::position::{Position, Stack};
 use tiltak::ptn::{Game, PtnMove};
 use tiltak::search::MctsSetting;
@@ -80,10 +81,10 @@ fn main() {
             },
             #[cfg(feature = "constant-tuning")]
             "openings" => {
-                let depth = 4;
+                let depth = 6;
                 let mut positions = HashSet::new();
                 let openings =
-                    generate_openings::<6>(Position::start_position(), &mut positions, depth);
+                    generate_openings::<6>(&mut Position::start_position(), &mut positions, depth);
                 println!("{} openings generated, evaluating...", openings.len());
 
                 let mut evaled_openings: Vec<_> = openings
@@ -94,7 +95,7 @@ fn main() {
                         for mv in opening.iter() {
                             position.do_move(mv.clone());
                         }
-                        (opening, search::mcts(position, 100_000))
+                        (opening, search::mcts(position, 30_000))
                     })
                     .collect();
 
@@ -181,7 +182,7 @@ fn analyze_openings<const S: usize>(nodes: u64) {
 
 #[cfg(feature = "constant-tuning")]
 fn generate_openings<const S: usize>(
-    mut position: Position<S>,
+    position: &mut Position<S>,
     positions: &mut HashSet<Position<S>>,
     depth: u8,
 ) -> Vec<Vec<Move>> {
@@ -202,7 +203,7 @@ fn generate_openings<const S: usize>(
             {
                 positions.insert(position.clone());
                 if depth > 1 {
-                    generate_openings(position.clone(), positions, depth - 1)
+                    generate_openings(position, positions, depth - 1)
                 } else {
                     vec![vec![]]
                 }
@@ -338,7 +339,7 @@ fn analyze_position_from_tps<const S: usize>() {
     println!("Enter TPS");
     let mut input = String::new();
     io::stdin().read_line(&mut input).unwrap();
-    let position = <Position<S>>::from_fen(&input).unwrap();
+    let position = <Position<S>>::from_fen_with_komi(&input, Komi::try_from(0.0).unwrap()).unwrap();
     analyze_position(&position)
 }
 
