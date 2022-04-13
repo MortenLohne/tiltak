@@ -7,8 +7,8 @@ use std::{env, io};
 use tiltak::position::{Komi, Position};
 
 use std::any::Any;
-use tiltak::search;
 use tiltak::search::MctsSetting;
+use tiltak::search::{self, MonteCarloTree};
 
 pub fn main() {
     let is_slatebot = env::args().any(|arg| arg == "--slatebot");
@@ -140,26 +140,27 @@ fn parse_go_string<const S: usize>(line: &str, position: &Position<S>, is_slateb
             let msecs = words.next().unwrap();
             let movetime = Duration::from_millis(u64::from_str(msecs).unwrap());
             let start_time = Instant::now();
-
             let mut tree = search::MonteCarloTree::with_settings(position.clone(), mcts_settings);
-            let mut total_nodes = 0;
+
             for i in 0.. {
                 let nodes_to_search = (200.0 * f64::powf(1.26, i as f64)) as u64;
                 for _ in 0..nodes_to_search {
                     tree.select();
                 }
-                total_nodes += nodes_to_search;
-                let (best_move, score) = tree.best_move();
+                let (best_move, best_score) = tree.best_move();
+                let pv: Vec<_> = tree.pv().collect();
                 println!(
-                    "info depth {} seldepth {} score cp {} nodes {} time {} pv {}",
-                    i / 2 + 1,
-                    tree.pv().count(),
-                    (score * 200.0 - 100.0) as i64,
-                    total_nodes,
+                    "info depth {} seldepth {} nodes {} score cp {} time {} nps {:.0} pv {}",
+                    ((tree.visits() as f64 / 10.0).log2()) as u64,
+                    pv.len(),
+                    tree.visits(),
+                    (best_score * 200.0 - 100.0) as i64,
                     start_time.elapsed().as_millis(),
-                    tree.pv()
-                        .map(|mv| mv.to_string::<S>() + " ")
-                        .collect::<String>()
+                    tree.visits() as f32 / start_time.elapsed().as_secs_f32(),
+                    pv.iter()
+                        .map(|mv| position.move_to_san(mv))
+                        .collect::<Vec<String>>()
+                        .join(" ")
                 );
                 if start_time.elapsed().as_secs_f64() > movetime.as_secs_f64() * 0.7 {
                     println!("bestmove {}", position.move_to_san(&best_move));
@@ -190,21 +191,34 @@ fn parse_go_string<const S: usize>(line: &str, position: &Position<S>, is_slateb
                 }
             }
 
+            println!("{:?}, {:?}", white_time, black_time);
+
             let max_time = match position.side_to_move() {
                 Color::White => white_time / 5 + white_inc / 2,
                 Color::Black => black_time / 5 + black_inc / 2,
             };
 
             let start_time = Instant::now();
-            let (best_move, score) =
-                search::play_move_time::<S>(position.clone(), max_time, mcts_settings);
 
-            println!(
-                "info score cp {} time {} pv {}",
-                (score * 200.0 - 100.0) as i64,
-                start_time.elapsed().as_millis(),
-                position.move_to_san(&best_move)
-            );
+            let mut tree = MonteCarloTree::with_settings(position.clone(), mcts_settings);
+            tree.search_for_time(max_time, |tree| {
+                let best_score = tree.best_move().1;
+                let pv: Vec<_> = tree.pv().collect();
+                println!(
+                    "info depth {} seldepth {} nodes {} score cp {} time {} nps {:.0} pv {}",
+                    ((tree.visits() as f64 / 10.0).log2()) as u64,
+                    pv.len(),
+                    tree.visits(),
+                    (best_score * 200.0 - 100.0) as i64,
+                    start_time.elapsed().as_millis(),
+                    tree.visits() as f32 / start_time.elapsed().as_secs_f32(),
+                    pv.iter()
+                        .map(|mv| position.move_to_san(mv))
+                        .collect::<Vec<String>>()
+                        .join(" ")
+                );
+            });
+            let best_move = tree.best_move().0;
 
             println!("bestmove {}", position.move_to_san(&best_move));
         }

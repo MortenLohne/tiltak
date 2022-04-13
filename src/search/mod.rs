@@ -171,28 +171,24 @@ impl<const S: usize> MonteCarloTree<S> {
         tree
     }
 
-    pub fn search_for_time(&mut self, max_time: time::Duration) {
-        let nodes_per_iteration = if self.settings.rollout_depth == 0 {
-            200
-        } else if self.settings.rollout_depth < 10 {
-            40
-        } else {
-            20
-        };
-
+    pub fn search_for_time<F>(&mut self, max_time: time::Duration, callback: F)
+    where
+        F: Fn(&Self),
+    {
         let start_time = time::Instant::now();
 
-        for i in 1.. {
-            for _ in 0..i * nodes_per_iteration {
+        for i in 0.. {
+            let nodes = (50.0 * 2.0_f32.powf(0.125).powi(i)) as u64;
+            for _ in 0..nodes {
                 self.select();
             }
 
-            let (best_move, best_score) = self.best_move();
-
+            // Always return when we have less than 10ms left
             if max_time < (time::Duration::from_millis(10))
                 || start_time.elapsed() > max_time - (time::Duration::from_millis(10))
                 || self.children().len() == 1
             {
+                callback(self);
                 return;
             }
 
@@ -200,19 +196,37 @@ impl<const S: usize> MonteCarloTree<S> {
             child_refs.sort_by_key(|edge| edge.visits);
             child_refs.reverse();
 
-            let node_ratio = child_refs[1].visits as f32 / child_refs[0].visits as f32;
+            let node_ratio = (1 + child_refs[1].visits) as f32 / (1 + child_refs[0].visits) as f32;
             let time_ratio = start_time.elapsed().as_secs_f32() / max_time.as_secs_f32();
 
+            let visits_sqrt = (self.visits() as f32).sqrt();
+            let dynamic_cpuct = self.settings.c_puct_init()
+                + Score::ln(
+                    (1.0 + self.visits() as Score + self.settings.c_puct_base())
+                        / self.settings.c_puct_base(),
+                );
+
+            let best_edge = self
+                .children()
+                .iter()
+                .max_by_key(|edge| edge.visits)
+                .unwrap();
+
+            let best_exploration_value = best_edge.exploration_value(visits_sqrt, dynamic_cpuct);
+
             if time_ratio.powf(2.0) > node_ratio / 2.0 {
-                // Do not stop if any other child nodes have better action value
-                if self
-                    .children()
-                    .iter()
-                    .any(|edge| edge.mv != best_move && 1.0 - edge.mean_action_value > best_score)
-                {
+                callback(self);
+                // Do not stop if any other child nodes have better exploration value
+                if self.children().iter().any(|edge| {
+                    edge.mv != best_edge.mv
+                        && edge.exploration_value(visits_sqrt, dynamic_cpuct)
+                            > best_exploration_value + 0.01
+                }) {
                     continue;
                 }
                 return;
+            } else if i % 2 == 0 {
+                callback(self);
             }
         }
     }
@@ -324,7 +338,7 @@ pub fn play_move_time<const S: usize>(
     settings: MctsSetting<S>,
 ) -> (Move, Score) {
     let mut tree = MonteCarloTree::with_settings(board, settings);
-    tree.search_for_time(max_time);
+    tree.search_for_time(max_time, |_| {});
     tree.best_move()
 }
 
@@ -345,7 +359,7 @@ pub fn mcts_training<const S: usize>(
         }
         TimeControl::Time(time, increment) => {
             let max_time = *time / 5 + *increment / 2;
-            tree.search_for_time(max_time);
+            tree.search_for_time(max_time, |_| {});
         }
     }
 
