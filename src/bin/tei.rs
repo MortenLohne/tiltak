@@ -21,7 +21,7 @@ pub fn main() {
         }
     }
 
-    println!("id name tiltak");
+    println!("id name Tiltak");
     println!("id author Morten Lohne");
     println!("option name HalfKomi type spin default 0 min -10 max 10");
     println!("teiok");
