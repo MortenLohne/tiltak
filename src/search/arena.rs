@@ -9,6 +9,7 @@ use std::{
 
 pub struct Arena {
     data: *mut u8,
+    orig_pointer: *mut u8,
     layout: Layout,
     next_index: cell::RefCell<NonZeroU32>,
     elem_size: usize,
@@ -47,15 +48,16 @@ impl Arena {
 
         let layout =
             Layout::from_size_align((capacity as usize + 2) * elem_size, raw_alignment).ok()?;
-        let data = unsafe {
+        let (data, orig_pointer) = unsafe {
             let ptr = alloc::alloc(layout);
 
             // Make sure the data starts at an address divisible by `elem_size`
-            ptr.add(elem_size - (ptr as usize) % elem_size)
+            (ptr.add(elem_size - (ptr as usize) % elem_size), ptr)
         };
 
         Some(Self {
             data,
+            orig_pointer,
             layout,
             next_index: cell::RefCell::new(NonZeroU32::new(1).unwrap()),
             elem_size,
@@ -104,5 +106,13 @@ impl Arena {
 
     unsafe fn ptr_to_index(&self, raw_index: NonZeroU32) -> *const u8 {
         self.data.add(raw_index.get() as usize * self.elem_size)
+    }
+}
+
+impl Drop for Arena {
+    fn drop(&mut self) {
+        unsafe {
+            alloc::dealloc(self.orig_pointer, self.layout);
+        }
     }
 }
