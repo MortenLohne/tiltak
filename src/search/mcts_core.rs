@@ -22,7 +22,7 @@ pub struct Tree {
 
 #[derive(PartialEq, Debug)]
 pub struct TreeEdge {
-    pub child: Option<arena::Index>,
+    pub child: Option<arena::Index<Tree>>,
     pub mv: Move,
     pub mean_action_value: Score,
     pub visits: u64,
@@ -78,7 +78,7 @@ impl TreeEdge {
         position: &mut Position<S>,
         settings: &MctsSetting<S>,
         temp_vectors: &mut TempVectors,
-        arena: &Arena<Tree>,
+        arena: &Arena,
     ) -> Score {
         if self.visits == 0 {
             self.expand(position, settings, temp_vectors, arena)
@@ -148,7 +148,7 @@ impl TreeEdge {
         position: &mut Position<S>,
         settings: &MctsSetting<S>,
         temp_vectors: &mut TempVectors,
-        arena: &Arena<Tree>,
+        arena: &Arena,
     ) -> Score {
         debug_assert!(self.child.is_none());
         self.child = Some(arena.add(Tree::new_node()));
@@ -313,12 +313,12 @@ impl GameResultForUs {
 }
 
 pub struct Pv<'a> {
-    arena: &'a Arena<Tree>,
+    arena: &'a Arena,
     tree: cell::Ref<'a, Tree>,
 }
 
 impl<'a> Pv<'a> {
-    pub fn new(tree: cell::Ref<'a, Tree>, arena: &'a Arena<Tree>) -> Pv<'a> {
+    pub fn new(tree: cell::Ref<'a, Tree>, arena: &'a Arena) -> Pv<'a> {
         Pv { tree, arena }
     }
 }

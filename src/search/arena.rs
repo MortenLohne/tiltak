@@ -1,25 +1,29 @@
-use std::{cell, num::NonZeroU32};
+use std::{cell, marker::PhantomData, mem, num::NonZeroU32};
 
-pub struct Arena<T> {
-    data: Box<[cell::RefCell<T>]>,
+pub struct Arena {
+    data: Box<[cell::RefCell<[u8; 32]>]>,
     next_index: cell::Cell<NonZeroU32>,
 }
 #[derive(PartialEq, Debug)]
-pub struct Index {
+pub struct Index<T> {
     data: NonZeroU32,
+    phantom: PhantomData<T>,
 }
 
-impl Index {
+impl<T> Index<T> {
     fn new(data: NonZeroU32) -> Self {
-        Self { data }
+        Self {
+            data,
+            phantom: PhantomData::default(),
+        }
     }
 }
 
-impl<T: Default> Arena<T> {
+impl Arena {
     pub fn new(capacity: usize) -> Self {
         let mut data_vec = Vec::with_capacity(capacity);
         while data_vec.len() < data_vec.capacity() {
-            data_vec.push(cell::RefCell::new(T::default()));
+            data_vec.push(cell::RefCell::new([0; 32]));
         }
         Self {
             data: data_vec.into_boxed_slice(),
@@ -27,15 +31,24 @@ impl<T: Default> Arena<T> {
         }
     }
 
-    pub fn get(&self, index: &Index) -> cell::Ref<T> {
-        self.data[index.data.get() as usize].borrow()
+    pub fn get<T>(&self, index: &Index<T>) -> cell::Ref<T> {
+        cell::Ref::map(
+            self.data[index.data.get() as usize].borrow(),
+            |arr| unsafe { mem::transmute(arr) },
+        )
     }
 
-    pub fn get_mut(&self, index: &mut Index) -> cell::RefMut<T> {
-        self.data[index.data.get() as usize].borrow_mut()
+    pub fn get_mut<T>(&self, index: &mut Index<T>) -> cell::RefMut<T> {
+        cell::RefMut::map(
+            self.data[index.data.get() as usize].borrow_mut(),
+            |arr| unsafe { mem::transmute(arr) },
+        )
     }
 
-    pub fn add(&self, value: T) -> Index {
+    pub fn add<T>(&self, value: T) -> Index<T> {
+        // Check that the arena supports this value
+        assert_eq!(mem::size_of::<T>(), mem::size_of::<[u8; 32]>());
+
         let old_index_raw = self
             .next_index
             .replace(NonZeroU32::new(self.next_index.get().get() + 1).unwrap());

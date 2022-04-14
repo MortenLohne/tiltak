@@ -19,7 +19,7 @@ mod arena;
 /// This module contains the public-facing convenience API for the search.
 /// The implementation itself in in mcts_core.
 mod mcts_core;
-use arena::Arena;
+pub use arena::Arena;
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug, PartialEq, Clone)]
@@ -116,7 +116,7 @@ pub struct MonteCarloTree<const S: usize> {
     position: Position<S>,
     settings: MctsSetting<S>,
     temp_vectors: TempVectors,
-    arena: Arena<Tree>,
+    arena: Arena,
 }
 
 impl<const S: usize> MonteCarloTree<S> {
@@ -266,8 +266,8 @@ impl<const S: usize> MonteCarloTree<S> {
             .unwrap_or_else(|| panic!("Couldn't find best move"))
     }
 
-    pub fn node_edge_sizes(&self, arena: &Arena<Tree>) -> (usize, usize) {
-        pub fn edge_sizes(edge: &TreeEdge, arena: &Arena<Tree>) -> (usize, usize) {
+    pub fn node_edge_sizes(&self, arena: &Arena) -> (usize, usize) {
+        pub fn edge_sizes(edge: &TreeEdge, arena: &Arena) -> (usize, usize) {
             if let Some(child_index) = &edge.child {
                 let (child_nodes, child_edges) = node_sizes(&*arena.get(child_index), arena);
                 (child_nodes, child_edges + 1)
@@ -275,7 +275,7 @@ impl<const S: usize> MonteCarloTree<S> {
                 (0, 1)
             }
         }
-        pub fn node_sizes(node: &Tree, arena: &Arena<Tree>) -> (usize, usize) {
+        pub fn node_sizes(node: &Tree, arena: &Arena) -> (usize, usize) {
             node.children
                 .iter()
                 .map(|edge| edge_sizes(edge, arena))

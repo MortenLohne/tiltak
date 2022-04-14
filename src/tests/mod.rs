@@ -9,6 +9,7 @@ mod policy_tests;
 mod ptn_tests;
 mod tactics_tests_5s;
 mod tactics_tests_6s;
+mod arena_tests;
 
 use crate::position::{Move, Position};
 use crate::search;
