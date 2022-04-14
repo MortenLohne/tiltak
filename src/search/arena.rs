@@ -79,7 +79,7 @@ impl Arena {
 
     pub fn add<T>(&self, value: T) -> Index<T> {
         // Check that the arena supports this value
-        assert_eq!(mem::size_of::<T>(), self.elem_size);
+        assert!(self.supports_type::<T>());
 
         let mut raw_next_index = self.next_index.borrow_mut();
 
@@ -96,6 +96,10 @@ impl Arena {
         *raw_next_index = NonZeroU32::new(raw_next_index.get() + 1).unwrap();
 
         old_index
+    }
+
+    pub const fn supports_type<T>(&self) -> bool {
+        mem::size_of::<T>() % self.elem_size == 0 && self.elem_size % mem::align_of::<T>() == 0
     }
 
     unsafe fn ptr_to_index(&self, raw_index: NonZeroU32) -> *const u8 {

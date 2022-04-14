@@ -1,9 +1,13 @@
 use crate::search::Arena;
 
 #[test]
-fn double_borrow() {
-    let arena = Arena::new(100_000, 32).unwrap();
-    let mut index = arena.add([0u8; 32]);
-    let value = arena.get_mut(&mut index);
-    assert_eq!(*value, *arena.get_mut(&mut index));
+fn supports_type_test() {
+    let arena = Arena::new(100_000, 4).unwrap();
+    assert!(arena.supports_type::<[u8; 4]>());
+    assert!(!arena.supports_type::<[u8; 3]>());
+    assert!(!arena.supports_type::<[u8; 1]>());
+    assert!(arena.supports_type::<[u8; 8]>());
+    assert!(!arena.supports_type::<usize>());
+    let index = arena.add(42u32);
+    assert_eq!(*arena.get(&index), 42);
 }
