@@ -203,7 +203,9 @@ impl<const S: usize> MonteCarloTree<S> {
                 return;
             }
 
-            let mut child_refs: Vec<TreeEdge> = self.children();
+            let child = self.get_child();
+            let mut child_refs: Vec<&TreeEdge> = child.children.iter().collect();
+
             child_refs.sort_by_key(|edge| edge.visits);
             child_refs.reverse();
 
@@ -304,7 +306,8 @@ impl<const S: usize> MonteCarloTree<S> {
 
     /// Print human-readable information of the search's progress.
     pub fn print_info(&self) {
-        let mut best_children = self.children();
+        let child = self.get_child();
+        let mut best_children: Vec<&TreeEdge> = child.children.iter().collect();
 
         best_children.sort_by_key(|edge| edge.visits);
         best_children.reverse();
