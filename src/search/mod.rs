@@ -4,7 +4,7 @@
 
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
-use std::cell::{self, Cell, RefCell};
+use std::cell;
 use std::{mem, time};
 
 use crate::position::Move;
@@ -15,11 +15,11 @@ use crate::search::mcts_core::{TempVectors, Tree, TreeEdge};
 
 use self::mcts_core::Pv;
 
-// use self::mcts_core::{Pv, TreeEdge};
-
 /// This module contains the public-facing convenience API for the search.
 /// The implementation itself in in mcts_core.
 mod mcts_core;
+mod arena;
+use arena::Arena;
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug, PartialEq, Clone)]
@@ -107,38 +107,6 @@ impl<const N: usize> MctsSetting<N> {
 
 /// Type alias for winning probability, used for scoring positions.
 pub type Score = f32;
-
-pub struct Arena<T> {
-    data: Box<[RefCell<T>]>,
-    next_index: Cell<u32>,
-}
-
-impl<T: Default> Arena<T> {
-    pub fn new(capacity: usize) -> Self {
-        let mut data_vec = Vec::with_capacity(capacity);
-        while data_vec.len() < data_vec.capacity() {
-            data_vec.push(RefCell::new(T::default()));
-        }
-        Self {
-            data: data_vec.into_boxed_slice(),
-            next_index: Cell::new(1),
-        }
-    }
-
-    pub fn get(&self, index: u32) -> cell::Ref<T> {
-        self.data[index as usize].borrow()
-    }
-
-    pub fn get_mut(&self, index: u32) -> cell::RefMut<T> {
-        self.data[index as usize].borrow_mut()
-    }
-
-    pub fn add(&self, value: T) -> u32 {
-        let old_index = self.next_index.replace(self.next_index.get() + 1);
-        *self.get_mut(old_index) = value;
-        old_index
-    }
-}
 
 /// Abstract representation of a Monte Carlo Search Tree.
 /// Gives more fine-grained control of the search process compared to using the `mcts` function.
