@@ -4,15 +4,18 @@
 
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
+use std::cell::{self, Cell, RefCell};
 use std::{mem, time};
 
 use crate::position::Move;
 use crate::position::Position;
 use crate::position::{Role, Square};
 pub use crate::search::mcts_core::best_move;
-use crate::search::mcts_core::{TempVectors, Tree};
+use crate::search::mcts_core::{TempVectors, Tree, TreeEdge};
 
-use self::mcts_core::{Pv, TreeEdge};
+use self::mcts_core::Pv;
+
+// use self::mcts_core::{Pv, TreeEdge};
 
 /// This module contains the public-facing convenience API for the search.
 /// The implementation itself in in mcts_core.
@@ -105,14 +108,47 @@ impl<const N: usize> MctsSetting<N> {
 /// Type alias for winning probability, used for scoring positions.
 pub type Score = f32;
 
+pub struct Arena<T> {
+    data: Box<[RefCell<T>]>,
+    next_index: Cell<u32>,
+}
+
+impl<T: Default> Arena<T> {
+    pub fn new(capacity: usize) -> Self {
+        let mut data_vec = Vec::with_capacity(capacity);
+        while data_vec.len() < data_vec.capacity() {
+            data_vec.push(RefCell::new(T::default()));
+        }
+        Self {
+            data: data_vec.into_boxed_slice(),
+            next_index: Cell::new(1),
+        }
+    }
+
+    pub fn get(&self, index: u32) -> cell::Ref<T> {
+        self.data[index as usize].borrow()
+    }
+
+    pub fn get_mut(&self, index: u32) -> cell::RefMut<T> {
+        self.data[index as usize].borrow_mut()
+    }
+
+    pub fn add(&self, value: T) -> u32 {
+        let old_index = self.next_index.replace(self.next_index.get() + 1);
+        *self.get_mut(old_index) = value;
+        old_index
+    }
+}
+
 /// Abstract representation of a Monte Carlo Search Tree.
 /// Gives more fine-grained control of the search process compared to using the `mcts` function.
-#[derive(Clone, PartialEq, Debug)]
+// #[derive(Clone, PartialEq, Debug)]
 pub struct MonteCarloTree<const S: usize> {
     edge: TreeEdge, // A virtual edge to the first node, with fake move and heuristic score
     position: Position<S>,
     settings: MctsSetting<S>,
     temp_vectors: TempVectors,
+    arena: Arena<Tree>,
 }
 
 impl<const S: usize> MonteCarloTree<S> {
@@ -128,7 +164,16 @@ impl<const S: usize> MonteCarloTree<S> {
             position,
             settings: MctsSetting::default(),
             temp_vectors: TempVectors::new::<S>(),
+            arena: Arena::new(1_000_000),
         }
+    }
+
+    pub fn get_child(&self) -> cell::Ref<Tree> {
+        self.arena.get(self.edge.child.unwrap())
+    }
+
+    pub fn get_child_mut(&self) -> cell::RefMut<Tree> {
+        self.arena.get_mut(self.edge.child.unwrap())
     }
 
     pub fn with_settings(position: Position<S>, settings: MctsSetting<S>) -> Self {
@@ -144,28 +189,26 @@ impl<const S: usize> MonteCarloTree<S> {
             position,
             settings: settings.clone(),
             temp_vectors: TempVectors::new::<S>(),
+            arena: Arena::new(1_000_000),
         };
 
         if let Some(alpha) = tree.settings.dirichlet {
             tree.select();
             tree.select();
-            (*tree.edge.child.as_mut().unwrap()).apply_dirichlet(0.25, alpha);
+            (tree.arena.get_mut(tree.edge.child.unwrap())).apply_dirichlet(0.25, alpha);
         }
 
         if !tree.settings.excluded_moves.is_empty() {
             tree.select();
             tree.select();
             let filtered_edges: Vec<TreeEdge> = tree
-                .edge
-                .child
-                .as_ref()
-                .unwrap()
+                .get_child()
                 .children
                 .iter()
                 .filter(|edge| !settings.excluded_moves.contains(&edge.mv))
                 .cloned()
                 .collect();
-            tree.edge.child.as_mut().unwrap().children = filtered_edges.into_boxed_slice();
+            (*tree.get_child_mut()).children = filtered_edges.into_boxed_slice();
         }
 
         tree
@@ -192,7 +235,7 @@ impl<const S: usize> MonteCarloTree<S> {
                 return;
             }
 
-            let mut child_refs: Vec<&TreeEdge> = self.children().iter().collect();
+            let mut child_refs: Vec<TreeEdge> = self.children();
             child_refs.sort_by_key(|edge| edge.visits);
             child_refs.reverse();
 
@@ -210,7 +253,8 @@ impl<const S: usize> MonteCarloTree<S> {
                 .children()
                 .iter()
                 .max_by_key(|edge| edge.visits)
-                .unwrap();
+                .unwrap()
+                .clone();
 
             let best_exploration_value = best_edge.exploration_value(visits_sqrt, dynamic_cpuct);
 
@@ -237,16 +281,14 @@ impl<const S: usize> MonteCarloTree<S> {
             &mut self.position.clone(),
             &self.settings,
             &mut self.temp_vectors,
+            &self.arena,
         )
     }
 
     /// Returns the best move, and its score (as winning probability) from the perspective of the side to move
     /// Panics if no search iterations have been run
     pub fn best_move(&self) -> (Move, f32) {
-        self.edge
-            .child
-            .as_ref()
-            .unwrap()
+        self.get_child()
             .children
             .iter()
             .max_by_key(|edge| edge.visits)
@@ -254,37 +296,40 @@ impl<const S: usize> MonteCarloTree<S> {
             .unwrap_or_else(|| panic!("Couldn't find best move"))
     }
 
-    pub fn node_edge_sizes(&self) -> (usize, usize) {
-        pub fn edge_sizes(edge: &TreeEdge) -> (usize, usize) {
-            if let Some(child) = &edge.child {
-                let (child_nodes, child_edges) = node_sizes(child);
+    pub fn node_edge_sizes(&self, arena: &Arena<Tree>) -> (usize, usize) {
+        pub fn edge_sizes(edge: &TreeEdge, arena: &Arena<Tree>) -> (usize, usize) {
+            if let Some(child_index) = &edge.child {
+                let (child_nodes, child_edges) = node_sizes(&*arena.get(*child_index), arena);
                 (child_nodes, child_edges + 1)
             } else {
                 (0, 1)
             }
         }
-        pub fn node_sizes(node: &Tree) -> (usize, usize) {
-            node.children.iter().map(edge_sizes).fold(
-                (1, 0),
-                |(acc_nodes, acc_edges), (child_nodes, child_edges)| {
-                    (acc_nodes + child_nodes, acc_edges + child_edges)
-                },
-            )
+        pub fn node_sizes(node: &Tree, arena: &Arena<Tree>) -> (usize, usize) {
+            node.children
+                .iter()
+                .map(|edge| edge_sizes(edge, arena))
+                .fold(
+                    (1, 0),
+                    |(acc_nodes, acc_edges), (child_nodes, child_edges)| {
+                        (acc_nodes + child_nodes, acc_edges + child_edges)
+                    },
+                )
         }
-        edge_sizes(&self.edge)
+        edge_sizes(&self.edge, arena)
     }
 
-    fn children(&self) -> &[TreeEdge] {
-        &self.edge.child.as_ref().unwrap().children
+    fn children(&self) -> Vec<TreeEdge> {
+        self.get_child().children.to_vec()
     }
 
     pub fn pv(&self) -> impl Iterator<Item = Move> + '_ {
-        Pv::new(self.edge.child.as_ref().unwrap())
+        Pv::new(self.edge.child.unwrap(), &self.arena)
     }
 
     /// Print human-readable information of the search's progress.
     pub fn print_info(&self) {
-        let mut best_children: Vec<&TreeEdge> = self.children().iter().collect();
+        let mut best_children = self.children();
 
         best_children.sort_by_key(|edge| edge.visits);
         best_children.reverse();
@@ -299,8 +344,8 @@ impl<const S: usize> MonteCarloTree<S> {
                 "Move {}: {} visits, {:.2}% mean action value, {:.3}% static score, {:.3} exploration value, pv {}",
                 edge.mv.to_string::<S>(), edge.visits, edge.mean_action_value * 100.0, edge.heuristic_score * 100.0,
                 edge.exploration_value((self.visits() as Score).sqrt(), dynamic_cpuct),
-                if edge.child.is_some() {
-                    Pv::new(edge.child.as_ref().unwrap()).map(|mv| mv.to_string::<S>() + " ").collect::<String>()
+                if let Some(index) = edge.child {
+                    Pv::new(index, &self.arena).map(|mv| mv.to_string::<S>() + " ").collect::<String>()
                 }
                 else {
                     String::new()
