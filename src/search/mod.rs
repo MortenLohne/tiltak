@@ -131,7 +131,7 @@ impl<const S: usize> MonteCarloTree<S> {
             position,
             settings: MctsSetting::default(),
             temp_vectors: TempVectors::new::<S>(),
-            arena: Arena::new(1_000_000),
+            arena: Arena::new(1_000_000, 32).unwrap(),
         }
     }
 
@@ -156,7 +156,7 @@ impl<const S: usize> MonteCarloTree<S> {
             position,
             settings: settings.clone(),
             temp_vectors: TempVectors::new::<S>(),
-            arena: Arena::new(1_000_000),
+            arena: Arena::new(1_000_000, 32).unwrap(),
         };
 
         if let Some(alpha) = tree.settings.dirichlet {

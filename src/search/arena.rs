@@ -1,13 +1,18 @@
 use std::{
-    cell::{self, UnsafeCell},
+    alloc,
+    alloc::Layout,
+    cell,
     marker::PhantomData,
-    mem,
+    mem::{self, MaybeUninit},
     num::NonZeroU32,
 };
 
 pub struct Arena {
-    data: Box<[UnsafeCell<[u8; 32]>]>,
-    next_index: cell::Cell<NonZeroU32>,
+    data: *mut u8,
+    layout: Layout,
+    next_index: cell::RefCell<NonZeroU32>,
+    elem_size: usize,
+    max_index: NonZeroU32,
 }
 #[derive(PartialEq, Debug)]
 pub struct Index<T> {
@@ -24,37 +29,76 @@ impl<T> Index<T> {
     }
 }
 
+const fn raw_alignment(mut alignment: usize) -> usize {
+    let mut raw_alignment = 1;
+    while alignment % 2 == 0 {
+        raw_alignment *= 2;
+        alignment /= 2;
+    }
+    raw_alignment
+}
+
 impl Arena {
-    pub fn new(capacity: usize) -> Self {
-        let mut data_vec = Vec::with_capacity(capacity);
-        while data_vec.len() < data_vec.capacity() {
-            data_vec.push(UnsafeCell::new([0; 32]));
+    pub fn new(capacity: u32, elem_size: usize) -> Option<Self> {
+        if elem_size == 0 || capacity == 0 || capacity >= u32::MAX - 1 {
+            return None;
         }
-        Self {
-            data: data_vec.into_boxed_slice(),
-            next_index: cell::Cell::new(NonZeroU32::new(1).unwrap()),
-        }
+        let raw_alignment = raw_alignment(elem_size);
+
+        let layout =
+            Layout::from_size_align((capacity as usize + 2) * elem_size, raw_alignment).ok()?;
+        let data = unsafe {
+            let ptr = alloc::alloc(layout);
+
+            // Make sure the data starts at an address divisible by `elem_size`
+            ptr.add(elem_size - (ptr as usize) % elem_size)
+        };
+
+        Some(Self {
+            data,
+            layout,
+            next_index: cell::RefCell::new(NonZeroU32::new(1).unwrap()),
+            elem_size,
+            max_index: NonZeroU32::new(capacity + 1).unwrap(),
+        })
     }
 
     pub fn get<'a, T>(&'a self, index: &'a Index<T>) -> &'a T {
-        let ptr = self.data[index.data.get() as usize].get() as *const T;
-        unsafe { &*ptr }
+        unsafe {
+            let ptr = self.ptr_to_index(index.data) as *const T;
+            &*ptr
+        }
     }
 
     pub fn get_mut<'a, T>(&'a self, index: &'a mut Index<T>) -> &'a mut T {
-        let ptr = self.data[index.data.get() as usize].get() as *mut T;
-        unsafe { &mut *ptr }
+        unsafe {
+            let ptr = self.ptr_to_index(index.data) as *mut T;
+            &mut *ptr
+        }
     }
 
     pub fn add<T>(&self, value: T) -> Index<T> {
         // Check that the arena supports this value
-        assert_eq!(mem::size_of::<T>(), mem::size_of::<[u8; 32]>());
+        assert_eq!(mem::size_of::<T>(), self.elem_size);
 
-        let old_index_raw = self
-            .next_index
-            .replace(NonZeroU32::new(self.next_index.get().get() + 1).unwrap());
-        let mut old_index = Index::new(old_index_raw);
-        *self.get_mut(&mut old_index) = value;
+        let mut raw_next_index = self.next_index.borrow_mut();
+
+        assert!(*raw_next_index <= self.max_index);
+
+        let ptr = unsafe { self.ptr_to_index(*raw_next_index) as *mut MaybeUninit<T> };
+
+        unsafe {
+            (*ptr).write(value);
+        }
+
+        let old_index = Index::new(*raw_next_index);
+
+        *raw_next_index = NonZeroU32::new(raw_next_index.get() + 1).unwrap();
+
         old_index
+    }
+
+    unsafe fn ptr_to_index(&self, raw_index: NonZeroU32) -> *const u8 {
+        self.data.add(raw_index.get() as usize * self.elem_size)
     }
 }
