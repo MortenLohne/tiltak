@@ -718,7 +718,7 @@ impl PlaytakSession {
                         {
                             let settings = playtak_settings.to_mcts_setting();
 
-                            let maximum_time = our_time_left / 20 + game.increment;
+                            let maximum_time = our_time_left / 6 + game.increment / 2;
 
                             search::play_move_time(position.clone(), maximum_time, settings)
                         }
