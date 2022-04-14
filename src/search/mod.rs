@@ -4,7 +4,6 @@
 
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
-use std::cell;
 use std::{mem, time};
 
 use crate::position::Move;
@@ -136,11 +135,11 @@ impl<const S: usize> MonteCarloTree<S> {
         }
     }
 
-    pub fn get_child(&self) -> cell::Ref<Tree> {
+    pub fn get_child(&self) -> &Tree {
         self.arena.get(self.edge.child.as_ref().unwrap())
     }
 
-    pub fn get_child_mut(&mut self) -> cell::RefMut<Tree> {
+    pub fn get_child_mut(&mut self) -> &mut Tree {
         self.arena.get_mut(self.edge.child.as_mut().unwrap())
     }
 

@@ -1,4 +1,4 @@
-use std::{cell, ops};
+use std::ops;
 
 use board_game_traits::{Color, GameResult, Position as PositionTrait};
 use rand::distributions::Distribution;
@@ -314,11 +314,11 @@ impl GameResultForUs {
 
 pub struct Pv<'a> {
     arena: &'a Arena,
-    tree: cell::Ref<'a, Tree>,
+    tree: &'a Tree,
 }
 
 impl<'a> Pv<'a> {
-    pub fn new(tree: cell::Ref<'a, Tree>, arena: &'a Arena) -> Pv<'a> {
+    pub fn new(tree: &'a Tree, arena: &'a Arena) -> Pv<'a> {
         Pv { tree, arena }
     }
 }
@@ -327,15 +327,19 @@ impl<'a> Iterator for Pv<'a> {
     type Item = Move;
 
     fn next(&mut self) -> Option<Self::Item> {
+        /*
         if let Some(edge) = self.tree.children.iter().max_by_key(|edge| edge.visits) {
             let mv = edge.mv.clone();
             if let Some(index) = edge.child.as_ref() {
-                self.tree = self.arena.get(index);
+                self.tree = cell::Ref::clone(&self.arena.get(index));
             }
             Some(mv)
         } else {
             None
         }
+        */
+        // TODO fix
+        None
     }
 }
 
