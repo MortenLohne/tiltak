@@ -15,10 +15,10 @@ use crate::search::mcts_core::{TempVectors, Tree, TreeEdge};
 
 use self::mcts_core::Pv;
 
+mod arena;
 /// This module contains the public-facing convenience API for the search.
 /// The implementation itself in in mcts_core.
 mod mcts_core;
-mod arena;
 use arena::Arena;
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -137,11 +137,11 @@ impl<const S: usize> MonteCarloTree<S> {
     }
 
     pub fn get_child(&self) -> cell::Ref<Tree> {
-        self.arena.get(self.edge.child.unwrap())
+        self.arena.get(self.edge.child.as_ref().unwrap())
     }
 
-    pub fn get_child_mut(&self) -> cell::RefMut<Tree> {
-        self.arena.get_mut(self.edge.child.unwrap())
+    pub fn get_child_mut(&mut self) -> cell::RefMut<Tree> {
+        self.arena.get_mut(self.edge.child.as_mut().unwrap())
     }
 
     pub fn with_settings(position: Position<S>, settings: MctsSetting<S>) -> Self {
@@ -163,7 +163,7 @@ impl<const S: usize> MonteCarloTree<S> {
         if let Some(alpha) = tree.settings.dirichlet {
             tree.select();
             tree.select();
-            (tree.arena.get_mut(tree.edge.child.unwrap())).apply_dirichlet(0.25, alpha);
+            (tree.arena.get_mut(tree.edge.child.as_mut().unwrap())).apply_dirichlet(0.25, alpha);
         }
 
         if !tree.settings.excluded_moves.is_empty() {
@@ -174,7 +174,7 @@ impl<const S: usize> MonteCarloTree<S> {
                 .children
                 .iter()
                 .filter(|edge| !settings.excluded_moves.contains(&edge.mv))
-                .cloned()
+                .map(|edge| edge.shallow_clone())
                 .collect();
             (*tree.get_child_mut()).children = filtered_edges.into_boxed_slice();
         }
@@ -222,7 +222,7 @@ impl<const S: usize> MonteCarloTree<S> {
                 .iter()
                 .max_by_key(|edge| edge.visits)
                 .unwrap()
-                .clone();
+                .shallow_clone();
 
             let best_exploration_value = best_edge.exploration_value(visits_sqrt, dynamic_cpuct);
 
@@ -267,7 +267,7 @@ impl<const S: usize> MonteCarloTree<S> {
     pub fn node_edge_sizes(&self, arena: &Arena<Tree>) -> (usize, usize) {
         pub fn edge_sizes(edge: &TreeEdge, arena: &Arena<Tree>) -> (usize, usize) {
             if let Some(child_index) = &edge.child {
-                let (child_nodes, child_edges) = node_sizes(&*arena.get(*child_index), arena);
+                let (child_nodes, child_edges) = node_sizes(&*arena.get(child_index), arena);
                 (child_nodes, child_edges + 1)
             } else {
                 (0, 1)
@@ -288,11 +288,18 @@ impl<const S: usize> MonteCarloTree<S> {
     }
 
     fn children(&self) -> Vec<TreeEdge> {
-        self.get_child().children.to_vec()
+        self.get_child()
+            .children
+            .iter()
+            .map(|edge| edge.shallow_clone())
+            .collect()
     }
 
     pub fn pv(&self) -> impl Iterator<Item = Move> + '_ {
-        Pv::new(self.edge.child.unwrap(), &self.arena)
+        Pv::new(
+            self.arena.get(self.edge.child.as_ref().unwrap()),
+            &self.arena,
+        )
     }
 
     /// Print human-readable information of the search's progress.
@@ -312,8 +319,8 @@ impl<const S: usize> MonteCarloTree<S> {
                 "Move {}: {} visits, {:.2}% mean action value, {:.3}% static score, {:.3} exploration value, pv {}",
                 edge.mv.to_string::<S>(), edge.visits, edge.mean_action_value * 100.0, edge.heuristic_score * 100.0,
                 edge.exploration_value((self.visits() as Score).sqrt(), dynamic_cpuct),
-                if let Some(index) = edge.child {
-                    Pv::new(index, &self.arena).map(|mv| mv.to_string::<S>() + " ").collect::<String>()
+                if let Some(index) = edge.child.as_ref() {
+                    Pv::new(self.arena.get(index), &self.arena).map(|mv| mv.to_string::<S>() + " ").collect::<String>()
                 }
                 else {
                     String::new()

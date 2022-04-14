@@ -1,4 +1,4 @@
-use std::ops;
+use std::{cell, ops};
 
 use board_game_traits::{Color, GameResult, Position as PositionTrait};
 use rand::distributions::Distribution;
@@ -10,19 +10,19 @@ use crate::position::Move;
 use crate::position::{GroupData, Position};
 use crate::search::{cp_to_win_percentage, MctsSetting, Score};
 
-use super::Arena;
+use super::{arena, Arena};
 
 /// A Monte Carlo Search Tree, containing every node that has been seen in search.
-#[derive(Clone, PartialEq, Debug, Default)]
+#[derive(PartialEq, Debug, Default)]
 pub struct Tree {
     pub children: Box<[TreeEdge]>,
     pub total_action_value: f64,
     pub is_terminal: bool,
 }
 
-#[derive(Clone, PartialEq, Debug)]
+#[derive(PartialEq, Debug)]
 pub struct TreeEdge {
-    pub child: Option<u32>,
+    pub child: Option<arena::Index>,
     pub mv: Move,
     pub mean_action_value: Score,
     pub visits: u64,
@@ -60,6 +60,16 @@ impl TreeEdge {
         }
     }
 
+    pub fn shallow_clone(&self) -> Self {
+        Self {
+            child: None,
+            mv: self.mv.clone(),
+            mean_action_value: self.mean_action_value,
+            visits: self.visits,
+            heuristic_score: self.heuristic_score,
+        }
+    }
+
     /// Perform one iteration of monte carlo tree search.
     ///
     /// Moves done on the board are not reversed.
@@ -72,12 +82,14 @@ impl TreeEdge {
     ) -> Score {
         if self.visits == 0 {
             self.expand(position, settings, temp_vectors, arena)
-        } else if arena.get(self.child.unwrap()).is_terminal {
+        } else if arena.get(self.child.as_ref().unwrap()).is_terminal {
             self.visits += 1;
-            arena.get_mut(self.child.unwrap()).total_action_value += self.mean_action_value as f64;
+            arena
+                .get_mut(self.child.as_mut().unwrap())
+                .total_action_value += self.mean_action_value as f64;
             self.mean_action_value
         } else {
-            let mut node = arena.get_mut(self.child.unwrap());
+            let mut node = arena.get_mut(self.child.as_mut().unwrap());
             debug_assert_eq!(
                 self.visits,
                 node.children.iter().map(|edge| edge.visits).sum::<u64>() + 1,
@@ -141,7 +153,7 @@ impl TreeEdge {
         debug_assert!(self.child.is_none());
         self.child = Some(arena.add(Tree::new_node()));
 
-        let mut child = arena.get_mut(self.child.unwrap());
+        let mut child = arena.get_mut(self.child.as_mut().unwrap());
 
         let (eval, is_terminal) = rollout(position, settings, settings.rollout_depth, temp_vectors);
 
@@ -302,12 +314,12 @@ impl GameResultForUs {
 
 pub struct Pv<'a> {
     arena: &'a Arena<Tree>,
-    index: u32,
+    tree: cell::Ref<'a, Tree>,
 }
 
 impl<'a> Pv<'a> {
-    pub fn new(index: u32, arena: &'a Arena<Tree>) -> Pv<'a> {
-        Pv { index, arena }
+    pub fn new(tree: cell::Ref<'a, Tree>, arena: &'a Arena<Tree>) -> Pv<'a> {
+        Pv { tree, arena }
     }
 }
 
@@ -315,16 +327,15 @@ impl<'a> Iterator for Pv<'a> {
     type Item = Move;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let tree = self.arena.get(self.index);
-        tree.children
-            .iter()
-            .max_by_key(|edge| edge.visits)
-            .and_then(|edge| {
-                edge.child.as_ref().map(|child_index| {
-                    self.index = *child_index;
-                    edge.mv.clone()
-                })
-            })
+        if let Some(edge) = self.tree.children.iter().max_by_key(|edge| edge.visits) {
+            let mv = edge.mv.clone();
+            if let Some(index) = edge.child.as_ref() {
+                self.tree = self.arena.get(index);
+            }
+            Some(mv)
+        } else {
+            None
+        }
     }
 }
 
