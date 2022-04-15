@@ -13,9 +13,9 @@ use crate::search::{cp_to_win_percentage, MctsSetting, Score};
 use super::{arena, Arena};
 
 /// A Monte Carlo Search Tree, containing every node that has been seen in search.
-#[derive(PartialEq, Debug, Default)]
+#[derive(PartialEq, Debug)]
 pub struct Tree {
-    pub children: Box<[TreeEdge]>,
+    pub children: arena::SliceIndex<TreeEdge>,
     pub total_action_value: f64,
     pub is_terminal: bool,
 }
@@ -92,7 +92,12 @@ impl TreeEdge {
             let mut node = arena.get_mut(self.child.as_mut().unwrap());
             debug_assert_eq!(
                 self.visits,
-                node.children.iter().map(|edge| edge.visits).sum::<u64>() + 1,
+                arena
+                    .get_slice(&node.children)
+                    .iter()
+                    .map(|edge| edge.visits)
+                    .sum::<u64>()
+                    + 1,
                 "{} visits, {} total action value, {} mean action value",
                 self.visits,
                 node.total_action_value,
@@ -101,7 +106,7 @@ impl TreeEdge {
             // Only generate child moves on the 2nd visit
             if self.visits == 1 {
                 let group_data = position.group_data();
-                node.init_children(position, &group_data, settings, temp_vectors);
+                node.init_children(position, &group_data, settings, temp_vectors, arena);
             }
 
             let visits_sqrt = (self.visits as Score).sqrt();
@@ -111,7 +116,7 @@ impl TreeEdge {
                 );
 
             assert_ne!(
-                node.children.len(),
+                arena.get_slice(&node.children).len(),
                 0,
                 "No legal moves in position\n{:?}",
                 position
@@ -120,7 +125,7 @@ impl TreeEdge {
             let mut best_exploration_value = 0.0;
             let mut best_child_node_index = 0;
 
-            for (i, edge) in node.children.iter().enumerate() {
+            for (i, edge) in arena.get_slice(&node.children).iter().enumerate() {
                 let child_exploration_value = edge.exploration_value(visits_sqrt, dynamic_cpuct);
                 if child_exploration_value >= best_exploration_value {
                     best_child_node_index = i;
@@ -128,7 +133,10 @@ impl TreeEdge {
                 }
             }
 
-            let child_edge = node.children.get_mut(best_child_node_index).unwrap();
+            let child_edge = arena
+                .get_slice_mut(&mut node.children)
+                .get_mut(best_child_node_index)
+                .unwrap();
 
             position.do_move(child_edge.mv.clone());
             let result = 1.0 - child_edge.select::<S>(position, settings, temp_vectors, arena);
@@ -181,6 +189,7 @@ impl Tree {
         group_data: &GroupData<S>,
         settings: &MctsSetting<S>,
         temp_vectors: &mut TempVectors,
+        arena: &Arena,
     ) {
         position.generate_moves_with_params(
             &settings.policy_params,
@@ -200,12 +209,12 @@ impl Tree {
                 settings.initial_mean_action_value(),
             ));
         }
-        self.children = children_vec.into_boxed_slice();
+        self.children = arena.add_slice(&mut children_vec);
     }
 
     fn new_node() -> Self {
         Tree {
-            children: Box::new([]),
+            children: arena::SliceIndex::default(),
             total_action_value: 0.0,
             is_terminal: false,
         }
@@ -215,12 +224,14 @@ impl Tree {
     /// The noise is given `epsilon` weight.
     /// `alpha` is used to generate the noise, lower values generate more varied noise.
     /// Values above 1 are less noisy, and tend towards uniform outputs
-    pub fn apply_dirichlet(&mut self, epsilon: f32, alpha: f32) {
+    pub fn apply_dirichlet(&mut self, arena: &Arena, epsilon: f32, alpha: f32) {
         let mut rng = rand::thread_rng();
-        let dirichlet = rand_distr::Dirichlet::new_with_size(alpha, self.children.len()).unwrap();
+        let dirichlet =
+            rand_distr::Dirichlet::new_with_size(alpha, arena.get_slice(&self.children).len())
+                .unwrap();
         let noise_vec = dirichlet.sample(&mut rng);
-        for (child_prior, eta) in self
-            .children
+        for (child_prior, eta) in arena
+            .get_slice_mut(&mut self.children)
             .iter_mut()
             .map(|child| &mut child.heuristic_score)
             .zip(noise_vec)

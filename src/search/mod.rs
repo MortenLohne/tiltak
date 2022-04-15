@@ -131,7 +131,7 @@ impl<const S: usize> MonteCarloTree<S> {
             position,
             settings: MctsSetting::default(),
             temp_vectors: TempVectors::new::<S>(),
-            arena: Arena::new(1_000_000, 32).unwrap(),
+            arena: Arena::new(100_000_000, 8).unwrap(),
         }
     }
 
@@ -156,26 +156,30 @@ impl<const S: usize> MonteCarloTree<S> {
             position,
             settings: settings.clone(),
             temp_vectors: TempVectors::new::<S>(),
-            arena: Arena::new(1_000_000, 32).unwrap(),
+            arena: Arena::new(100_000_000, 8).unwrap(),
         };
 
         if let Some(alpha) = tree.settings.dirichlet {
             tree.select();
             tree.select();
-            (tree.arena.get_mut(tree.edge.child.as_mut().unwrap())).apply_dirichlet(0.25, alpha);
+            (tree.arena.get_mut(tree.edge.child.as_mut().unwrap())).apply_dirichlet(
+                &tree.arena,
+                0.25,
+                alpha,
+            );
         }
 
         if !tree.settings.excluded_moves.is_empty() {
             tree.select();
             tree.select();
-            let filtered_edges: Vec<TreeEdge> = tree
-                .get_child()
-                .children
+            let mut filtered_edges: Vec<TreeEdge> = tree
+                .arena
+                .get_slice(&tree.get_child().children)
                 .iter()
                 .filter(|edge| !settings.excluded_moves.contains(&edge.mv))
                 .map(|edge| edge.shallow_clone())
                 .collect();
-            (*tree.get_child_mut()).children = filtered_edges.into_boxed_slice();
+            (*tree.get_child_mut()).children = tree.arena.add_slice(&mut filtered_edges);
         }
 
         tree
@@ -203,7 +207,8 @@ impl<const S: usize> MonteCarloTree<S> {
             }
 
             let child = self.get_child();
-            let mut child_refs: Vec<&TreeEdge> = child.children.iter().collect();
+            let mut child_refs: Vec<&TreeEdge> =
+                self.arena.get_slice(&child.children).iter().collect();
 
             child_refs.sort_by_key(|edge| edge.visits);
             child_refs.reverse();
@@ -257,8 +262,8 @@ impl<const S: usize> MonteCarloTree<S> {
     /// Returns the best move, and its score (as winning probability) from the perspective of the side to move
     /// Panics if no search iterations have been run
     pub fn best_move(&self) -> (Move, f32) {
-        self.get_child()
-            .children
+        self.arena
+            .get_slice(&self.get_child().children)
             .iter()
             .max_by_key(|edge| edge.visits)
             .map(|edge| (edge.mv.clone(), 1.0 - edge.mean_action_value))
@@ -275,7 +280,8 @@ impl<const S: usize> MonteCarloTree<S> {
             }
         }
         pub fn node_sizes(node: &Tree, arena: &Arena) -> (usize, usize) {
-            node.children
+            arena
+                .get_slice(&node.children)
                 .iter()
                 .map(|edge| edge_sizes(edge, arena))
                 .fold(
@@ -289,8 +295,8 @@ impl<const S: usize> MonteCarloTree<S> {
     }
 
     fn children(&self) -> Vec<TreeEdge> {
-        self.get_child()
-            .children
+        self.arena
+            .get_slice(&self.get_child().children)
             .iter()
             .map(|edge| edge.shallow_clone())
             .collect()
@@ -306,7 +312,8 @@ impl<const S: usize> MonteCarloTree<S> {
     /// Print human-readable information of the search's progress.
     pub fn print_info(&self) {
         let child = self.get_child();
-        let mut best_children: Vec<&TreeEdge> = child.children.iter().collect();
+        let mut best_children: Vec<&TreeEdge> =
+            self.arena.get_slice(&child.children).iter().collect();
 
         best_children.sort_by_key(|edge| edge.visits);
         best_children.reverse();

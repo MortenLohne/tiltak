@@ -1,12 +1,4 @@
-use std::{
-    alloc,
-    alloc::Layout,
-    cell,
-    marker::PhantomData,
-    mem::{self, MaybeUninit},
-    num::NonZeroU32,
-    slice,
-};
+use std::{alloc, alloc::Layout, any, cell, fmt, marker::PhantomData, mem, num::NonZeroU32, slice};
 
 pub struct Arena {
     data: *mut u8,
@@ -16,6 +8,17 @@ pub struct Arena {
     elem_size: usize,
     max_index: NonZeroU32,
 }
+
+impl fmt::Debug for Arena {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Arena")
+            .field("next_index", &self.next_index)
+            .field("elem_size", &self.elem_size)
+            .field("max_index", &self.max_index)
+            .finish()
+    }
+}
+
 #[derive(PartialEq, Debug)]
 pub struct Index<T> {
     data: NonZeroU32,
@@ -31,18 +34,29 @@ impl<T> Index<T> {
     }
 }
 
+#[derive(PartialEq, Debug)]
 pub struct SliceIndex<T> {
     data: NonZeroU32,
-    length: NonZeroU32,
+    length: u32,
     phantom: PhantomData<T>,
 }
 
 impl<T> SliceIndex<T> {
-    fn new(data: NonZeroU32, length: NonZeroU32) -> Self {
+    fn new(data: NonZeroU32, length: u32) -> Self {
         Self {
             data,
             length,
             phantom: PhantomData::default(),
+        }
+    }
+}
+
+impl<T> Default for SliceIndex<T> {
+    fn default() -> Self {
+        Self {
+            data: NonZeroU32::new(1).unwrap(),
+            length: 0,
+            phantom: Default::default(),
         }
     }
 }
@@ -102,22 +116,37 @@ impl Arena {
     }
 
     pub fn get_slice<'a, T>(&'a self, index: &'a SliceIndex<T>) -> &'a [T] {
-        unsafe {
-            let ptr = self.ptr_to_index(index.data) as *const T;
-            slice::from_raw_parts(ptr, index.length.get() as usize)
+        if index.length == 0 {
+            Default::default()
+        } else {
+            unsafe {
+                let ptr = self.ptr_to_index(index.data) as *const T;
+                slice::from_raw_parts(ptr, index.length as usize)
+            }
         }
     }
 
     pub fn get_slice_mut<'a, T>(&'a self, index: &'a mut SliceIndex<T>) -> &'a mut [T] {
-        unsafe {
-            let ptr = self.ptr_to_index(index.data) as *mut T;
-            slice::from_raw_parts_mut(ptr, index.length.get() as usize)
+        if index.length == 0 {
+            Default::default()
+        } else {
+            unsafe {
+                let ptr = self.ptr_to_index(index.data) as *mut T;
+                slice::from_raw_parts_mut(ptr, index.length as usize)
+            }
         }
     }
 
     pub fn add<T>(&self, value: T) -> Index<T> {
         // Check that the arena supports this value
-        assert!(self.supports_type::<T>());
+        assert!(
+            self.supports_type::<T>(),
+            "cannot store {} of size {} and alignment {} in arena with size {}",
+            any::type_name::<T>(),
+            mem::size_of::<T>(),
+            mem::align_of::<T>(),
+            self.elem_size
+        );
 
         let mut raw_next_index = self.next_index.borrow_mut();
 
@@ -129,10 +158,10 @@ impl Arena {
                 <= self.max_index.get()
         );
 
-        let ptr = unsafe { self.ptr_to_index(*raw_next_index) as *mut MaybeUninit<T> };
+        let ptr = unsafe { self.ptr_to_index(*raw_next_index) as *mut T };
 
         unsafe {
-            (*ptr).write(value);
+            *ptr = value;
         }
 
         let old_index = Index::new(*raw_next_index);
@@ -159,16 +188,16 @@ impl Arena {
 
         assert!(raw_new_index <= self.max_index);
 
-        let mut ptr = unsafe { self.ptr_to_index(*raw_index) as *mut MaybeUninit<T> };
+        let mut ptr = unsafe { self.ptr_to_index(*raw_index) as *mut T };
 
         for value in values.drain(..) {
             unsafe {
-                (*ptr).write(value);
-                ptr = ptr.add(self.bucket_size::<T>() as usize);
+                *ptr = value;
+                ptr = ptr.add(1);
             }
         }
 
-        let old_index = SliceIndex::new(*raw_index, NonZeroU32::new(length as u32).unwrap());
+        let old_index = SliceIndex::new(*raw_index, length as u32);
 
         *raw_index = raw_new_index;
 
