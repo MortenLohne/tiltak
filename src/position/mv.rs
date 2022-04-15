@@ -2,6 +2,7 @@ use std::fmt::Write;
 use std::iter;
 use std::str::FromStr;
 
+use arrayvec::ArrayVec;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
@@ -257,5 +258,5 @@ impl Move {
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub enum ReverseMove {
     Place(Square),
-    Move(Square, Direction, StackMovement, bool),
+    Move(Square, Direction, StackMovement, ArrayVec<u8, 8>, bool),
 }

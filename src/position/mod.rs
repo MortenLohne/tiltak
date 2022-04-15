@@ -6,6 +6,7 @@ use std::mem;
 use std::ops::{Index, IndexMut};
 use std::{fmt, ops};
 
+use arrayvec::ArrayVec;
 use board_game_traits::{Color, GameResult};
 use board_game_traits::{EvalPosition as EvalPositionTrait, Position as PositionTrait};
 use lazy_static::lazy_static;
@@ -1003,9 +1004,11 @@ impl<const S: usize> Position<S> {
                     let num_moves = self.perft(depth - 1);
                     self.reverse_move(reverse_move);
                     debug_assert_eq!(
-                        *self, old_position,
+                        *self,
+                        old_position,
                         "Failed to restore old board after {:?} on\n{:?}",
-                        mv, old_position
+                        mv.to_string::<S>(),
+                        old_position
                     );
                     num_moves
                 })
@@ -1031,9 +1034,11 @@ impl<const S: usize> Position<S> {
                         let num_moves = self.bulk_perft(depth - 1);
                         self.reverse_move(reverse_move);
                         debug_assert_eq!(
-                            *self, old_position,
+                            *self,
+                            old_position,
                             "Failed to restore old board after {:?} on\n{:?}",
-                            mv, old_position
+                            mv.to_string::<S>(),
+                            old_position
                         );
                         num_moves
                     })
@@ -1109,9 +1114,9 @@ impl<const S: usize> PositionTrait for Position<S> {
             Move::Move(square, direction, stack_movement) => {
                 let mut from = square;
 
-                let mut pieces_held_behind = S as u8;
-                let mut pieces_left_behind = StackMovement::new();
+                let mut pieces_left_behind = ArrayVec::new();
                 let mut flattens_stone = false;
+                let mut pieces_taken_last = None;
 
                 for sq in <MoveIterator<S>>::new(square, direction, stack_movement) {
                     self.hash ^= self.zobrist_hash_for_square(sq);
@@ -1122,12 +1127,17 @@ impl<const S: usize> PositionTrait for Position<S> {
 
                     if self[to].top_stone.map(Piece::role) == Some(Wall) {
                         flattens_stone = true;
-                        debug_assert!(self[from].top_stone().unwrap().role() == Cap);
+                        debug_assert_eq!(
+                            self[from].top_stone().map(Piece::role),
+                            Some(Cap),
+                            "{}",
+                            mv.to_string::<S>()
+                        );
                     }
 
+                    assert!(self[from].len() >= pieces_to_take, "\n{:?}", self);
+
                     let pieces_to_leave = self[from].len() - pieces_to_take;
-                    pieces_left_behind.push::<S>(Movement { pieces_to_take }, pieces_held_behind); // TODO probably broken
-                    pieces_held_behind = pieces_to_take;
 
                     for _ in pieces_to_leave..self[from].len() {
                         let piece = self[from].get(pieces_to_leave).unwrap();
@@ -1135,19 +1145,28 @@ impl<const S: usize> PositionTrait for Position<S> {
                         self[from].remove(pieces_to_leave);
                     }
 
+                    if let Some(taken_last) = pieces_taken_last {
+                        pieces_left_behind.push(taken_last - pieces_to_take);
+                    }
+
+                    pieces_taken_last = Some(pieces_to_take);
+
                     from = to;
                 }
+
+                pieces_left_behind.push(pieces_taken_last.unwrap());
 
                 for sq in <MoveIterator<S>>::new(square, direction, stack_movement) {
                     self.hash ^= self.zobrist_hash_for_square(sq);
                 }
 
-                // let mut movement_vec: Vec<Movement> = pieces_left_behind.into_iter::<S>().collect();
-                // movement_vec.reverse();
-
-                // pieces_left_behind = StackMovement::from_movements::<S, _>(movement_vec);
-
-                ReverseMove::Move(from, direction.reverse(), stack_movement, flattens_stone)
+                ReverseMove::Move(
+                    square,
+                    direction,
+                    stack_movement,
+                    pieces_left_behind,
+                    flattens_stone,
+                )
             }
         };
 
@@ -1189,31 +1208,35 @@ impl<const S: usize> PositionTrait for Position<S> {
                 };
             }
 
-            ReverseMove::Move(from, direction, stack_movement, flattens_wall) => {
-                unimplemented!();
-                let mut square = from;
-
+            ReverseMove::Move(
+                from,
+                direction,
+                stack_movement,
+                pieces_left_behind,
+                flattens_wall,
+            ) => {
                 for square in <MoveIterator<S>>::new(from, direction, stack_movement) {
                     self.hash ^= self.zobrist_hash_for_square(square);
                 }
 
-                for Movement { pieces_to_take } in stack_movement.into_iter::<S>() {
-                    let to = square.go_direction::<S>(direction).unwrap();
+                let mut to = from;
 
-                    let pieces_to_leave = self[square].len() - pieces_to_take;
+                for piece_left_behind in pieces_left_behind.into_iter() {
+                    to = to.go_direction::<S>(direction).unwrap();
+                    let temp_pieces: ArrayVec<Piece, 8> = (0..piece_left_behind)
+                        .map(|_| self[to].pop().unwrap())
+                        .collect();
 
-                    for _ in pieces_to_leave..self[square].len() {
-                        let piece = self[square].get(pieces_to_leave).unwrap();
-                        self[to].push(piece);
-                        self[square].remove(pieces_to_leave);
+                    for piece in temp_pieces.into_iter().rev() {
+                        self[from].push(piece);
                     }
-                    square = to;
                 }
 
                 if flattens_wall {
-                    match self[from].top_stone().unwrap().color() {
-                        Color::White => self[from].replace_top(WhiteWall),
-                        Color::Black => self[from].replace_top(BlackWall),
+                    debug_assert_eq!(self[to].top_stone().map(Piece::role), Some(Flat));
+                    match self[to].top_stone().unwrap().color() {
+                        Color::White => self[to].replace_top(WhiteWall),
+                        Color::Black => self[to].replace_top(BlackWall),
                     };
                 };
 
