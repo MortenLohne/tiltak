@@ -69,6 +69,11 @@ impl<const S: usize> Position<S> {
         movements: &mut Vec<StackMovement>,
     ) {
         if let Some(neighbour) = square.go_direction::<S>(direction) {
+            let pieces_held = if square == origin_square {
+                S as u8
+            } else {
+                pieces_carried
+            };
             let max_pieces_to_take = if square == origin_square {
                 pieces_carried.min(S as u8)
             } else {
@@ -80,12 +85,12 @@ impl<const S: usize> Position<S> {
             }
             if neighbour_piece.map(Piece::role) == Some(Wall) && max_pieces_to_take > 0 {
                 let mut new_movement = partial_movement;
-                new_movement.push(Movement { pieces_to_take: 1 });
+                new_movement.push::<S>(Movement { pieces_to_take: 1 }, pieces_held);
                 movements.push(new_movement);
             } else {
                 for pieces_to_take in 1..=max_pieces_to_take {
                     let mut new_movement = partial_movement;
-                    new_movement.push(Movement { pieces_to_take });
+                    new_movement.push::<S>(Movement { pieces_to_take }, pieces_held);
 
                     self.generate_moving_moves_cap::<Colorr>(
                         direction,
@@ -95,6 +100,10 @@ impl<const S: usize> Position<S> {
                         new_movement,
                         movements,
                     );
+
+                    // Finish the movement
+                    new_movement.push::<S>(Movement { pieces_to_take: 0 }, pieces_to_take);
+
                     movements.push(new_movement);
                 }
             }
@@ -117,6 +126,11 @@ impl<const S: usize> Position<S> {
             }
 
             let neighbour = square.go_direction::<S>(direction).unwrap();
+            let pieces_held = if square == origin_square {
+                S as u8
+            } else {
+                pieces_carried
+            };
             let max_pieces_to_take = if square == origin_square {
                 pieces_carried.min(S as u8)
             } else {
@@ -124,7 +138,7 @@ impl<const S: usize> Position<S> {
             };
             for pieces_to_take in 1..=max_pieces_to_take {
                 let mut new_movement = partial_movement;
-                new_movement.push(Movement { pieces_to_take });
+                new_movement.push::<S>(Movement { pieces_to_take }, pieces_held);
 
                 self.generate_moving_moves_non_cap::<Colorr>(
                     direction,
@@ -134,6 +148,10 @@ impl<const S: usize> Position<S> {
                     new_movement,
                     movements,
                 );
+
+                // Finish the movement
+                new_movement.push::<S>(Movement { pieces_to_take: 0 }, pieces_to_take);
+
                 movements.push(new_movement);
             }
         }

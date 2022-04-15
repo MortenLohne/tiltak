@@ -36,7 +36,7 @@ impl Move {
                 Wall => write!(string, "S{}", square.to_string::<S>()).unwrap(),
             },
             Move::Move(square, direction, stack_movements) => {
-                let mut pieces_held = stack_movements.get(0).pieces_to_take;
+                let mut pieces_held = stack_movements.get::<S>(0).pieces_to_take;
                 if pieces_held == 1 {
                     write!(string, "{}", square.to_string::<S>()).unwrap();
                 } else {
@@ -50,7 +50,7 @@ impl Move {
                 }
                 // Omit number of pieces dropped, if all stones are dropped immediately
                 if stack_movements.len() > 1 {
-                    for movement in stack_movements.into_iter().skip(1) {
+                    for movement in stack_movements.into_iter::<S>().skip(1) {
                         let pieces_to_drop = pieces_held - movement.pieces_to_take;
                         write!(string, "{}", pieces_to_drop).unwrap();
                         pieces_held -= pieces_to_drop;
@@ -87,7 +87,7 @@ impl Move {
                     .ok_or_else(|| pgn_traits::Error::new_parse_error("Bad direction"))?;
                 // Moves in the simplified move notation always move one piece
                 let mut movement = StackMovement::new();
-                movement.push(Movement { pieces_to_take: 1 });
+                movement.push::<S>(Movement { pieces_to_take: 1 }, 1);
                 Ok(Move::Move(square, direction, movement))
             }
             'C' if input.len() == 3 => {
@@ -101,6 +101,12 @@ impl Move {
                 let direction = Direction::parse(input.chars().nth(3).unwrap())
                     .ok_or_else(|| pgn_traits::Error::new_parse_error("Bad direction"))?;
                 let pieces_taken = first_char.to_digit(10).unwrap() as u8;
+                if pieces_taken as usize > S {
+                    return Err(pgn_traits::Error::new_parse_error(format!(
+                        "{} too large for {}s",
+                        input, S
+                    )));
+                }
                 let mut pieces_held = pieces_taken;
 
                 let mut amounts_to_drop: Vec<u8> = input
@@ -113,19 +119,29 @@ impl Move {
                             format!("Couldn't parse move \"{}\": found non-integer when expecting number of pieces to drop", input
                         ))
                     })?;
-                amounts_to_drop.pop(); //
+                amounts_to_drop.pop();
 
                 let mut movements = StackMovement::new();
-                movements.push(Movement {
-                    pieces_to_take: pieces_taken,
-                });
+                movements.push::<S>(
+                    Movement {
+                        pieces_to_take: pieces_taken,
+                    },
+                    S as u8,
+                );
 
                 for amount_to_drop in amounts_to_drop {
-                    movements.push(Movement {
-                        pieces_to_take: pieces_held - amount_to_drop,
-                    });
+                    movements.push::<S>(
+                        Movement {
+                            pieces_to_take: pieces_held - amount_to_drop,
+                        },
+                        pieces_held,
+                    );
                     pieces_held -= amount_to_drop;
                 }
+
+                // Finish the movement
+                movements.push::<S>(Movement { pieces_to_take: 0 }, pieces_held);
+
                 Ok(Move::Move(square, direction, movements))
             }
             _ => Err(pgn_traits::Error::new(
@@ -154,9 +170,9 @@ impl Move {
             Move::Move(start_square, direction, stack_movement) => {
                 let mut output = String::new();
                 let mut end_square = *start_square;
-                let mut pieces_held = stack_movement.get(0).pieces_to_take;
+                let mut pieces_held = stack_movement.get::<S>(0).pieces_to_take;
                 let pieces_to_leave: Vec<u8> = stack_movement
-                    .into_iter()
+                    .into_iter::<S>()
                     .skip(1)
                     .map(|Movement { pieces_to_take }| {
                         end_square = end_square.go_direction::<S>(*direction).unwrap();
@@ -208,7 +224,7 @@ impl Move {
 
             let mut pieces_held = num_pieces_taken;
 
-            let pieces_taken: StackMovement =
+            let pieces_taken: StackMovement = StackMovement::from_movements::<S, _>(
                 iter::once(num_pieces_taken)
                     .chain(pieces_dropped.iter().take(pieces_dropped.len() - 1).map(
                         |pieces_to_drop| {
@@ -216,8 +232,8 @@ impl Move {
                             pieces_held
                         },
                     ))
-                    .map(|pieces_to_take| Movement { pieces_to_take })
-                    .collect();
+                    .map(|pieces_to_take| Movement { pieces_to_take }),
+            );
 
             let direction = match (
                 start_square.rank::<S>().cmp(&end_square.rank::<S>()),

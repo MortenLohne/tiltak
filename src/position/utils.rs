@@ -1,6 +1,5 @@
 use std::convert::TryFrom;
 use std::fmt::{self, Write};
-use std::iter::FromIterator;
 use std::ops;
 use std::ops::{Index, IndexMut};
 use std::str::FromStr;
@@ -474,7 +473,7 @@ impl Direction {
 pub struct StackMovement {
     // The first 4 bits is the number of squares moved
     // The remaining 28 bits are the number of pieces taken, 4 bits per number
-    data: u32,
+    data: u8,
 }
 
 impl StackMovement {
@@ -482,76 +481,88 @@ impl StackMovement {
         StackMovement { data: 0 }
     }
 
-    pub fn get(self, index: u8) -> Movement {
-        assert!(index < self.len() as u8);
-        let movement_in_place = self.data & 0b1111 << (index * 4);
-        Movement {
-            pieces_to_take: (movement_in_place >> (index * 4)) as u8,
+    pub fn get<const S: usize>(self, index: u8) -> Movement {
+        /*
+        let mut data = self.data;
+        let mut pieces_carried = S as u8;
+        let mut squares_moved = 0;
+        for _ in 0..S {
+            if squares_moved == index {
+                return Movement {
+                    pieces_to_take: pieces_carried
+                }
+            }
+            else if data % 2 == 1 {
+                squares_moved += 1;
+            }
+            pieces_carried -= 1;
+            data = data >> 1;
+        }
+        panic!("Couldn't get index for movement {:?}", self);
+        */
+
+        self.into_iter::<S>().nth(index as usize).unwrap()
+    }
+
+    pub fn push<const S: usize>(&mut self, movement: Movement, pieces_held: u8) {
+        debug_assert!(pieces_held > 0);
+        debug_assert!(
+            self.data == 0 || pieces_held > movement.pieces_to_take,
+            "data {:b}, {} pieces held, taking {}",
+            self.data,
+            pieces_held,
+            movement.pieces_to_take
+        );
+
+        let pieces_to_drop = pieces_held - movement.pieces_to_take;
+
+        if self.data != 0 {
+            self.data <<= pieces_to_drop - 1;
+        }
+        if movement.pieces_to_take > 0 {
+            self.data <<= 1;
+            self.data |= 1;
         }
     }
 
-    pub fn push(&mut self, movement: Movement) {
-        let length = self.len() as u32;
-        debug_assert!(
-            length < 7,
-            "Stack movement cannot grow any more: {:#b}",
-            self.data
-        );
-        debug_assert!(movement.pieces_to_take < 8);
-        self.data |= (movement.pieces_to_take as u32) << (length * 4);
-        self.data &= (1_u32 << 28).overflowing_sub(1).0;
-        self.data |= (length + 1) << 28;
-    }
-
     pub fn len(self) -> usize {
-        (self.data >> (28_u32)) as usize
+        self.data.count_ones() as usize
     }
 
     pub fn is_empty(self) -> bool {
         self.len() == 0
     }
-}
 
-impl FromIterator<Movement> for StackMovement {
-    fn from_iter<T: IntoIterator<Item = Movement>>(iter: T) -> Self {
+    pub fn from_movements<const S: usize, I: IntoIterator<Item = Movement>>(iter: I) -> Self {
+        let mut pieces_held = S as u8;
         let mut result = StackMovement::new();
         for movement in iter {
-            result.push(movement)
+            // println!("Holding {}, taking {}", pieces_held, movement.pieces_to_take);
+            result.push::<S>(movement, pieces_held);
+            pieces_held = movement.pieces_to_take;
         }
         result
     }
-}
 
-impl IntoIterator for StackMovement {
-    type Item = Movement;
-    type IntoIter = StackMovementIterator;
-
-    fn into_iter(self) -> Self::IntoIter {
-        StackMovementIterator {
-            num_left: self.len() as u8,
-            _movements: self.data,
-        }
+    pub fn into_iter<const S: usize>(self) -> impl Iterator<Item = Movement> {
+        StackMovementIterator { data: self.data }
     }
 }
 
 pub struct StackMovementIterator {
-    num_left: u8,
-    _movements: u32,
+    data: u8,
 }
 
 impl Iterator for StackMovementIterator {
     type Item = Movement;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.num_left == 0 {
+        if self.data == 0 {
             None
         } else {
-            self.num_left -= 1;
-            let result = self._movements & 0b1111;
-            self._movements >>= 4;
-            Some(Movement {
-                pieces_to_take: result as u8,
-            })
+            let pieces_to_take = 8 - self.data.leading_zeros() as u8;
+            self.data &= !(1 << (pieces_to_take - 1));
+            Some(Movement { pieces_to_take })
         }
     }
 }
