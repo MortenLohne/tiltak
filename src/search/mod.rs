@@ -10,13 +10,15 @@ use crate::position::Move;
 use crate::position::Position;
 use crate::position::{Role, Square};
 pub use crate::search::mcts_core::best_move;
-use crate::search::mcts_core::{TempVectors, Tree};
+use crate::search::mcts_core::{TempVectors, Tree, TreeEdge};
 
-use self::mcts_core::{Pv, TreeEdge};
+use self::mcts_core::Pv;
 
+mod arena;
 /// This module contains the public-facing convenience API for the search.
 /// The implementation itself in in mcts_core.
 mod mcts_core;
+pub use arena::Arena;
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug, PartialEq, Clone)]
@@ -107,12 +109,13 @@ pub type Score = f32;
 
 /// Abstract representation of a Monte Carlo Search Tree.
 /// Gives more fine-grained control of the search process compared to using the `mcts` function.
-#[derive(Clone, PartialEq, Debug)]
+// #[derive(Clone, PartialEq, Debug)]
 pub struct MonteCarloTree<const S: usize> {
     edge: TreeEdge, // A virtual edge to the first node, with fake move and heuristic score
     position: Position<S>,
     settings: MctsSetting<S>,
     temp_vectors: TempVectors,
+    arena: Arena,
 }
 
 impl<const S: usize> MonteCarloTree<S> {
@@ -128,7 +131,16 @@ impl<const S: usize> MonteCarloTree<S> {
             position,
             settings: MctsSetting::default(),
             temp_vectors: TempVectors::new::<S>(),
+            arena: Arena::new(100_000_000, 8).unwrap(),
         }
+    }
+
+    pub fn get_child(&self) -> &Tree {
+        self.arena.get(self.edge.child.as_ref().unwrap())
+    }
+
+    pub fn get_child_mut(&mut self) -> &mut Tree {
+        self.arena.get_mut(self.edge.child.as_mut().unwrap())
     }
 
     pub fn with_settings(position: Position<S>, settings: MctsSetting<S>) -> Self {
@@ -144,28 +156,30 @@ impl<const S: usize> MonteCarloTree<S> {
             position,
             settings: settings.clone(),
             temp_vectors: TempVectors::new::<S>(),
+            arena: Arena::new(100_000_000, 8).unwrap(),
         };
 
         if let Some(alpha) = tree.settings.dirichlet {
             tree.select();
             tree.select();
-            (*tree.edge.child.as_mut().unwrap()).apply_dirichlet(0.25, alpha);
+            (tree.arena.get_mut(tree.edge.child.as_mut().unwrap())).apply_dirichlet(
+                &tree.arena,
+                0.25,
+                alpha,
+            );
         }
 
         if !tree.settings.excluded_moves.is_empty() {
             tree.select();
             tree.select();
-            let filtered_edges: Vec<TreeEdge> = tree
-                .edge
-                .child
-                .as_ref()
-                .unwrap()
-                .children
+            let mut filtered_edges: Vec<TreeEdge> = tree
+                .arena
+                .get_slice(&tree.get_child().children)
                 .iter()
                 .filter(|edge| !settings.excluded_moves.contains(&edge.mv))
-                .cloned()
+                .map(|edge| edge.shallow_clone())
                 .collect();
-            tree.edge.child.as_mut().unwrap().children = filtered_edges.into_boxed_slice();
+            (*tree.get_child_mut()).children = tree.arena.add_slice(&mut filtered_edges);
         }
 
         tree
@@ -192,7 +206,10 @@ impl<const S: usize> MonteCarloTree<S> {
                 return;
             }
 
-            let mut child_refs: Vec<&TreeEdge> = self.children().iter().collect();
+            let child = self.get_child();
+            let mut child_refs: Vec<&TreeEdge> =
+                self.arena.get_slice(&child.children).iter().collect();
+
             child_refs.sort_by_key(|edge| edge.visits);
             child_refs.reverse();
 
@@ -210,7 +227,8 @@ impl<const S: usize> MonteCarloTree<S> {
                 .children()
                 .iter()
                 .max_by_key(|edge| edge.visits)
-                .unwrap();
+                .unwrap()
+                .shallow_clone();
 
             let best_exploration_value = best_edge.exploration_value(visits_sqrt, dynamic_cpuct);
 
@@ -237,54 +255,62 @@ impl<const S: usize> MonteCarloTree<S> {
             &mut self.position.clone(),
             &self.settings,
             &mut self.temp_vectors,
+            &self.arena,
         )
     }
 
     /// Returns the best move, and its score (as winning probability) from the perspective of the side to move
     /// Panics if no search iterations have been run
     pub fn best_move(&self) -> (Move, f32) {
-        self.edge
-            .child
-            .as_ref()
-            .unwrap()
-            .children
+        self.arena
+            .get_slice(&self.get_child().children)
             .iter()
             .max_by_key(|edge| edge.visits)
             .map(|edge| (edge.mv.clone(), 1.0 - edge.mean_action_value))
             .unwrap_or_else(|| panic!("Couldn't find best move"))
     }
 
-    pub fn node_edge_sizes(&self) -> (usize, usize) {
-        pub fn edge_sizes(edge: &TreeEdge) -> (usize, usize) {
-            if let Some(child) = &edge.child {
-                let (child_nodes, child_edges) = node_sizes(child);
+    pub fn node_edge_sizes(&self, arena: &Arena) -> (usize, usize) {
+        pub fn edge_sizes(edge: &TreeEdge, arena: &Arena) -> (usize, usize) {
+            if let Some(child_index) = &edge.child {
+                let (child_nodes, child_edges) = node_sizes(&*arena.get(child_index), arena);
                 (child_nodes, child_edges + 1)
             } else {
                 (0, 1)
             }
         }
-        pub fn node_sizes(node: &Tree) -> (usize, usize) {
-            node.children.iter().map(edge_sizes).fold(
-                (1, 0),
-                |(acc_nodes, acc_edges), (child_nodes, child_edges)| {
-                    (acc_nodes + child_nodes, acc_edges + child_edges)
-                },
-            )
+        pub fn node_sizes(node: &Tree, arena: &Arena) -> (usize, usize) {
+            arena
+                .get_slice(&node.children)
+                .iter()
+                .map(|edge| edge_sizes(edge, arena))
+                .fold(
+                    (1, 0),
+                    |(acc_nodes, acc_edges), (child_nodes, child_edges)| {
+                        (acc_nodes + child_nodes, acc_edges + child_edges)
+                    },
+                )
         }
-        edge_sizes(&self.edge)
+        edge_sizes(&self.edge, arena)
     }
 
-    fn children(&self) -> &[TreeEdge] {
-        &self.edge.child.as_ref().unwrap().children
+    fn children(&self) -> Vec<TreeEdge> {
+        self.arena
+            .get_slice(&self.get_child().children)
+            .iter()
+            .map(|edge| edge.shallow_clone())
+            .collect()
     }
 
     pub fn pv(&self) -> impl Iterator<Item = Move> + '_ {
-        Pv::new(self.edge.child.as_ref().unwrap())
+        Pv::new(&self.edge, &self.arena)
     }
 
     /// Print human-readable information of the search's progress.
     pub fn print_info(&self) {
-        let mut best_children: Vec<&TreeEdge> = self.children().iter().collect();
+        let child = self.get_child();
+        let mut best_children: Vec<&TreeEdge> =
+            self.arena.get_slice(&child.children).iter().collect();
 
         best_children.sort_by_key(|edge| edge.visits);
         best_children.reverse();
@@ -299,12 +325,7 @@ impl<const S: usize> MonteCarloTree<S> {
                 "Move {}: {} visits, {:.2}% mean action value, {:.3}% static score, {:.3} exploration value, pv {}",
                 edge.mv.to_string::<S>(), edge.visits, edge.mean_action_value * 100.0, edge.heuristic_score * 100.0,
                 edge.exploration_value((self.visits() as Score).sqrt(), dynamic_cpuct),
-                if edge.child.is_some() {
-                    Pv::new(edge.child.as_ref().unwrap()).map(|mv| mv.to_string::<S>() + " ").collect::<String>()
-                }
-                else {
-                    String::new()
-                }
+                Pv::new(edge, &self.arena).skip(1).map(|mv| mv.to_string::<S>() + " ").collect::<String>()
             )
         });
     }

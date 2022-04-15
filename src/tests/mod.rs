@@ -1,3 +1,4 @@
+mod arena_tests;
 mod blunder_tests;
 mod board_generic_tests;
 mod board_tests;
