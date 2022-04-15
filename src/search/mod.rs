@@ -303,10 +303,7 @@ impl<const S: usize> MonteCarloTree<S> {
     }
 
     pub fn pv(&self) -> impl Iterator<Item = Move> + '_ {
-        Pv::new(
-            self.arena.get(self.edge.child.as_ref().unwrap()),
-            &self.arena,
-        )
+        Pv::new(&self.edge, &self.arena)
     }
 
     /// Print human-readable information of the search's progress.
@@ -328,12 +325,7 @@ impl<const S: usize> MonteCarloTree<S> {
                 "Move {}: {} visits, {:.2}% mean action value, {:.3}% static score, {:.3} exploration value, pv {}",
                 edge.mv.to_string::<S>(), edge.visits, edge.mean_action_value * 100.0, edge.heuristic_score * 100.0,
                 edge.exploration_value((self.visits() as Score).sqrt(), dynamic_cpuct),
-                if let Some(index) = edge.child.as_ref() {
-                    Pv::new(self.arena.get(index), &self.arena).map(|mv| mv.to_string::<S>() + " ").collect::<String>()
-                }
-                else {
-                    String::new()
-                }
+                Pv::new(edge, &self.arena).skip(1).map(|mv| mv.to_string::<S>() + " ").collect::<String>()
             )
         });
     }

@@ -325,12 +325,15 @@ impl GameResultForUs {
 
 pub struct Pv<'a> {
     arena: &'a Arena,
-    tree: &'a Tree,
+    edge: Option<&'a TreeEdge>,
 }
 
 impl<'a> Pv<'a> {
-    pub fn new(tree: &'a Tree, arena: &'a Arena) -> Pv<'a> {
-        Pv { tree, arena }
+    pub fn new(edge: &'a TreeEdge, arena: &'a Arena) -> Pv<'a> {
+        Pv {
+            edge: Some(edge),
+            arena,
+        }
     }
 }
 
@@ -338,19 +341,19 @@ impl<'a> Iterator for Pv<'a> {
     type Item = Move;
 
     fn next(&mut self) -> Option<Self::Item> {
-        /*
-        if let Some(edge) = self.tree.children.iter().max_by_key(|edge| edge.visits) {
+        self.edge.map(|edge| {
             let mv = edge.mv.clone();
-            if let Some(index) = edge.child.as_ref() {
-                self.tree = cell::Ref::clone(&self.arena.get(index));
+            if let Some(child_index) = &edge.child {
+                let child = self.arena.get(child_index);
+                let best_edge = self
+                    .arena
+                    .get_slice(&child.children)
+                    .iter()
+                    .max_by_key(|edge| edge.visits);
+                self.edge = best_edge;
             }
-            Some(mv)
-        } else {
-            None
-        }
-        */
-        // TODO fix
-        None
+            mv
+        })
     }
 }
 
