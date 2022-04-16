@@ -53,15 +53,13 @@ pub fn handle_aws_event_generic<const S: usize>(e: Event, _c: Context) -> Result
     }
 
     let settings = if let Some(dirichlet) = e.dirichlet_noise {
-        MctsSetting::default()
-            .add_dirichlet(dirichlet)
-            .add_rollout_depth(e.rollout_depth)
-            .add_rollout_temperature(e.rollout_temperature)
+        MctsSetting::default().add_dirichlet(dirichlet)
     } else {
         MctsSetting::default()
-            .add_rollout_depth(e.rollout_depth)
-            .add_rollout_temperature(e.rollout_temperature)
-    };
+    }
+    .add_rollout_depth(e.rollout_depth)
+    .add_rollout_temperature(e.rollout_temperature)
+    .mem_usage(2_usize.pow(2));
 
     match e.time_control {
         TimeControl::Time(time_left, increment) => {

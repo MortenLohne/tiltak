@@ -680,7 +680,9 @@ impl PlaytakSession {
                         ];
                         (moves.choose(&mut rng).unwrap().clone(), 0.0)
                     } else if let Some(fixed_nodes) = playtak_settings.fixed_nodes {
-                        let settings = playtak_settings.to_mcts_setting();
+                        let settings =
+                            playtak_settings.to_mcts_setting()
+                            .arena_size_for_nodes(fixed_nodes as u32);
                         let mut tree = search::MonteCarloTree::with_settings(position.clone(), settings);
                         for _ in 0..fixed_nodes {
                             tree.select();
@@ -716,7 +718,9 @@ impl PlaytakSession {
 
                         #[cfg(not(feature = "aws-lambda-client"))]
                         {
-                            let settings = playtak_settings.to_mcts_setting();
+                            let settings =
+                                playtak_settings.to_mcts_setting()
+                                .arena_size(2_u32.pow(31));
 
                             let maximum_time = our_time_left / 6 + game.increment / 2;
 

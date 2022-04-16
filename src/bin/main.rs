@@ -151,7 +151,7 @@ fn main() {
     }
 }
 
-fn analyze_openings<const S: usize>(nodes: u64) {
+fn analyze_openings<const S: usize>(nodes: u32) {
     let mut input = String::new();
     io::stdin().read_to_string(&mut input).unwrap();
     for line in input.lines() {
@@ -161,7 +161,8 @@ fn analyze_openings<const S: usize>(nodes: u64) {
             position.do_move(mv);
         }
         let start_time = time::Instant::now();
-        let mut tree = search::MonteCarloTree::new(position.clone());
+        let settings = search::MctsSetting::default().arena_size_for_nodes(nodes);
+        let mut tree = search::MonteCarloTree::with_settings(position.clone(), settings);
         for _ in 0..nodes {
             tree.select();
         }
@@ -397,7 +398,9 @@ fn analyze_position<const S: usize>(position: &Position<S>) {
         }
         println!();
     }
-    let settings: MctsSetting<S> = search::MctsSetting::default().exclude_moves(vec![]);
+    let settings: MctsSetting<S> = search::MctsSetting::default()
+        .arena_size(2_u32.pow(31))
+        .exclude_moves(vec![]);
     let start_time = time::Instant::now();
 
     let mut tree = search::MonteCarloTree::with_settings(position.clone(), settings);

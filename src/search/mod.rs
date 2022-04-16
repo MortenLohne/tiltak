@@ -29,6 +29,7 @@ pub enum TimeControl {
 
 #[derive(Clone, PartialEq, Debug)]
 pub struct MctsSetting<const S: usize> {
+    arena_size: u32,
     value_params: Vec<f32>,
     policy_params: Vec<f32>,
     search_params: Vec<Score>,
@@ -41,6 +42,7 @@ pub struct MctsSetting<const S: usize> {
 impl<const S: usize> Default for MctsSetting<S> {
     fn default() -> Self {
         MctsSetting {
+            arena_size: 2_u32.pow(26), // Default to 1.5GB max
             value_params: Vec::from(<Position<S>>::value_params()),
             policy_params: Vec::from(<Position<S>>::policy_params()),
             search_params: vec![1.43, 2800.0, 0.61],
@@ -53,6 +55,27 @@ impl<const S: usize> Default for MctsSetting<S> {
 }
 
 impl<const N: usize> MctsSetting<N> {
+    /// Set a very liberal arena size, for searching a given amount of nodes
+    pub fn arena_size_for_nodes(self, nodes: u32) -> Self {
+        // For 6s, the toughest position I've found required 40 elements/node searched
+        // This formula gives 108, which is hopefully plenty
+        self.arena_size((N * N) as u32 * 3 * nodes)
+    }
+
+    pub fn mem_usage(self, mem_usage: usize) -> Self {
+        assert!(
+            mem_usage < u32::MAX as usize // Check for 32-bit platforms
+            || mem_usage < 24 * 2_usize.pow(32) - 2
+        );
+        self.arena_size((mem_usage / ARENA_ELEMENT_SIZE) as u32)
+    }
+
+    pub fn arena_size(mut self, arena_size: u32) -> Self {
+        assert!(arena_size < u32::MAX - 1);
+        self.arena_size = arena_size;
+        self
+    }
+
     pub fn add_value_params(mut self, value_params: Vec<f32>) -> Self {
         self.value_params = value_params;
         self
@@ -106,6 +129,7 @@ impl<const N: usize> MctsSetting<N> {
 
 /// Type alias for winning probability, used for scoring positions.
 pub type Score = f32;
+pub const ARENA_ELEMENT_SIZE: usize = 24;
 
 /// Abstract representation of a Monte Carlo Search Tree.
 /// Gives more fine-grained control of the search process compared to using the `mcts` function.
@@ -120,31 +144,10 @@ pub struct MonteCarloTree<const S: usize> {
 
 impl<const S: usize> MonteCarloTree<S> {
     pub fn new(position: Position<S>) -> Self {
-        MonteCarloTree {
-            edge: TreeEdge {
-                child: None,
-                mv: Move::Place(Role::Flat, Square(0)),
-                mean_action_value: 0.0,
-                visits: 0,
-                heuristic_score: 0.0,
-            },
-            position,
-            settings: MctsSetting::default(),
-            temp_vectors: TempVectors::new::<S>(),
-            arena: Arena::new(100_000_000, 8).unwrap(),
-        }
-    }
-
-    pub fn get_child(&self) -> &Tree {
-        self.arena.get(self.edge.child.as_ref().unwrap())
-    }
-
-    pub fn get_child_mut(&mut self) -> &mut Tree {
-        self.arena.get_mut(self.edge.child.as_mut().unwrap())
+        Self::with_settings(position, MctsSetting::default())
     }
 
     pub fn with_settings(position: Position<S>, settings: MctsSetting<S>) -> Self {
-        #[allow(unused_mut)]
         let mut tree = MonteCarloTree {
             edge: TreeEdge {
                 child: None,
@@ -156,7 +159,7 @@ impl<const S: usize> MonteCarloTree<S> {
             position,
             settings: settings.clone(),
             temp_vectors: TempVectors::new::<S>(),
-            arena: Arena::new(100_000_000, 8).unwrap(),
+            arena: Arena::new(settings.arena_size, ARENA_ELEMENT_SIZE).unwrap(),
         };
 
         if let Some(alpha) = tree.settings.dirichlet {
@@ -183,6 +186,14 @@ impl<const S: usize> MonteCarloTree<S> {
         }
 
         tree
+    }
+
+    pub fn get_child(&self) -> &Tree {
+        self.arena.get(self.edge.child.as_ref().unwrap())
+    }
+
+    pub fn get_child_mut(&mut self) -> &mut Tree {
+        self.arena.get_mut(self.edge.child.as_mut().unwrap())
     }
 
     pub fn search_for_time<F>(&mut self, max_time: time::Duration, callback: F)
@@ -341,7 +352,8 @@ impl<const S: usize> MonteCarloTree<S> {
 
 /// The simplest way to use the mcts module. Run Monte Carlo Tree Search for `nodes` nodes, returning the best move, and its estimated winning probability for the side to move.
 pub fn mcts<const S: usize>(position: Position<S>, nodes: u64) -> (Move, Score) {
-    let mut tree = MonteCarloTree::new(position);
+    let settings = MctsSetting::default().arena_size_for_nodes(nodes as u32);
+    let mut tree = MonteCarloTree::with_settings(position, settings);
 
     for _ in 0..nodes.max(2) {
         tree.select();
