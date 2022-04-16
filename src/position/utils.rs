@@ -481,27 +481,10 @@ impl StackMovement {
         StackMovement { data: 0 }
     }
 
-    pub fn get<const S: usize>(self, index: u8) -> Movement {
-        /*
-        let mut data = self.data;
-        let mut pieces_carried = S as u8;
-        let mut squares_moved = 0;
-        for _ in 0..S {
-            if squares_moved == index {
-                return Movement {
-                    pieces_to_take: pieces_carried
-                }
-            }
-            else if data % 2 == 1 {
-                squares_moved += 1;
-            }
-            pieces_carried -= 1;
-            data = data >> 1;
+    pub fn get_first<const S: usize>(&self) -> Movement {
+        Movement {
+            pieces_to_take: 8 - self.data.leading_zeros() as u8,
         }
-        panic!("Couldn't get index for movement {:?}", self);
-        */
-
-        self.into_iter::<S>().nth(index as usize).unwrap()
     }
 
     pub fn push<const S: usize>(&mut self, movement: Movement, pieces_held: u8) {

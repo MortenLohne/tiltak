@@ -749,16 +749,19 @@ impl<const S: usize> Position<S> {
             Move::Place(Role::Flat, _) => -1,
             Move::Place(_, _) => 0,
             Move::Move(square, direction, stack_movement) => {
-                let mut destination_square =
-                    if stack_movement.get::<S>(0).pieces_to_take == self[square].len() {
-                        square.go_direction::<S>(direction).unwrap()
-                    } else {
-                        square
-                    };
+                let mut destination_square = if stack_movement
+                    .get_first_movement::<S>()
+                    .pieces_to_take
+                    == self[square].len()
+                {
+                    square.go_direction::<S>(direction).unwrap()
+                } else {
+                    square
+                };
 
                 let mut fcd = 0;
 
-                if self[square].len() == stack_movement.get::<S>(0).pieces_to_take {
+                if self[square].len() == stack_movement.get_first_movement::<S>().pieces_to_take {
                     let top_stone = self[square].top_stone.unwrap();
                     if top_stone.role() == Flat {
                         fcd -= 1;
