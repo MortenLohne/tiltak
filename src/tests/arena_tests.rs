@@ -22,3 +22,14 @@ fn slice_test() {
     assert_eq!(*arena.get(&index), [4, 5]);
     assert_eq!(*arena.get(&index2), [6, 7, 8]);
 }
+
+#[test]
+fn slot_57_size() {
+    let arena = Arena::new(3, 57).unwrap();
+    let index = arena.add([3_u8; 57]).unwrap();
+    let slice_index = arena.add_slice(&mut vec![[4_u8; 57], [5_u8; 57]]).unwrap();
+
+    assert_eq!(arena.add([3_u8; 57]), None);
+    assert_eq!(arena.get(&index), &[3; 57]);
+    assert_eq!(arena.get_slice(&slice_index), &[[4; 57], [5; 57]]);
+}

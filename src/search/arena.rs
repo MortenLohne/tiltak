@@ -14,7 +14,7 @@ pub struct Arena {
     orig_pointer: *mut u8,
     layout: Layout,
     next_index: AtomicU32,
-    elem_size: usize,
+    slot_size: usize,
     max_index: u32,
 }
 
@@ -22,7 +22,7 @@ impl fmt::Debug for Arena {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Arena")
             .field("next_index", &self.next_index)
-            .field("elem_size", &self.elem_size)
+            .field("elem_size", &self.slot_size)
             .field("max_index", &self.max_index)
             .finish()
     }
@@ -80,14 +80,14 @@ const fn raw_alignment(mut alignment: usize) -> usize {
 }
 
 impl Arena {
-    pub fn new(capacity: u32, elem_size: usize) -> Option<Self> {
-        if elem_size == 0 || capacity == 0 || capacity >= u32::MAX - 1 {
+    pub fn new(num_slots: u32, elem_size: usize) -> Option<Self> {
+        if elem_size == 0 || num_slots == 0 || num_slots >= u32::MAX - 1 {
             return None;
         }
         let raw_alignment = raw_alignment(elem_size);
 
         let layout =
-            Layout::from_size_align((capacity as usize + 2) * elem_size, raw_alignment).ok()?;
+            Layout::from_size_align((num_slots as usize + 2) * elem_size, raw_alignment).ok()?;
 
         let (data, orig_pointer) = unsafe {
             let ptr = alloc::alloc(layout);
@@ -105,8 +105,8 @@ impl Arena {
             orig_pointer,
             layout,
             next_index: AtomicU32::new(1),
-            elem_size,
-            max_index: capacity + 2,
+            slot_size: elem_size,
+            max_index: num_slots + 1,
         })
     }
 
@@ -154,10 +154,10 @@ impl Arena {
             any::type_name::<T>(),
             mem::size_of::<T>(),
             mem::align_of::<T>(),
-            self.elem_size
+            self.slot_size
         );
 
-        let index = self.get_index_for_element(self.bucket_size::<T>())?;
+        let index = self.get_index_for_element(self.num_slots_required::<T>())?;
 
         let ptr = unsafe { self.ptr_to_index(index) as *mut T };
 
@@ -170,10 +170,15 @@ impl Arena {
 
     pub fn add_slice<T>(&self, values: &mut Vec<T>) -> Option<SliceIndex<T>> {
         assert!(self.supports_type::<T>());
-        let length = values.len();
-        assert_ne!(length, 0);
 
-        let index = self.get_index_for_element(self.bucket_size::<T>() * values.len() as u32)?;
+        let length = values.len();
+
+        if length == 0 {
+            return Some(SliceIndex::default());
+        }
+
+        let index =
+            self.get_index_for_element(self.num_slots_required::<T>() * values.len() as u32)?;
 
         let mut ptr = unsafe { self.ptr_to_index(index) as *mut T };
 
@@ -191,26 +196,26 @@ impl Arena {
     }
 
     /// Gets an appropriate index for the new element, if there is space available
-    fn get_index_for_element(&self, size: u32) -> Option<u32> {
+    fn get_index_for_element(&self, slots: u32) -> Option<u32> {
         self.next_index
             .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |index| {
                 index
-                    .checked_add(size)
+                    .checked_add(slots)
                     .filter(|next_index| *next_index <= self.max_index)
             })
             .ok()
     }
 
     pub const fn supports_type<T>(&self) -> bool {
-        mem::size_of::<T>() % self.elem_size == 0 && self.elem_size % mem::align_of::<T>() == 0
+        mem::size_of::<T>() % self.slot_size == 0 && self.slot_size % mem::align_of::<T>() == 0
     }
 
     unsafe fn ptr_to_index(&self, raw_index: u32) -> *const u8 {
-        self.data.add(raw_index as usize * self.elem_size)
+        self.data.add(raw_index as usize * self.slot_size)
     }
 
-    const fn bucket_size<T>(&self) -> u32 {
-        (mem::size_of::<T>() / self.elem_size) as u32
+    const fn num_slots_required<T>(&self) -> u32 {
+        (mem::size_of::<T>() / self.slot_size) as u32
     }
 }
 
