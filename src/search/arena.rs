@@ -207,7 +207,7 @@ impl Arena {
     }
 
     pub const fn supports_type<T>(&self) -> bool {
-        mem::size_of::<T>() % self.slot_size == 0 && self.slot_size % mem::align_of::<T>() == 0
+        self.slot_size % mem::align_of::<T>() == 0
     }
 
     unsafe fn ptr_to_index(&self, raw_index: u32) -> *const u8 {
@@ -215,7 +215,13 @@ impl Arena {
     }
 
     const fn num_slots_required<T>(&self) -> u32 {
-        (mem::size_of::<T>() / self.slot_size) as u32
+        let q = (mem::size_of::<T>() / self.slot_size) as u32;
+        let rem = (mem::size_of::<T>() % self.slot_size) as u32;
+        if rem == 0 {
+            q
+        } else {
+            q + 1
+        }
     }
 }
 

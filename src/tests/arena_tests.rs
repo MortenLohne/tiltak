@@ -4,8 +4,8 @@ use crate::search::Arena;
 fn supports_type_test() {
     let arena = Arena::new(100_000, 4).unwrap();
     assert!(arena.supports_type::<[u8; 4]>());
-    assert!(!arena.supports_type::<[u8; 3]>());
-    assert!(!arena.supports_type::<[u8; 1]>());
+    assert!(arena.supports_type::<[u8; 3]>());
+    assert!(arena.supports_type::<[u8; 1]>());
     assert!(arena.supports_type::<[u8; 8]>());
     assert!(!arena.supports_type::<usize>());
     let index = arena.add(42u32).unwrap();
@@ -30,6 +30,7 @@ fn slot_57_size() {
     let slice_index = arena.add_slice(&mut vec![[4_u8; 57], [5_u8; 57]]).unwrap();
 
     assert_eq!(arena.add([3_u8; 57]), None);
+    assert_eq!(arena.add(1_u8), None);
     assert_eq!(arena.get(&index), &[3; 57]);
     assert_eq!(arena.get_slice(&slice_index), &[[4; 57], [5; 57]]);
 }
