@@ -159,7 +159,7 @@ impl<const S: usize> MonteCarloTree<S> {
             position,
             settings: settings.clone(),
             temp_vectors: TempVectors::new::<S>(),
-            arena: Arena::new(settings.arena_size, ARENA_ELEMENT_SIZE).unwrap(),
+            arena: Arena::new(settings.arena_size).unwrap(),
         };
 
         if let Some(alpha) = tree.settings.dirichlet {

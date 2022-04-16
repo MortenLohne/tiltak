@@ -2,7 +2,7 @@ use crate::search::Arena;
 
 #[test]
 fn supports_type_test() {
-    let arena = Arena::new(100_000, 4).unwrap();
+    let arena: Arena<4> = Arena::new(100_000).unwrap();
     assert!(arena.supports_type::<[u8; 4]>());
     assert!(arena.supports_type::<[u8; 3]>());
     assert!(arena.supports_type::<[u8; 1]>());
@@ -14,7 +14,7 @@ fn supports_type_test() {
 
 #[test]
 fn slice_test() {
-    let arena = Arena::new(8, 4).unwrap();
+    let arena: Arena<4> = Arena::new(8).unwrap();
     let slice_index = arena.add_slice(&mut vec![1u32, 2, 3]).unwrap();
     let index = arena.add([4u32, 5]).unwrap();
     let index2 = arena.add([6u32, 7, 8]).unwrap();
@@ -25,7 +25,7 @@ fn slice_test() {
 
 #[test]
 fn slot_57_size() {
-    let arena = Arena::new(3, 57).unwrap();
+    let arena: Arena<57> = Arena::new(3).unwrap();
     let index = arena.add([3_u8; 57]).unwrap();
     let slice_index = arena.add_slice(&mut vec![[4_u8; 57], [5_u8; 57]]).unwrap();
 

@@ -9,20 +9,19 @@ use std::{
     sync::atomic::{AtomicU32, Ordering},
 };
 
-pub struct Arena {
+pub struct Arena<const S: usize = 24> {
     data: *mut u8,
     orig_pointer: *mut u8,
     layout: Layout,
     next_index: AtomicU32,
-    slot_size: usize,
     max_index: u32,
 }
 
-impl fmt::Debug for Arena {
+impl<const S: usize> fmt::Debug for Arena<S> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Arena")
             .field("next_index", &self.next_index)
-            .field("elem_size", &self.slot_size)
+            .field("slot_size", &S)
             .field("max_index", &self.max_index)
             .finish()
     }
@@ -79,24 +78,23 @@ const fn raw_alignment(mut alignment: usize) -> usize {
     raw_alignment
 }
 
-impl Arena {
-    pub fn new(num_slots: u32, slot_size: usize) -> Option<Self> {
-        if slot_size == 0 || num_slots == 0 || num_slots >= u32::MAX - 1 {
+impl<const S: usize> Arena<S> {
+    pub fn new(num_slots: u32) -> Option<Self> {
+        if S == 0 || num_slots == 0 || num_slots >= u32::MAX - 1 {
             return None;
         }
-        let raw_alignment = raw_alignment(slot_size);
+        let raw_alignment = raw_alignment(S);
 
-        let layout =
-            Layout::from_size_align((num_slots as usize + 2) * slot_size, raw_alignment).ok()?;
+        let layout = Layout::from_size_align((num_slots as usize + 2) * S, raw_alignment).ok()?;
 
         let (data, orig_pointer) = unsafe {
             let ptr = alloc::alloc(layout);
 
             // Make sure the pointer is correctly aligned
-            if (ptr as usize) % slot_size == 0 {
+            if (ptr as usize) % S == 0 {
                 (ptr, ptr)
             } else {
-                (ptr.add(slot_size - (ptr as usize) % slot_size), ptr)
+                (ptr.add(S - (ptr as usize) % S), ptr)
             }
         };
 
@@ -105,7 +103,6 @@ impl Arena {
             orig_pointer,
             layout,
             next_index: AtomicU32::new(1),
-            slot_size,
             max_index: num_slots + 1,
         })
     }
@@ -154,10 +151,10 @@ impl Arena {
             any::type_name::<T>(),
             mem::size_of::<T>(),
             mem::align_of::<T>(),
-            self.slot_size
+            S
         );
 
-        let index = self.get_index_for_element(self.num_slots_required::<T>())?;
+        let index = self.get_index_for_element(Self::num_slots_required::<T>())?;
 
         let ptr = unsafe { self.ptr_to_index(index) as *mut T };
 
@@ -178,7 +175,7 @@ impl Arena {
         }
 
         let index =
-            self.get_index_for_element(self.num_slots_required::<T>() * values.len() as u32)?;
+            self.get_index_for_element(Self::num_slots_required::<T>() * values.len() as u32)?;
 
         let mut ptr = unsafe { self.ptr_to_index(index) as *mut T };
 
@@ -207,16 +204,16 @@ impl Arena {
     }
 
     pub const fn supports_type<T>(&self) -> bool {
-        self.slot_size % mem::align_of::<T>() == 0
+        S % mem::align_of::<T>() == 0
     }
 
     unsafe fn ptr_to_index(&self, raw_index: u32) -> *const u8 {
-        self.data.add(raw_index as usize * self.slot_size)
+        self.data.add(raw_index as usize * S)
     }
 
-    const fn num_slots_required<T>(&self) -> u32 {
-        let q = (mem::size_of::<T>() / self.slot_size) as u32;
-        let rem = (mem::size_of::<T>() % self.slot_size) as u32;
+    const fn num_slots_required<T>() -> u32 {
+        let q = (mem::size_of::<T>() / S) as u32;
+        let rem = (mem::size_of::<T>() % S) as u32;
         if rem == 0 {
             q
         } else {
@@ -225,7 +222,7 @@ impl Arena {
     }
 }
 
-impl Drop for Arena {
+impl<const S: usize> Drop for Arena<S> {
     fn drop(&mut self) {
         unsafe {
             alloc::dealloc(self.orig_pointer, self.layout);
