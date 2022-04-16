@@ -1,12 +1,21 @@
-use std::{alloc, alloc::Layout, any, cell, fmt, marker::PhantomData, mem, num::NonZeroU32, slice};
+use std::{
+    alloc,
+    alloc::Layout,
+    any, fmt,
+    marker::PhantomData,
+    mem,
+    num::NonZeroU32,
+    slice,
+    sync::atomic::{AtomicU32, Ordering},
+};
 
 pub struct Arena {
     data: *mut u8,
     orig_pointer: *mut u8,
     layout: Layout,
-    next_index: cell::RefCell<NonZeroU32>,
+    next_index: AtomicU32,
     elem_size: usize,
-    max_index: NonZeroU32,
+    max_index: u32,
 }
 
 impl fmt::Debug for Arena {
@@ -95,22 +104,22 @@ impl Arena {
             data,
             orig_pointer,
             layout,
-            next_index: cell::RefCell::new(NonZeroU32::new(1).unwrap()),
+            next_index: AtomicU32::new(1),
             elem_size,
-            max_index: NonZeroU32::new(capacity + 2).unwrap(),
+            max_index: capacity + 2,
         })
     }
 
     pub fn get<'a, T>(&'a self, index: &'a Index<T>) -> &'a T {
         unsafe {
-            let ptr = self.ptr_to_index(index.data) as *const T;
+            let ptr = self.ptr_to_index(index.data.get()) as *const T;
             &*ptr
         }
     }
 
     pub fn get_mut<'a, T>(&'a self, index: &'a mut Index<T>) -> &'a mut T {
         unsafe {
-            let ptr = self.ptr_to_index(index.data) as *mut T;
+            let ptr = self.ptr_to_index(index.data.get()) as *mut T;
             &mut *ptr
         }
     }
@@ -120,7 +129,7 @@ impl Arena {
             Default::default()
         } else {
             unsafe {
-                let ptr = self.ptr_to_index(index.data) as *const T;
+                let ptr = self.ptr_to_index(index.data.get()) as *const T;
                 slice::from_raw_parts(ptr, index.length as usize)
             }
         }
@@ -131,7 +140,7 @@ impl Arena {
             Default::default()
         } else {
             unsafe {
-                let ptr = self.ptr_to_index(index.data) as *mut T;
+                let ptr = self.ptr_to_index(index.data.get()) as *mut T;
                 slice::from_raw_parts_mut(ptr, index.length as usize)
             }
         }
@@ -148,27 +157,26 @@ impl Arena {
             self.elem_size
         );
 
-        let mut raw_next_index = self.next_index.borrow_mut();
+        let index = self.get_index_for_element(self.bucket_size::<T>()).unwrap();
 
-        assert!(
-            raw_next_index
-                .get()
-                .checked_add(self.bucket_size::<T>())
-                .unwrap()
-                <= self.max_index.get()
-        );
-
-        let ptr = unsafe { self.ptr_to_index(*raw_next_index) as *mut T };
+        let ptr = unsafe { self.ptr_to_index(index) as *mut T };
 
         unsafe {
             *ptr = value;
         }
 
-        let old_index = Index::new(*raw_next_index);
+        Index::new(NonZeroU32::new(index).unwrap())
+    }
 
-        *raw_next_index = NonZeroU32::new(raw_next_index.get() + self.bucket_size::<T>()).unwrap();
-
-        old_index
+    /// Gets an appropriate index for the new element, if there is space available
+    fn get_index_for_element(&self, size: u32) -> Option<u32> {
+        self.next_index
+            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |index| {
+                index
+                    .checked_add(size)
+                    .filter(|next_index| *next_index <= self.max_index)
+            })
+            .ok()
     }
 
     pub fn add_slice<T>(&self, values: &mut Vec<T>) -> SliceIndex<T> {
@@ -176,19 +184,11 @@ impl Arena {
         let length = values.len();
         assert_ne!(length, 0);
 
-        let mut raw_index = self.next_index.borrow_mut();
+        let index = self
+            .get_index_for_element(self.bucket_size::<T>() * values.len() as u32)
+            .unwrap();
 
-        let raw_new_index = NonZeroU32::new(
-            raw_index
-                .get()
-                .checked_add(self.bucket_size::<T>() * values.len() as u32)
-                .unwrap(),
-        )
-        .unwrap();
-
-        assert!(raw_new_index <= self.max_index);
-
-        let mut ptr = unsafe { self.ptr_to_index(*raw_index) as *mut T };
+        let mut ptr = unsafe { self.ptr_to_index(index) as *mut T };
 
         for value in values.drain(..) {
             unsafe {
@@ -197,19 +197,15 @@ impl Arena {
             }
         }
 
-        let old_index = SliceIndex::new(*raw_index, length as u32);
-
-        *raw_index = raw_new_index;
-
-        old_index
+        SliceIndex::new(NonZeroU32::new(index).unwrap(), length as u32)
     }
 
     pub const fn supports_type<T>(&self) -> bool {
         mem::size_of::<T>() % self.elem_size == 0 && self.elem_size % mem::align_of::<T>() == 0
     }
 
-    unsafe fn ptr_to_index(&self, raw_index: NonZeroU32) -> *const u8 {
-        self.data.add(raw_index.get() as usize * self.elem_size)
+    unsafe fn ptr_to_index(&self, raw_index: u32) -> *const u8 {
+        self.data.add(raw_index as usize * self.elem_size)
     }
 
     const fn bucket_size<T>(&self) -> u32 {
