@@ -2,9 +2,9 @@
 
 use std::fmt::Write;
 use std::hash::{Hash, Hasher};
-use std::mem;
 use std::ops::{Index, IndexMut};
 use std::{fmt, ops};
+use std::{iter, mem};
 
 use arrayvec::ArrayVec;
 use board_game_traits::{Color, GameResult};
@@ -749,19 +749,16 @@ impl<const S: usize> Position<S> {
             Move::Place(Role::Flat, _) => -1,
             Move::Place(_, _) => 0,
             Move::Move(square, direction, stack_movement) => {
-                let mut destination_square = if stack_movement
-                    .get_first_movement::<S>()
-                    .pieces_to_take
-                    == self[square].len()
-                {
-                    square.go_direction::<S>(direction).unwrap()
-                } else {
-                    square
-                };
+                let mut destination_square =
+                    if stack_movement.get_first::<S>().pieces_to_take == self[square].len() {
+                        square.go_direction::<S>(direction).unwrap()
+                    } else {
+                        square
+                    };
 
                 let mut fcd = 0;
 
-                if self[square].len() == stack_movement.get_first_movement::<S>().pieces_to_take {
+                if self[square].len() == stack_movement.get_first::<S>().pieces_to_take {
                     let top_stone = self[square].top_stone.unwrap();
                     if top_stone.role() == Flat {
                         fcd -= 1;
@@ -1115,49 +1112,43 @@ impl<const S: usize> PositionTrait for Position<S> {
                 ReverseMove::Place(to)
             }
             Move::Move(square, direction, stack_movement) => {
-                let mut from = square;
-
-                let mut pieces_left_behind = ArrayVec::new();
-                let mut flattens_stone = false;
-                let mut pieces_taken_last = None;
-
                 for sq in <MoveIterator<S>>::new(square, direction, stack_movement) {
                     self.hash ^= self.zobrist_hash_for_square(sq);
                 }
 
-                for Movement { pieces_to_take } in stack_movement.into_iter::<S>() {
-                    let to = from.go_direction::<S>(direction).unwrap();
+                let mut to = square;
+
+                let mut pieces_left_behind = ArrayVec::new();
+                let mut flattens_stone = false;
+
+                let mut movement_iter = stack_movement.into_iter::<S>();
+                let mut moving_pieces: ArrayVec<Piece, 8> = ArrayVec::new();
+
+                for _ in 0..movement_iter.next().unwrap().pieces_to_take {
+                    moving_pieces.push(self[square].pop().unwrap());
+                }
+
+                for Movement { pieces_to_take } in
+                    movement_iter.chain(iter::once(Movement { pieces_to_take: 0 }))
+                {
+                    to = to.go_direction::<S>(direction).unwrap();
 
                     if self[to].top_stone.map(Piece::role) == Some(Wall) {
                         flattens_stone = true;
                         debug_assert_eq!(
-                            self[from].top_stone().map(Piece::role),
+                            self[square].top_stone().map(Piece::role),
                             Some(Cap),
                             "{}",
                             mv.to_string::<S>()
                         );
                     }
 
-                    assert!(self[from].len() >= pieces_to_take, "\n{:?}", self);
+                    pieces_left_behind.push(moving_pieces.len() as u8 - pieces_to_take);
 
-                    let pieces_to_leave = self[from].len() - pieces_to_take;
-
-                    for _ in pieces_to_leave..self[from].len() {
-                        let piece = self[from].get(pieces_to_leave).unwrap();
-                        self[to].push(piece);
-                        self[from].remove(pieces_to_leave);
+                    while moving_pieces.len() as u8 > pieces_to_take {
+                        self[to].push(moving_pieces.pop().unwrap());
                     }
-
-                    if let Some(taken_last) = pieces_taken_last {
-                        pieces_left_behind.push(taken_last - pieces_to_take);
-                    }
-
-                    pieces_taken_last = Some(pieces_to_take);
-
-                    from = to;
                 }
-
-                pieces_left_behind.push(pieces_taken_last.unwrap());
 
                 for sq in <MoveIterator<S>>::new(square, direction, stack_movement) {
                     self.hash ^= self.zobrist_hash_for_square(sq);
@@ -1289,10 +1280,12 @@ impl<const S: usize> Iterator for MoveIterator<S> {
             None
         } else {
             let next_square = self.square;
-            self.square = self
-                .square
-                .go_direction::<S>(self.direction)
-                .unwrap_or(Square(0));
+            if self.squares_left > 1 {
+                self.square = self
+                    .square
+                    .go_direction::<S>(self.direction)
+                    .unwrap();
+            }
             self.squares_left -= 1;
             Some(next_square)
         }

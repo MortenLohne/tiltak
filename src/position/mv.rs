@@ -37,7 +37,7 @@ impl Move {
                 Wall => write!(string, "S{}", square.to_string::<S>()).unwrap(),
             },
             Move::Move(square, direction, stack_movements) => {
-                let mut pieces_held = stack_movements.get_first_movement::<S>().pieces_to_take;
+                let mut pieces_held = stack_movements.get_first::<S>().pieces_to_take;
                 if pieces_held == 1 {
                     write!(string, "{}", square.to_string::<S>()).unwrap();
                 } else {
@@ -171,7 +171,7 @@ impl Move {
             Move::Move(start_square, direction, stack_movement) => {
                 let mut output = String::new();
                 let mut end_square = *start_square;
-                let mut pieces_held = stack_movement.get_first_movement::<S>().pieces_to_take;
+                let mut pieces_held = stack_movement.get_first::<S>().pieces_to_take;
                 let pieces_to_leave: Vec<u8> = stack_movement
                     .into_iter::<S>()
                     .skip(1)
