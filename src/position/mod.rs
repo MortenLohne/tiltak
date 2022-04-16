@@ -1135,12 +1135,6 @@ impl<const S: usize> PositionTrait for Position<S> {
 
                     if self[to].top_stone.map(Piece::role) == Some(Wall) {
                         flattens_stone = true;
-                        debug_assert_eq!(
-                            self[square].top_stone().map(Piece::role),
-                            Some(Cap),
-                            "{}",
-                            mv.to_string::<S>()
-                        );
                     }
 
                     pieces_left_behind.push(moving_pieces.len() as u8 - pieces_to_take);
@@ -1281,10 +1275,7 @@ impl<const S: usize> Iterator for MoveIterator<S> {
         } else {
             let next_square = self.square;
             if self.squares_left > 1 {
-                self.square = self
-                    .square
-                    .go_direction::<S>(self.direction)
-                    .unwrap();
+                self.square = self.square.go_direction::<S>(self.direction).unwrap();
             }
             self.squares_left -= 1;
             Some(next_square)
