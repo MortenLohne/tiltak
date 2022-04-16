@@ -80,23 +80,23 @@ const fn raw_alignment(mut alignment: usize) -> usize {
 }
 
 impl Arena {
-    pub fn new(num_slots: u32, elem_size: usize) -> Option<Self> {
-        if elem_size == 0 || num_slots == 0 || num_slots >= u32::MAX - 1 {
+    pub fn new(num_slots: u32, slot_size: usize) -> Option<Self> {
+        if slot_size == 0 || num_slots == 0 || num_slots >= u32::MAX - 1 {
             return None;
         }
-        let raw_alignment = raw_alignment(elem_size);
+        let raw_alignment = raw_alignment(slot_size);
 
         let layout =
-            Layout::from_size_align((num_slots as usize + 2) * elem_size, raw_alignment).ok()?;
+            Layout::from_size_align((num_slots as usize + 2) * slot_size, raw_alignment).ok()?;
 
         let (data, orig_pointer) = unsafe {
             let ptr = alloc::alloc(layout);
 
             // Make sure the pointer is correctly aligned
-            if (ptr as usize) % elem_size == 0 {
+            if (ptr as usize) % slot_size == 0 {
                 (ptr, ptr)
             } else {
-                (ptr.add(elem_size - (ptr as usize) % elem_size), ptr)
+                (ptr.add(slot_size - (ptr as usize) % slot_size), ptr)
             }
         };
 
@@ -105,7 +105,7 @@ impl Arena {
             orig_pointer,
             layout,
             next_index: AtomicU32::new(1),
-            slot_size: elem_size,
+            slot_size,
             max_index: num_slots + 1,
         })
     }
