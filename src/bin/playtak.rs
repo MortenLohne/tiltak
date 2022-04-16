@@ -685,7 +685,10 @@ impl PlaytakSession {
                             .arena_size_for_nodes(fixed_nodes as u32);
                         let mut tree = search::MonteCarloTree::with_settings(position.clone(), settings);
                         for _ in 0..fixed_nodes {
-                            tree.select();
+                            if tree.select().is_none() {
+                                eprintln!("Warning: Search stopped early due to OOM");
+                                break;
+                            };
                         }
 
                         // Wait for a bit

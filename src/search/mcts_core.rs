@@ -73,13 +73,14 @@ impl TreeEdge {
     /// Perform one iteration of monte carlo tree search.
     ///
     /// Moves done on the board are not reversed.
+    #[must_use]
     pub fn select<const S: usize>(
         &mut self,
         position: &mut Position<S>,
         settings: &MctsSetting<S>,
         temp_vectors: &mut TempVectors,
         arena: &Arena,
-    ) -> Score {
+    ) -> Option<Score> {
         if self.visits == 0 {
             self.expand(position, settings, temp_vectors, arena)
         } else if arena.get(self.child.as_ref().unwrap()).is_terminal {
@@ -87,7 +88,7 @@ impl TreeEdge {
             arena
                 .get_mut(self.child.as_mut().unwrap())
                 .total_action_value += self.mean_action_value as f64;
-            self.mean_action_value
+            Some(self.mean_action_value)
         } else {
             let mut node = arena.get_mut(self.child.as_mut().unwrap());
             debug_assert_eq!(
@@ -106,7 +107,7 @@ impl TreeEdge {
             // Only generate child moves on the 2nd visit
             if self.visits == 1 {
                 let group_data = position.group_data();
-                node.init_children(position, &group_data, settings, temp_vectors, arena);
+                node.init_children(position, &group_data, settings, temp_vectors, arena)?;
             }
 
             let visits_sqrt = (self.visits as Score).sqrt();
@@ -139,27 +140,28 @@ impl TreeEdge {
                 .unwrap();
 
             position.do_move(child_edge.mv.clone());
-            let result = 1.0 - child_edge.select::<S>(position, settings, temp_vectors, arena);
+            let result = 1.0 - child_edge.select::<S>(position, settings, temp_vectors, arena)?;
             self.visits += 1;
 
             node.total_action_value += result as f64;
 
             self.mean_action_value = (node.total_action_value / self.visits as f64) as f32;
-            result
+            Some(result)
         }
     }
 
     // Never inline, for profiling purposes
     #[inline(never)]
+    #[must_use]
     fn expand<const S: usize>(
         &mut self,
         position: &mut Position<S>,
         settings: &MctsSetting<S>,
         temp_vectors: &mut TempVectors,
         arena: &Arena,
-    ) -> Score {
+    ) -> Option<Score> {
         debug_assert!(self.child.is_none());
-        self.child = Some(arena.add(Tree::new_node()));
+        self.child = Some(arena.add(Tree::new_node())?);
 
         let mut child = arena.get_mut(self.child.as_mut().unwrap());
 
@@ -169,7 +171,7 @@ impl TreeEdge {
         child.total_action_value = eval as f64;
         self.mean_action_value = eval;
         child.is_terminal = is_terminal;
-        eval
+        Some(eval)
     }
 
     #[inline]
@@ -183,6 +185,7 @@ impl Tree {
     /// Do not initialize children in the expansion phase, for better performance
     /// Never inline, for profiling purposes
     #[inline(never)]
+    #[must_use]
     fn init_children<const S: usize>(
         &mut self,
         position: &Position<S>,
@@ -190,7 +193,7 @@ impl Tree {
         settings: &MctsSetting<S>,
         temp_vectors: &mut TempVectors,
         arena: &Arena,
-    ) {
+    ) -> Option<()> {
         position.generate_moves_with_params(
             &settings.policy_params,
             group_data,
@@ -209,7 +212,8 @@ impl Tree {
                 settings.initial_mean_action_value(),
             ));
         }
-        self.children = arena.add_slice(&mut children_vec);
+        self.children = arena.add_slice(&mut children_vec)?;
+        Some(())
     }
 
     fn new_node() -> Self {

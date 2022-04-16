@@ -164,7 +164,10 @@ fn analyze_openings<const S: usize>(nodes: u32) {
         let settings = search::MctsSetting::default().arena_size_for_nodes(nodes);
         let mut tree = search::MonteCarloTree::with_settings(position.clone(), settings);
         for _ in 0..nodes {
-            tree.select();
+            if tree.select().is_none() {
+                eprintln!("Warning: Search stopped early due to OOM");
+                break;
+            };
         }
         let pv: Vec<Move> = tree.pv().take(4).collect();
         print!(
@@ -405,7 +408,10 @@ fn analyze_position<const S: usize>(position: &Position<S>) {
 
     let mut tree = search::MonteCarloTree::with_settings(position.clone(), settings);
     for i in 1.. {
-        tree.select();
+        if tree.select().is_none() {
+            println!("Search stopped due to OOM");
+            break;
+        };
         if i % 100_000 == 0 {
             println!(
                 "{} visits, val={:.2}%, static eval={:.4}, static winning probability={:.2}%, {:.2}s",

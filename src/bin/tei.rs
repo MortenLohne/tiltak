@@ -145,7 +145,10 @@ fn parse_go_string<const S: usize>(line: &str, position: &Position<S>, is_slateb
             for i in 0.. {
                 let nodes_to_search = (200.0 * f64::powf(1.26, i as f64)) as u64;
                 for _ in 0..nodes_to_search {
-                    tree.select();
+                    if tree.select().is_none() {
+                        eprintln!("Warning: Search stopped early due to OOM");
+                        break;
+                    };
                 }
                 let (best_move, best_score) = tree.best_move();
                 let pv: Vec<_> = tree.pv().collect();

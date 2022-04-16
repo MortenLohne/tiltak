@@ -146,7 +146,7 @@ impl Arena {
         }
     }
 
-    pub fn add<T>(&self, value: T) -> Index<T> {
+    pub fn add<T>(&self, value: T) -> Option<Index<T>> {
         // Check that the arena supports this value
         assert!(
             self.supports_type::<T>(),
@@ -157,7 +157,7 @@ impl Arena {
             self.elem_size
         );
 
-        let index = self.get_index_for_element(self.bucket_size::<T>()).unwrap();
+        let index = self.get_index_for_element(self.bucket_size::<T>())?;
 
         let ptr = unsafe { self.ptr_to_index(index) as *mut T };
 
@@ -165,7 +165,29 @@ impl Arena {
             *ptr = value;
         }
 
-        Index::new(NonZeroU32::new(index).unwrap())
+        Some(Index::new(NonZeroU32::new(index).unwrap()))
+    }
+
+    pub fn add_slice<T>(&self, values: &mut Vec<T>) -> Option<SliceIndex<T>> {
+        assert!(self.supports_type::<T>());
+        let length = values.len();
+        assert_ne!(length, 0);
+
+        let index = self.get_index_for_element(self.bucket_size::<T>() * values.len() as u32)?;
+
+        let mut ptr = unsafe { self.ptr_to_index(index) as *mut T };
+
+        for value in values.drain(..) {
+            unsafe {
+                *ptr = value;
+                ptr = ptr.add(1);
+            }
+        }
+
+        Some(SliceIndex::new(
+            NonZeroU32::new(index).unwrap(),
+            length as u32,
+        ))
     }
 
     /// Gets an appropriate index for the new element, if there is space available
@@ -177,27 +199,6 @@ impl Arena {
                     .filter(|next_index| *next_index <= self.max_index)
             })
             .ok()
-    }
-
-    pub fn add_slice<T>(&self, values: &mut Vec<T>) -> SliceIndex<T> {
-        assert!(self.supports_type::<T>());
-        let length = values.len();
-        assert_ne!(length, 0);
-
-        let index = self
-            .get_index_for_element(self.bucket_size::<T>() * values.len() as u32)
-            .unwrap();
-
-        let mut ptr = unsafe { self.ptr_to_index(index) as *mut T };
-
-        for value in values.drain(..) {
-            unsafe {
-                *ptr = value;
-                ptr = ptr.add(1);
-            }
-        }
-
-        SliceIndex::new(NonZeroU32::new(index).unwrap(), length as u32)
     }
 
     pub const fn supports_type<T>(&self) -> bool {

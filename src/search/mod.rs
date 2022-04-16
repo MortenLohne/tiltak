@@ -163,8 +163,8 @@ impl<const S: usize> MonteCarloTree<S> {
         };
 
         if let Some(alpha) = tree.settings.dirichlet {
-            tree.select();
-            tree.select();
+            tree.select().unwrap();
+            tree.select().unwrap();
             (tree.arena.get_mut(tree.edge.child.as_mut().unwrap())).apply_dirichlet(
                 &tree.arena,
                 0.25,
@@ -173,8 +173,8 @@ impl<const S: usize> MonteCarloTree<S> {
         }
 
         if !tree.settings.excluded_moves.is_empty() {
-            tree.select();
-            tree.select();
+            tree.select().unwrap();
+            tree.select().unwrap();
             let mut filtered_edges: Vec<TreeEdge> = tree
                 .arena
                 .get_slice(&tree.get_child().children)
@@ -182,7 +182,7 @@ impl<const S: usize> MonteCarloTree<S> {
                 .filter(|edge| !settings.excluded_moves.contains(&edge.mv))
                 .map(|edge| edge.shallow_clone())
                 .collect();
-            (*tree.get_child_mut()).children = tree.arena.add_slice(&mut filtered_edges);
+            (*tree.get_child_mut()).children = tree.arena.add_slice(&mut filtered_edges).unwrap();
         }
 
         tree
@@ -205,7 +205,11 @@ impl<const S: usize> MonteCarloTree<S> {
         for i in 0.. {
             let nodes = (50.0 * 2.0_f32.powf(0.125).powi(i)) as u64;
             for _ in 0..nodes {
-                self.select();
+                if self.select().is_none() {
+                    eprintln!("Warning: Search stopped early due to OOM");
+                    callback(self);
+                    return;
+                };
             }
 
             // Always return when we have less than 10ms left
@@ -261,7 +265,8 @@ impl<const S: usize> MonteCarloTree<S> {
     }
 
     /// Run one iteration of MCTS
-    pub fn select(&mut self) -> f32 {
+    #[must_use]
+    pub fn select(&mut self) -> Option<f32> {
         self.edge.select::<S>(
             &mut self.position.clone(),
             &self.settings,
@@ -356,7 +361,7 @@ pub fn mcts<const S: usize>(position: Position<S>, nodes: u64) -> (Move, Score) 
     let mut tree = MonteCarloTree::with_settings(position, settings);
 
     for _ in 0..nodes.max(2) {
-        tree.select();
+        tree.select().unwrap();
     }
     let (mv, score) = tree.best_move();
     (mv, score)
@@ -387,7 +392,10 @@ pub fn mcts_training<const S: usize>(
     match time_control {
         TimeControl::FixedNodes(nodes) => {
             for _ in 0..*nodes {
-                tree.select();
+                if tree.select().is_none() {
+                    eprintln!("Warning: Search stopped early due to OOM");
+                    break;
+                };
             }
         }
         TimeControl::Time(time, increment) => {

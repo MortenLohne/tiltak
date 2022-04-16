@@ -78,7 +78,10 @@ pub fn handle_aws_event_generic<const S: usize>(e: Event, _c: Context) -> Result
         TimeControl::FixedNodes(nodes) => {
             let mut tree = search::MonteCarloTree::with_settings(position, settings);
             for _ in 0..nodes {
-                tree.select();
+                if tree.select().is_none() {
+                    eprintln!("Warning: Search stopped early due to OOM");
+                    break;
+                };
             }
             let score = 1.0 - tree.best_move().1;
             let pv = tree.pv().map(|mv| mv.to_string::<S>()).collect();

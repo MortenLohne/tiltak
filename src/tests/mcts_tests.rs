@@ -192,7 +192,7 @@ fn plays_correct_move_property(move_strings: &[&str], correct_moves: &[&str]) {
     }
 
     for i in 1..=nodes {
-        mcts.select();
+        mcts.select().unwrap();
         if i % 5000 == 0 {
             let (best_move, _score) = mcts.best_move();
             assert!(correct_moves
