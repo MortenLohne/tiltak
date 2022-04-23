@@ -90,6 +90,10 @@ impl<const S: usize> Arena<S> {
         let (data, orig_pointer) = unsafe {
             let ptr = alloc::alloc(layout);
 
+            if ptr.is_null() {
+                return None
+            }
+
             // Make sure the pointer is correctly aligned
             if (ptr as usize) % S == 0 {
                 (ptr, ptr)
