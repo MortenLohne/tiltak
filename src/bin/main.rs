@@ -61,7 +61,8 @@ fn main() {
                 Some(&"6") => analyze_position_from_ptn::<6>(),
                 Some(&"7") => analyze_position_from_ptn::<7>(),
                 Some(&"8") => analyze_position_from_ptn::<8>(),
-                _ => analyze_position_from_ptn::<5>(),
+                Some(s) => println!("Unsupported size {}", s),
+                None => analyze_position_from_ptn::<5>(),
             },
             "tps" => match words.get(1) {
                 Some(&"4") => analyze_position_from_tps::<4>(),
@@ -69,15 +70,18 @@ fn main() {
                 Some(&"6") => analyze_position_from_tps::<6>(),
                 Some(&"7") => analyze_position_from_tps::<7>(),
                 Some(&"8") => analyze_position_from_tps::<8>(),
-                _ => analyze_position_from_tps::<5>(),
+                Some(s) => println!("Unsupported size {}", s),
+                None => analyze_position_from_tps::<5>(),
             },
             "perft" => match words.get(1) {
+                Some(&"3") => perft_from_tps::<3>(),
                 Some(&"4") => perft_from_tps::<4>(),
                 Some(&"5") => perft_from_tps::<5>(),
                 Some(&"6") => perft_from_tps::<6>(),
                 Some(&"7") => perft_from_tps::<7>(),
                 Some(&"8") => perft_from_tps::<8>(),
-                _ => perft_from_tps::<5>(),
+                Some(s) => println!("Unsupported size {}", s),
+                None => perft_from_tps::<5>(),
             },
             #[cfg(feature = "constant-tuning")]
             "openings" => {
