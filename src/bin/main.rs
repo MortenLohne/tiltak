@@ -52,7 +52,7 @@ fn main() {
             }
             "aimatch" => {
                 for i in 1..10 {
-                    mcts_vs_minmax(3, 50000 * i);
+                    mcts_vs_minmax(5, 50000 * i);
                 }
             }
             "analyze" => match words.get(1) {
@@ -343,7 +343,7 @@ fn analyze_position_from_tps<const S: usize>() {
     println!("Enter TPS");
     let mut input = String::new();
     io::stdin().read_line(&mut input).unwrap();
-    let position = <Position<S>>::from_fen_with_komi(&input, Komi::try_from(0.0).unwrap()).unwrap();
+    let position = <Position<S>>::from_fen_with_komi(&input, Komi::try_from(3.0).unwrap()).unwrap();
     analyze_position(&position)
 }
 
@@ -402,6 +402,7 @@ fn analyze_position<const S: usize>(position: &Position<S>) {
         println!();
     }
     let settings: MctsSetting<S> = search::MctsSetting::default()
+        .add_rollout_depth(200)
         .arena_size(2_u32.pow(31))
         .exclude_moves(vec![]);
     let start_time = time::Instant::now();
@@ -412,7 +413,7 @@ fn analyze_position<const S: usize>(position: &Position<S>) {
             println!("Search stopped due to OOM");
             break;
         };
-        if i % 100_000 == 0 {
+        if i % 10_000 == 0 {
             println!(
                 "{} visits, val={:.2}%, static eval={:.4}, static winning probability={:.2}%, {:.2}s",
                 tree.visits(),

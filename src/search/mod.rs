@@ -165,19 +165,20 @@ impl<const S: usize> MonteCarloTree<S> {
         if let Some(alpha) = tree.settings.dirichlet {
             tree.select().unwrap();
             tree.select().unwrap();
-            (tree.arena.get_mut(tree.edge.child.as_mut().unwrap())).apply_dirichlet(
-                &tree.arena,
-                0.25,
-                alpha,
-            );
+            unsafe {
+                (tree.arena.get_mut(tree.edge.child.as_mut().unwrap())).apply_dirichlet(
+                    &tree.arena,
+                    0.25,
+                    alpha,
+                );
+            }
         }
 
         if !tree.settings.excluded_moves.is_empty() {
             tree.select().unwrap();
             tree.select().unwrap();
             let mut filtered_edges: Vec<TreeEdge> = tree
-                .arena
-                .get_slice(&tree.get_child().children)
+                .children_ref()
                 .iter()
                 .filter(|edge| !settings.excluded_moves.contains(&edge.mv))
                 .map(|edge| edge.shallow_clone())
@@ -189,11 +190,11 @@ impl<const S: usize> MonteCarloTree<S> {
     }
 
     pub fn get_child(&self) -> &Tree {
-        self.arena.get(self.edge.child.as_ref().unwrap())
+        unsafe { self.arena.get(self.edge.child.as_ref().unwrap()) }
     }
 
     pub fn get_child_mut(&mut self) -> &mut Tree {
-        self.arena.get_mut(self.edge.child.as_mut().unwrap())
+        unsafe { self.arena.get_mut(self.edge.child.as_mut().unwrap()) }
     }
 
     pub fn search_for_time<F>(&mut self, max_time: time::Duration, callback: F)
@@ -215,15 +216,13 @@ impl<const S: usize> MonteCarloTree<S> {
             // Always return when we have less than 10ms left
             if max_time < (time::Duration::from_millis(10))
                 || start_time.elapsed() > max_time - (time::Duration::from_millis(10))
-                || self.children().len() == 1
+                || self.children_ref().len() == 1
             {
                 callback(self);
                 return;
             }
 
-            let child = self.get_child();
-            let mut child_refs: Vec<&TreeEdge> =
-                self.arena.get_slice(&child.children).iter().collect();
+            let mut child_refs: Vec<&TreeEdge> = self.children_ref();
 
             child_refs.sort_by_key(|edge| edge.visits);
             child_refs.reverse();
@@ -239,7 +238,7 @@ impl<const S: usize> MonteCarloTree<S> {
                 );
 
             let best_edge = self
-                .children()
+                .children_ref()
                 .iter()
                 .max_by_key(|edge| edge.visits)
                 .unwrap()
@@ -250,7 +249,7 @@ impl<const S: usize> MonteCarloTree<S> {
             if time_ratio.powf(2.0) > node_ratio / 2.0 {
                 callback(self);
                 // Do not stop if any other child nodes have better exploration value
-                if self.children().iter().any(|edge| {
+                if self.children_ref().iter().any(|edge| {
                     edge.mv != best_edge.mv
                         && edge.exploration_value(visits_sqrt, dynamic_cpuct)
                             > best_exploration_value + 0.01
@@ -278,8 +277,7 @@ impl<const S: usize> MonteCarloTree<S> {
     /// Returns the best move, and its score (as winning probability) from the perspective of the side to move
     /// Panics if no search iterations have been run
     pub fn best_move(&self) -> (Move, f32) {
-        self.arena
-            .get_slice(&self.get_child().children)
+        self.children_ref()
             .iter()
             .max_by_key(|edge| edge.visits)
             .map(|edge| (edge.mv.clone(), 1.0 - edge.mean_action_value))
@@ -289,44 +287,46 @@ impl<const S: usize> MonteCarloTree<S> {
     pub fn node_edge_sizes(&self, arena: &Arena) -> (usize, usize) {
         pub fn edge_sizes(edge: &TreeEdge, arena: &Arena) -> (usize, usize) {
             if let Some(child_index) = &edge.child {
-                let (child_nodes, child_edges) = node_sizes(&*arena.get(child_index), arena);
+                let (child_nodes, child_edges) =
+                    unsafe { node_sizes(&*arena.get(child_index), arena) };
                 (child_nodes, child_edges + 1)
             } else {
                 (0, 1)
             }
         }
         pub fn node_sizes(node: &Tree, arena: &Arena) -> (usize, usize) {
-            arena
-                .get_slice(&node.children)
-                .iter()
-                .map(|edge| edge_sizes(edge, arena))
-                .fold(
-                    (1, 0),
-                    |(acc_nodes, acc_edges), (child_nodes, child_edges)| {
-                        (acc_nodes + child_nodes, acc_edges + child_edges)
-                    },
-                )
+            unsafe {
+                arena
+                    .get_slice(&node.children)
+                    .iter()
+                    .map(|edge| edge_sizes(edge, arena))
+                    .fold(
+                        (1, 0),
+                        |(acc_nodes, acc_edges), (child_nodes, child_edges)| {
+                            (acc_nodes + child_nodes, acc_edges + child_edges)
+                        },
+                    )
+            }
         }
         edge_sizes(&self.edge, arena)
     }
 
-    fn children(&self) -> Vec<TreeEdge> {
-        self.arena
-            .get_slice(&self.get_child().children)
-            .iter()
-            .map(|edge| edge.shallow_clone())
-            .collect()
+    fn children_ref(&self) -> Vec<&TreeEdge> {
+        unsafe {
+            self.arena
+                .get_slice(&self.get_child().children)
+                .iter()
+                .collect()
+        }
     }
 
     pub fn pv(&self) -> impl Iterator<Item = Move> + '_ {
-        Pv::new(&self.edge, &self.arena)
+        unsafe { Pv::new(&self.edge, &self.arena) }
     }
 
     /// Print human-readable information of the search's progress.
     pub fn print_info(&self) {
-        let child = self.get_child();
-        let mut best_children: Vec<&TreeEdge> =
-            self.arena.get_slice(&child.children).iter().collect();
+        let mut best_children: Vec<&TreeEdge> = self.children_ref();
 
         best_children.sort_by_key(|edge| edge.visits);
         best_children.reverse();
@@ -341,7 +341,9 @@ impl<const S: usize> MonteCarloTree<S> {
                 "Move {}: {} visits, {:.2}% mean action value, {:.3}% static score, {:.3} exploration value, pv {}",
                 edge.mv.to_string::<S>(), edge.visits, edge.mean_action_value * 100.0, edge.heuristic_score * 100.0,
                 edge.exploration_value((self.visits() as Score).sqrt(), dynamic_cpuct),
-                Pv::new(edge, &self.arena).skip(1).map(|mv| mv.to_string::<S>() + " ").collect::<String>()
+                unsafe {
+                    Pv::new(edge, &self.arena).skip(1).map(|mv| mv.to_string::<S>() + " ").collect::<String>()
+                }
             )
         });
     }
@@ -404,8 +406,8 @@ pub fn mcts_training<const S: usize>(
         }
     }
 
-    let child_visits: u64 = tree.children().iter().map(|edge| edge.visits).sum();
-    tree.children()
+    let child_visits: u64 = tree.children_ref().iter().map(|edge| edge.visits).sum();
+    tree.children_ref()
         .iter()
         .map(|edge| (edge.mv.clone(), edge.visits as f32 / child_visits as f32))
         .collect()
