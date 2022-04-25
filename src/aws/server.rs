@@ -65,7 +65,7 @@ pub fn handle_aws_event_generic<const S: usize>(e: Event, _c: Context) -> Result
     }
     .add_rollout_depth(e.rollout_depth)
     .add_rollout_temperature(e.rollout_temperature)
-    .mem_usage(2_usize.pow(2));
+    .mem_usage(2_usize.pow(30));
 
     let start_time = Instant::now();
 
