@@ -91,7 +91,7 @@ impl<const S: usize> Arena<S> {
             let ptr = alloc::alloc(layout);
 
             if ptr.is_null() {
-                return None
+                return None;
             }
 
             // Make sure the pointer is correctly aligned
@@ -111,6 +111,9 @@ impl<const S: usize> Arena<S> {
         })
     }
 
+    /// Get a reference to an element in the arena
+    /// # Safety
+    /// This function is actually unsafe, if the index is from a different arena
     pub fn get<'a, T>(&'a self, index: &'a Index<T>) -> &'a T {
         unsafe {
             let ptr = self.ptr_to_index(index.data.get()) as *const T;
@@ -118,6 +121,9 @@ impl<const S: usize> Arena<S> {
         }
     }
 
+    /// Get a mutable reference to an element in the arena
+    /// # Safety
+    /// This function is actually unsafe, if the index is from a different arena
     pub fn get_mut<'a, T>(&'a self, index: &'a mut Index<T>) -> &'a mut T {
         unsafe {
             let ptr = self.ptr_to_index(index.data.get()) as *mut T;
@@ -125,6 +131,9 @@ impl<const S: usize> Arena<S> {
         }
     }
 
+    /// Get a slice from the arena
+    /// # Safety
+    /// This function is actually unsafe, if the index is from a different arena
     pub fn get_slice<'a, T>(&'a self, index: &'a SliceIndex<T>) -> &'a [T] {
         if index.length == 0 {
             Default::default()
@@ -136,6 +145,9 @@ impl<const S: usize> Arena<S> {
         }
     }
 
+    /// Get a mutable slice from the arena
+    /// # Safety
+    /// This function is actually unsafe, if the index is from a different arena
     pub fn get_slice_mut<'a, T>(&'a self, index: &'a mut SliceIndex<T>) -> &'a mut [T] {
         if index.length == 0 {
             Default::default()
