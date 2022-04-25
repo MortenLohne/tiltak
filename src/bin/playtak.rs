@@ -2,7 +2,7 @@ use std::convert::Infallible;
 use std::io::{BufRead, Result, Write};
 use std::net::TcpStream;
 use std::str::FromStr;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use std::{io, net, thread};
 
 use board_game_traits::{Color, GameResult, Position as PositionTrait};
@@ -701,6 +701,7 @@ impl PlaytakSession {
                         #[cfg(feature = "aws-lambda-client")]
                         {
                             let aws_function_name = self.aws_function_name.as_ref().unwrap();
+                            let start_time = Instant::now();
                             let event = aws::Event {
                                 size: S,
                                 tps: None,
@@ -714,8 +715,16 @@ impl PlaytakSession {
                                 rollout_depth: playtak_settings.rollout_depth,
                                 rollout_temperature: playtak_settings.rollout_temperature,
                             };
-                            let aws::Output { pv, score } =
+                            let aws::Output { pv, score, nodes, mem_usage, time_taken } =
                                 aws::client::best_move_aws(aws_function_name, &event)?;
+
+                            debug!("{} nodes, {}MB, {:.1}s taken, {}ms overhead",
+                                nodes,
+                                mem_usage / (1024 * 1024),
+                                time_taken.as_secs_f32(),
+                                (start_time.elapsed() - time_taken).as_millis()
+                            );
+
                             (position.move_from_san(&pv[0]).unwrap(), score)
                         }
 

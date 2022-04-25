@@ -223,6 +223,10 @@ impl<const S: usize> Arena<S> {
         S % mem::align_of::<T>() == 0
     }
 
+    pub fn slots_used(&self) -> u32 {
+        self.next_index.load(Ordering::SeqCst) - 1
+    }
+
     unsafe fn ptr_to_index(&self, raw_index: u32) -> *const u8 {
         self.data.add(raw_index as usize * S)
     }

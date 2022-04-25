@@ -350,6 +350,10 @@ impl<const S: usize> MonteCarloTree<S> {
         self.edge.visits
     }
 
+    pub fn mem_usage(&self) -> usize {
+        self.arena.slots_used() as usize * 24
+    }
+
     pub fn mean_action_value(&self) -> Score {
         self.edge.mean_action_value
     }
