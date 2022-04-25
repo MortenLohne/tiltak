@@ -91,7 +91,7 @@ impl<const S: usize> Arena<S> {
             let ptr = alloc::alloc(layout);
 
             if ptr.is_null() {
-                return None;
+                return None
             }
 
             // Make sure the pointer is correctly aligned
@@ -111,31 +111,39 @@ impl<const S: usize> Arena<S> {
         })
     }
 
-    pub unsafe fn get<'a, T>(&'a self, index: &'a Index<T>) -> &'a T {
-        let ptr = self.ptr_to_index(index.data.get()) as *const T;
-        &*ptr
-    }
-
-    pub unsafe fn get_mut<'a, T>(&'a self, index: &'a mut Index<T>) -> &'a mut T {
-        let ptr = self.ptr_to_index(index.data.get()) as *mut T;
-        &mut *ptr
-    }
-
-    pub unsafe fn get_slice<'a, T>(&'a self, index: &'a SliceIndex<T>) -> &'a [T] {
-        if index.length == 0 {
-            Default::default()
-        } else {
+    pub fn get<'a, T>(&'a self, index: &'a Index<T>) -> &'a T {
+        unsafe {
             let ptr = self.ptr_to_index(index.data.get()) as *const T;
-            slice::from_raw_parts(ptr, index.length as usize)
+            &*ptr
         }
     }
 
-    pub unsafe fn get_slice_mut<'a, T>(&'a self, index: &'a mut SliceIndex<T>) -> &'a mut [T] {
+    pub fn get_mut<'a, T>(&'a self, index: &'a mut Index<T>) -> &'a mut T {
+        unsafe {
+            let ptr = self.ptr_to_index(index.data.get()) as *mut T;
+            &mut *ptr
+        }
+    }
+
+    pub fn get_slice<'a, T>(&'a self, index: &'a SliceIndex<T>) -> &'a [T] {
         if index.length == 0 {
             Default::default()
         } else {
-            let ptr = self.ptr_to_index(index.data.get()) as *mut T;
-            slice::from_raw_parts_mut(ptr, index.length as usize)
+            unsafe {
+                let ptr = self.ptr_to_index(index.data.get()) as *const T;
+                slice::from_raw_parts(ptr, index.length as usize)
+            }
+        }
+    }
+
+    pub fn get_slice_mut<'a, T>(&'a self, index: &'a mut SliceIndex<T>) -> &'a mut [T] {
+        if index.length == 0 {
+            Default::default()
+        } else {
+            unsafe {
+                let ptr = self.ptr_to_index(index.data.get()) as *mut T;
+                slice::from_raw_parts_mut(ptr, index.length as usize)
+            }
         }
     }
 
