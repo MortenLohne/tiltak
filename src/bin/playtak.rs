@@ -2,7 +2,9 @@ use std::convert::Infallible;
 use std::io::{BufRead, Result, Write};
 use std::net::TcpStream;
 use std::str::FromStr;
-use std::time::{Duration, Instant};
+#[cfg(feature = "aws-lambda-client")]
+use std::time::Instant;
+use std::time::Duration;
 use std::{io, net, thread};
 
 use board_game_traits::{Color, GameResult, Position as PositionTrait};
