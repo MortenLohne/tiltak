@@ -233,6 +233,7 @@ impl Move {
                             pieces_held
                         },
                     ))
+                    .chain(iter::once(0))
                     .map(|pieces_to_take| Movement { pieces_to_take }),
             );
 
