@@ -80,9 +80,10 @@ pub fn handle_aws_event_generic<const S: usize>(e: Event, _c: Context) -> Result
             let mut tree = MonteCarloTree::with_settings(position, settings);
             tree.search_for_time(max_time, |_| {});
 
-            let (best_move, score) = tree.best_move();
+            let score = 1.0 - tree.best_move().1;
+            let pv = tree.pv().map(|mv| mv.to_string::<S>()).collect();
             Ok(Output {
-                pv: vec![best_move.to_string::<S>()],
+                pv,
                 score,
                 nodes: tree.visits(),
                 mem_usage: tree.mem_usage() as u64,

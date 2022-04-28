@@ -334,10 +334,13 @@ pub struct Pv<'a> {
 
 impl<'a> Pv<'a> {
     pub fn new(edge: &'a TreeEdge, arena: &'a Arena) -> Pv<'a> {
-        Pv {
+        let mut pv = Pv {
             edge: Some(edge),
             arena,
-        }
+        };
+        // Skip the dummy move on the top of the tree
+        pv.next();
+        pv
     }
 }
 
