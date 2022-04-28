@@ -17,7 +17,8 @@ pub fn perft_check_answers<const S: usize>(position: &mut Position<S>, answers: 
             assert_eq!(
                 position.perft(depth as u16),
                 answer,
-                "Wrong perft result on\n{:?}",
+                "Wrong perft result for depth {} on\n{:?}",
+                depth,
                 position
             );
         }

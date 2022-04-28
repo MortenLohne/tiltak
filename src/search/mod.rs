@@ -10,13 +10,15 @@ use crate::position::Move;
 use crate::position::Position;
 use crate::position::{Role, Square};
 pub use crate::search::mcts_core::best_move;
-use crate::search::mcts_core::{TempVectors, Tree};
+use crate::search::mcts_core::{TempVectors, Tree, TreeEdge};
 
-use self::mcts_core::{Pv, TreeEdge};
+use self::mcts_core::Pv;
 
+mod arena;
 /// This module contains the public-facing convenience API for the search.
 /// The implementation itself in in mcts_core.
 mod mcts_core;
+pub use arena::Arena;
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug, PartialEq, Clone)]
@@ -27,6 +29,7 @@ pub enum TimeControl {
 
 #[derive(Clone, PartialEq, Debug)]
 pub struct MctsSetting<const S: usize> {
+    arena_size: u32,
     value_params: Vec<f32>,
     policy_params: Vec<f32>,
     search_params: Vec<Score>,
@@ -39,6 +42,7 @@ pub struct MctsSetting<const S: usize> {
 impl<const S: usize> Default for MctsSetting<S> {
     fn default() -> Self {
         MctsSetting {
+            arena_size: 2_u32.pow(26), // Default to 1.5GB max
             value_params: Vec::from(<Position<S>>::value_params()),
             policy_params: Vec::from(<Position<S>>::policy_params()),
             search_params: vec![1.43, 2800.0, 0.61],
@@ -51,6 +55,27 @@ impl<const S: usize> Default for MctsSetting<S> {
 }
 
 impl<const N: usize> MctsSetting<N> {
+    /// Set a very liberal arena size, for searching a given amount of nodes
+    pub fn arena_size_for_nodes(self, nodes: u32) -> Self {
+        // For 6s, the toughest position I've found required 40 elements/node searched
+        // This formula gives 108, which is hopefully plenty
+        self.arena_size((N * N) as u32 * 3 * nodes)
+    }
+
+    pub fn mem_usage(self, mem_usage: usize) -> Self {
+        assert!(
+            mem_usage < u32::MAX as usize // Check for 32-bit platforms
+            || mem_usage < 24 * 2_usize.pow(32) - 2
+        );
+        self.arena_size((mem_usage / ARENA_ELEMENT_SIZE) as u32)
+    }
+
+    pub fn arena_size(mut self, arena_size: u32) -> Self {
+        assert!(arena_size < u32::MAX - 1);
+        self.arena_size = arena_size;
+        self
+    }
+
     pub fn add_value_params(mut self, value_params: Vec<f32>) -> Self {
         self.value_params = value_params;
         self
@@ -104,35 +129,25 @@ impl<const N: usize> MctsSetting<N> {
 
 /// Type alias for winning probability, used for scoring positions.
 pub type Score = f32;
+pub const ARENA_ELEMENT_SIZE: usize = 24;
 
 /// Abstract representation of a Monte Carlo Search Tree.
 /// Gives more fine-grained control of the search process compared to using the `mcts` function.
-#[derive(Clone, PartialEq, Debug)]
+// #[derive(Clone, PartialEq, Debug)]
 pub struct MonteCarloTree<const S: usize> {
     edge: TreeEdge, // A virtual edge to the first node, with fake move and heuristic score
     position: Position<S>,
     settings: MctsSetting<S>,
     temp_vectors: TempVectors,
+    arena: Arena,
 }
 
 impl<const S: usize> MonteCarloTree<S> {
     pub fn new(position: Position<S>) -> Self {
-        MonteCarloTree {
-            edge: TreeEdge {
-                child: None,
-                mv: Move::Place(Role::Flat, Square(0)),
-                mean_action_value: 0.0,
-                visits: 0,
-                heuristic_score: 0.0,
-            },
-            position,
-            settings: MctsSetting::default(),
-            temp_vectors: TempVectors::new::<S>(),
-        }
+        Self::with_settings(position, MctsSetting::default())
     }
 
     pub fn with_settings(position: Position<S>, settings: MctsSetting<S>) -> Self {
-        #[allow(unused_mut)]
         let mut tree = MonteCarloTree {
             edge: TreeEdge {
                 child: None,
@@ -144,31 +159,41 @@ impl<const S: usize> MonteCarloTree<S> {
             position,
             settings: settings.clone(),
             temp_vectors: TempVectors::new::<S>(),
+            arena: Arena::new(settings.arena_size).unwrap(),
         };
 
         if let Some(alpha) = tree.settings.dirichlet {
-            tree.select();
-            tree.select();
-            (*tree.edge.child.as_mut().unwrap()).apply_dirichlet(0.25, alpha);
+            tree.select().unwrap();
+            tree.select().unwrap();
+            (tree.arena.get_mut(tree.edge.child.as_mut().unwrap())).apply_dirichlet(
+                &tree.arena,
+                0.25,
+                alpha,
+            );
         }
 
         if !tree.settings.excluded_moves.is_empty() {
-            tree.select();
-            tree.select();
-            let filtered_edges: Vec<TreeEdge> = tree
-                .edge
-                .child
-                .as_ref()
-                .unwrap()
-                .children
+            tree.select().unwrap();
+            tree.select().unwrap();
+            let mut filtered_edges: Vec<TreeEdge> = tree
+                .arena
+                .get_slice(&tree.get_child().children)
                 .iter()
                 .filter(|edge| !settings.excluded_moves.contains(&edge.mv))
-                .cloned()
+                .map(|edge| edge.shallow_clone())
                 .collect();
-            tree.edge.child.as_mut().unwrap().children = filtered_edges.into_boxed_slice();
+            (*tree.get_child_mut()).children = tree.arena.add_slice(&mut filtered_edges).unwrap();
         }
 
         tree
+    }
+
+    pub fn get_child(&self) -> &Tree {
+        self.arena.get(self.edge.child.as_ref().unwrap())
+    }
+
+    pub fn get_child_mut(&mut self) -> &mut Tree {
+        self.arena.get_mut(self.edge.child.as_mut().unwrap())
     }
 
     pub fn search_for_time<F>(&mut self, max_time: time::Duration, callback: F)
@@ -180,7 +205,11 @@ impl<const S: usize> MonteCarloTree<S> {
         for i in 0.. {
             let nodes = (50.0 * 2.0_f32.powf(0.125).powi(i)) as u64;
             for _ in 0..nodes {
-                self.select();
+                if self.select().is_none() {
+                    eprintln!("Warning: Search stopped early due to OOM");
+                    callback(self);
+                    return;
+                };
             }
 
             // Always return when we have less than 10ms left
@@ -192,7 +221,10 @@ impl<const S: usize> MonteCarloTree<S> {
                 return;
             }
 
-            let mut child_refs: Vec<&TreeEdge> = self.children().iter().collect();
+            let child = self.get_child();
+            let mut child_refs: Vec<&TreeEdge> =
+                self.arena.get_slice(&child.children).iter().collect();
+
             child_refs.sort_by_key(|edge| edge.visits);
             child_refs.reverse();
 
@@ -210,7 +242,8 @@ impl<const S: usize> MonteCarloTree<S> {
                 .children()
                 .iter()
                 .max_by_key(|edge| edge.visits)
-                .unwrap();
+                .unwrap()
+                .shallow_clone();
 
             let best_exploration_value = best_edge.exploration_value(visits_sqrt, dynamic_cpuct);
 
@@ -232,59 +265,68 @@ impl<const S: usize> MonteCarloTree<S> {
     }
 
     /// Run one iteration of MCTS
-    pub fn select(&mut self) -> f32 {
+    #[must_use]
+    pub fn select(&mut self) -> Option<f32> {
         self.edge.select::<S>(
             &mut self.position.clone(),
             &self.settings,
             &mut self.temp_vectors,
+            &self.arena,
         )
     }
 
     /// Returns the best move, and its score (as winning probability) from the perspective of the side to move
     /// Panics if no search iterations have been run
     pub fn best_move(&self) -> (Move, f32) {
-        self.edge
-            .child
-            .as_ref()
-            .unwrap()
-            .children
+        self.arena
+            .get_slice(&self.get_child().children)
             .iter()
             .max_by_key(|edge| edge.visits)
             .map(|edge| (edge.mv.clone(), 1.0 - edge.mean_action_value))
             .unwrap_or_else(|| panic!("Couldn't find best move"))
     }
 
-    pub fn node_edge_sizes(&self) -> (usize, usize) {
-        pub fn edge_sizes(edge: &TreeEdge) -> (usize, usize) {
-            if let Some(child) = &edge.child {
-                let (child_nodes, child_edges) = node_sizes(child);
+    pub fn node_edge_sizes(&self, arena: &Arena) -> (usize, usize) {
+        pub fn edge_sizes(edge: &TreeEdge, arena: &Arena) -> (usize, usize) {
+            if let Some(child_index) = &edge.child {
+                let (child_nodes, child_edges) = node_sizes(&*arena.get(child_index), arena);
                 (child_nodes, child_edges + 1)
             } else {
                 (0, 1)
             }
         }
-        pub fn node_sizes(node: &Tree) -> (usize, usize) {
-            node.children.iter().map(edge_sizes).fold(
-                (1, 0),
-                |(acc_nodes, acc_edges), (child_nodes, child_edges)| {
-                    (acc_nodes + child_nodes, acc_edges + child_edges)
-                },
-            )
+        pub fn node_sizes(node: &Tree, arena: &Arena) -> (usize, usize) {
+            arena
+                .get_slice(&node.children)
+                .iter()
+                .map(|edge| edge_sizes(edge, arena))
+                .fold(
+                    (1, 0),
+                    |(acc_nodes, acc_edges), (child_nodes, child_edges)| {
+                        (acc_nodes + child_nodes, acc_edges + child_edges)
+                    },
+                )
         }
-        edge_sizes(&self.edge)
+        edge_sizes(&self.edge, arena)
     }
 
-    fn children(&self) -> &[TreeEdge] {
-        &self.edge.child.as_ref().unwrap().children
+    fn children(&self) -> Vec<TreeEdge> {
+        self.arena
+            .get_slice(&self.get_child().children)
+            .iter()
+            .map(|edge| edge.shallow_clone())
+            .collect()
     }
 
     pub fn pv(&self) -> impl Iterator<Item = Move> + '_ {
-        Pv::new(self.edge.child.as_ref().unwrap())
+        Pv::new(&self.edge, &self.arena)
     }
 
     /// Print human-readable information of the search's progress.
     pub fn print_info(&self) {
-        let mut best_children: Vec<&TreeEdge> = self.children().iter().collect();
+        let child = self.get_child();
+        let mut best_children: Vec<&TreeEdge> =
+            self.arena.get_slice(&child.children).iter().collect();
 
         best_children.sort_by_key(|edge| edge.visits);
         best_children.reverse();
@@ -299,18 +341,17 @@ impl<const S: usize> MonteCarloTree<S> {
                 "Move {}: {} visits, {:.2}% mean action value, {:.3}% static score, {:.3} exploration value, pv {}",
                 edge.mv.to_string::<S>(), edge.visits, edge.mean_action_value * 100.0, edge.heuristic_score * 100.0,
                 edge.exploration_value((self.visits() as Score).sqrt(), dynamic_cpuct),
-                if edge.child.is_some() {
-                    Pv::new(edge.child.as_ref().unwrap()).map(|mv| mv.to_string::<S>() + " ").collect::<String>()
-                }
-                else {
-                    String::new()
-                }
+                Pv::new(edge, &self.arena).skip(1).map(|mv| mv.to_string::<S>() + " ").collect::<String>()
             )
         });
     }
 
     pub fn visits(&self) -> u64 {
         self.edge.visits
+    }
+
+    pub fn mem_usage(&self) -> usize {
+        self.arena.slots_used() as usize * 24
     }
 
     pub fn mean_action_value(&self) -> Score {
@@ -320,10 +361,11 @@ impl<const S: usize> MonteCarloTree<S> {
 
 /// The simplest way to use the mcts module. Run Monte Carlo Tree Search for `nodes` nodes, returning the best move, and its estimated winning probability for the side to move.
 pub fn mcts<const S: usize>(position: Position<S>, nodes: u64) -> (Move, Score) {
-    let mut tree = MonteCarloTree::new(position);
+    let settings = MctsSetting::default().arena_size_for_nodes(nodes as u32);
+    let mut tree = MonteCarloTree::with_settings(position, settings);
 
     for _ in 0..nodes.max(2) {
-        tree.select();
+        tree.select().unwrap();
     }
     let (mv, score) = tree.best_move();
     (mv, score)
@@ -354,7 +396,10 @@ pub fn mcts_training<const S: usize>(
     match time_control {
         TimeControl::FixedNodes(nodes) => {
             for _ in 0..*nodes {
-                tree.select();
+                if tree.select().is_none() {
+                    eprintln!("Warning: Search stopped early due to OOM");
+                    break;
+                };
             }
         }
         TimeControl::Time(time, increment) => {

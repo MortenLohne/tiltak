@@ -2,6 +2,8 @@ use std::convert::Infallible;
 use std::io::{BufRead, Result, Write};
 use std::net::TcpStream;
 use std::str::FromStr;
+#[cfg(feature = "aws-lambda-client")]
+use std::time::Instant;
 use std::time::Duration;
 use std::{io, net, thread};
 
@@ -680,10 +682,15 @@ impl PlaytakSession {
                         ];
                         (moves.choose(&mut rng).unwrap().clone(), 0.0)
                     } else if let Some(fixed_nodes) = playtak_settings.fixed_nodes {
-                        let settings = playtak_settings.to_mcts_setting();
+                        let settings =
+                            playtak_settings.to_mcts_setting()
+                            .arena_size_for_nodes(fixed_nodes as u32);
                         let mut tree = search::MonteCarloTree::with_settings(position.clone(), settings);
                         for _ in 0..fixed_nodes {
-                            tree.select();
+                            if tree.select().is_none() {
+                                eprintln!("Warning: Search stopped early due to OOM");
+                                break;
+                            };
                         }
 
                         // Wait for a bit
@@ -696,6 +703,7 @@ impl PlaytakSession {
                         #[cfg(feature = "aws-lambda-client")]
                         {
                             let aws_function_name = self.aws_function_name.as_ref().unwrap();
+                            let start_time = Instant::now();
                             let event = aws::Event {
                                 size: S,
                                 tps: None,
@@ -709,14 +717,24 @@ impl PlaytakSession {
                                 rollout_depth: playtak_settings.rollout_depth,
                                 rollout_temperature: playtak_settings.rollout_temperature,
                             };
-                            let aws::Output { pv, score } =
+                            let aws::Output { pv, score, nodes, mem_usage, time_taken } =
                                 aws::client::best_move_aws(aws_function_name, &event)?;
+
+                            debug!("{} nodes, {}MB, {:.1}s taken, {}ms overhead",
+                                nodes,
+                                mem_usage / (1024 * 1024),
+                                time_taken.as_secs_f32(),
+                                (start_time.elapsed() - time_taken).as_millis()
+                            );
+
                             (position.move_from_san(&pv[0]).unwrap(), score)
                         }
 
                         #[cfg(not(feature = "aws-lambda-client"))]
                         {
-                            let settings = playtak_settings.to_mcts_setting();
+                            let settings =
+                                playtak_settings.to_mcts_setting()
+                                .arena_size(2_u32.pow(31));
 
                             let maximum_time = our_time_left / 6 + game.increment / 2;
 

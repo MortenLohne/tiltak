@@ -10,17 +10,19 @@ use crate::position::Move;
 use crate::position::{GroupData, Position};
 use crate::search::{cp_to_win_percentage, MctsSetting, Score};
 
+use super::{arena, Arena};
+
 /// A Monte Carlo Search Tree, containing every node that has been seen in search.
-#[derive(Clone, PartialEq, Debug)]
+#[derive(PartialEq, Debug)]
 pub struct Tree {
-    pub children: Box<[TreeEdge]>,
+    pub children: arena::SliceIndex<TreeEdge>,
     pub total_action_value: f64,
     pub is_terminal: bool,
 }
 
-#[derive(Clone, PartialEq, Debug)]
+#[derive(PartialEq, Debug)]
 pub struct TreeEdge {
-    pub child: Option<Box<Tree>>,
+    pub child: Option<arena::Index<Tree>>,
     pub mv: Move,
     pub mean_action_value: Score,
     pub visits: u64,
@@ -58,26 +60,45 @@ impl TreeEdge {
         }
     }
 
+    pub fn shallow_clone(&self) -> Self {
+        Self {
+            child: None,
+            mv: self.mv.clone(),
+            mean_action_value: self.mean_action_value,
+            visits: self.visits,
+            heuristic_score: self.heuristic_score,
+        }
+    }
+
     /// Perform one iteration of monte carlo tree search.
     ///
     /// Moves done on the board are not reversed.
+    #[must_use]
     pub fn select<const S: usize>(
         &mut self,
         position: &mut Position<S>,
         settings: &MctsSetting<S>,
         temp_vectors: &mut TempVectors,
-    ) -> Score {
+        arena: &Arena,
+    ) -> Option<Score> {
         if self.visits == 0 {
-            self.expand(position, settings, temp_vectors)
-        } else if self.child.as_ref().unwrap().is_terminal {
+            self.expand(position, settings, temp_vectors, arena)
+        } else if arena.get(self.child.as_ref().unwrap()).is_terminal {
             self.visits += 1;
-            self.child.as_mut().unwrap().total_action_value += self.mean_action_value as f64;
-            self.mean_action_value
+            arena
+                .get_mut(self.child.as_mut().unwrap())
+                .total_action_value += self.mean_action_value as f64;
+            Some(self.mean_action_value)
         } else {
-            let node = self.child.as_mut().unwrap();
+            let mut node = arena.get_mut(self.child.as_mut().unwrap());
             debug_assert_eq!(
                 self.visits,
-                node.children.iter().map(|edge| edge.visits).sum::<u64>() + 1,
+                arena
+                    .get_slice(&node.children)
+                    .iter()
+                    .map(|edge| edge.visits)
+                    .sum::<u64>()
+                    + 1,
                 "{} visits, {} total action value, {} mean action value",
                 self.visits,
                 node.total_action_value,
@@ -86,7 +107,7 @@ impl TreeEdge {
             // Only generate child moves on the 2nd visit
             if self.visits == 1 {
                 let group_data = position.group_data();
-                node.init_children(position, &group_data, settings, temp_vectors);
+                node.init_children(position, &group_data, settings, temp_vectors, arena)?;
             }
 
             let visits_sqrt = (self.visits as Score).sqrt();
@@ -96,7 +117,7 @@ impl TreeEdge {
                 );
 
             assert_ne!(
-                node.children.len(),
+                arena.get_slice(&node.children).len(),
                 0,
                 "No legal moves in position\n{:?}",
                 position
@@ -105,7 +126,7 @@ impl TreeEdge {
             let mut best_exploration_value = 0.0;
             let mut best_child_node_index = 0;
 
-            for (i, edge) in node.children.iter().enumerate() {
+            for (i, edge) in arena.get_slice(&node.children).iter().enumerate() {
                 let child_exploration_value = edge.exploration_value(visits_sqrt, dynamic_cpuct);
                 if child_exploration_value >= best_exploration_value {
                     best_child_node_index = i;
@@ -113,30 +134,36 @@ impl TreeEdge {
                 }
             }
 
-            let child_edge = node.children.get_mut(best_child_node_index).unwrap();
+            let child_edge = arena
+                .get_slice_mut(&mut node.children)
+                .get_mut(best_child_node_index)
+                .unwrap();
 
             position.do_move(child_edge.mv.clone());
-            let result = 1.0 - child_edge.select::<S>(position, settings, temp_vectors);
+            let result = 1.0 - child_edge.select::<S>(position, settings, temp_vectors, arena)?;
             self.visits += 1;
 
             node.total_action_value += result as f64;
 
             self.mean_action_value = (node.total_action_value / self.visits as f64) as f32;
-            result
+            Some(result)
         }
     }
 
     // Never inline, for profiling purposes
     #[inline(never)]
+    #[must_use]
     fn expand<const S: usize>(
         &mut self,
         position: &mut Position<S>,
         settings: &MctsSetting<S>,
         temp_vectors: &mut TempVectors,
-    ) -> Score {
+        arena: &Arena,
+    ) -> Option<Score> {
         debug_assert!(self.child.is_none());
-        self.child = Some(Box::new(Tree::new_node()));
-        let child = self.child.as_mut().unwrap();
+        self.child = Some(arena.add(Tree::new_node())?);
+
+        let mut child = arena.get_mut(self.child.as_mut().unwrap());
 
         let (eval, is_terminal) = rollout(position, settings, settings.rollout_depth, temp_vectors);
 
@@ -144,7 +171,7 @@ impl TreeEdge {
         child.total_action_value = eval as f64;
         self.mean_action_value = eval;
         child.is_terminal = is_terminal;
-        eval
+        Some(eval)
     }
 
     #[inline]
@@ -158,13 +185,15 @@ impl Tree {
     /// Do not initialize children in the expansion phase, for better performance
     /// Never inline, for profiling purposes
     #[inline(never)]
+    #[must_use]
     fn init_children<const S: usize>(
         &mut self,
         position: &Position<S>,
         group_data: &GroupData<S>,
         settings: &MctsSetting<S>,
         temp_vectors: &mut TempVectors,
-    ) {
+        arena: &Arena,
+    ) -> Option<()> {
         position.generate_moves_with_params(
             &settings.policy_params,
             group_data,
@@ -183,12 +212,13 @@ impl Tree {
                 settings.initial_mean_action_value(),
             ));
         }
-        self.children = children_vec.into_boxed_slice();
+        self.children = arena.add_slice(&mut children_vec)?;
+        Some(())
     }
 
     fn new_node() -> Self {
         Tree {
-            children: Box::new([]),
+            children: arena::SliceIndex::default(),
             total_action_value: 0.0,
             is_terminal: false,
         }
@@ -198,12 +228,14 @@ impl Tree {
     /// The noise is given `epsilon` weight.
     /// `alpha` is used to generate the noise, lower values generate more varied noise.
     /// Values above 1 are less noisy, and tend towards uniform outputs
-    pub fn apply_dirichlet(&mut self, epsilon: f32, alpha: f32) {
+    pub fn apply_dirichlet(&mut self, arena: &Arena, epsilon: f32, alpha: f32) {
         let mut rng = rand::thread_rng();
-        let dirichlet = rand_distr::Dirichlet::new_with_size(alpha, self.children.len()).unwrap();
+        let dirichlet =
+            rand_distr::Dirichlet::new_with_size(alpha, arena.get_slice(&self.children).len())
+                .unwrap();
         let noise_vec = dirichlet.sample(&mut rng);
-        for (child_prior, eta) in self
-            .children
+        for (child_prior, eta) in arena
+            .get_slice_mut(&mut self.children)
             .iter_mut()
             .map(|child| &mut child.heuristic_score)
             .zip(noise_vec)
@@ -296,12 +328,16 @@ impl GameResultForUs {
 }
 
 pub struct Pv<'a> {
-    tree: &'a Tree,
+    arena: &'a Arena,
+    edge: Option<&'a TreeEdge>,
 }
 
 impl<'a> Pv<'a> {
-    pub fn new(tree: &'a Tree) -> Pv<'a> {
-        Pv { tree }
+    pub fn new(edge: &'a TreeEdge, arena: &'a Arena) -> Pv<'a> {
+        Pv {
+            edge: Some(edge),
+            arena,
+        }
     }
 }
 
@@ -309,16 +345,19 @@ impl<'a> Iterator for Pv<'a> {
     type Item = Move;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.tree
-            .children
-            .iter()
-            .max_by_key(|edge| edge.visits)
-            .and_then(|edge| {
-                edge.child.as_ref().map(|child| {
-                    self.tree = child;
-                    edge.mv.clone()
-                })
-            })
+        self.edge.map(|edge| {
+            let mv = edge.mv.clone();
+            if let Some(child_index) = &edge.child {
+                let child = self.arena.get(child_index);
+                let best_edge = self
+                    .arena
+                    .get_slice(&child.children)
+                    .iter()
+                    .max_by_key(|edge| edge.visits);
+                self.edge = best_edge;
+            }
+            mv
+        })
     }
 }
 

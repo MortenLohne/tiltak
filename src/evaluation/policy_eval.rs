@@ -556,7 +556,7 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usize>(
             policy_features.move_role_bonus[role_id] += 1.0;
 
             if stack_movement.len() == 1
-                && stack_movement.get(0).pieces_to_take == 1
+                && stack_movement.get_first::<S>().pieces_to_take == 1
                 && position[*square].len() == 1
             {
                 if let Some(piece) =
@@ -575,7 +575,7 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usize>(
             }
 
             let mut destination_square =
-                if stack_movement.get(0).pieces_to_take == position[*square].len() {
+                if stack_movement.get_first::<S>().pieces_to_take == position[*square].len() {
                     square.go_direction::<S>(*direction).unwrap()
                 } else {
                     *square
@@ -608,7 +608,7 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usize>(
             let mut their_pieces_captured = 0;
 
             // Special case for when we spread the whole stack
-            if position[*square].len() == stack_movement.get(0).pieces_to_take {
+            if position[*square].len() == stack_movement.get_first::<S>().pieces_to_take {
                 let top_stone = position[*square].top_stone.unwrap();
                 if top_stone.is_road_piece() {
                     our_squares_affected.push(*square);

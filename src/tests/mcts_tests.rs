@@ -172,7 +172,10 @@ fn plays_correct_move_property(move_strings: &[&str], correct_moves: &[&str]) {
     do_moves_and_check_validity(&mut position, move_strings);
 
     position.generate_moves(&mut moves);
-    let mut mcts = search::MonteCarloTree::new(position.clone());
+
+    let nodes = 25000;
+    let settings = search::MctsSetting::default().arena_size_for_nodes(nodes);
+    let mut mcts = search::MonteCarloTree::with_settings(position.clone(), settings);
 
     for move_string in correct_moves {
         assert_eq!(
@@ -188,8 +191,8 @@ fn plays_correct_move_property(move_strings: &[&str], correct_moves: &[&str]) {
         );
     }
 
-    for i in 1..25000 {
-        mcts.select();
+    for i in 1..=nodes {
+        mcts.select().unwrap();
         if i % 5000 == 0 {
             let (best_move, _score) = mcts.best_move();
             assert!(correct_moves

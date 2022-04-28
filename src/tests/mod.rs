@@ -1,3 +1,4 @@
+mod arena_tests;
 mod blunder_tests;
 mod board_generic_tests;
 mod board_tests;
@@ -24,7 +25,10 @@ fn do_moves_and_check_validity<const S: usize>(position: &mut Position<S>, move_
             moves.contains(&mv),
             "Move {} was not among legal moves: {:?}\n{:?}",
             position.move_to_san(&mv),
-            moves,
+            moves
+                .iter()
+                .map(|mv| mv.to_string::<S>())
+                .collect::<Vec<_>>(),
             position
         );
         position.do_move(mv);
@@ -63,7 +67,10 @@ fn plays_correct_hard_move_property<const S: usize>(move_strings: &[&str], corre
             moves.contains(&position.move_from_san(move_string).unwrap()),
             "Candidate move {} was not among legal moves {:?} in position\n{:?}",
             move_string,
-            moves,
+            moves
+                .iter()
+                .map(|mv| mv.to_string::<S>())
+                .collect::<Vec<_>>(),
             position
         );
     }
@@ -97,7 +104,10 @@ fn plays_correct_move_easy_tps_property<const S: usize>(tps: &str, correct_moves
             moves.contains(&position.move_from_san(move_string).unwrap()),
             "Candidate move {} was not among legal moves {:?} in position\n{:?}",
             move_string,
-            moves,
+            moves
+                .iter()
+                .map(|mv| mv.to_string::<S>())
+                .collect::<Vec<_>>(),
             position
         );
     }
