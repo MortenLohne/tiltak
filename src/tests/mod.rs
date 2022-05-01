@@ -16,6 +16,63 @@ use crate::search;
 use board_game_traits::Position as PositionTrait;
 use pgn_traits::PgnPosition;
 
+pub struct TestPosition {
+    tps_string: Option<&'static str>,
+    move_strings: Vec<&'static str>,
+}
+
+impl TestPosition {
+    pub fn position<const S: usize>(&self) -> Position<S> {
+        let mut position = self.tps_string.map(Position::from_fen).map(Result::ok).flatten().unwrap_or_default();
+        do_moves_and_check_validity(&mut position, &self.move_strings);
+        position
+    }
+
+    pub fn plays_correct_move_long_prop<const S: usize>(&self, correct_moves: &[&str]) {
+        self.plays_correct_move_prop::<S>(correct_moves, 50_000)
+    }
+
+    pub fn plays_correct_move_short_prop<const S: usize>(&self, correct_moves: &[&str]) {
+        self.plays_correct_move_prop::<S>(correct_moves, 10_000)
+    }
+
+    fn plays_correct_move_prop<const S: usize>(&self, correct_moves: &[&str], nodes: u64) {
+        let position: Position<S> = self.position();
+        let candidate_moves = check_candidate_moves(&position, correct_moves);
+
+        let (best_move, score) = search::mcts(position.clone(), nodes);
+
+        assert!(
+            candidate_moves.contains(&best_move),
+            "{} didn't play one of the correct moves {:?}, {} {:.1}% played instead in position:\n{:?}",
+            position.side_to_move(),
+            correct_moves,
+            position.move_to_san(&best_move),
+            score * 100.0,
+            position
+        );
+    }
+}
+
+fn check_candidate_moves<const S: usize>(position: &Position<S>, candidate_move_strings: &[&str]) -> Vec<Move> {
+    let mut legal_moves = vec![];
+    position.generate_moves(&mut legal_moves);
+    candidate_move_strings.iter().map(|candidate_move_string| {
+        let mv = position.move_from_san(candidate_move_string).unwrap();
+        assert!(
+            legal_moves.contains(&mv),
+            "Candidate move {} was not among legal moves {:?} in position\n{:?}",
+            mv.to_string::<S>(),
+            legal_moves
+                .iter()
+                .map(|mv| mv.to_string::<S>())
+                .collect::<Vec<_>>(),
+            position
+        );
+        mv
+    }).collect()
+}
+
 fn do_moves_and_check_validity<const S: usize>(position: &mut Position<S>, move_strings: &[&str]) {
     let mut moves = vec![];
     for mv_san in move_strings.iter() {
