@@ -229,3 +229,10 @@ fn pure_stack_spread_setting_up_fortress_smash_tinue() {
     ]);
     test_position.plays_correct_move_long_prop::<6>(&["6f2<1113", "6f2<2211"]);
 }
+
+#[test]
+fn setup_double_tak_threat_test() {
+    // Alion's Puzzle #8
+    let test_position = TestPosition::from_tps("2,2,21,2,12S,2/2,2,2,211112C,22221C,21/12,2,x,1,21,221S/2,1,1,1,1,2/2,1,1,1,1,2/2S,1,1,x2,12 1 35");
+    test_position.plays_correct_move_long_prop::<6>(&["b3>"]);
+}
