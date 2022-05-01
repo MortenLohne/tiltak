@@ -11,19 +11,38 @@ mod ptn_tests;
 mod tactics_tests_5s;
 mod tactics_tests_6s;
 
-use crate::position::{Move, Position};
+use crate::position::{Komi, Move, Position};
 use crate::search;
 use board_game_traits::Position as PositionTrait;
 use pgn_traits::PgnPosition;
 
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct TestPosition {
-    tps_string: Option<&'static str>,
-    move_strings: Vec<&'static str>,
+    pub tps_string: Option<&'static str>,
+    pub move_strings: &'static [&'static str],
+    pub komi: Komi,
 }
 
 impl TestPosition {
+    pub fn from_tps(tps: &'static str) -> Self {
+        Self {
+            tps_string: Some(tps),
+            ..Default::default()
+        }
+    }
+
+    pub fn from_move_strings(move_strings: &'static [&'static str]) -> Self {
+        Self {
+            move_strings,
+            ..Default::default()
+        }
+    }
+
     pub fn position<const S: usize>(&self) -> Position<S> {
-        let mut position = self.tps_string.map(Position::from_fen).map(Result::ok).flatten().unwrap_or_default();
+        let mut position = self
+            .tps_string
+            .and_then(|tps| Position::from_fen_with_komi(tps, self.komi).ok())
+            .unwrap_or_else(|| Position::start_position_with_komi(self.komi));
         do_moves_and_check_validity(&mut position, &self.move_strings);
         position
     }
@@ -52,25 +71,60 @@ impl TestPosition {
             position
         );
     }
+
+    pub fn top_policy_move_prop<const S: usize>(&self, correct_moves: &[&str]) {
+        self.top_n_policy_move::<S>(correct_moves, 1)
+    }
+
+    pub fn top_five_policy_move_prop<const S: usize>(&self, correct_moves: &[&str]) {
+        self.top_n_policy_move::<S>(correct_moves, 5)
+    }
+
+    fn top_n_policy_move<const S: usize>(&self, correct_moves: &[&str], n: usize) {
+        let position: Position<S> = self.position();
+        let candidate_moves = check_candidate_moves(&position, correct_moves);
+
+        let policy_moves = moves_sorted_by_policy(&position);
+
+        assert!(
+            policy_moves
+                .iter()
+                .take(n)
+                .any(|(mv, _)| candidate_moves.contains(mv)),
+            "Expected one of {:?}, got {:?} instead",
+            correct_moves,
+            policy_moves
+                .iter()
+                .take(n)
+                .map(|(mv, score)| format!("{}, {:.1}%", mv.to_string::<S>(), score * 100.0))
+                .collect::<Vec<_>>(),
+        );
+    }
 }
 
-fn check_candidate_moves<const S: usize>(position: &Position<S>, candidate_move_strings: &[&str]) -> Vec<Move> {
+fn check_candidate_moves<const S: usize>(
+    position: &Position<S>,
+    candidate_move_strings: &[&str],
+) -> Vec<Move> {
     let mut legal_moves = vec![];
     position.generate_moves(&mut legal_moves);
-    candidate_move_strings.iter().map(|candidate_move_string| {
-        let mv = position.move_from_san(candidate_move_string).unwrap();
-        assert!(
-            legal_moves.contains(&mv),
-            "Candidate move {} was not among legal moves {:?} in position\n{:?}",
-            mv.to_string::<S>(),
-            legal_moves
-                .iter()
-                .map(|mv| mv.to_string::<S>())
-                .collect::<Vec<_>>(),
-            position
-        );
-        mv
-    }).collect()
+    candidate_move_strings
+        .iter()
+        .map(|candidate_move_string| {
+            let mv = position.move_from_san(candidate_move_string).unwrap();
+            assert!(
+                legal_moves.contains(&mv),
+                "Candidate move {} was not among legal moves {:?} in position\n{:?}",
+                mv.to_string::<S>(),
+                legal_moves
+                    .iter()
+                    .map(|mv| mv.to_string::<S>())
+                    .collect::<Vec<_>>(),
+                position
+            );
+            mv
+        })
+        .collect()
 }
 
 fn do_moves_and_check_validity<const S: usize>(position: &mut Position<S>, move_strings: &[&str]) {
