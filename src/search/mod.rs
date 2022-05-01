@@ -341,7 +341,7 @@ impl<const S: usize> MonteCarloTree<S> {
                 "Move {}: {} visits, {:.2}% mean action value, {:.3}% static score, {:.3} exploration value, pv {}",
                 edge.mv.to_string::<S>(), edge.visits, edge.mean_action_value * 100.0, edge.heuristic_score * 100.0,
                 edge.exploration_value((self.visits() as Score).sqrt(), dynamic_cpuct),
-                Pv::new(edge, &self.arena).skip(1).map(|mv| mv.to_string::<S>() + " ").collect::<String>()
+                Pv::new(edge, &self.arena).map(|mv| mv.to_string::<S>() + " ").collect::<String>()
             )
         });
     }
