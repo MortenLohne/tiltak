@@ -44,7 +44,7 @@ impl TestPosition {
             .tps_string
             .map(|tps| Position::from_fen_with_komi(tps, self.komi).unwrap())
             .unwrap_or_else(|| Position::start_position_with_komi(self.komi));
-        do_moves_and_check_validity(&mut position, &self.move_strings);
+        do_moves_and_check_validity(&mut position, self.move_strings);
         position
     }
 
@@ -69,6 +69,21 @@ impl TestPosition {
             correct_moves,
             position.move_to_san(&best_move),
             score * 100.0,
+            position
+        );
+    }
+
+    pub fn avoid_move_short_prop<const S: usize>(&self, avoid_moves: &[&str]) {
+        let position: Position<S> = self.position();
+        let candidate_moves = check_candidate_moves(&position, avoid_moves);
+
+        let (best_move, _) = search::mcts(position.clone(), 10_000);
+
+        assert!(
+            !candidate_moves.contains(&best_move),
+            "{} played wrong move {} in position:\n{:?}",
+            position.side_to_move(),
+            position.move_to_san(&best_move),
             position
         );
     }
