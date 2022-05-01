@@ -236,3 +236,10 @@ fn setup_double_tak_threat_test() {
     let test_position = TestPosition::from_tps("2,2,21,2,12S,2/2,2,2,211112C,22221C,21/12,2,x,1,21,221S/2,1,1,1,1,2/2,1,1,1,1,2/2S,1,1,x2,12 1 35");
     test_position.plays_correct_move_long_prop::<6>(&["b3>"]);
 }
+
+#[test]
+fn double_tak_threat_tinue() {
+    // Alion's Puzzle #6
+    let test_position = TestPosition::from_tps("x,1,x4/x,12S,x,2,x2/x,12,212S,x,2C,x/12,2111211C,1S,112,11112,x/2221,x,2,1,2,1S/2222221,x,2,2,2,2 1 44");
+    test_position.plays_correct_move_long_prop::<6>(&["6b3-"]);
+}
