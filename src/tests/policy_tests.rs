@@ -90,3 +90,10 @@ fn create_hard_cap_next_to_critical_square_test() {
     );
     test_position.top_five_policy_move_prop::<6>(&["3c1+12"]);
 }
+
+#[test]
+fn create_double_tak_threat_test() {
+    // Taken from Alion's Puzzle #3
+    let test_position = TestPosition::from_tps("x2,1,21,x,2/1,x,212,1,212,2/1S,2,2,2C,21,2/21S,1,121C,x2,12/2,2,121,1,1,1/2,2,1,x2,22S 1 28");
+    test_position.top_five_policy_move_prop::<6>(&["3c3-"]);
+}
