@@ -11,6 +11,7 @@ mod ptn_tests;
 mod tactics_tests_5s;
 mod tactics_tests_6s;
 
+use crate::evaluation::parameters::{self, PolicyFeatures};
 use crate::position::{Komi, Move, Position};
 use crate::search;
 use board_game_traits::Position as PositionTrait;
@@ -41,7 +42,7 @@ impl TestPosition {
     pub fn position<const S: usize>(&self) -> Position<S> {
         let mut position = self
             .tps_string
-            .and_then(|tps| Position::from_fen_with_komi(tps, self.komi).ok())
+            .map(|tps| Position::from_fen_with_komi(tps, self.komi).unwrap())
             .unwrap_or_else(|| Position::start_position_with_komi(self.komi));
         do_moves_and_check_validity(&mut position, &self.move_strings);
         position
@@ -99,6 +100,26 @@ impl TestPosition {
                 .map(|(mv, score)| format!("{}, {:.1}%", mv.to_string::<S>(), score * 100.0))
                 .collect::<Vec<_>>(),
         );
+    }
+
+    pub fn sets_winning_flag<const S: usize>(&self) -> bool {
+        let position = self.position::<S>();
+
+        let group_data = position.group_data();
+        let mut moves = vec![];
+        position.generate_moves(&mut moves);
+
+        let mut feature_sets = vec![vec![0.0; parameters::num_policy_features::<S>()]; moves.len()];
+        let mut policy_feature_sets: Vec<PolicyFeatures> = feature_sets
+            .iter_mut()
+            .map(|feature_set| PolicyFeatures::new::<S>(feature_set))
+            .collect();
+
+        position.features_for_moves(&mut policy_feature_sets, &moves, &group_data);
+
+        policy_feature_sets
+            .iter()
+            .any(|features| features.decline_win[0] != 0.0)
     }
 }
 
