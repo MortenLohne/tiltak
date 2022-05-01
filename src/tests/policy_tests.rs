@@ -82,3 +82,11 @@ fn impure_spread_inside_group_win_test() {
     let test_position = TestPosition::from_tps("x,1,x,12112S,x,2/1,1,2211,212222212,12121121C,2/x,1,x,212,x2/2S,1,x,2,x2/21,12S,x,222,21212C,x/x,2,21,x,1,x 1 56");
     test_position.top_policy_move_prop::<6>(&["3c5-111", "4c5-121"]);
 }
+
+#[test]
+fn create_hard_cap_next_to_critical_square_test() {
+    let test_position = TestPosition::from_tps(
+        "2,x,2,2,1S,x/x,22,2,221S,2,2/x2,1S,2,2,x/1,2S,x4/2S,1,1,1,1,1/1,212C,111C,1,1,x 1 20",
+    );
+    test_position.top_five_policy_move_prop::<6>(&["3c1+12"]);
+}
