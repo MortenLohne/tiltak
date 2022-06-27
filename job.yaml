@@ -1,0 +1,20 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: tiltak-bench
+spec:
+  template:
+    spec:
+      containers:
+      - name: tiltak-bench
+        image: mortenlohne/tiltak-bench:0.0.1
+        resources:
+          limits:
+            cpu: 2
+            memory: 3Gi
+          requests:
+            cpu: "1300m"
+            memory: 3Gi
+      restartPolicy: Never
+
+  backoffLimit: 4
