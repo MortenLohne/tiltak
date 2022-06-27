@@ -27,6 +27,18 @@ pub mod playtak;
 pub mod tei;
 
 fn main() {
+    
+    println!("Starting benchmark");
+    const NODES: u64 = 5_000_000;
+    let start_time = time::Instant::now();
+    
+    let position = <Position<6>>::default();
+
+    let (mv, score) = search::mcts::<6>(position, NODES);
+    println!("{}: {:.1}%, {:.2}s", mv.to_string::<6>(), score * 100.0, start_time.elapsed().as_secs_f32());
+    
+    return;
+
     println!("play: Play against the engine through the command line");
     println!("aimatch: Watch the engine play against a very simple minmax implementation");
     println!("analyze <size>: Analyze a given position, provided from a PTN or a simple move list");
