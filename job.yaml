@@ -7,7 +7,7 @@ spec:
     spec:
       containers:
       - name: tiltak-bench
-        image: mortenlohne/tiltak-bench:0.0.1
+        image: mortenlohne/tiltak-bench:0.0.2
         resources:
           limits:
             cpu: 2
