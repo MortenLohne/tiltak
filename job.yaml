@@ -11,10 +11,10 @@ spec:
         resources:
           limits:
             cpu: 2
-            memory: 3Gi
+            memory: 2500Mi
           requests:
-            cpu: "1300m"
-            memory: 3Gi
+            cpu: "500m"
+            memory: 2500Mi
       restartPolicy: Never
 
   backoffLimit: 4
