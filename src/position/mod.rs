@@ -51,8 +51,8 @@ lazy_static! {
 
 pub const MAX_BOARD_SIZE: usize = 8;
 
-pub const fn starting_stones<const S: usize>() -> u8 {
-    match S {
+pub const fn starting_stones(size: usize) -> u8 {
+    match size {
         3 => 10,
         4 => 15,
         5 => 21,
@@ -63,8 +63,8 @@ pub const fn starting_stones<const S: usize>() -> u8 {
     }
 }
 
-pub const fn starting_capstones<const S: usize>() -> u8 {
-    match S {
+pub const fn starting_capstones(size: usize) -> u8 {
+    match size {
         3 => 0,
         4 => 0,
         5 => 1,
@@ -473,10 +473,10 @@ impl<const S: usize> Position<S> {
         Position {
             cells: Default::default(),
             to_move: Color::White,
-            white_stones_left: starting_stones::<S>(),
-            black_stones_left: starting_stones::<S>(),
-            white_caps_left: starting_capstones::<S>(),
-            black_caps_left: starting_capstones::<S>(),
+            white_stones_left: starting_stones(S),
+            black_stones_left: starting_stones(S),
+            white_caps_left: starting_capstones(S),
+            black_caps_left: starting_capstones(S),
             half_moves_played: 0,
             moves: vec![],
             komi,
@@ -1159,7 +1159,7 @@ impl<const S: usize> PositionTrait for Position<S> {
         };
 
         debug_assert_eq!(
-            2 * (starting_stones::<S>() + starting_capstones::<S>())
+            2 * (starting_stones(S) + starting_capstones(S))
                 - self.white_stones_left
                 - self.black_stones_left
                 - self.white_caps_left

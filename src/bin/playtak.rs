@@ -28,7 +28,9 @@ use tiltak::search::MctsSetting;
 
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub struct PlaytakSettings {
+    default_seek_size: usize,
     default_seek_color: Option<Color>,
+    allow_choosing_size: bool,
     allow_choosing_color: bool,
     fixed_nodes: Option<u64>,
     dirichlet_noise: Option<f32>,
@@ -114,6 +116,10 @@ pub fn main() -> Result<()> {
             .long("allow-choosing-color")
             .help("Allow users to change the bot's seek color through chat")
             .takes_value(false))
+        .arg(Arg::with_name("allowChoosingSize")
+            .long("allow-choosing-size")
+            .help("Allow users to change the bot's board size through chat")
+            .takes_value(false))
         .arg(Arg::with_name("seekColor")
             .long("seek-color")
             .help("Color of games to seek")
@@ -198,6 +204,7 @@ pub fn main() -> Result<()> {
     let size: usize = matches.value_of("size").unwrap().parse().unwrap();
 
     let allow_choosing_color = matches.is_present("allowChoosingColor");
+    let allow_choosing_size = matches.is_present("allowChoosingSize");
     let default_seek_color = match matches.value_of("seekColor").unwrap() {
         "white" => Some(Color::White),
         "black" => Some(Color::Black),
@@ -228,8 +235,10 @@ pub fn main() -> Result<()> {
     let komi = matches.value_of("komi").unwrap().parse().unwrap();
 
     let playtak_settings = PlaytakSettings {
+        allow_choosing_size,
         allow_choosing_color,
         default_seek_color,
+        default_seek_size: size,
         fixed_nodes,
         dirichlet_noise,
         rollout_depth,
@@ -283,9 +292,7 @@ pub fn main() -> Result<()> {
                 }
             }
             None => match size {
-                4 => session.seek_playtak_games::<4>(playtak_settings),
-                5 => session.seek_playtak_games::<5>(playtak_settings),
-                6 => session.seek_playtak_games::<6>(playtak_settings),
+                4..=6 => session.seek_playtak_games(playtak_settings),
                 s => panic!("Unsupported size {}", s),
             }
             .unwrap_err(),
@@ -377,6 +384,29 @@ impl<'a> ChatCommand<'a> {
         self.respond(session, &format!("Seeking next game with {}", color_string))?;
         Ok(Some(next_game_color))
     }
+
+    pub fn process_size_command(&self, session: &mut PlaytakSession) -> Result<Option<usize>> {
+        let next_game_size = match self.argument {
+            Some("4") => 4,
+            Some("5") => 5,
+            Some("6") => 6,
+            s => {
+                self.respond(
+                    session,
+                    &format!(
+                        "Unsupported size {}. Must be 4, 5 or 6",
+                        s.unwrap_or_default()
+                    ),
+                )?;
+                return Ok(None);
+            }
+        };
+        self.respond(
+            session,
+            &format!("Seeking next game with size {}", next_game_size),
+        )?;
+        Ok(Some(next_game_size))
+    }
 }
 
 struct PlaytakSession {
@@ -392,7 +422,7 @@ struct PlaytakSession {
 #[derive(Debug, PartialEq, Eq)]
 struct PlaytakGame<'a> {
     game_no: u64,
-    _board_size: usize,
+    size: usize,
     white_player: &'a str,
     black_player: &'a str,
     our_color: Color,
@@ -405,7 +435,7 @@ impl<'a> PlaytakGame<'a> {
     pub fn from_playtak_game_words(words: &[&'a str], increment: Duration) -> PlaytakGame<'a> {
         PlaytakGame {
             game_no: u64::from_str(words[2]).unwrap(),
-            _board_size: usize::from_str(words[3]).unwrap(),
+            size: usize::from_str(words[3]).unwrap(),
             white_player: words[4],
             black_player: words[6],
             our_color: match words[7] {
@@ -517,14 +547,15 @@ impl PlaytakSession {
         Ok(())
     }
 
-    fn send_seek<const S: usize>(
+    fn send_seek(
         &mut self,
         playtak_settings: PlaytakSettings,
+        size: usize,
         color: Option<Color>,
     ) -> Result<()> {
         self.send_line(&format!(
             "Seek {} {} {} {} {} {} {} 0 0 ",
-            S,
+            size,
             playtak_settings.seek_game_time.as_secs(),
             playtak_settings.seek_increment.as_secs(),
             match color {
@@ -533,17 +564,15 @@ impl PlaytakSession {
                 None => "A",
             },
             playtak_settings.komi.half_komi(),
-            position::starting_stones::<S>(),
-            position::starting_capstones::<S>(),
+            position::starting_stones(size),
+            position::starting_capstones(size),
         ))
     }
 
-    fn seek_playtak_games<const S: usize>(
-        &mut self,
-        playtak_settings: PlaytakSettings,
-    ) -> io::Result<Infallible> {
+    fn seek_playtak_games(&mut self, playtak_settings: PlaytakSettings) -> io::Result<Infallible> {
         let mut restoring_previous_session = true;
         let mut next_seek_color = playtak_settings.default_seek_color;
+        let mut next_seek_size = playtak_settings.default_seek_size;
 
         loop {
             let input = self.read_line()?;
@@ -557,15 +586,28 @@ impl PlaytakSession {
                         &words,
                         playtak_settings.seek_increment,
                     );
-                    let (_game, updated_seek_color) = self.play_game::<S>(
-                        playtak_game,
-                        playtak_settings,
-                        restoring_previous_session,
-                    )?;
-                    next_seek_color = updated_seek_color;
+                    let (updated_seek_size, updated_seek_color) = match playtak_game.size {
+                        4 => self.play_game::<4>(
+                            playtak_game,
+                            playtak_settings,
+                            restoring_previous_session,
+                        )?,
+                        5 => self.play_game::<5>(
+                            playtak_game,
+                            playtak_settings,
+                            restoring_previous_session,
+                        )?,
+                        6 => self.play_game::<6>(
+                            playtak_game,
+                            playtak_settings,
+                            restoring_previous_session,
+                        )?,
+                        s => panic!("Unsupported size {}", s),
+                    };
                     restoring_previous_session = false;
-                    self.send_seek::<S>(playtak_settings, next_seek_color)?;
-                    next_seek_color = playtak_settings.default_seek_color;
+                    self.send_seek(playtak_settings, updated_seek_size, updated_seek_color)?;
+                    next_seek_color = updated_seek_color;
+                    next_seek_size = updated_seek_size;
                 }
                 "NOK" => {
                     warn!("Received NOK from server, ignoring. This may happen if the game was aborted while we were thinking");
@@ -582,8 +624,17 @@ impl PlaytakSession {
                             } else if let Some(updated_seek_color) =
                                 chat_command.process_color_command(self)?
                             {
-                                self.send_seek::<S>(playtak_settings, updated_seek_color)?;
-                                next_seek_color = playtak_settings.default_seek_color;
+                                next_seek_color = updated_seek_color;
+                                self.send_seek(playtak_settings, next_seek_size, next_seek_color)?;
+                            }
+                        } else if chat_command.command == "size" {
+                            if !playtak_settings.allow_choosing_size {
+                                chat_command.respond(self, "Cannot choose size for this bot")?
+                            } else if let Some(updated_seek_size) =
+                                chat_command.process_size_command(self)?
+                            {
+                                next_seek_size = updated_seek_size;
+                                self.send_seek(playtak_settings, next_seek_size, next_seek_color)?;
                             }
                         } else {
                             chat_command.respond(self, "Unknown command")?
@@ -594,8 +645,7 @@ impl PlaytakSession {
                     if restoring_previous_session {
                         debug!("No longer restoring previous session");
                         restoring_previous_session = false;
-                        self.send_seek::<S>(playtak_settings, next_seek_color)?;
-                        next_seek_color = playtak_settings.default_seek_color;
+                        self.send_seek(playtak_settings, next_seek_size, next_seek_color)?;
                     }
                     debug!("Ignoring server message \"{}\"", input.trim())
                 }
@@ -650,7 +700,7 @@ impl PlaytakSession {
         game: PlaytakGame,
         playtak_settings: PlaytakSettings,
         mut restoring_previous_session: bool,
-    ) -> io::Result<(Game<Position<S>>, Option<Color>)> {
+    ) -> io::Result<(usize, Option<Color>)> {
         info!(
             "Starting game #{}, {} vs {} as {}, {}+{:.1}, {} komi",
             game.game_no,
@@ -661,6 +711,7 @@ impl PlaytakSession {
             game.increment.as_secs_f32(),
             game.komi
         );
+        let mut next_seek_size = playtak_settings.default_seek_size;
         let mut next_seek_color = playtak_settings.default_seek_color;
         let mut position = <Position<S>>::start_position_with_komi(game.komi);
         let mut moves = vec![];
@@ -802,6 +853,14 @@ impl PlaytakSession {
                                 {
                                     next_seek_color = updated_seek_color;
                                 }
+                            } else if chat_command.command == "size" {
+                                if !playtak_settings.allow_choosing_size {
+                                    chat_command.respond(self, "Cannot choose size for this bot")?
+                                } else if let Some(updated_seek_size) =
+                                    chat_command.process_size_command(self)?
+                                {
+                                    next_seek_size = updated_seek_size;
+                                }
                             } else {
                                 chat_command.respond(self, "Unknown command")?
                             }
@@ -875,7 +934,7 @@ impl PlaytakSession {
         }
         info!("Move list: {}", move_list.join(" "));
 
-        Ok((game, next_seek_color))
+        Ok((next_seek_size, next_seek_color))
     }
 }
 
