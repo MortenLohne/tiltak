@@ -10,7 +10,6 @@ spec:
         image: mortenlohne/tiltak-bench:0.0.2
         resources:
           limits:
-            cpu: 2
             memory: 2500Mi
           requests:
             cpu: "500m"
