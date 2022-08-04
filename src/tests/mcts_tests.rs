@@ -8,14 +8,24 @@ use std::time::Duration;
 
 #[test]
 fn exclude_moves_test() {
+    let excluded_moves = ["a1", "a6", "f1", "f6"]
+        .iter()
+        .map(|move_string| Move::from_string::<6>(move_string).unwrap())
+        .collect::<Vec<Move>>();
     let settings = MctsSetting::default()
         .arena_size_for_nodes(1000)
-        .exclude_moves(vec![Move::from_string::<6>("a1").unwrap()]);
+        .exclude_moves(excluded_moves.clone());
     let mut tree = MonteCarloTree::with_settings(<Position<6>>::start_position(), settings);
 
     for _ in 0..1000 {
         tree.select().unwrap();
     }
+    let (best_move, _score) = tree.best_move();
+    assert!(
+        !excluded_moves.contains(&best_move),
+        "{}",
+        best_move.to_string::<6>()
+    );
 }
 
 #[test]

@@ -148,43 +148,51 @@ impl<const S: usize> MonteCarloTree<S> {
     }
 
     pub fn with_settings(position: Position<S>, settings: MctsSetting<S>) -> Self {
-        let mut tree = MonteCarloTree {
-            edge: TreeEdge {
-                child: None,
-                mv: Move::Place(Role::Flat, Square(0)),
-                mean_action_value: 0.0,
-                visits: 0,
-                heuristic_score: 0.0,
-            },
-            position,
-            settings: settings.clone(),
-            temp_vectors: TempVectors::new::<S>(),
-            arena: Arena::new(settings.arena_size).unwrap(),
+        let arena = Arena::new(settings.arena_size).unwrap();
+        let mut temp_vectors = TempVectors::new::<S>();
+        let mut root_edge = TreeEdge {
+            child: None,
+            mv: Move::Place(Role::Flat, Square(0)),
+            mean_action_value: 0.0,
+            visits: 0,
+            heuristic_score: 0.0,
         };
 
-        if let Some(alpha) = tree.settings.dirichlet {
-            tree.select().unwrap();
-            tree.select().unwrap();
-            (tree.arena.get_mut(tree.edge.child.as_mut().unwrap())).apply_dirichlet(
-                &tree.arena,
-                0.25,
-                alpha,
-            );
+        root_edge
+            .select(&mut position.clone(), &settings, &mut temp_vectors, &arena)
+            .unwrap();
+        root_edge
+            .select(&mut position.clone(), &settings, &mut temp_vectors, &arena)
+            .unwrap();
+
+        if let Some(alpha) = settings.dirichlet {
+            (arena.get_mut(root_edge.child.as_mut().unwrap())).apply_dirichlet(&arena, 0.25, alpha);
         }
 
-        if !tree.settings.excluded_moves.is_empty() {
-            tree.select().unwrap();
-            let mut filtered_edges: Vec<TreeEdge> = tree
-                .arena
-                .get_slice(&tree.get_child().children)
-                .iter()
+        if !settings.excluded_moves.is_empty() {
+            let mut filtered_edges: Vec<TreeEdge> = arena
+                .get_slice_mut(&mut arena.get_mut(root_edge.child.as_mut().unwrap()).children)
+                .iter_mut()
                 .filter(|edge| !settings.excluded_moves.contains(&edge.mv))
-                .map(|edge| edge.shallow_clone())
+                .map(|edge| TreeEdge {
+                    child: edge.child.take(),
+                    mv: edge.mv.clone(),
+                    mean_action_value: edge.mean_action_value,
+                    visits: edge.visits,
+                    heuristic_score: edge.heuristic_score,
+                })
                 .collect();
-            (*tree.get_child_mut()).children = tree.arena.add_slice(&mut filtered_edges).unwrap();
+            (*arena.get_mut(root_edge.child.as_mut().unwrap())).children =
+                arena.add_slice(&mut filtered_edges).unwrap();
         }
 
-        tree
+        MonteCarloTree {
+            edge: root_edge,
+            position,
+            settings,
+            temp_vectors,
+            arena,
+        }
     }
 
     pub fn get_child(&self) -> &Tree {
