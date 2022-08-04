@@ -174,7 +174,6 @@ impl<const S: usize> MonteCarloTree<S> {
 
         if !tree.settings.excluded_moves.is_empty() {
             tree.select().unwrap();
-            tree.select().unwrap();
             let mut filtered_edges: Vec<TreeEdge> = tree
                 .arena
                 .get_slice(&tree.get_child().children)

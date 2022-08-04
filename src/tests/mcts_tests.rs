@@ -1,10 +1,22 @@
-use crate::position::Position;
-use crate::search;
+use crate::position::{Move, Position};
 use crate::search::MctsSetting;
+use crate::search::{self, MonteCarloTree};
 use crate::tests::TestPosition;
 use board_game_traits::Position as PositionTrait;
 use pgn_traits::PgnPosition;
 use std::time::Duration;
+
+#[test]
+fn exclude_moves_test() {
+    let settings = MctsSetting::default()
+        .arena_size_for_nodes(1000)
+        .exclude_moves(vec![Move::from_string::<6>("a1").unwrap()]);
+    let mut tree = MonteCarloTree::with_settings(<Position<6>>::start_position(), settings);
+
+    for _ in 0..1000 {
+        tree.select().unwrap();
+    }
+}
 
 #[test]
 fn play_on_low_time() {
