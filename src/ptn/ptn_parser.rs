@@ -1,9 +1,8 @@
 use crate::ptn::{Game, ParseError, PtnMove};
 use pgn_traits::PgnPosition;
-use std::fmt::Debug;
 use std::str::FromStr;
 
-pub fn parse_ptn<B: PgnPosition + Debug + Clone>(input: &str) -> Result<Vec<Game<B>>, ParseError> {
+pub fn parse_ptn<B: PgnPosition>(input: &str) -> Result<Vec<Game<B>>, ParseError> {
     let mut parser = ParserData { input };
     let mut games = vec![];
     loop {
@@ -25,9 +24,7 @@ pub fn parse_ptn<B: PgnPosition + Debug + Clone>(input: &str) -> Result<Vec<Game
     }
 }
 
-fn parse_game<B: PgnPosition + Debug + Clone>(
-    input: &mut ParserData,
-) -> Result<Game<B>, ParseError> {
+fn parse_game<B: PgnPosition>(input: &mut ParserData) -> Result<Game<B>, ParseError> {
     let mut tags = vec![];
     input.skip_whitespaces();
     while input.peek() == Some('[') {
@@ -35,12 +32,11 @@ fn parse_game<B: PgnPosition + Debug + Clone>(
         input.skip_whitespaces();
         tags.push((tag.to_string(), value));
     }
-    let position = B::start_position();
 
-    let (moves, game_result_str) = parse_moves(input, position.clone())?;
+    let (moves, game_result_str) = parse_moves(input, B::start_position())?;
 
     Ok(Game {
-        start_position: position,
+        start_position: B::start_position(),
         moves,
         game_result_str,
         tags,
@@ -92,7 +88,7 @@ fn parse_tag<'a>(input: &mut ParserData<'a>) -> Result<(&'a str, String), pgn_tr
 }
 
 #[allow(clippy::type_complexity)]
-fn parse_moves<B: PgnPosition + Debug + Clone>(
+fn parse_moves<B: PgnPosition>(
     input: &mut ParserData,
     mut position: B,
 ) -> Result<(Vec<PtnMove<B::Move>>, Option<&'static str>), ParseError> {
