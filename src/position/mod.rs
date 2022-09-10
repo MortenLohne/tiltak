@@ -1333,6 +1333,10 @@ impl<const S: usize> pgn_traits::PgnPosition for Position<S> {
             .map(|result| result.result_str())
     }
 
+    fn full_move_number(&self) -> Option<u32> {
+        Some(self.half_moves_played() as u32 / 2 + 1)
+    }
+
     fn from_fen_with_settings(
         fen: &str,
         settings: &Self::Settings,
@@ -1401,8 +1405,8 @@ impl<const S: usize> pgn_traits::PgnPosition for Position<S> {
 
         match fen_words[2].parse::<usize>() {
             Ok(n) => match position.side_to_move() {
-                Color::White => position.half_moves_played = (n - 1) * 2,
-                Color::Black => position.half_moves_played = (n - 1) * 2 + 1,
+                Color::White => position.half_moves_played = 2 * n - 2,
+                Color::Black => position.half_moves_played = 2 * n - 1,
             },
             Err(e) => {
                 return Err(pgn_traits::Error::new_caused_by(

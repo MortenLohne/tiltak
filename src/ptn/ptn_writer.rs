@@ -1,6 +1,7 @@
 use crate::ptn::{Game, PtnMove};
 use board_game_traits::Color;
 use pgn_traits::PgnPosition;
+use std::fmt::Write as _;
 use std::io;
 use std::io::Write;
 
@@ -58,6 +59,8 @@ impl<B: PgnPosition + Clone> Game<B> {
         let mut column_position = 0;
         let mut buffer = String::new();
 
+        let start_move_number = position.full_move_number().unwrap_or(1) as usize;
+
         for (
             i,
             PtnMove {
@@ -67,16 +70,19 @@ impl<B: PgnPosition + Clone> Game<B> {
             },
         ) in self.moves.iter().enumerate()
         {
+            let move_string = position.move_to_san(mv);
             if i == 0 && position.side_to_move() == Color::Black {
-                buffer.push_str(&format!("1... {}", position.move_to_san(mv)));
+                write!(buffer, "{}... {}", start_move_number, move_string).unwrap();
             } else if position.side_to_move() == Color::White {
-                buffer.push_str(&format!(
+                write!(
+                    buffer,
                     "{}. {}",
-                    (i + 1) / 2 + 1,
-                    position.move_to_san(mv),
-                ));
+                    (i + 1) / 2 + start_move_number,
+                    move_string
+                )
+                .unwrap();
             } else {
-                buffer.push_str(&position.move_to_san(mv));
+                buffer.push_str(&move_string);
             }
 
             for annotation in annotations {
