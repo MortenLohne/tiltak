@@ -1312,6 +1312,8 @@ impl<const S: usize> pgn_traits::PgnPosition for Position<S> {
         ("Result", "*"),
     ];
 
+    const START_POSITION_TAG_NAME: Option<&'static str> = Some("TPS");
+
     const POSSIBLE_GAME_RESULTS: &'static [(&'static str, Option<GameResult>)] = &[
         ("*", None),
         ("1-0", Some(GameResult::WhiteWin)),

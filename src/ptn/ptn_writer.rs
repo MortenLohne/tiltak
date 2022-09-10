@@ -33,15 +33,23 @@ impl<B: PgnPosition + Clone> Game<B> {
             }
         }
 
-        if self.start_position != B::start_position()
-            && !tags.iter().any(|(tag, _)| tag.eq_ignore_ascii_case("FEN"))
-        {
-            writeln!(f, "[FEN \"{}\"", self.start_position.to_fen())?;
-        }
-
         // Write any remaining tags
         for (tag, value) in tags.iter() {
             writeln!(f, "[{} \"{}\"]", tag, value)?;
+        }
+
+        // Write TPS tag, if starting position is non-standard
+        if let Some(fen_tag) = B::START_POSITION_TAG_NAME {
+            if self.start_position != B::start_position()
+                && !B::REQUIRED_TAGS
+                    .iter()
+                    .any(|(tag, _)| tag.eq_ignore_ascii_case(fen_tag))
+                && !tags
+                    .iter()
+                    .any(|(tag, _)| tag.eq_ignore_ascii_case(fen_tag))
+            {
+                writeln!(f, "[{} \"{}\"]", fen_tag, self.start_position.to_fen())?;
+            }
         }
 
         writeln!(f)?;

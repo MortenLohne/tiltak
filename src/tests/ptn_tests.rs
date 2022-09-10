@@ -2,6 +2,7 @@ use crate::position::{Move, Position};
 use crate::ptn::{ptn_parser, Game, PtnMove};
 use crate::tests::do_moves_and_check_validity;
 use board_game_traits::Position as PositionTrait;
+use pgn_traits::PgnPosition;
 use std::io::Cursor;
 
 #[test]
@@ -42,6 +43,47 @@ pub fn write_and_read_ptn_test() {
     let parsed_games: Vec<Game<Position<6>>> = ptn_parser::parse_ptn(&ptn).unwrap();
 
     assert_eq!(parsed_games, vec![game])
+}
+
+#[test]
+pub fn custom_start_position_test() {
+    let mut position = <Position<6>>::start_position();
+
+    position.do_move(position.move_from_san("a1").unwrap());
+    position.do_move(position.move_from_san("f6").unwrap());
+
+    let tps = position.to_fen();
+
+    let moves = vec![PtnMove {
+        mv: position.move_from_san("e6").unwrap(),
+        annotations: vec![],
+        comment: String::new(),
+    }];
+
+    let mut game: Game<Position<6>> = Game {
+        start_position: position,
+        moves,
+        game_result_str: Some("R-0"),
+        tags: vec![
+            ("Player1".to_string(), "tiltak".to_string()),
+            ("Player2".to_string(), "tiltak".to_string()),
+            ("Date".to_string(), "2021.03.06".to_string()),
+            ("Size".to_string(), "6".to_string()),
+            ("Result".to_string(), "1-0".to_string()),
+            ("Round".to_string(), "1".to_string()),
+        ],
+    };
+
+    let mut ptn_writer = Cursor::new(vec![]);
+    game.game_to_ptn(&mut ptn_writer).unwrap();
+    let ptn = String::from_utf8(ptn_writer.into_inner()).unwrap();
+
+    let parsed_games: Vec<Game<Position<6>>> = ptn_parser::parse_ptn(&ptn).unwrap();
+
+    // Manually write the tag afterwards, to test that the writer does it automatically
+    game.tags.push(("TPS".to_string(), tps));
+
+    assert_eq!(parsed_games, vec![game], "ptn:\n{}", ptn)
 }
 
 #[test]
