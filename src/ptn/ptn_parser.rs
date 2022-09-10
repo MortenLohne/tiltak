@@ -33,23 +33,27 @@ fn parse_game<B: PgnPosition>(input: &mut ParserData) -> Result<Game<B>, ParseEr
         tags.push((tag.to_string(), value));
     }
 
-    let (moves, game_result_str) = parse_moves(input, B::start_position())?;
-
-    let start_position = if let Some(fen_tag) = B::START_POSITION_TAG_NAME {
-        if let Some((_, tps)) = tags
-            .iter()
-            .find(|(name, _)| name.eq_ignore_ascii_case(fen_tag))
-        {
-            B::from_fen(tps)?
+    // Thunk to get the game's start position
+    // It can't be a regular variable, because there is no `B: Clone` bound
+    let start_position = || {
+        if let Some(fen_tag) = B::START_POSITION_TAG_NAME {
+            if let Some((_, tps)) = tags
+                .iter()
+                .find(|(name, _)| name.eq_ignore_ascii_case(fen_tag))
+            {
+                B::from_fen(tps)
+            } else {
+                Ok(B::start_position())
+            }
         } else {
-            B::start_position()
+            Ok(B::start_position())
         }
-    } else {
-        B::start_position()
     };
 
+    let (moves, game_result_str) = parse_moves(input, start_position()?)?;
+
     Ok(Game {
-        start_position,
+        start_position: start_position()?,
         moves,
         game_result_str,
         tags,
