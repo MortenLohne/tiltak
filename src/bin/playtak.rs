@@ -263,7 +263,7 @@ pub fn main() -> Result<()> {
             Ok(ok) => ok,
             Err(err) => {
                 warn!("Failed to connect due to \"{}\", retrying...", err);
-                thread::sleep(Duration::from_secs(2));
+                thread::sleep(Duration::from_secs(10));
                 continue;
             }
         };
@@ -299,8 +299,11 @@ pub fn main() -> Result<()> {
         };
 
         match error.kind() {
-            io::ErrorKind::ConnectionAborted | io::ErrorKind::ConnectionReset => {
-                warn!("Server connection interrupted, caused by \"{}\". This may be due to a server restart, attempting to reconnect.", error)
+            io::ErrorKind::ConnectionAborted
+            | io::ErrorKind::ConnectionReset
+            | io::ErrorKind::TimedOut => {
+                warn!("Server connection interrupted, caused by \"{}\". This may be due to a server restart, attempting to reconnect.", error);
+                thread::sleep(Duration::from_secs(2));
             }
             _ => {
                 error!("Fatal error of kind {:?}: {}", error.kind(), error);
