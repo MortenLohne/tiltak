@@ -9,6 +9,9 @@ use crate::evaluation::parameters::PolicyFeatures;
 use crate::search::TimeControl;
 use board_game_traits::GameResult;
 use board_game_traits::Position as PositionTrait;
+use dfdx::prelude::ModuleBuilder;
+use dfdx::prelude::SaveToNpz;
+use dfdx::tensor;
 use pgn_traits::PgnPosition;
 use rand::prelude::*;
 use rayon::prelude::*;
@@ -335,7 +338,7 @@ pub fn read_games_from_file<const S: usize>(
 
 pub fn tune_value_from_file<const S: usize, const N: usize>(
     file_name: &str,
-) -> Result<[f32; N], DynError> {
+) -> Result<(), DynError> {
     let games = read_games_from_file::<S>(file_name)?;
 
     let (positions, results) = positions_and_results_from_games(games);
@@ -366,11 +369,16 @@ pub fn tune_value_from_file<const S: usize, const N: usize>(
         *param = rng.gen_range(-0.01..0.01)
     }
 
-    let tuned_parameters = gradient_descent::gradient_descent(&samples, &initial_params, 100.0);
+    let mut cpu: tensor::Cpu = Default::default();
+    let mut model = cpu.build_module();
 
-    println!("Final parameters: {:?}", tuned_parameters);
+    gradient_descent::gradient_descent_dfdx(&samples, &mut cpu, &mut model, 0.02);
 
-    Ok(tuned_parameters)
+    let filename = "model.zip";
+    model.save(filename)?;
+    println!("Saved parameters to {}", filename);
+
+    Ok(())
 }
 
 pub fn tune_value_and_policy<const S: usize, const N: usize, const M: usize>(
