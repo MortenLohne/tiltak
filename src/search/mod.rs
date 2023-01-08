@@ -35,6 +35,7 @@ pub enum TimeControl {
 #[derive(Clone, Debug)]
 pub struct MctsSetting<const S: usize> {
     arena_size: u32,
+    cpu: Cpu,
     value_params: ValueModel<NUM_VALUE_FEATURES_6S>, // TODO: Generic
     policy_params: Vec<f32>,
     search_params: Vec<Score>,
@@ -46,14 +47,13 @@ pub struct MctsSetting<const S: usize> {
 
 impl<const S: usize> Default for MctsSetting<S> {
     fn default() -> Self {
+        let cpu: Cpu = Default::default(); // TODO: Hard-coded stuff
+        let mut value_params: ValueModel<NUM_VALUE_FEATURES_6S> = cpu.build_module();
+        value_params.load("model.zip").unwrap();
         MctsSetting {
             arena_size: 2_u32.pow(26), // Default to 1.5GB max
-            value_params: {
-                let cpu: Cpu = Default::default(); // TODO: Hard-coded stuff
-                let mut model: ValueModel<NUM_VALUE_FEATURES_6S> = cpu.build_module();
-                model.load("model_B1000_256_v62.zip").unwrap();
-                model
-            },
+            cpu,
+            value_params,
             policy_params: Vec::from(<Position<S>>::policy_params()),
             search_params: vec![1.43, 2800.0, 0.61],
             dirichlet: None,

@@ -11,7 +11,7 @@ use board_game_traits::{Color, GameResult};
 use board_game_traits::{EvalPosition as EvalPositionTrait, Position as PositionTrait};
 use dfdx::prelude::Module;
 use dfdx::shapes::Const;
-use dfdx::tensor::{AsVec, Cpu, Tensor, ZerosTensor};
+use dfdx::tensor::{Cpu, Tensor, ZerosTensor, AsArray};
 use lazy_static::lazy_static;
 use pgn_traits::PgnPosition;
 use rand::{Rng, SeedableRng};
@@ -905,13 +905,13 @@ impl<const S: usize> Position<S> {
     pub(crate) fn static_eval_with_params_and_data(
         &self,
         group_data: &GroupData<S>,
+        cpu: &Cpu,
         model: &ValueModel<NUM_VALUE_FEATURES_6S>,
         features: &mut [f32],
     ) -> f32 {
         let mut value_features = ValueFeatures::new::<S>(features);
         value_eval::static_eval_game_phase(self, group_data, &mut value_features);
 
-        let cpu = Cpu::default();
         let mut input_tensor: Tensor<(Const<1>, Const<NUM_VALUE_FEATURES_6S>)> = cpu.zeros();
         input_tensor.copy_from(&features);
         let prediction = model.forward(input_tensor);
@@ -919,7 +919,7 @@ impl<const S: usize> Position<S> {
         for c in features.iter_mut() {
             *c = 0.0;
         }
-        prediction.as_vec()[0]
+        (prediction.array()[0][0] + 1.0) / 2.0
     }
 
     pub fn value_params() -> &'static [f32] {

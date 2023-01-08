@@ -12,10 +12,9 @@ pub const NUM_VALUE_FEATURES_6S: usize = 134;
 pub const NUM_POLICY_FEATURES_6S: usize = 186;
 
 pub type ValueModel<const N: usize> = (
-    (Linear<N, 256>, ReLU),
-    (Linear<256, 256>, ReLU),
-    (Linear<256, 256>, ReLU),
-    (Linear<256, 1>, Tanh),
+    (Linear<N, 32>, ReLU),
+    (Linear<32, 32>, ReLU),
+    (Linear<32, 1>, Tanh),
 );
 
 #[derive(Debug)]

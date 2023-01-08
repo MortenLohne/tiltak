@@ -271,6 +271,7 @@ pub fn rollout<const S: usize>(
     } else if depth == 0 {
         let static_eval = position.static_eval_with_params_and_data(
             &group_data,
+            &settings.cpu,
             &settings.value_params,
             &mut temp_vectors.value_scores,
         );

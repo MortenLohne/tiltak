@@ -352,8 +352,8 @@ pub fn tune_value_from_file<const S: usize, const N: usize>(
             position.static_eval_features(&mut features);
             let result = match game_result {
                 GameResult::WhiteWin => 1.0,
-                GameResult::Draw => 0.5,
-                GameResult::BlackWin => 0.0,
+                GameResult::Draw => 0.0,
+                GameResult::BlackWin => -1.0,
             };
             TrainingSample {
                 features,
@@ -374,6 +374,9 @@ pub fn tune_value_from_file<const S: usize, const N: usize>(
     let mut model: ValueModel<N> = cpu.build_module();
 
     gradient_descent::gradient_descent_dfdx(&samples, &mut cpu, &mut model, 0.05);
+    gradient_descent::gradient_descent_dfdx(&samples, &mut cpu, &mut model, 0.005);
+    gradient_descent::gradient_descent_dfdx(&samples, &mut cpu, &mut model, 0.0005);
+    gradient_descent::gradient_descent_dfdx(&samples, &mut cpu, &mut model, 0.00005);
 
     let filename = "model.zip";
     model.save(filename)?;
@@ -408,8 +411,8 @@ pub fn tune_value_and_policy<const S: usize, const N: usize, const M: usize>(
             position.static_eval_features(&mut features);
             let result = match game_result {
                 GameResult::WhiteWin => 1.0,
-                GameResult::Draw => 0.5,
-                GameResult::BlackWin => 0.0,
+                GameResult::Draw => 0.0,
+                GameResult::BlackWin => -1.0,
             };
             TrainingSample {
                 features,

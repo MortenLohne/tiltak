@@ -57,6 +57,10 @@ pub fn gradient_descent_dfdx<const N: usize, E: Dtype, M>(
     });
 
     let first_start = Instant::now();
+    let mut best_epoch = 0;
+    let mut best_epoch_loss = f32::MAX;
+    let mut escaping = false;
+
     for i_epoch in 0.. {
         let mut total_epoch_loss = 0.0;
         let mut num_batches = 0;
@@ -79,16 +83,27 @@ pub fn gradient_descent_dfdx<const N: usize, E: Dtype, M>(
         }
         let dur = Instant::now() - start;
         println!(
-            "Epoch {} in {:.3}s ({:.1} batches/s): avg sample loss {:.5}",
+            "Epoch {} in {:.3}s ({:.1} batches/s): avg sample loss {:.6}",
             i_epoch + 1,
             dur.as_secs_f32(),
             num_batches as f32 / dur.as_secs_f32(),
             total_epoch_loss / num_batches as f32,
         );
-        if i_epoch % 10 == 0 {
+        if i_epoch % 20 == 0 {
             model
-                .save(format!("model_B{}_256_v{}.zip", BATCH_SIZE, i_epoch / 10))
+                .save(format!("model_g5_B{}_32_v{}_lr{:05}.zip", BATCH_SIZE, i_epoch / 20, (learning_rate * 10000.0) as i32))
                 .unwrap();
+        }
+        if total_epoch_loss < best_epoch_loss {
+            best_epoch_loss = total_epoch_loss;
+            best_epoch = i_epoch;
+            if escaping {
+                break;
+            }
+        }
+        if best_epoch + 20 < i_epoch {
+            escaping = true;
+            println!("Escaping at the next opportunity")
         }
     }
 
