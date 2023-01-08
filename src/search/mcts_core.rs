@@ -8,7 +8,7 @@ use crate::evaluation::parameters;
 use crate::position::Move;
 /// This module contains the core of the MCTS search algorithm
 use crate::position::{GroupData, Position};
-use crate::search::{cp_to_win_percentage, MctsSetting, Score};
+use crate::search::{MctsSetting, Score};
 
 use super::{arena, Arena};
 
@@ -269,11 +269,11 @@ pub fn rollout<const S: usize>(
 
         (game_result_for_us.score(), true)
     } else if depth == 0 {
-        let static_eval = cp_to_win_percentage(position.static_eval_with_params_and_data(
+        let static_eval = position.static_eval_with_params_and_data(
             &group_data,
             &settings.value_params,
             &mut temp_vectors.value_scores,
-        ));
+        );
         match position.side_to_move() {
             Color::White => (static_eval, false),
             Color::Black => (1.0 - static_eval, false),

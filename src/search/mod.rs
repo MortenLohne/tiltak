@@ -2,10 +2,15 @@
 //!
 //! This implementation does not use full Monte Carlo rollouts, relying on a heuristic evaluation when expanding new nodes instead.
 
+use dfdx::prelude::LoadFromNpz;
+use dfdx::prelude::ModuleBuilder;
+use dfdx::tensor::Cpu;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 use std::{mem, time};
 
+use crate::evaluation::parameters::ValueModel;
+use crate::evaluation::parameters::NUM_VALUE_FEATURES_6S;
 use crate::position::Move;
 use crate::position::Position;
 use crate::position::{Role, Square};
@@ -27,10 +32,10 @@ pub enum TimeControl {
     Time(time::Duration, time::Duration), // Total time left, increment
 }
 
-#[derive(Clone, PartialEq, Debug)]
+#[derive(Clone, Debug)]
 pub struct MctsSetting<const S: usize> {
     arena_size: u32,
-    value_params: Vec<f32>,
+    value_params: ValueModel<NUM_VALUE_FEATURES_6S>, // TODO: Generic
     policy_params: Vec<f32>,
     search_params: Vec<Score>,
     dirichlet: Option<f32>,
@@ -43,7 +48,12 @@ impl<const S: usize> Default for MctsSetting<S> {
     fn default() -> Self {
         MctsSetting {
             arena_size: 2_u32.pow(26), // Default to 1.5GB max
-            value_params: Vec::from(<Position<S>>::value_params()),
+            value_params: {
+                let cpu: Cpu = Default::default(); // TODO: Hard-coded stuff
+                let mut model: ValueModel<NUM_VALUE_FEATURES_6S> = cpu.build_module();
+                model.load("model_B1000_256_v62.zip").unwrap();
+                model
+            },
             policy_params: Vec::from(<Position<S>>::policy_params()),
             search_params: vec![1.43, 2800.0, 0.61],
             dirichlet: None,
@@ -76,9 +86,10 @@ impl<const N: usize> MctsSetting<N> {
         self
     }
 
-    pub fn add_value_params(mut self, value_params: Vec<f32>) -> Self {
-        self.value_params = value_params;
-        self
+    pub fn add_value_params(self, _value_params: Vec<f32>) -> Self {
+        unimplemented!() // TODO: Repair
+                         //self.value_params = value_params;
+                         //self
     }
 
     pub fn add_policy_params(mut self, policy_params: Vec<f32>) -> Self {

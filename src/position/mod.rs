@@ -9,6 +9,9 @@ use std::{iter, mem};
 use arrayvec::ArrayVec;
 use board_game_traits::{Color, GameResult};
 use board_game_traits::{EvalPosition as EvalPositionTrait, Position as PositionTrait};
+use dfdx::prelude::Module;
+use dfdx::shapes::Const;
+use dfdx::tensor::{AsVec, Cpu, Tensor, ZerosTensor};
 use lazy_static::lazy_static;
 use pgn_traits::PgnPosition;
 use rand::{Rng, SeedableRng};
@@ -28,8 +31,8 @@ pub(crate) use utils::AbstractBoard;
 pub use mv::{Move, ReverseMove};
 
 use crate::evaluation::parameters::{
-    ValueFeatures, POLICY_PARAMS_4S, POLICY_PARAMS_5S, POLICY_PARAMS_6S, VALUE_PARAMS_4S,
-    VALUE_PARAMS_5S, VALUE_PARAMS_6S,
+    ValueFeatures, ValueModel, NUM_VALUE_FEATURES_6S, POLICY_PARAMS_4S, POLICY_PARAMS_5S,
+    POLICY_PARAMS_6S, VALUE_PARAMS_4S, VALUE_PARAMS_5S, VALUE_PARAMS_6S,
 };
 use crate::evaluation::value_eval;
 use crate::position::color_trait::ColorTr;
@@ -902,16 +905,21 @@ impl<const S: usize> Position<S> {
     pub(crate) fn static_eval_with_params_and_data(
         &self,
         group_data: &GroupData<S>,
-        params: &[f32],
+        model: &ValueModel<NUM_VALUE_FEATURES_6S>,
         features: &mut [f32],
     ) -> f32 {
         let mut value_features = ValueFeatures::new::<S>(features);
         value_eval::static_eval_game_phase(self, group_data, &mut value_features);
-        let eval = features.iter().zip(params).map(|(a, b)| a * b).sum();
+
+        let cpu = Cpu::default();
+        let mut input_tensor: Tensor<(Const<1>, Const<NUM_VALUE_FEATURES_6S>)> = cpu.zeros();
+        input_tensor.copy_from(&features);
+        let prediction = model.forward(input_tensor);
+
         for c in features.iter_mut() {
             *c = 0.0;
         }
-        eval
+        prediction.as_vec()[0]
     }
 
     pub fn value_params() -> &'static [f32] {

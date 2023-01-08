@@ -416,7 +416,7 @@ fn analyze_position<const S: usize>(position: &Position<S>) {
             println!("Search stopped due to OOM");
             break;
         };
-        if i % 100_000 == 0 {
+        if i % 10_000 == 0 {
             println!(
                 "{} visits, val={:.2}%, static eval={:.4}, static winning probability={:.2}%, {:.2}s",
                 tree.visits(),
