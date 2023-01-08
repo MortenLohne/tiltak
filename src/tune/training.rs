@@ -6,6 +6,7 @@ use std::time;
 use std::{error, fs, io};
 
 use crate::evaluation::parameters::PolicyFeatures;
+use crate::evaluation::parameters::ValueModel;
 use crate::search::TimeControl;
 use board_game_traits::GameResult;
 use board_game_traits::Position as PositionTrait;
@@ -370,7 +371,7 @@ pub fn tune_value_from_file<const S: usize, const N: usize>(
     }
 
     let mut cpu: tensor::Cpu = Default::default();
-    let mut model = cpu.build_module();
+    let mut model: ValueModel<N> = cpu.build_module();
 
     gradient_descent::gradient_descent_dfdx(&samples, &mut cpu, &mut model, 0.05);
 

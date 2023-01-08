@@ -1,3 +1,5 @@
+use dfdx::prelude::{Linear, ReLU, Tanh};
+
 use crate::position::{num_line_symmetries, num_square_symmetries};
 
 pub const NUM_VALUE_FEATURES_4S: usize = 87;
@@ -8,6 +10,13 @@ pub const NUM_POLICY_FEATURES_5S: usize = 176;
 
 pub const NUM_VALUE_FEATURES_6S: usize = 134;
 pub const NUM_POLICY_FEATURES_6S: usize = 186;
+
+pub type ValueModel<const N: usize> = (
+    (Linear<N, 256>, ReLU),
+    (Linear<256, 256>, ReLU),
+    (Linear<256, 256>, ReLU),
+    (Linear<256, 1>, Tanh),
+);
 
 #[derive(Debug)]
 pub struct ValueFeatures<'a> {

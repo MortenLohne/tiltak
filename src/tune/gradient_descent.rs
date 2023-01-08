@@ -33,28 +33,28 @@ pub fn get_batch<const N: usize, const B: usize>(
     (input_tensor, output_tensor)
 }
 
-pub type Model<const N: usize> = (
-    (Linear<N, 256>, ReLU),
-    (Linear<256, 256>, ReLU),
-    (Linear<256, 256>, ReLU),
-    (Linear<256, 1>, Tanh),
-);
+const BATCH_SIZE: usize = 1000;
 
-pub fn gradient_descent_dfdx<const N: usize>(
+pub fn gradient_descent_dfdx<const N: usize, E: Dtype, M>(
     samples: &[TrainingSample<N>],
     dev: &mut Cpu,
-    model: &mut Model<N>,
+    model: &mut M,
     learning_rate: f32,
-) {
+) where
+    M: GradientUpdate<Cpu, E>
+        + ModuleMut<
+            Tensor<(Const<BATCH_SIZE>, Const<N>), f32, Cpu, OwnedTape<Cpu>>,
+            Output = Tensor<(Const<BATCH_SIZE>, Const<1>), f32, Cpu, OwnedTape<Cpu>>,
+        > + GradientUpdate<Cpu, f32>
+        + SaveToNpz,
+{
     let mut rng = StdRng::seed_from_u64(0);
 
-    let mut sgd: Sgd<Model<N>> = Sgd::new(SgdConfig {
+    let mut sgd: Sgd<M> = Sgd::new(SgdConfig {
         lr: learning_rate,
         momentum: Some(Momentum::Nesterov(0.95)),
         weight_decay: None,
     });
-
-    const BATCH_SIZE: usize = 1000;
 
     let first_start = Instant::now();
     for i_epoch in 0.. {
@@ -66,7 +66,8 @@ pub fn gradient_descent_dfdx<const N: usize>(
             SubsetIterator::<BATCH_SIZE>::shuffled(samples.len(), &mut rng)
                 .map(|i| get_batch(samples, &dev, i))
         {
-            let prediction = model.forward_mut(test_samples.trace());
+            let prediction: Tensor<(Const<BATCH_SIZE>, Const<1>), f32, Cpu, OwnedTape<Cpu>> =
+                model.forward_mut(test_samples.trace());
             let loss = mse_loss(prediction, test_samples_output.clone());
 
             total_epoch_loss += loss.array();
@@ -85,7 +86,9 @@ pub fn gradient_descent_dfdx<const N: usize>(
             total_epoch_loss / num_batches as f32,
         );
         if i_epoch % 10 == 0 {
-            model.save(format!("model_B{}_256_v{}.zip", BATCH_SIZE, i_epoch / 10)).unwrap();
+            model
+                .save(format!("model_B{}_256_v{}.zip", BATCH_SIZE, i_epoch / 10))
+                .unwrap();
         }
     }
 
