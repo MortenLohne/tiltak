@@ -372,7 +372,7 @@ pub fn tune_value_from_file<const S: usize, const N: usize>(
     let mut cpu: tensor::Cpu = Default::default();
     let mut model = cpu.build_module();
 
-    gradient_descent::gradient_descent_dfdx(&samples, &mut cpu, &mut model, 0.02);
+    gradient_descent::gradient_descent_dfdx(&samples, &mut cpu, &mut model, 0.05);
 
     let filename = "model.zip";
     model.save(filename)?;

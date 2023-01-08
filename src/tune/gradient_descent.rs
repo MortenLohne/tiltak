@@ -54,7 +54,7 @@ pub fn gradient_descent_dfdx<const N: usize>(
         weight_decay: None,
     });
 
-    const BATCH_SIZE: usize = 100;
+    const BATCH_SIZE: usize = 1000;
 
     let first_start = Instant::now();
     for i_epoch in 0.. {
@@ -84,8 +84,8 @@ pub fn gradient_descent_dfdx<const N: usize>(
             num_batches as f32 / dur.as_secs_f32(),
             total_epoch_loss / num_batches as f32,
         );
-        if first_start.elapsed().as_secs() > 300 {
-            break;
+        if i_epoch % 10 == 0 {
+            model.save(format!("model_B{}_256_v{}.zip", BATCH_SIZE, i_epoch / 10)).unwrap();
         }
     }
 
