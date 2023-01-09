@@ -6,6 +6,7 @@ use std::time;
 use std::{error, fs, io};
 
 use crate::evaluation::parameters::PolicyFeatures;
+use crate::evaluation::parameters::PolicyModel;
 use crate::evaluation::parameters::ValueModel;
 use crate::search::TimeControl;
 use board_game_traits::GameResult;
@@ -373,10 +374,17 @@ pub fn tune_value_from_file<const S: usize, const N: usize>(
     let mut cpu: tensor::Cpu = Default::default();
     let mut model: ValueModel<N> = cpu.build_module();
 
-    gradient_descent::gradient_descent_dfdx(&samples, &mut cpu, &mut model, 0.05);
-    gradient_descent::gradient_descent_dfdx(&samples, &mut cpu, &mut model, 0.005);
-    gradient_descent::gradient_descent_dfdx(&samples, &mut cpu, &mut model, 0.0005);
-    gradient_descent::gradient_descent_dfdx(&samples, &mut cpu, &mut model, 0.00005);
+    gradient_descent::gradient_descent_dfdx::<1000, N, _, _>(&samples, &mut cpu, &mut model, 0.05);
+    gradient_descent::gradient_descent_dfdx::<1000, N, _, _>(&samples, &mut cpu, &mut model, 0.005);
+    gradient_descent::gradient_descent_dfdx::<1000, N, _, _>(
+        &samples, &mut cpu, &mut model, 0.0005,
+    );
+    gradient_descent::gradient_descent_dfdx::<1000, N, _, _>(
+        &samples, &mut cpu, &mut model, 0.00005,
+    );
+    gradient_descent::gradient_descent_dfdx::<1000, N, _, _>(
+        &samples, &mut cpu, &mut model, 0.000005,
+    );
 
     let filename = "model.zip";
     model.save(filename)?;
@@ -461,17 +469,46 @@ pub fn tune_value_and_policy<const S: usize, const N: usize, const M: usize>(
         }
     }
 
-    let tuned_value_parameters =
-        gradient_descent::gradient_descent(&value_training_samples, initial_value_params, 100.0);
+    // let tuned_value_parameters =
+    //     gradient_descent::gradient_descent(&value_training_samples, initial_value_params, 100.0);
 
-    println!("Final parameters: {:?}", tuned_value_parameters);
+    println!("Skipping value parameters");
 
-    let tuned_policy_parameters =
-        gradient_descent::gradient_descent(&policy_training_samples, initial_policy_params, 5000.0);
+    let mut cpu: tensor::Cpu = Default::default();
+    let mut model: PolicyModel<M> = cpu.build_module();
 
-    println!("Final parameters: {:?}", tuned_policy_parameters);
+    gradient_descent::gradient_descent_dfdx::<1000, M, _, _>(
+        &policy_training_samples,
+        &mut cpu,
+        &mut model,
+        0.1,
+    );
+    gradient_descent::gradient_descent_dfdx::<1000, M, _, _>(
+        &policy_training_samples,
+        &mut cpu,
+        &mut model,
+        0.01,
+    );
+    gradient_descent::gradient_descent_dfdx::<1000, M, _, _>(
+        &policy_training_samples,
+        &mut cpu,
+        &mut model,
+        0.001,
+    );
+    gradient_descent::gradient_descent_dfdx::<1000, M, _, _>(
+        &policy_training_samples,
+        &mut cpu,
+        &mut model,
+        0.0001,
+    );
 
-    Ok((tuned_value_parameters, tuned_policy_parameters))
+    let filename = "policy_model.zip";
+    model.save(filename)?;
+    println!("Saved parameters to {}", filename);
+
+    unimplemented!()
+
+    // Ok((tuned_value_parameters, tuned_policy_parameters))
 }
 
 pub fn tune_value_and_policy_from_file<const S: usize, const N: usize, const M: usize>(
@@ -514,8 +551,8 @@ pub fn games_and_move_scoress_from_file<const S: usize>(
             games.truncate(10_000);
         }
         6 => {
-            move_scoress.truncate(8000);
-            games.truncate(8000);
+            move_scoress.truncate(4000);
+            games.truncate(4000);
         }
         _ => (),
     }

@@ -33,9 +33,7 @@ pub fn get_batch<const N: usize, const B: usize>(
     (input_tensor, output_tensor)
 }
 
-const BATCH_SIZE: usize = 1000;
-
-pub fn gradient_descent_dfdx<const N: usize, E: Dtype, M>(
+pub fn gradient_descent_dfdx<const B: usize, const N: usize, E: Dtype, M>(
     samples: &[TrainingSample<N>],
     dev: &mut Cpu,
     model: &mut M,
@@ -43,8 +41,8 @@ pub fn gradient_descent_dfdx<const N: usize, E: Dtype, M>(
 ) where
     M: GradientUpdate<Cpu, E>
         + ModuleMut<
-            Tensor<(Const<BATCH_SIZE>, Const<N>), f32, Cpu, OwnedTape<Cpu>>,
-            Output = Tensor<(Const<BATCH_SIZE>, Const<1>), f32, Cpu, OwnedTape<Cpu>>,
+            Tensor<(Const<B>, Const<N>), f32, Cpu, OwnedTape<Cpu>>,
+            Output = Tensor<(Const<B>, Const<1>), f32, Cpu, OwnedTape<Cpu>>,
         > + GradientUpdate<Cpu, f32>
         + SaveToNpz,
 {
@@ -67,10 +65,10 @@ pub fn gradient_descent_dfdx<const N: usize, E: Dtype, M>(
         let start = Instant::now();
 
         for (test_samples, test_samples_output) in
-            SubsetIterator::<BATCH_SIZE>::shuffled(samples.len(), &mut rng)
+            SubsetIterator::<B>::shuffled(samples.len(), &mut rng)
                 .map(|i| get_batch(samples, &dev, i))
         {
-            let prediction: Tensor<(Const<BATCH_SIZE>, Const<1>), f32, Cpu, OwnedTape<Cpu>> =
+            let prediction: Tensor<(Const<B>, Const<1>), f32, Cpu, OwnedTape<Cpu>> =
                 model.forward_mut(test_samples.trace());
             let loss = mse_loss(prediction, test_samples_output.clone());
 
@@ -83,7 +81,7 @@ pub fn gradient_descent_dfdx<const N: usize, E: Dtype, M>(
         }
         let dur = Instant::now() - start;
         println!(
-            "Epoch {} in {:.3}s ({:.1} batches/s): avg sample loss {:.6}",
+            "Epoch {} in {:.3}s ({:.1} batches/s): avg sample loss {:.7}",
             i_epoch + 1,
             dur.as_secs_f32(),
             num_batches as f32 / dur.as_secs_f32(),
@@ -91,7 +89,12 @@ pub fn gradient_descent_dfdx<const N: usize, E: Dtype, M>(
         );
         if i_epoch % 20 == 0 {
             model
-                .save(format!("model_g5_B{}_32_v{}_lr{:05}.zip", BATCH_SIZE, i_epoch / 20, (learning_rate * 10000.0) as i32))
+                .save(format!(
+                    "value_model_g6_B{}_16_v{}_lr{:05}.zip",
+                    B,
+                    i_epoch / 20,
+                    (learning_rate * 10000.0) as i32
+                ))
                 .unwrap();
         }
         if total_epoch_loss < best_epoch_loss {
@@ -100,6 +103,9 @@ pub fn gradient_descent_dfdx<const N: usize, E: Dtype, M>(
             if escaping {
                 break;
             }
+        }
+        if best_epoch + 40 < i_epoch {
+            break;
         }
         if best_epoch + 20 < i_epoch {
             escaping = true;

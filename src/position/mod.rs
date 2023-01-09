@@ -11,7 +11,7 @@ use board_game_traits::{Color, GameResult};
 use board_game_traits::{EvalPosition as EvalPositionTrait, Position as PositionTrait};
 use dfdx::prelude::Module;
 use dfdx::shapes::Const;
-use dfdx::tensor::{Cpu, Tensor, ZerosTensor, AsArray};
+use dfdx::tensor::{AsArray, Cpu, Tensor, ZerosTensor};
 use lazy_static::lazy_static;
 use pgn_traits::PgnPosition;
 use rand::{Rng, SeedableRng};

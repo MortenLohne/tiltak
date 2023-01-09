@@ -49,7 +49,7 @@ impl<const S: usize> Default for MctsSetting<S> {
     fn default() -> Self {
         let cpu: Cpu = Default::default(); // TODO: Hard-coded stuff
         let mut value_params: ValueModel<NUM_VALUE_FEATURES_6S> = cpu.build_module();
-        value_params.load("model.zip").unwrap();
+        value_params.load("model_49811.zip").unwrap();
         MctsSetting {
             arena_size: 2_u32.pow(26), // Default to 1.5GB max
             cpu,
