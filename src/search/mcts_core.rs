@@ -195,8 +195,9 @@ impl Tree {
         arena: &Arena,
     ) -> Option<()> {
         position.generate_moves_with_params(
-            &settings.policy_params,
             group_data,
+            &settings.cpu,
+            &settings.policy_model,
             &mut temp_vectors.simple_moves,
             &mut temp_vectors.moves,
             &mut temp_vectors.policy_score_sets,
@@ -282,6 +283,8 @@ pub fn rollout<const S: usize>(
     } else {
         position.generate_moves_with_probabilities(
             &group_data,
+            &settings.cpu,
+            &settings.policy_model,
             &mut temp_vectors.simple_moves,
             &mut temp_vectors.moves,
             &mut temp_vectors.policy_score_sets,

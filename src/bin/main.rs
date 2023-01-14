@@ -379,8 +379,15 @@ fn analyze_position<const S: usize>(position: &Position<S>) {
     let mut simple_moves = vec![];
     let mut moves = vec![];
 
+    let settings: MctsSetting<S> = search::MctsSetting::default()
+        .arena_size(2_u32.pow(31))
+        .exclude_moves(vec![]);
+    let start_time = time::Instant::now();
+
     position.generate_moves_with_probabilities(
         &position.group_data(),
+        &settings.cpu,
+        &settings.policy_model,
         &mut simple_moves,
         &mut moves,
         &mut vec![],
@@ -405,10 +412,6 @@ fn analyze_position<const S: usize>(position: &Position<S>) {
         }
         println!();
     }
-    let settings: MctsSetting<S> = search::MctsSetting::default()
-        .arena_size(2_u32.pow(31))
-        .exclude_moves(vec![]);
-    let start_time = time::Instant::now();
 
     let mut tree = search::MonteCarloTree::with_settings(position.clone(), settings);
     for i in 1.. {

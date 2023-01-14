@@ -1,6 +1,9 @@
 use crate::evaluation::parameters;
 use arrayvec::ArrayVec;
 use board_game_traits::{Color, GameResult, Position as PositionTrait};
+use dfdx::prelude::Module;
+use dfdx::shapes::Const;
+use dfdx::tensor::{AsArray, Cpu, Tensor, ZerosTensor};
 
 use crate::evaluation::parameters::PolicyFeatures;
 use crate::position::bitboard::BitBoard;
@@ -12,6 +15,8 @@ use crate::position::{square_symmetries, GroupData, Piece, Position, Role};
 use crate::position::{squares_iterator, Move};
 use crate::position::{GroupEdgeConnection, Square};
 use crate::search;
+
+use super::parameters::{PolicyModel, NUM_POLICY_FEATURES_6S};
 
 const POLICY_BASELINE: f32 = 0.05;
 
@@ -27,7 +32,8 @@ pub fn inverse_sigmoid(x: f32) -> f32 {
 impl<const S: usize> Position<S> {
     pub(crate) fn generate_moves_with_probabilities_colortr<Us: ColorTr, Them: ColorTr>(
         &self,
-        params: &[f32],
+        cpu: &Cpu,
+        policy_model: &PolicyModel<NUM_POLICY_FEATURES_6S>,
         group_data: &GroupData<S>,
         simple_moves: &mut Vec<Move>,
         moves: &mut Vec<(Move, search::Score)>,
@@ -51,16 +57,15 @@ impl<const S: usize> Position<S> {
                 .drain(..)
                 .zip(feature_sets)
                 .map(|(mv, features)| {
-                    let offset = inverse_sigmoid(1.0 / num_moves as f32);
-
-                    let total_value: f32 =
-                        features.iter().zip(params).map(|(c, p)| c * p).sum::<f32>() + offset;
+                    let mut input_tensor: Tensor<(Const<1>, Const<NUM_POLICY_FEATURES_6S>)> =
+                        cpu.zeros();
+                    input_tensor.copy_from(&features);
+                    let prediction = policy_model.forward(input_tensor);
 
                     for c in features.iter_mut() {
                         *c = 0.0;
                     }
-
-                    (mv, sigmoid(total_value))
+                    (mv, prediction.array()[0][0])
                 }),
         );
 

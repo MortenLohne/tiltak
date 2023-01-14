@@ -90,7 +90,7 @@ pub fn gradient_descent_dfdx<const B: usize, const N: usize, E: Dtype, M>(
         if i_epoch % 20 == 0 {
             model
                 .save(format!(
-                    "value_model_g6_B{}_16_v{}_lr{:05}.zip",
+                    "policy_model_g6_B{}_16_v{}_lr{:05}.zip",
                     B,
                     i_epoch / 20,
                     (learning_rate * 10000.0) as i32

@@ -481,25 +481,31 @@ pub fn tune_value_and_policy<const S: usize, const N: usize, const M: usize>(
         &policy_training_samples,
         &mut cpu,
         &mut model,
-        0.1,
+        0.2,
     );
     gradient_descent::gradient_descent_dfdx::<1000, M, _, _>(
         &policy_training_samples,
         &mut cpu,
         &mut model,
-        0.01,
+        0.02,
     );
     gradient_descent::gradient_descent_dfdx::<1000, M, _, _>(
         &policy_training_samples,
         &mut cpu,
         &mut model,
-        0.001,
+        0.002,
     );
     gradient_descent::gradient_descent_dfdx::<1000, M, _, _>(
         &policy_training_samples,
         &mut cpu,
         &mut model,
-        0.0001,
+        0.0002,
+    );
+    gradient_descent::gradient_descent_dfdx::<1000, M, _, _>(
+        &policy_training_samples,
+        &mut cpu,
+        &mut model,
+        0.00002,
     );
 
     let filename = "policy_model.zip";

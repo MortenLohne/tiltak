@@ -9,7 +9,9 @@ use dfdx::tensor::Cpu;
 use serde::{Deserialize, Serialize};
 use std::{mem, time};
 
+use crate::evaluation::parameters::PolicyModel;
 use crate::evaluation::parameters::ValueModel;
+use crate::evaluation::parameters::NUM_POLICY_FEATURES_6S;
 use crate::evaluation::parameters::NUM_VALUE_FEATURES_6S;
 use crate::position::Move;
 use crate::position::Position;
@@ -35,8 +37,9 @@ pub enum TimeControl {
 #[derive(Clone, Debug)]
 pub struct MctsSetting<const S: usize> {
     arena_size: u32,
-    cpu: Cpu,
+    pub cpu: Cpu,
     value_params: ValueModel<NUM_VALUE_FEATURES_6S>, // TODO: Generic
+    pub policy_model: PolicyModel<NUM_POLICY_FEATURES_6S>,
     policy_params: Vec<f32>,
     search_params: Vec<Score>,
     dirichlet: Option<f32>,
@@ -50,10 +53,13 @@ impl<const S: usize> Default for MctsSetting<S> {
         let cpu: Cpu = Default::default(); // TODO: Hard-coded stuff
         let mut value_params: ValueModel<NUM_VALUE_FEATURES_6S> = cpu.build_module();
         value_params.load("model_49811.zip").unwrap();
+        let mut policy_model: PolicyModel<NUM_POLICY_FEATURES_6S> = cpu.build_module();
+        policy_model.load("policy_model_0037861.zip").unwrap();
         MctsSetting {
             arena_size: 2_u32.pow(26), // Default to 1.5GB max
             cpu,
             value_params,
+            policy_model,
             policy_params: Vec::from(<Position<S>>::policy_params()),
             search_params: vec![1.43, 2800.0, 0.61],
             dirichlet: None,

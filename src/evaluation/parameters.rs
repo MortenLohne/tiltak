@@ -1,4 +1,4 @@
-use dfdx::prelude::{Linear, ReLU, Tanh};
+use dfdx::prelude::{Linear, ReLU, Sigmoid, Tanh};
 
 use crate::position::{num_line_symmetries, num_square_symmetries};
 
@@ -18,9 +18,9 @@ pub type ValueModel<const N: usize> = (
 );
 
 pub type PolicyModel<const N: usize> = (
-    (Linear<N, 16>, ReLU),
-    (Linear<16, 16>, ReLU),
-    (Linear<16, 1>, Tanh),
+    (Linear<N, 8>, ReLU),
+    (Linear<8, 8>, ReLU),
+    (Linear<8, 1>, Sigmoid),
 );
 
 #[derive(Debug)]

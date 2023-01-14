@@ -31,8 +31,9 @@ pub(crate) use utils::AbstractBoard;
 pub use mv::{Move, ReverseMove};
 
 use crate::evaluation::parameters::{
-    ValueFeatures, ValueModel, NUM_VALUE_FEATURES_6S, POLICY_PARAMS_4S, POLICY_PARAMS_5S,
-    POLICY_PARAMS_6S, VALUE_PARAMS_4S, VALUE_PARAMS_5S, VALUE_PARAMS_6S,
+    PolicyModel, ValueFeatures, ValueModel, NUM_POLICY_FEATURES_6S, NUM_VALUE_FEATURES_6S,
+    POLICY_PARAMS_4S, POLICY_PARAMS_5S, POLICY_PARAMS_6S, VALUE_PARAMS_4S, VALUE_PARAMS_5S,
+    VALUE_PARAMS_6S,
 };
 use crate::evaluation::value_eval;
 use crate::position::color_trait::ColorTr;
@@ -950,8 +951,9 @@ impl<const S: usize> Position<S> {
 
     pub fn generate_moves_with_params(
         &self,
-        params: &[f32],
         group_data: &GroupData<S>,
+        cpu: &Cpu,
+        policy_model: &PolicyModel<NUM_POLICY_FEATURES_6S>,
         simple_moves: &mut Vec<<Self as PositionTrait>::Move>,
         moves: &mut Vec<(<Self as PositionTrait>::Move, f32)>,
         features: &mut Vec<Box<[f32]>>,
@@ -960,14 +962,16 @@ impl<const S: usize> Position<S> {
         self.generate_moves(simple_moves);
         match self.side_to_move() {
             Color::White => self.generate_moves_with_probabilities_colortr::<WhiteTr, BlackTr>(
-                params,
+                cpu,
+                policy_model,
                 group_data,
                 simple_moves,
                 moves,
                 features,
             ),
             Color::Black => self.generate_moves_with_probabilities_colortr::<BlackTr, WhiteTr>(
-                params,
+                cpu,
+                policy_model,
                 group_data,
                 simple_moves,
                 moves,
@@ -985,13 +989,16 @@ impl<const S: usize> Position<S> {
     pub fn generate_moves_with_probabilities(
         &self,
         group_data: &GroupData<S>,
+        cpu: &Cpu,
+        policy_model: &PolicyModel<NUM_POLICY_FEATURES_6S>,
         simple_moves: &mut Vec<Move>,
         moves: &mut Vec<(Move, search::Score)>,
         features: &mut Vec<Box<[f32]>>,
     ) {
         self.generate_moves_with_params(
-            Self::policy_params(),
             group_data,
+            cpu,
+            policy_model,
             simple_moves,
             moves,
             features,
