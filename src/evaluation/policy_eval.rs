@@ -117,7 +117,7 @@ impl<const S: usize> Position<S> {
             }
         }
         if immediate_win_exists {
-            for features_set in feature_sets {
+            for features_set in feature_sets.iter_mut().take(moves.len()) {
                 if !has_immediate_win(features_set) {
                     features_set.decline_win[0] = 1.0;
                 }
