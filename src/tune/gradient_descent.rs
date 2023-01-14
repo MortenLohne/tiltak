@@ -87,16 +87,7 @@ pub fn gradient_descent_dfdx<const B: usize, const N: usize, E: Dtype, M>(
             num_batches as f32 / dur.as_secs_f32(),
             total_epoch_loss / num_batches as f32,
         );
-        if i_epoch % 20 == 0 {
-            model
-                .save(format!(
-                    "policy_model_g6_B{}_16_v{}_lr{:05}.zip",
-                    B,
-                    i_epoch / 20,
-                    (learning_rate * 10000.0) as i32
-                ))
-                .unwrap();
-        }
+        if i_epoch % 20 == 0 {}
         if total_epoch_loss < best_epoch_loss {
             best_epoch_loss = total_epoch_loss;
             best_epoch = i_epoch;
@@ -113,6 +104,13 @@ pub fn gradient_descent_dfdx<const B: usize, const N: usize, E: Dtype, M>(
         }
     }
 
+    model
+        .save(format!(
+            "policy_model_2x2_B{}_16_lr{:05}.zip",
+            B,
+            (learning_rate * 10000.0) as i32
+        ))
+        .unwrap();
     println!("Finished in {:.1}s", first_start.elapsed().as_secs_f32());
 
     model.save("model.model").unwrap();

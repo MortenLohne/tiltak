@@ -508,7 +508,7 @@ pub fn tune_value_and_policy<const S: usize, const N: usize, const M: usize>(
         0.00002,
     );
 
-    let filename = "policy_model.zip";
+    let filename = "policy_model_2x2.zip";
     model.save(filename)?;
     println!("Saved parameters to {}", filename);
 
