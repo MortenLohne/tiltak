@@ -149,6 +149,7 @@ fn main() {
             }
             "mem_usage" => mem_usage(),
             "bench" => bench(),
+            "bench_policy" => bench_policy(),
             "selfplay" => mcts_selfplay(time::Duration::from_secs(10)),
             s => println!("Unknown option \"{}\"", s),
         }
@@ -561,6 +562,66 @@ fn play_human(mut position: Position<5>) {
         Some(GameResult::BlackWin) => println!("Black won! Board:\n{:?}", position),
         Some(GameResult::Draw) => println!("The game was drawn! Board:\n{:?}", position),
     }
+}
+
+fn bench_policy() {
+    const DEPTH: u16 = 4;
+    let start_time = time::Instant::now();
+    let mut position: Position<6> = Position::from_fen(
+        "x2,2,x3/1,1112,1,1,1,x/x2,212,x,1,1/2,12C,21C,x,2,x/x,1,2,1,2,2/2,1,2,x3 1 19",
+    )
+    .unwrap();
+
+    let settings: MctsSetting<6> = MctsSetting::default();
+    let mut simple_moves = vec![];
+    let mut features = vec![];
+
+    let num_nodes = recurse(
+        &mut position,
+        DEPTH,
+        &settings,
+        &mut simple_moves,
+        &mut features,
+    );
+
+    fn recurse(
+        position: &mut Position<6>,
+        depth: u16,
+        settings: &MctsSetting<6>,
+        simple_moves: &mut Vec<Move>,
+        features: &mut Vec<Box<[f32]>>,
+    ) -> u64 {
+        let mut moves = vec![];
+        let group_data = position.group_data();
+        if position.game_result_with_group_data(&group_data).is_some() {
+            return 1;
+        }
+        position.generate_moves_with_probabilities(
+            &group_data,
+            &settings.cpu,
+            &settings.policy_model,
+            simple_moves,
+            &mut moves,
+            features,
+        );
+
+        let mut num_nodes = moves.len() as u64;
+        if depth > 1 {
+            for (mv, _score) in moves {
+                let reverse_move = position.do_move(mv);
+                num_nodes += recurse(position, depth - 1, settings, simple_moves, features);
+                position.reverse_move(reverse_move);
+            }
+        }
+        num_nodes
+    }
+    let elapsed = start_time.elapsed().as_secs_f64();
+    println!(
+        "{} moves generated in {:.1}s, {:.0} moves/s",
+        num_nodes,
+        elapsed,
+        (num_nodes as f64) / elapsed
+    );
 }
 
 fn bench() {

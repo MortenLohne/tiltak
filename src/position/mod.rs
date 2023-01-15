@@ -804,10 +804,7 @@ impl<const S: usize> Position<S> {
         }
     }
 
-    pub(crate) fn game_result_with_group_data(
-        &self,
-        group_data: &GroupData<S>,
-    ) -> Option<GameResult> {
+    pub fn game_result_with_group_data(&self, group_data: &GroupData<S>) -> Option<GameResult> {
         self.detailed_game_result(group_data)
             .map(|result| result.game_result())
     }
