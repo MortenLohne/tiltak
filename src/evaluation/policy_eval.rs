@@ -2,7 +2,7 @@ use crate::evaluation::parameters;
 use arrayvec::ArrayVec;
 use board_game_traits::{Color, GameResult, Position as PositionTrait};
 use dfdx::prelude::Module;
-use dfdx::shapes::Const;
+use dfdx::shapes::Rank2;
 use dfdx::tensor::{AsArray, Cpu, Tensor, ZerosTensor};
 
 use crate::evaluation::parameters::PolicyFeatures;
@@ -29,6 +29,30 @@ pub fn inverse_sigmoid(x: f32) -> f32 {
     f32::ln(x / (1.0 - x))
 }
 
+pub fn process_batch<const N: usize, const B: usize>(
+    samples: &mut [Box<[f32]>],
+    simple_moves: &[Move],
+    moves: &mut Vec<(Move, f32)>,
+    start_index: usize,
+    cpu: &Cpu,
+    policy_model: &PolicyModel<N>,
+) {
+    let mut input_data: Vec<f32> = Vec::with_capacity(B * N);
+    let mut input_tensor: Tensor<Rank2<B, N>> = cpu.zeros();
+    assert!(samples.len() >= start_index + B);
+    for sample in samples.iter_mut().skip(start_index).take(B) {
+        input_data.extend(sample.iter());
+        for c in sample.iter_mut() {
+            *c = 0.0;
+        }
+    }
+    input_tensor.copy_from(&input_data);
+
+    let prediction = policy_model.forward(input_tensor).array();
+
+    moves.extend((0..B).map(|i| (simple_moves[i + start_index].clone(), prediction[i][0])));
+}
+
 impl<const S: usize> Position<S> {
     pub(crate) fn generate_moves_with_probabilities_colortr<Us: ColorTr, Them: ColorTr>(
         &self,
@@ -52,22 +76,46 @@ impl<const S: usize> Position<S> {
 
         self.features_for_moves(&mut policy_feature_sets, simple_moves, group_data);
 
-        moves.extend(
-            simple_moves
-                .drain(..)
-                .zip(feature_sets)
-                .map(|(mv, features)| {
-                    let mut input_tensor: Tensor<(Const<1>, Const<NUM_POLICY_FEATURES_6S>)> =
-                        cpu.zeros();
-                    input_tensor.copy_from(&features);
-                    let prediction = policy_model.forward(input_tensor);
+        let mut i = 0;
+        loop {
+            if i + 16 <= simple_moves.len() {
+                process_batch::<NUM_POLICY_FEATURES_6S, 16>(
+                    feature_sets,
+                    simple_moves,
+                    moves,
+                    i,
+                    cpu,
+                    policy_model,
+                );
+                i += 16;
+            } else if i + 4 <= simple_moves.len() {
+                process_batch::<NUM_POLICY_FEATURES_6S, 4>(
+                    feature_sets,
+                    simple_moves,
+                    moves,
+                    i,
+                    cpu,
+                    policy_model,
+                );
+                i += 4;
+            } else if i + 1 <= simple_moves.len() {
+                process_batch::<NUM_POLICY_FEATURES_6S, 1>(
+                    feature_sets,
+                    simple_moves,
+                    moves,
+                    i,
+                    cpu,
+                    policy_model,
+                );
+                i += 1;
+            } else {
+                break;
+            }
+        }
 
-                    for c in features.iter_mut() {
-                        *c = 0.0;
-                    }
-                    (mv, prediction.array()[0][0])
-                }),
-        );
+        assert_eq!(simple_moves.len(), i);
+
+        simple_moves.clear();
 
         let score_sum: f32 = moves.iter().map(|(_mv, score)| *score).sum();
 
