@@ -240,9 +240,18 @@ fn main() {
                 },
             ];
             match size {
-                4 => spsa::tune::<4>(&mut variables, arg.value_of("book")),
-                5 => spsa::tune::<5>(&mut variables, arg.value_of("book")),
-                6 => spsa::tune::<6>(&mut variables, arg.value_of("book")),
+                4 => spsa::tune::<4, NUM_VALUE_FEATURES_4S, NUM_POLICY_FEATURES_4S>(
+                    &mut variables,
+                    arg.value_of("book"),
+                ),
+                5 => spsa::tune::<5, NUM_VALUE_FEATURES_5S, NUM_POLICY_FEATURES_5S>(
+                    &mut variables,
+                    arg.value_of("book"),
+                ),
+                6 => spsa::tune::<6, NUM_VALUE_FEATURES_6S, NUM_POLICY_FEATURES_6S>(
+                    &mut variables,
+                    arg.value_of("book"),
+                ),
                 _ => panic!("Size {} not supported.", size),
             }
         }

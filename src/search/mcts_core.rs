@@ -74,10 +74,10 @@ impl TreeEdge {
     ///
     /// Moves done on the board are not reversed.
     #[must_use]
-    pub fn select<const S: usize>(
+    pub fn select<const S: usize, const N: usize, const M: usize>(
         &mut self,
         position: &mut Position<S>,
-        settings: &MctsSetting<S>,
+        settings: &MctsSetting<S, N, M>,
         temp_vectors: &mut TempVectors,
         arena: &Arena,
     ) -> Option<Score> {
@@ -140,7 +140,8 @@ impl TreeEdge {
                 .unwrap();
 
             position.do_move(child_edge.mv.clone());
-            let result = 1.0 - child_edge.select::<S>(position, settings, temp_vectors, arena)?;
+            let result =
+                1.0 - child_edge.select::<S, N, M>(position, settings, temp_vectors, arena)?;
             self.visits += 1;
 
             node.total_action_value += result as f64;
@@ -153,10 +154,10 @@ impl TreeEdge {
     // Never inline, for profiling purposes
     #[inline(never)]
     #[must_use]
-    fn expand<const S: usize>(
+    fn expand<const S: usize, const N: usize, const M: usize>(
         &mut self,
         position: &mut Position<S>,
-        settings: &MctsSetting<S>,
+        settings: &MctsSetting<S, N, M>,
         temp_vectors: &mut TempVectors,
         arena: &Arena,
     ) -> Option<Score> {
@@ -186,11 +187,11 @@ impl Tree {
     /// Never inline, for profiling purposes
     #[inline(never)]
     #[must_use]
-    fn init_children<const S: usize>(
+    fn init_children<const S: usize, const N: usize, const M: usize>(
         &mut self,
         position: &Position<S>,
         group_data: &GroupData<S>,
-        settings: &MctsSetting<S>,
+        settings: &MctsSetting<S, N, M>,
         temp_vectors: &mut TempVectors,
         arena: &Arena,
     ) -> Option<()> {
@@ -251,9 +252,9 @@ impl Tree {
 /// Higher depths are mainly used for playing with reduced difficulty
 // Never inline, for profiling purposes
 #[inline(never)]
-pub fn rollout<const S: usize>(
+pub fn rollout<const S: usize, const N: usize, const M: usize>(
     position: &mut Position<S>,
-    settings: &MctsSetting<S>,
+    settings: &MctsSetting<S, N, M>,
     depth: u16,
     temp_vectors: &mut TempVectors,
 ) -> (Score, bool) {

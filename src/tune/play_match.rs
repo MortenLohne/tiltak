@@ -15,9 +15,9 @@ use crate::search::TimeControl;
 use crate::search::{MctsSetting, Score};
 
 /// Play a single training game between two parameter sets
-pub fn play_game<const S: usize>(
-    white_settings: &MctsSetting<S>,
-    black_settings: &MctsSetting<S>,
+pub fn play_game<const S: usize, const N: usize, const M: usize>(
+    white_settings: &MctsSetting<S, N, M>,
+    black_settings: &MctsSetting<S, N, M>,
     opening: &[Move],
     temperature: f64,
     time_control: &TimeControl,
@@ -44,18 +44,22 @@ pub fn play_game<const S: usize>(
         let start_time = Instant::now();
 
         let moves_scores = match (time_control, position.side_to_move()) {
-            (TimeControl::FixedNodes(_), Color::White) => {
-                search::mcts_training::<S>(position.clone(), time_control, white_settings.clone())
-            }
-            (TimeControl::FixedNodes(_), Color::Black) => {
-                search::mcts_training::<S>(position.clone(), time_control, black_settings.clone())
-            }
-            (TimeControl::Time(_, _), Color::White) => search::mcts_training::<S>(
+            (TimeControl::FixedNodes(_), Color::White) => search::mcts_training::<S, N, M>(
+                position.clone(),
+                time_control,
+                white_settings.clone(),
+            ),
+            (TimeControl::FixedNodes(_), Color::Black) => search::mcts_training::<S, N, M>(
+                position.clone(),
+                time_control,
+                black_settings.clone(),
+            ),
+            (TimeControl::Time(_, _), Color::White) => search::mcts_training::<S, N, M>(
                 position.clone(),
                 &TimeControl::Time(white_time_left, increment),
                 white_settings.clone(),
             ),
-            (TimeControl::Time(_, _), Color::Black) => search::mcts_training::<S>(
+            (TimeControl::Time(_, _), Color::Black) => search::mcts_training::<S, N, M>(
                 position.clone(),
                 &TimeControl::Time(black_time_left, increment),
                 white_settings.clone(),

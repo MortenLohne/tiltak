@@ -26,7 +26,10 @@ enum SpsaDirection {
 }
 
 /// Tune the variables indefinitely
-pub fn tune<const S: usize>(variables: &mut [Variable], book_path: Option<&str>) {
+pub fn tune<const S: usize, const N: usize, const M: usize>(
+    variables: &mut [Variable],
+    book_path: Option<&str>,
+) {
     let openings = if let Some(path) = book_path {
         openings_from_file::<S>(path).unwrap()
     } else {
@@ -38,8 +41,11 @@ pub fn tune<const S: usize>(variables: &mut [Variable], book_path: Option<&str>)
         let cloned_variables = (*mutex_variables.lock().unwrap()).to_vec();
         let mut rng = rand::rngs::StdRng::from_entropy();
 
-        let result =
-            tuning_iteration::<_, S>(&cloned_variables, &mut rng, &openings[i % openings.len()]);
+        let result = tuning_iteration::<_, S, N, M>(
+            &cloned_variables,
+            &mut rng,
+            &openings[i % openings.len()],
+        );
         {
             let mut mut_variables = mutex_variables.lock().unwrap();
             for (variable, result) in (*mut_variables).iter_mut().zip(&result) {
@@ -71,7 +77,7 @@ pub fn tune<const S: usize>(variables: &mut [Variable], book_path: Option<&str>)
 }
 
 /// Run one iteration of the SPSA algorithm
-fn tuning_iteration<R: rand::Rng, const S: usize>(
+fn tuning_iteration<R: rand::Rng, const S: usize, const N: usize, const M: usize>(
     variables: &[Variable],
     rng: &mut R,
     opening: &[Move],
@@ -91,12 +97,12 @@ fn tuning_iteration<R: rand::Rng, const S: usize>(
         .map(|(a, b)| if rng.gen() { (a, b) } else { (b, a) })
         .unzip();
 
-    let player1_settings = <MctsSetting<S>>::default()
+    let player1_settings = <MctsSetting<S, N, M>>::default()
         .add_search_params(player1_variables.iter().map(|(_, a)| *a).collect());
-    let player2_settings = <MctsSetting<S>>::default()
+    let player2_settings = <MctsSetting<S, N, M>>::default()
         .add_search_params(player2_variables.iter().map(|(_, a)| *a).collect());
 
-    let (game, _) = play_game::<S>(
+    let (game, _) = play_game::<S, N, M>(
         &player1_settings,
         &player2_settings,
         opening,

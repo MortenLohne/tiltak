@@ -31,9 +31,8 @@ pub(crate) use utils::AbstractBoard;
 pub use mv::{Move, ReverseMove};
 
 use crate::evaluation::parameters::{
-    PolicyModel, ValueFeatures, ValueModel, NUM_POLICY_FEATURES_6S, NUM_VALUE_FEATURES_6S,
-    POLICY_PARAMS_4S, POLICY_PARAMS_5S, POLICY_PARAMS_6S, VALUE_PARAMS_4S, VALUE_PARAMS_5S,
-    VALUE_PARAMS_6S,
+    PolicyModel, ValueFeatures, ValueModel, POLICY_PARAMS_4S, POLICY_PARAMS_5S, POLICY_PARAMS_6S,
+    VALUE_PARAMS_4S, VALUE_PARAMS_5S, VALUE_PARAMS_6S,
 };
 use crate::evaluation::value_eval;
 use crate::position::color_trait::ColorTr;
@@ -900,18 +899,18 @@ impl<const S: usize> Position<S> {
         suicide_win_square
     }
 
-    pub(crate) fn static_eval_with_params_and_data(
+    pub(crate) fn static_eval_with_params_and_data<const N: usize>(
         &self,
         group_data: &GroupData<S>,
         cpu: &Cpu,
-        model: &ValueModel<NUM_VALUE_FEATURES_6S>,
+        model: &ValueModel<N>,
         features: &mut [f32],
     ) -> f32 {
         let mut value_features = ValueFeatures::new::<S>(features);
         value_eval::static_eval_game_phase(self, group_data, &mut value_features);
 
-        let mut input_tensor: Tensor<(Const<1>, Const<NUM_VALUE_FEATURES_6S>)> = cpu.zeros();
-        input_tensor.copy_from(&features);
+        let mut input_tensor: Tensor<(Const<1>, Const<N>)> = cpu.zeros();
+        input_tensor.copy_from(features);
         let prediction = model.forward(input_tensor);
 
         for c in features.iter_mut() {
@@ -946,11 +945,11 @@ impl<const S: usize> Position<S> {
         value_eval::static_eval_game_phase(self, &group_data, &mut value_features);
     }
 
-    pub fn generate_moves_with_params(
+    pub fn generate_moves_with_params<const N: usize>(
         &self,
         group_data: &GroupData<S>,
         cpu: &Cpu,
-        policy_model: &PolicyModel<NUM_POLICY_FEATURES_6S>,
+        policy_model: &PolicyModel<N>,
         simple_moves: &mut Vec<<Self as PositionTrait>::Move>,
         moves: &mut Vec<(<Self as PositionTrait>::Move, f32)>,
         features: &mut Vec<Box<[f32]>>,
@@ -958,7 +957,7 @@ impl<const S: usize> Position<S> {
         debug_assert!(simple_moves.is_empty());
         self.generate_moves(simple_moves);
         match self.side_to_move() {
-            Color::White => self.generate_moves_with_probabilities_colortr::<WhiteTr, BlackTr>(
+            Color::White => self.generate_moves_with_probabilities_colortr::<N, WhiteTr, BlackTr>(
                 cpu,
                 policy_model,
                 group_data,
@@ -966,7 +965,7 @@ impl<const S: usize> Position<S> {
                 moves,
                 features,
             ),
-            Color::Black => self.generate_moves_with_probabilities_colortr::<BlackTr, WhiteTr>(
+            Color::Black => self.generate_moves_with_probabilities_colortr::<N, BlackTr, WhiteTr>(
                 cpu,
                 policy_model,
                 group_data,
@@ -983,11 +982,11 @@ impl<const S: usize> Position<S> {
     ///
     /// * `simple_moves` - An empty vector to temporarily store moves without probabilities. The vector will be emptied before the function returns, and only serves to re-use allocated memory.
     /// * `moves` A vector to place the moves and associated probabilities.
-    pub fn generate_moves_with_probabilities(
+    pub fn generate_moves_with_probabilities<const N: usize>(
         &self,
         group_data: &GroupData<S>,
         cpu: &Cpu,
-        policy_model: &PolicyModel<NUM_POLICY_FEATURES_6S>,
+        policy_model: &PolicyModel<N>,
         simple_moves: &mut Vec<Move>,
         moves: &mut Vec<(Move, search::Score)>,
         features: &mut Vec<Box<[f32]>>,

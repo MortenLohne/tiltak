@@ -4,6 +4,10 @@ use std::io::{BufRead, BufReader};
 use std::str::FromStr;
 use std::time::{Duration, Instant};
 use std::{env, io};
+use tiltak::evaluation::parameters::{
+    NUM_POLICY_FEATURES_4S, NUM_POLICY_FEATURES_5S, NUM_POLICY_FEATURES_6S, NUM_VALUE_FEATURES_4S,
+    NUM_VALUE_FEATURES_5S, NUM_VALUE_FEATURES_6S,
+};
 use tiltak::position::{Komi, Position};
 
 use std::any::Any;
@@ -78,17 +82,17 @@ pub fn main() {
                 }
             }
             "go" => match size {
-                Some(4) => parse_go_string::<4>(
+                Some(4) => parse_go_string::<4, NUM_VALUE_FEATURES_4S, NUM_POLICY_FEATURES_4S>(
                     &line,
                     position.as_ref().and_then(|p| p.downcast_ref()).unwrap(),
                     is_slatebot,
                 ),
-                Some(5) => parse_go_string::<5>(
+                Some(5) => parse_go_string::<5, NUM_VALUE_FEATURES_5S, NUM_POLICY_FEATURES_5S>(
                     &line,
                     position.as_ref().and_then(|p| p.downcast_ref()).unwrap(),
                     is_slatebot,
                 ),
-                Some(6) => parse_go_string::<6>(
+                Some(6) => parse_go_string::<6, NUM_VALUE_FEATURES_6S, NUM_POLICY_FEATURES_6S>(
                     &line,
                     position.as_ref().and_then(|p| p.downcast_ref()).unwrap(),
                     is_slatebot,
@@ -125,11 +129,15 @@ fn parse_position_string<const S: usize>(line: &str, komi: Komi) -> Position<S> 
     position
 }
 
-fn parse_go_string<const S: usize>(line: &str, position: &Position<S>, is_slatebot: bool) {
+fn parse_go_string<const S: usize, const N: usize, const M: usize>(
+    line: &str,
+    position: &Position<S>,
+    is_slatebot: bool,
+) {
     let mut words = line.split_whitespace();
     words.next(); // go
 
-    let mcts_settings = if is_slatebot {
+    let mcts_settings: MctsSetting<S, N, M> = if is_slatebot {
         MctsSetting::default().add_rollout_depth(200)
     } else {
         MctsSetting::default()

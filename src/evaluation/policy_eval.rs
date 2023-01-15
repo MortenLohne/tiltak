@@ -16,7 +16,7 @@ use crate::position::{squares_iterator, Move};
 use crate::position::{GroupEdgeConnection, Square};
 use crate::search;
 
-use super::parameters::{PolicyModel, NUM_POLICY_FEATURES_6S};
+use super::parameters::PolicyModel;
 
 const POLICY_BASELINE: f32 = 0.05;
 
@@ -54,10 +54,14 @@ pub fn process_batch<const N: usize, const B: usize>(
 }
 
 impl<const S: usize> Position<S> {
-    pub(crate) fn generate_moves_with_probabilities_colortr<Us: ColorTr, Them: ColorTr>(
+    pub(crate) fn generate_moves_with_probabilities_colortr<
+        const N: usize,
+        Us: ColorTr,
+        Them: ColorTr,
+    >(
         &self,
         cpu: &Cpu,
-        policy_model: &PolicyModel<NUM_POLICY_FEATURES_6S>,
+        policy_model: &PolicyModel<N>,
         group_data: &GroupData<S>,
         simple_moves: &mut Vec<Move>,
         moves: &mut Vec<(Move, search::Score)>,
@@ -79,34 +83,13 @@ impl<const S: usize> Position<S> {
         let mut i = 0;
         loop {
             if i + 16 <= simple_moves.len() {
-                process_batch::<NUM_POLICY_FEATURES_6S, 16>(
-                    feature_sets,
-                    simple_moves,
-                    moves,
-                    i,
-                    cpu,
-                    policy_model,
-                );
+                process_batch::<N, 16>(feature_sets, simple_moves, moves, i, cpu, policy_model);
                 i += 16;
             } else if i + 4 <= simple_moves.len() {
-                process_batch::<NUM_POLICY_FEATURES_6S, 4>(
-                    feature_sets,
-                    simple_moves,
-                    moves,
-                    i,
-                    cpu,
-                    policy_model,
-                );
+                process_batch::<N, 4>(feature_sets, simple_moves, moves, i, cpu, policy_model);
                 i += 4;
-            } else if i + 1 <= simple_moves.len() {
-                process_batch::<NUM_POLICY_FEATURES_6S, 1>(
-                    feature_sets,
-                    simple_moves,
-                    moves,
-                    i,
-                    cpu,
-                    policy_model,
-                );
+            } else if i < simple_moves.len() {
+                process_batch::<N, 1>(feature_sets, simple_moves, moves, i, cpu, policy_model);
                 i += 1;
             } else {
                 break;

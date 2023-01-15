@@ -11,8 +11,6 @@ use std::{mem, time};
 
 use crate::evaluation::parameters::PolicyModel;
 use crate::evaluation::parameters::ValueModel;
-use crate::evaluation::parameters::NUM_POLICY_FEATURES_6S;
-use crate::evaluation::parameters::NUM_VALUE_FEATURES_6S;
 use crate::position::Move;
 use crate::position::Position;
 use crate::position::{Role, Square};
@@ -35,11 +33,11 @@ pub enum TimeControl {
 }
 
 #[derive(Clone, Debug)]
-pub struct MctsSetting<const S: usize> {
+pub struct MctsSetting<const S: usize, const N: usize, const M: usize> {
     arena_size: u32,
     pub cpu: Cpu,
-    value_params: ValueModel<NUM_VALUE_FEATURES_6S>, // TODO: Generic
-    pub policy_model: PolicyModel<NUM_POLICY_FEATURES_6S>,
+    value_params: ValueModel<N>, // TODO: Generic
+    pub policy_model: PolicyModel<M>,
     policy_params: Vec<f32>,
     search_params: Vec<Score>,
     dirichlet: Option<f32>,
@@ -48,12 +46,12 @@ pub struct MctsSetting<const S: usize> {
     rollout_temperature: f64,
 }
 
-impl<const S: usize> Default for MctsSetting<S> {
+impl<const S: usize, const N: usize, const M: usize> Default for MctsSetting<S, N, M> {
     fn default() -> Self {
         let cpu: Cpu = Default::default(); // TODO: Hard-coded stuff
-        let mut value_params: ValueModel<NUM_VALUE_FEATURES_6S> = cpu.build_module();
+        let mut value_params: ValueModel<N> = cpu.build_module();
         value_params.load("model_49811.zip").unwrap();
-        let mut policy_model: PolicyModel<NUM_POLICY_FEATURES_6S> = cpu.build_module();
+        let mut policy_model: PolicyModel<M> = cpu.build_module();
         policy_model.load("policy_model_0037861.zip").unwrap();
         MctsSetting {
             arena_size: 2_u32.pow(26), // Default to 1.5GB max
@@ -70,12 +68,12 @@ impl<const S: usize> Default for MctsSetting<S> {
     }
 }
 
-impl<const N: usize> MctsSetting<N> {
+impl<const S: usize, const N: usize, const M: usize> MctsSetting<S, N, M> {
     /// Set a very liberal arena size, for searching a given amount of nodes
     pub fn arena_size_for_nodes(self, nodes: u32) -> Self {
         // For 6s, the toughest position I've found required 40 elements/node searched
         // This formula gives 108, which is hopefully plenty
-        self.arena_size((N * N) as u32 * 3 * nodes)
+        self.arena_size((S * S) as u32 * 3 * nodes)
     }
 
     pub fn mem_usage(self, mem_usage: usize) -> Self {
@@ -151,20 +149,20 @@ pub const ARENA_ELEMENT_SIZE: usize = 24;
 /// Abstract representation of a Monte Carlo Search Tree.
 /// Gives more fine-grained control of the search process compared to using the `mcts` function.
 // #[derive(Clone, PartialEq, Debug)]
-pub struct MonteCarloTree<const S: usize> {
+pub struct MonteCarloTree<const S: usize, const N: usize, const M: usize> {
     edge: TreeEdge, // A virtual edge to the first node, with fake move and heuristic score
     position: Position<S>,
-    settings: MctsSetting<S>,
+    settings: MctsSetting<S, N, M>,
     temp_vectors: TempVectors,
     arena: Arena,
 }
 
-impl<const S: usize> MonteCarloTree<S> {
+impl<const S: usize, const N: usize, const M: usize> MonteCarloTree<S, N, M> {
     pub fn new(position: Position<S>) -> Self {
         Self::with_settings(position, MctsSetting::default())
     }
 
-    pub fn with_settings(position: Position<S>, settings: MctsSetting<S>) -> Self {
+    pub fn with_settings(position: Position<S>, settings: MctsSetting<S, N, M>) -> Self {
         let arena = Arena::new(settings.arena_size).unwrap();
         let mut temp_vectors = TempVectors::new::<S>();
         let mut root_edge = TreeEdge {
@@ -291,7 +289,7 @@ impl<const S: usize> MonteCarloTree<S> {
     /// Run one iteration of MCTS
     #[must_use]
     pub fn select(&mut self) -> Option<f32> {
-        self.edge.select::<S>(
+        self.edge.select::<S, N, M>(
             &mut self.position.clone(),
             &self.settings,
             &mut self.temp_vectors,
@@ -384,8 +382,11 @@ impl<const S: usize> MonteCarloTree<S> {
 }
 
 /// The simplest way to use the mcts module. Run Monte Carlo Tree Search for `nodes` nodes, returning the best move, and its estimated winning probability for the side to move.
-pub fn mcts<const S: usize>(position: Position<S>, nodes: u64) -> (Move, Score) {
-    let settings = MctsSetting::default().arena_size_for_nodes(nodes as u32);
+pub fn mcts<const S: usize, const N: usize, const M: usize>(
+    position: Position<S>,
+    nodes: u64,
+) -> (Move, Score) {
+    let settings: MctsSetting<S, N, M> = MctsSetting::default().arena_size_for_nodes(nodes as u32);
     let mut tree = MonteCarloTree::with_settings(position, settings);
 
     for _ in 0..nodes.max(2) {
@@ -398,10 +399,10 @@ pub fn mcts<const S: usize>(position: Position<S>, nodes: u64) -> (Move, Score) 
 /// Play a move, calculating for a maximum duration.
 /// It will usually spend much less time, especially if the move is obvious.
 /// On average, it will spend around 20% of `max_time`, and rarely more than 50%.
-pub fn play_move_time<const S: usize>(
+pub fn play_move_time<const S: usize, const N: usize, const M: usize>(
     board: Position<S>,
     max_time: time::Duration,
-    settings: MctsSetting<S>,
+    settings: MctsSetting<S, N, M>,
 ) -> (Move, Score) {
     let mut tree = MonteCarloTree::with_settings(board, settings);
     tree.search_for_time(max_time, |_| {});
@@ -410,10 +411,10 @@ pub fn play_move_time<const S: usize>(
 
 /// Run mcts with specific static evaluation parameters, for optimization the parameter set.
 /// Also applies Dirichlet noise to the root node
-pub fn mcts_training<const S: usize>(
+pub fn mcts_training<const S: usize, const N: usize, const M: usize>(
     position: Position<S>,
     time_control: &TimeControl,
-    settings: MctsSetting<S>,
+    settings: MctsSetting<S, N, M>,
 ) -> Vec<(Move, Score)> {
     let mut tree = MonteCarloTree::with_settings(position, settings);
 

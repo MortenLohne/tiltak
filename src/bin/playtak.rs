@@ -19,6 +19,10 @@ use rand::seq::SliceRandom;
 use rand::Rng;
 #[cfg(feature = "aws-lambda-client")]
 use tiltak::aws;
+use tiltak::evaluation::parameters::{
+    NUM_POLICY_FEATURES_4S, NUM_POLICY_FEATURES_5S, NUM_POLICY_FEATURES_6S, NUM_VALUE_FEATURES_4S,
+    NUM_VALUE_FEATURES_5S, NUM_VALUE_FEATURES_6S,
+};
 use tiltak::position;
 use tiltak::position::{squares_iterator, Move, Role, Square};
 use tiltak::position::{Komi, Position};
@@ -42,7 +46,9 @@ pub struct PlaytakSettings {
 }
 
 impl PlaytakSettings {
-    pub fn to_mcts_setting<const S: usize>(&self) -> MctsSetting<S> {
+    pub fn to_mcts_setting<const S: usize, const N: usize, const M: usize>(
+        &self,
+    ) -> MctsSetting<S, N, M> {
         if let Some(dirichlet) = self.dirichlet_noise {
             MctsSetting::default()
                 .add_dirichlet(dirichlet)
@@ -282,9 +288,18 @@ pub fn main() -> Result<()> {
         let error = match matches.value_of("playBot") {
             Some(bot_name) => {
                 match match size {
-                    4 => session.accept_seek::<4>(playtak_settings, bot_name),
-                    5 => session.accept_seek::<5>(playtak_settings, bot_name),
-                    6 => session.accept_seek::<6>(playtak_settings, bot_name),
+                    4 => session.accept_seek::<4, NUM_VALUE_FEATURES_4S, NUM_POLICY_FEATURES_4S>(
+                        playtak_settings,
+                        bot_name,
+                    ),
+                    5 => session.accept_seek::<5, NUM_VALUE_FEATURES_5S, NUM_POLICY_FEATURES_5S>(
+                        playtak_settings,
+                        bot_name,
+                    ),
+                    6 => session.accept_seek::<6, NUM_VALUE_FEATURES_6S, NUM_POLICY_FEATURES_6S>(
+                        playtak_settings,
+                        bot_name,
+                    ),
                     s => panic!("Unsupported size {}", s),
                 } {
                     Ok(_game) => return Ok(()),
@@ -590,17 +605,17 @@ impl PlaytakSession {
                         playtak_settings.seek_increment,
                     );
                     let (updated_seek_size, updated_seek_color) = match playtak_game.size {
-                        4 => self.play_game::<4>(
+                        4 => self.play_game::<4, NUM_VALUE_FEATURES_4S, NUM_POLICY_FEATURES_4S>(
                             playtak_game,
                             playtak_settings,
                             restoring_previous_session,
                         )?,
-                        5 => self.play_game::<5>(
+                        5 => self.play_game::<5, NUM_VALUE_FEATURES_5S, NUM_POLICY_FEATURES_5S>(
                             playtak_game,
                             playtak_settings,
                             restoring_previous_session,
                         )?,
-                        6 => self.play_game::<6>(
+                        6 => self.play_game::<6, NUM_VALUE_FEATURES_6S, NUM_POLICY_FEATURES_6S>(
                             playtak_game,
                             playtak_settings,
                             restoring_previous_session,
@@ -656,7 +671,7 @@ impl PlaytakSession {
         }
     }
 
-    pub fn accept_seek<const S: usize>(
+    pub fn accept_seek<const S: usize, const N: usize, const M: usize>(
         &mut self,
         playtak_settings: PlaytakSettings,
         bot_name: &str,
@@ -673,7 +688,7 @@ impl PlaytakSession {
             match words[0] {
                 "Game" => {
                     let playtak_game = PlaytakGame::from_playtak_game_words(&words, increment);
-                    self.play_game::<S>(playtak_game, playtak_settings, false)?;
+                    self.play_game::<S, N, M>(playtak_game, playtak_settings, false)?;
                     return Ok(());
                 }
 
@@ -698,7 +713,7 @@ impl PlaytakSession {
 
     /// The main game loop of a playtak game.
     /// Mutually recursive with `seek_game`, which places a new seek as soon as the game finishes.
-    fn play_game<const S: usize>(
+    fn play_game<const S: usize, const N: usize, const M: usize>(
         &mut self,
         game: PlaytakGame,
         playtak_settings: PlaytakSettings,
@@ -736,7 +751,7 @@ impl PlaytakSession {
                         ];
                         (moves.choose(&mut rng).unwrap().clone(), 0.0)
                     } else if let Some(fixed_nodes) = playtak_settings.fixed_nodes {
-                        let settings =
+                        let settings: MctsSetting<S, N, M> =
                             playtak_settings.to_mcts_setting()
                             .arena_size_for_nodes(fixed_nodes as u32);
                         let mut tree = search::MonteCarloTree::with_settings(position.clone(), settings);
@@ -786,7 +801,7 @@ impl PlaytakSession {
 
                         #[cfg(not(feature = "aws-lambda-client"))]
                         {
-                            let settings =
+                            let settings: MctsSetting<S, N, M> =
                                 playtak_settings.to_mcts_setting()
                                 .arena_size(2_u32.pow(31));
 

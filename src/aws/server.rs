@@ -1,4 +1,8 @@
 use crate::aws::{Event, Output, TimeControl};
+use crate::evaluation::parameters::{
+    NUM_POLICY_FEATURES_4S, NUM_POLICY_FEATURES_5S, NUM_POLICY_FEATURES_6S, NUM_VALUE_FEATURES_4S,
+    NUM_VALUE_FEATURES_5S, NUM_VALUE_FEATURES_6S,
+};
 use crate::position::{Komi, Position};
 use crate::search::MctsSetting;
 use crate::search::{self, MonteCarloTree};
@@ -13,14 +17,17 @@ type Error = Box<dyn std::error::Error + Sync + Send>;
 /// AWS serverside handler
 pub async fn handle_aws_event(e: Event, c: Context) -> Result<Output, Error> {
     match e.size {
-        4 => handle_aws_event_generic::<4>(e, c),
-        5 => handle_aws_event_generic::<5>(e, c),
-        6 => handle_aws_event_generic::<6>(e, c),
+        4 => handle_aws_event_generic::<4, NUM_VALUE_FEATURES_4S, NUM_POLICY_FEATURES_4S>(e, c),
+        5 => handle_aws_event_generic::<5, NUM_VALUE_FEATURES_5S, NUM_POLICY_FEATURES_5S>(e, c),
+        6 => handle_aws_event_generic::<6, NUM_VALUE_FEATURES_6S, NUM_POLICY_FEATURES_6S>(e, c),
         s => panic!("Unsupported board size {}", s),
     }
 }
 
-pub fn handle_aws_event_generic<const S: usize>(e: Event, _c: Context) -> Result<Output, Error> {
+pub fn handle_aws_event_generic<const S: usize, const N: usize, const M: usize>(
+    e: Event,
+    _c: Context,
+) -> Result<Output, Error> {
     let komi = Komi::try_from(e.komi)?;
     let mut position = match e.tps {
         Some(tps) => <Position<S>>::from_fen_with_komi(&tps, komi)?,
@@ -58,7 +65,7 @@ pub fn handle_aws_event_generic<const S: usize>(e: Event, _c: Context) -> Result
         None => (),
     }
 
-    let settings = if let Some(dirichlet) = e.dirichlet_noise {
+    let settings: MctsSetting<S, N, M> = if let Some(dirichlet) = e.dirichlet_noise {
         MctsSetting::default().add_dirichlet(dirichlet)
     } else {
         MctsSetting::default()

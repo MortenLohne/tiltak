@@ -21,7 +21,7 @@ pub fn get_batch<const N: usize, const B: usize>(
     idxs: [usize; B],
 ) -> (Tensor<Rank2<B, N>, f32, Cpu>, Tensor<Rank2<B, 1>, f32, Cpu>) {
     let mut input_data: Vec<f32> = Vec::with_capacity(B * N);
-    let mut output_data: Vec<f32> = Vec::with_capacity(B * 1);
+    let mut output_data: Vec<f32> = Vec::with_capacity(B);
     for (_batch_i, &data_index) in idxs.iter().enumerate() {
         input_data.extend(samples[data_index].features);
         output_data.push(samples[data_index].result);
@@ -66,7 +66,7 @@ pub fn gradient_descent_dfdx<const B: usize, const N: usize, E: Dtype, M>(
 
         for (test_samples, test_samples_output) in
             SubsetIterator::<B>::shuffled(samples.len(), &mut rng)
-                .map(|i| get_batch(samples, &dev, i))
+                .map(|i| get_batch(samples, dev, i))
         {
             let prediction: Tensor<(Const<B>, Const<1>), f32, Cpu, OwnedTape<Cpu>> =
                 model.forward_mut(test_samples.trace());

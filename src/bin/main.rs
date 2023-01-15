@@ -10,6 +10,10 @@ use pgn_traits::PgnPosition;
 #[cfg(feature = "constant-tuning")]
 use rayon::prelude::*;
 
+use tiltak::evaluation::parameters::{
+    NUM_POLICY_FEATURES_4S, NUM_POLICY_FEATURES_5S, NUM_POLICY_FEATURES_6S, NUM_VALUE_FEATURES_4S,
+    NUM_VALUE_FEATURES_5S, NUM_VALUE_FEATURES_6S,
+};
 use tiltak::evaluation::{parameters, value_eval};
 use tiltak::minmax;
 #[cfg(feature = "constant-tuning")]
@@ -56,22 +60,34 @@ fn main() {
                 }
             }
             "analyze" => match words.get(1) {
-                Some(&"4") => analyze_position_from_ptn::<4>(),
-                Some(&"5") => analyze_position_from_ptn::<5>(),
-                Some(&"6") => analyze_position_from_ptn::<6>(),
-                Some(&"7") => analyze_position_from_ptn::<7>(),
-                Some(&"8") => analyze_position_from_ptn::<8>(),
+                Some(&"4") => {
+                    analyze_position_from_ptn::<4, NUM_VALUE_FEATURES_4S, NUM_POLICY_FEATURES_4S>()
+                }
+                Some(&"5") => {
+                    analyze_position_from_ptn::<5, NUM_VALUE_FEATURES_5S, NUM_POLICY_FEATURES_5S>()
+                }
+                Some(&"6") => {
+                    analyze_position_from_ptn::<6, NUM_VALUE_FEATURES_6S, NUM_POLICY_FEATURES_6S>()
+                }
                 Some(s) => println!("Unsupported size {}", s),
-                None => analyze_position_from_ptn::<5>(),
+                None => {
+                    analyze_position_from_ptn::<5, NUM_VALUE_FEATURES_5S, NUM_POLICY_FEATURES_5S>()
+                }
             },
             "tps" => match words.get(1) {
-                Some(&"4") => analyze_position_from_tps::<4>(),
-                Some(&"5") => analyze_position_from_tps::<5>(),
-                Some(&"6") => analyze_position_from_tps::<6>(),
-                Some(&"7") => analyze_position_from_tps::<7>(),
-                Some(&"8") => analyze_position_from_tps::<8>(),
+                Some(&"4") => {
+                    analyze_position_from_tps::<4, NUM_VALUE_FEATURES_4S, NUM_POLICY_FEATURES_4S>()
+                }
+                Some(&"5") => {
+                    analyze_position_from_tps::<5, NUM_VALUE_FEATURES_5S, NUM_POLICY_FEATURES_5S>()
+                }
+                Some(&"6") => {
+                    analyze_position_from_tps::<6, NUM_VALUE_FEATURES_6S, NUM_POLICY_FEATURES_6S>()
+                }
                 Some(s) => println!("Unsupported size {}", s),
-                None => analyze_position_from_tps::<5>(),
+                None => {
+                    analyze_position_from_tps::<5, NUM_VALUE_FEATURES_5S, NUM_POLICY_FEATURES_5S>()
+                }
             },
             "perft" => match words.get(1) {
                 Some(&"3") => perft_from_tps::<3>(),
@@ -99,7 +115,12 @@ fn main() {
                         for mv in opening.iter() {
                             position.do_move(mv.clone());
                         }
-                        (opening, search::mcts(position, 30_000))
+                        (
+                            opening,
+                            search::mcts::<6, NUM_VALUE_FEATURES_6S, NUM_POLICY_FEATURES_6S>(
+                                position, 30_000,
+                            ),
+                        )
                     })
                     .collect();
 
@@ -117,7 +138,9 @@ fn main() {
                 }
                 return;
             }
-            "analyze_openings" => analyze_openings::<6>(6_000_000),
+            "analyze_openings" => {
+                analyze_openings::<6, NUM_VALUE_FEATURES_6S, NUM_POLICY_FEATURES_6S>(6_000_000)
+            }
             "game" => {
                 println!("Enter move list or a full PTN, then press enter followed by CTRL+D");
                 let mut input = String::new();
@@ -131,7 +154,9 @@ fn main() {
                         }
                         println!("Analyzing 1 game: ");
 
-                        analyze_game::<6>(games[0].clone());
+                        analyze_game::<6, NUM_VALUE_FEATURES_6S, NUM_POLICY_FEATURES_6S>(
+                            games[0].clone(),
+                        );
                     }
                     None | Some(&"5") => {
                         io::stdin().read_to_string(&mut input).unwrap();
@@ -142,7 +167,9 @@ fn main() {
                         }
                         println!("Analyzing 1 game: ");
 
-                        analyze_game::<5>(games[0].clone());
+                        analyze_game::<5, NUM_VALUE_FEATURES_5S, NUM_POLICY_FEATURES_5S>(
+                            games[0].clone(),
+                        );
                     }
                     Some(s) => println!("Game analysis at size {} not available", s),
                 }
@@ -156,17 +183,18 @@ fn main() {
     }
 }
 
-fn analyze_openings<const S: usize>(nodes: u32) {
+fn analyze_openings<const S: usize, const N: usize, const M: usize>(nodes: u32) {
     let mut input = String::new();
     io::stdin().read_to_string(&mut input).unwrap();
     for line in input.lines() {
-        let mut position = <Position<6>>::start_position();
+        let mut position = <Position<S>>::start_position();
         for word in line.split_whitespace() {
             let mv = position.move_from_san(word).unwrap();
             position.do_move(mv);
         }
         let start_time = time::Instant::now();
-        let settings = search::MctsSetting::default().arena_size_for_nodes(nodes);
+        let settings: MctsSetting<S, N, M> =
+            search::MctsSetting::default().arena_size_for_nodes(nodes);
         let mut tree = search::MonteCarloTree::with_settings(position.clone(), settings);
         for _ in 0..nodes {
             if tree.select().is_none() {
@@ -237,8 +265,11 @@ fn mcts_selfplay(max_time: time::Duration) {
 
     while position.game_result().is_none() {
         let start_time = time::Instant::now();
-        let (best_move, score) =
-            search::play_move_time::<5>(position.clone(), max_time, MctsSetting::default());
+        let (best_move, score) = search::play_move_time::<
+            5,
+            NUM_VALUE_FEATURES_5S,
+            NUM_POLICY_FEATURES_5S,
+        >(position.clone(), max_time, MctsSetting::default());
 
         match position.side_to_move() {
             Color::White => white_elapsed += start_time.elapsed(),
@@ -291,7 +322,11 @@ fn mcts_vs_minmax(minmax_depth: u16, mcts_nodes: u64) {
         }
         match position.side_to_move() {
             Color::Black => {
-                let (best_move, score) = search::mcts::<5>(position.clone(), mcts_nodes);
+                let (best_move, score) = search::mcts::<
+                    5,
+                    NUM_VALUE_FEATURES_5S,
+                    NUM_POLICY_FEATURES_5S,
+                >(position.clone(), mcts_nodes);
                 position.do_move(best_move.clone());
                 moves.push(best_move.clone());
                 println!("{:6}: {:.3}", best_move.to_string::<5>(), score);
@@ -325,7 +360,7 @@ fn mcts_vs_minmax(minmax_depth: u16, mcts_nodes: u64) {
     println!("\n{:?}\nResult: {:?}", position, position.game_result());
 }
 
-fn analyze_position_from_ptn<const S: usize>() {
+fn analyze_position_from_ptn<const S: usize, const N: usize, const M: usize>() {
     println!("Enter move list or a full PTN, then press enter followed by CTRL+D");
 
     let mut input = String::new();
@@ -341,18 +376,18 @@ fn analyze_position_from_ptn<const S: usize>() {
     for PtnMove { mv, .. } in games[0].moves.clone() {
         position.do_move(mv);
     }
-    analyze_position(&position)
+    analyze_position::<S, N, M>(&position)
 }
 
-fn analyze_position_from_tps<const S: usize>() {
+fn analyze_position_from_tps<const S: usize, const N: usize, const M: usize>() {
     println!("Enter TPS");
     let mut input = String::new();
     io::stdin().read_line(&mut input).unwrap();
     let position = <Position<S>>::from_fen_with_komi(&input, Komi::try_from(0.0).unwrap()).unwrap();
-    analyze_position(&position)
+    analyze_position::<S, N, M>(&position)
 }
 
-fn analyze_position<const S: usize>(position: &Position<S>) {
+fn analyze_position<const S: usize, const N: usize, const M: usize>(position: &Position<S>) {
     println!("TPS {}", position.to_fen());
     println!("{:?}", position);
 
@@ -380,7 +415,7 @@ fn analyze_position<const S: usize>(position: &Position<S>) {
     let mut simple_moves = vec![];
     let mut moves = vec![];
 
-    let settings: MctsSetting<S> = search::MctsSetting::default()
+    let settings: MctsSetting<S, N, M> = search::MctsSetting::default()
         .arena_size(2_u32.pow(31))
         .exclude_moves(vec![]);
     let start_time = time::Instant::now();
@@ -460,7 +495,7 @@ fn perft<const S: usize>(position: &mut Position<S>) {
     }
 }
 
-fn analyze_game<const S: usize>(game: Game<Position<S>>) {
+fn analyze_game<const S: usize, const N: usize, const M: usize>(game: Game<Position<S>>) {
     let mut position = game.start_position.clone();
     let mut ply_number = 2;
     for PtnMove { mv, .. } in game.moves {
@@ -488,7 +523,7 @@ fn analyze_game<const S: usize>(game: Game<Position<S>>) {
                 );
             }
         } else {
-            let (best_move, score) = search::mcts::<S>(position.clone(), 1_000_000);
+            let (best_move, score) = search::mcts::<S, N, M>(position.clone(), 1_000_000);
             if ply_number % 2 == 0 {
                 print!(
                     "{}. {} {{{:.2}%, best reply {}}} ",
@@ -550,7 +585,11 @@ fn play_human(mut position: Position<5>) {
                 let c_move = position.move_from_san(input_str.trim()).unwrap();
                 position.do_move(c_move);
             } else {
-                let (best_move, score) = search::mcts::<5>(position.clone(), 1_000_000);
+                let (best_move, score) = search::mcts::<
+                    5,
+                    NUM_VALUE_FEATURES_5S,
+                    NUM_POLICY_FEATURES_5S,
+                >(position.clone(), 1_000_000);
 
                 println!("Computer played {:?} with score {}", best_move, score);
                 position.do_move(best_move);
@@ -572,7 +611,8 @@ fn bench_policy() {
     )
     .unwrap();
 
-    let settings: MctsSetting<6> = MctsSetting::default();
+    let settings: MctsSetting<6, NUM_VALUE_FEATURES_6S, NUM_POLICY_FEATURES_6S> =
+        MctsSetting::default();
     let mut simple_moves = vec![];
     let mut features = vec![];
 
@@ -587,7 +627,7 @@ fn bench_policy() {
     fn recurse(
         position: &mut Position<6>,
         depth: u16,
-        settings: &MctsSetting<6>,
+        settings: &MctsSetting<6, NUM_VALUE_FEATURES_6S, NUM_POLICY_FEATURES_6S>,
         simple_moves: &mut Vec<Move>,
         features: &mut Vec<Box<[f32]>>,
     ) -> u64 {
@@ -630,7 +670,8 @@ fn bench() {
     {
         let position = <Position<5>>::default();
 
-        let (_move, score) = search::mcts::<5>(position, NODES);
+        let (_move, score) =
+            search::mcts::<5, NUM_VALUE_FEATURES_5S, NUM_POLICY_FEATURES_5S>(position, NODES);
         print!("{:.3}, ", score);
     }
 
@@ -639,7 +680,8 @@ fn bench() {
 
         do_moves_and_check_validity(&mut position, &["d3", "c3", "c4", "1d3<", "1c4+", "Sc4"]);
 
-        let (_move, score) = search::mcts::<5>(position, NODES);
+        let (_move, score) =
+            search::mcts::<5, NUM_VALUE_FEATURES_5S, NUM_POLICY_FEATURES_5S>(position, NODES);
         print!("{:.3}, ", score);
     }
     {
@@ -653,7 +695,8 @@ fn bench() {
             ],
         );
 
-        let (_move, score) = search::mcts::<5>(position, NODES);
+        let (_move, score) =
+            search::mcts::<5, NUM_VALUE_FEATURES_5S, NUM_POLICY_FEATURES_6S>(position, NODES);
         println!("{:.3}", score);
     }
     let time_taken = start_time.elapsed();
