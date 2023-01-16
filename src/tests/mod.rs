@@ -11,10 +11,11 @@ mod ptn_tests;
 mod tactics_tests_5s;
 mod tactics_tests_6s;
 
-use crate::evaluation::parameters::{self, PolicyFeatures};
+use crate::evaluation::parameters::{self, PolicyFeatures, policy_model};
 use crate::position::{Komi, Move, Position};
 use crate::search;
 use board_game_traits::Position as PositionTrait;
+use dfdx::tensor::Cpu;
 use pgn_traits::PgnPosition;
 
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
@@ -48,19 +49,29 @@ impl TestPosition {
         position
     }
 
-    pub fn plays_correct_move_long_prop<const S: usize>(&self, correct_moves: &[&str]) {
-        self.plays_correct_move_prop::<S>(correct_moves, 50_000)
+    pub fn plays_correct_move_long_prop<const S: usize, const N: usize, const M: usize>(
+        &self,
+        correct_moves: &[&str],
+    ) {
+        self.plays_correct_move_prop::<S, N, M>(correct_moves, 50_000)
     }
 
-    pub fn plays_correct_move_short_prop<const S: usize>(&self, correct_moves: &[&str]) {
-        self.plays_correct_move_prop::<S>(correct_moves, 10_000)
+    pub fn plays_correct_move_short_prop<const S: usize, const N: usize, const M: usize>(
+        &self,
+        correct_moves: &[&str],
+    ) {
+        self.plays_correct_move_prop::<S, N, M>(correct_moves, 10_000)
     }
 
-    fn plays_correct_move_prop<const S: usize>(&self, correct_moves: &[&str], nodes: u64) {
+    fn plays_correct_move_prop<const S: usize, const N: usize, const M: usize>(
+        &self,
+        correct_moves: &[&str],
+        nodes: u64,
+    ) {
         let position: Position<S> = self.position();
         let candidate_moves = check_candidate_moves(&position, correct_moves);
 
-        let (best_move, score) = search::mcts(position.clone(), nodes);
+        let (best_move, score) = search::mcts::<S, N, M>(position.clone(), nodes);
 
         assert!(
             candidate_moves.contains(&best_move),
@@ -73,11 +84,14 @@ impl TestPosition {
         );
     }
 
-    pub fn avoid_move_short_prop<const S: usize>(&self, avoid_moves: &[&str]) {
+    pub fn avoid_move_short_prop<const S: usize, const N: usize, const M: usize>(
+        &self,
+        avoid_moves: &[&str],
+    ) {
         let position: Position<S> = self.position();
         let candidate_moves = check_candidate_moves(&position, avoid_moves);
 
-        let (best_move, _) = search::mcts(position.clone(), 10_000);
+        let (best_move, _) = search::mcts::<S, N, M>(position.clone(), 10_000);
 
         assert!(
             !candidate_moves.contains(&best_move),
@@ -88,19 +102,22 @@ impl TestPosition {
         );
     }
 
-    pub fn top_policy_move_prop<const S: usize>(&self, correct_moves: &[&str]) {
-        self.top_n_policy_move::<S>(correct_moves, 1)
+    pub fn top_policy_move_prop<const S: usize, const N: usize>(&self, correct_moves: &[&str]) {
+        self.top_n_policy_move::<S, N>(correct_moves, 1)
     }
 
-    pub fn top_five_policy_move_prop<const S: usize>(&self, correct_moves: &[&str]) {
-        self.top_n_policy_move::<S>(correct_moves, 5)
+    pub fn top_five_policy_move_prop<const S: usize, const N: usize>(
+        &self,
+        correct_moves: &[&str],
+    ) {
+        self.top_n_policy_move::<S, N>(correct_moves, 5)
     }
 
-    fn top_n_policy_move<const S: usize>(&self, correct_moves: &[&str], n: usize) {
+    fn top_n_policy_move<const S: usize, const N: usize>(&self, correct_moves: &[&str], n: usize) {
         let position: Position<S> = self.position();
         let candidate_moves = check_candidate_moves(&position, correct_moves);
 
-        let policy_moves = moves_sorted_by_policy(&position);
+        let policy_moves = moves_sorted_by_policy::<S, N>(&position);
 
         assert!(
             policy_moves
@@ -183,12 +200,17 @@ fn do_moves_and_check_validity<const S: usize>(position: &mut Position<S>, move_
     }
 }
 
-fn moves_sorted_by_policy<const S: usize>(position: &Position<S>) -> Vec<(Move, f32)> {
+fn moves_sorted_by_policy<const S: usize, const N: usize>(
+    position: &Position<S>,
+) -> Vec<(Move, f32)> {
     let mut simple_moves = vec![];
     let mut legal_moves = vec![];
     let group_data = position.group_data();
-    position.generate_moves_with_probabilities(
+    let cpu = Cpu::default();
+    position.generate_moves_with_probabilities::<N>(
         &group_data,
+        &cpu,
+        &policy_model::<S, N>(),
         &mut simple_moves,
         &mut legal_moves,
         &mut vec![],

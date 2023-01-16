@@ -1,6 +1,9 @@
 use std::convert::TryFrom;
 
-use crate::position::Komi;
+use crate::{
+    evaluation::parameters::{NUM_POLICY_FEATURES_5S, NUM_VALUE_FEATURES_5S},
+    position::Komi,
+};
 
 use super::TestPosition;
 
@@ -10,7 +13,9 @@ fn avoid_loss_in_two() {
         "b5", "e2", "Cc3", "b3", "b2", "Cc2", "b4", "c4", "d3", "c5", "e3",
     ]);
 
-    test_position.plays_correct_move_long_prop::<5>(&["a3", "d2", "d4", "a2", "c2<"]);
+    test_position.plays_correct_move_long_prop::<5, NUM_VALUE_FEATURES_5S, NUM_POLICY_FEATURES_5S>(
+        &["a3", "d2", "d4", "a2", "c2<"],
+    );
 }
 
 #[test]
@@ -21,7 +26,9 @@ fn avoid_loss_in_three2() {
         "b3", "c3",
     ]);
 
-    test_position.plays_correct_move_long_prop::<5>(&["a3", "2c2+"]);
+    test_position.plays_correct_move_long_prop::<5, NUM_VALUE_FEATURES_5S, NUM_POLICY_FEATURES_5S>(
+        &["a3", "2c2+"],
+    );
 }
 
 #[test]
@@ -35,7 +42,9 @@ fn find_win_in_two() {
         "a2",
     ]);
 
-    test_position.plays_correct_move_long_prop::<5>(&["5e4+"]);
+    test_position.plays_correct_move_long_prop::<5, NUM_VALUE_FEATURES_5S, NUM_POLICY_FEATURES_5S>(
+        &["5e4+"],
+    );
 }
 
 #[test]
@@ -46,7 +55,9 @@ fn find_win_in_two2() {
         "1d5>1", "d5", "e4", "2c5>11", "1d5<1", "2e5<11", "2d5>2",
     ]);
 
-    test_position.plays_correct_move_long_prop::<5>(&["2c5>11"]);
+    test_position.plays_correct_move_long_prop::<5, NUM_VALUE_FEATURES_5S, NUM_POLICY_FEATURES_5S>(
+        &["2c5>11"],
+    );
 }
 
 #[test]
@@ -56,7 +67,8 @@ fn find_win_in_two3() {
         "a5", "e5", "e4", "Cc3", "e3", "e2", "Cd3", "d2", "e1", "c4", "1e1+1", "e1", "1d3-1", "Sd1",
     ]);
 
-    test_position.plays_correct_move_long_prop::<5>(&["d2>"]);
+    test_position
+        .plays_correct_move_long_prop::<5, NUM_VALUE_FEATURES_5S, NUM_POLICY_FEATURES_5S>(&["d2>"]);
 }
 
 #[test]
@@ -70,7 +82,9 @@ fn find_capstone_spread_win_in_two() {
         "5e5-212", "2d4>", "e3+", "e1",
     ]);
 
-    test_position.plays_correct_move_long_prop::<5>(&["2e2+11"]);
+    test_position.plays_correct_move_long_prop::<5, NUM_VALUE_FEATURES_5S, NUM_POLICY_FEATURES_5S>(
+        &["2e2+11"],
+    );
 }
 
 #[test]
@@ -80,7 +94,8 @@ fn capture_stack_in_strong_file() {
         "b5", "a5", "e1", "b3", "Cc3", "b4", "b2", "c5", "a4", "d5", "c4", "e5", "a3", "b3<", "a5>",
     ]);
 
-    test_position.plays_correct_move_long_prop::<5>(&["b4+"]);
+    test_position
+        .plays_correct_move_long_prop::<5, NUM_VALUE_FEATURES_5S, NUM_POLICY_FEATURES_5S>(&["b4+"]);
 }
 
 #[test]
@@ -94,7 +109,9 @@ fn spread_stack_for_tinue() {
         "b3+", "b5-", "d2+", "5c3>", "3b2+", "c1", "a3-", "d1", "3b3>21",
     ]);
 
-    test_position.plays_correct_move_long_prop::<5>(&["4b4-211"]);
+    test_position.plays_correct_move_long_prop::<5, NUM_VALUE_FEATURES_5S, NUM_POLICY_FEATURES_5S>(
+        &["4b4-211"],
+    );
 }
 
 #[test]
@@ -105,7 +122,9 @@ fn find_win_in_three() {
         "Sc2", "a1", "2b1>", "b2+", "b5", "b1", "c4", "d2", "c5",
     ]);
 
-    test_position.plays_correct_move_long_prop::<5>(&["2b3-11"]);
+    test_position.plays_correct_move_long_prop::<5, NUM_VALUE_FEATURES_5S, NUM_POLICY_FEATURES_5S>(
+        &["2b3-11"],
+    );
 }
 
 #[test]
@@ -117,7 +136,8 @@ fn find_win_in_three2() {
         "c1", "a3", "a1+", "a3-",
     ]);
 
-    test_position.plays_correct_move_long_prop::<5>(&["d1<"]);
+    test_position
+        .plays_correct_move_long_prop::<5, NUM_VALUE_FEATURES_5S, NUM_POLICY_FEATURES_5S>(&["d1<"]);
 }
 
 #[test]
@@ -126,7 +146,8 @@ fn tactic_test1() {
         "b4", "e1", "Cc3", "Cc4", "d4", "b3", "b2", "d3", "c2", "a3", "c3>", "e4", "c3",
     ]);
 
-    test_position.plays_correct_move_long_prop::<5>(&["d5"]);
+    test_position
+        .plays_correct_move_long_prop::<5, NUM_VALUE_FEATURES_5S, NUM_POLICY_FEATURES_5S>(&["d5"]);
 }
 
 #[test]
@@ -136,7 +157,8 @@ fn simple_move_move_to_win() {
         "a5", "e2", "Cc3", "a4", "b3", "a3", "a2", "b2", "e3", "b2<", "a1", "Cb2", "b1",
     ]);
 
-    test_position.plays_correct_move_long_prop::<5>(&["b2<"]);
+    test_position
+        .plays_correct_move_long_prop::<5, NUM_VALUE_FEATURES_5S, NUM_POLICY_FEATURES_5S>(&["b2<"]);
 }
 
 #[test]
@@ -147,7 +169,8 @@ fn flatten_our_stone_to_win() {
         "a1", "e3", "c3+", "Sc3", "d1", "Se1", "e2", "Sd2", "a2", "a3", "a4", "2d4-", "a5",
     ]);
 
-    test_position.plays_correct_move_long_prop::<5>(&["d3<"]);
+    test_position
+        .plays_correct_move_long_prop::<5, NUM_VALUE_FEATURES_5S, NUM_POLICY_FEATURES_5S>(&["d3<"]);
 }
 
 #[test]
@@ -158,7 +181,9 @@ fn winning_movement_test() {
         "c1>", "b3", "d4", "e2", "b4", "d3-", "4d1<22", "c2-", "Sd1", "c2", "d1+", "2c1<", "c4",
     ]);
 
-    test_position.plays_correct_move_long_prop::<5>(&["4b1>13"]);
+    test_position.plays_correct_move_long_prop::<5, NUM_VALUE_FEATURES_5S, NUM_POLICY_FEATURES_5S>(
+        &["4b1>13"],
+    );
 }
 
 #[test]
@@ -169,7 +194,8 @@ fn winning_movement_test2() {
         "d5", "c4", "d4<", "4c5<22", "c5", "b3", "2c4+", "3b5-", "2c5<", "a4",
     ]);
 
-    test_position.plays_correct_move_long_prop::<5>(&["b5<"]);
+    test_position
+        .plays_correct_move_long_prop::<5, NUM_VALUE_FEATURES_5S, NUM_POLICY_FEATURES_5S>(&["b5<"]);
 }
 
 #[test]
@@ -181,5 +207,6 @@ fn double_tak_threat_from_citadel_test() {
         move_strings: &[],
         komi: Komi::try_from(1.0).unwrap(),
     };
-    test_position.plays_correct_move_long_prop::<5>(&["e2<"]);
+    test_position
+        .plays_correct_move_long_prop::<5, NUM_VALUE_FEATURES_5S, NUM_POLICY_FEATURES_5S>(&["e2<"]);
 }

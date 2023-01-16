@@ -1,4 +1,3 @@
-use std::convert::TryFrom;
 use std::io::Read;
 use std::io::Write;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -14,6 +13,7 @@ use board_game_traits::Position as PositionTrait;
 use dfdx::prelude::ModuleBuilder;
 use dfdx::prelude::SaveToNpz;
 use dfdx::tensor;
+use dfdx::tensor::Cpu;
 use pgn_traits::PgnPosition;
 use rand::prelude::*;
 use rayon::prelude::*;
@@ -37,11 +37,11 @@ type MoveScoresForGame = Vec<Vec<MoveScore>>;
 pub fn train_from_scratch<const S: usize, const N: usize, const M: usize>(
     training_id: usize,
 ) -> Result<(), DynError> {
-    let mut rng = rand::rngs::StdRng::from_seed([0; 32]);
+    let cpu = Cpu::default();
 
-    let initial_value_params: [f32; N] = array_from_fn(|| rng.gen_range(-0.01..0.01));
+    let initial_value_params: ValueModel<N> = cpu.build_module();
 
-    let initial_policy_params: [f32; M] = array_from_fn(|| rng.gen_range(-0.01..0.01));
+    let initial_policy_params: PolicyModel<M> = cpu.build_module();
 
     train_perpetually::<S, N, M>(
         training_id,
@@ -91,10 +91,12 @@ pub fn continue_training<const S: usize, const N: usize, const M: usize>(
         move_scores.iter().map(Vec::len).sum::<usize>()
     );
 
+    let settings: MctsSetting<S, N, M> = MctsSetting::default();
+
     train_perpetually::<S, N, M>(
         training_id,
-        &<[f32; N]>::try_from(<Position<S>>::value_params())?,
-        &<[f32; M]>::try_from(<Position<S>>::policy_params())?,
+        &settings.value_params,
+        &settings.policy_model,
         games,
         move_scores,
         batch_id,
@@ -103,8 +105,8 @@ pub fn continue_training<const S: usize, const N: usize, const M: usize>(
 
 pub fn train_perpetually<const S: usize, const N: usize, const M: usize>(
     training_id: usize,
-    initial_value_params: &[f32; N],
-    initial_policy_params: &[f32; M],
+    initial_value_params: &ValueModel<N>,
+    initial_policy_params: &PolicyModel<M>,
     mut all_games: Vec<Game<Position<S>>>,
     mut all_move_scores: Vec<MoveScoresForGame>,
     mut batch_id: usize,
@@ -113,11 +115,11 @@ pub fn train_perpetually<const S: usize, const N: usize, const M: usize>(
     // Only train from the last n batches
     const BATCHES_FOR_TRAINING: usize = 10;
 
-    let mut last_value_params = *initial_value_params;
-    let mut last_policy_params = *initial_policy_params;
+    let mut last_value_params = initial_value_params.clone();
+    let mut last_policy_params = initial_policy_params.clone();
 
-    let mut value_params = *initial_value_params;
-    let mut policy_params = *initial_policy_params;
+    let mut value_params = initial_value_params.clone();
+    let mut policy_params = initial_policy_params.clone();
 
     let start_time = time::Instant::now();
     let mut playing_time = time::Duration::default();
@@ -223,12 +225,13 @@ pub fn train_perpetually<const S: usize, const N: usize, const M: usize>(
 
         let value_tuning_start_time = time::Instant::now();
 
-        let (new_value_params, new_policy_params): ([f32; N], [f32; M]) = tune_value_and_policy(
-            &games_in_training_batch,
-            &move_scores_in_training_batch,
-            &value_params,
-            &policy_params,
-        )?;
+        let (new_value_params, new_policy_params): (ValueModel<N>, PolicyModel<M>) =
+            tune_value_and_policy(
+                &games_in_training_batch,
+                &move_scores_in_training_batch,
+                &value_params,
+                &policy_params,
+            )?;
 
         last_value_params = value_params;
         last_policy_params = policy_params;
@@ -249,21 +252,21 @@ pub fn train_perpetually<const S: usize, const N: usize, const M: usize>(
 }
 
 fn play_game_pair<const S: usize, const N: usize, const M: usize>(
-    last_value_params: &[f32],
-    last_policy_params: &[f32],
-    value_params: &[f32],
-    policy_params: &[f32],
+    last_value_params: &ValueModel<N>,
+    last_policy_params: &PolicyModel<M>,
+    value_params: &ValueModel<N>,
+    policy_params: &PolicyModel<M>,
     current_params_wins: &AtomicU64,
     last_params_wins: &AtomicU64,
     i: usize,
 ) -> (Game<Position<S>>, Vec<Vec<(Move, f32)>>) {
     let settings = MctsSetting::default()
-        .add_value_params(value_params.to_vec())
-        .add_policy_params(policy_params.to_vec())
+        .add_value_params(value_params.clone())
+        .add_policy_params(policy_params.clone())
         .add_dirichlet(0.2);
     let last_settings = MctsSetting::default()
-        .add_value_params(last_value_params.to_vec())
-        .add_policy_params(last_policy_params.to_vec())
+        .add_value_params(last_value_params.clone())
+        .add_policy_params(last_policy_params.clone())
         .add_dirichlet(0.2);
     if i % 2 == 0 {
         let game = play_game::<S, N, M>(
@@ -364,13 +367,6 @@ pub fn tune_value_from_file<const S: usize, const N: usize>(
         })
         .collect::<Vec<_>>();
 
-    let mut rng = rand::rngs::StdRng::from_seed([0; 32]);
-    let mut initial_params = [0.00; N];
-
-    for param in initial_params.iter_mut() {
-        *param = rng.gen_range(-0.01..0.01)
-    }
-
     let mut cpu: tensor::Cpu = Default::default();
     let mut model: ValueModel<N> = cpu.build_module();
 
@@ -396,9 +392,9 @@ pub fn tune_value_from_file<const S: usize, const N: usize>(
 pub fn tune_value_and_policy<const S: usize, const N: usize, const M: usize>(
     games: &[Game<Position<S>>],
     move_scoress: &[MoveScoresForGame],
-    initial_value_params: &[f32; N],
-    initial_policy_params: &[f32; M],
-) -> Result<([f32; N], [f32; M]), DynError> {
+    initial_value_model: &ValueModel<N>,
+    initial_policy_model: &PolicyModel<M>,
+) -> Result<(ValueModel<N>, PolicyModel<M>), DynError> {
     let mut games_and_move_scoress: Vec<(&Game<Position<S>>, &MoveScoresForGame)> =
         games.iter().zip(move_scoress).collect();
 
@@ -469,66 +465,96 @@ pub fn tune_value_and_policy<const S: usize, const N: usize, const M: usize>(
         }
     }
 
-    // let tuned_value_parameters =
-    //     gradient_descent::gradient_descent(&value_training_samples, initial_value_params, 100.0);
-
-    println!("Skipping value parameters");
-
     let mut cpu: tensor::Cpu = Default::default();
-    let mut model: PolicyModel<M> = cpu.build_module();
+    let mut value_model: ValueModel<N> = initial_value_model.clone();
+
+    gradient_descent::gradient_descent_dfdx::<1000, N, _, _>(
+        &value_training_samples,
+        &mut cpu,
+        &mut value_model,
+        0.05,
+    );
+    gradient_descent::gradient_descent_dfdx::<1000, N, _, _>(
+        &value_training_samples,
+        &mut cpu,
+        &mut value_model,
+        0.005,
+    );
+    gradient_descent::gradient_descent_dfdx::<1000, N, _, _>(
+        &value_training_samples,
+        &mut cpu,
+        &mut value_model,
+        0.0005,
+    );
+    gradient_descent::gradient_descent_dfdx::<1000, N, _, _>(
+        &value_training_samples,
+        &mut cpu,
+        &mut value_model,
+        0.00005,
+    );
+    gradient_descent::gradient_descent_dfdx::<1000, N, _, _>(
+        &value_training_samples,
+        &mut cpu,
+        &mut value_model,
+        0.000005,
+    );
+
+    let filename = format!("value_model_16x16_{}s_final.zip", S);
+    value_model.save(&filename)?;
+    println!("Saved parameters to {}", filename);
+
+    let mut policy_model: PolicyModel<M> = initial_policy_model.clone();
 
     gradient_descent::gradient_descent_dfdx::<1000, M, _, _>(
         &policy_training_samples,
         &mut cpu,
-        &mut model,
+        &mut policy_model,
         0.2,
     );
     gradient_descent::gradient_descent_dfdx::<1000, M, _, _>(
         &policy_training_samples,
         &mut cpu,
-        &mut model,
+        &mut policy_model,
         0.02,
     );
     gradient_descent::gradient_descent_dfdx::<1000, M, _, _>(
         &policy_training_samples,
         &mut cpu,
-        &mut model,
+        &mut policy_model,
         0.002,
     );
     gradient_descent::gradient_descent_dfdx::<1000, M, _, _>(
         &policy_training_samples,
         &mut cpu,
-        &mut model,
+        &mut policy_model,
         0.0002,
     );
     gradient_descent::gradient_descent_dfdx::<1000, M, _, _>(
         &policy_training_samples,
         &mut cpu,
-        &mut model,
+        &mut policy_model,
         0.00002,
     );
 
-    let filename = "policy_model_2x2.zip";
-    model.save(filename)?;
+    let filename = format!("policy_model_8x8_{}s_final.zip", S);
+    policy_model.save(&filename)?;
     println!("Saved parameters to {}", filename);
 
-    unimplemented!()
-
-    // Ok((tuned_value_parameters, tuned_policy_parameters))
+    Ok((value_model, policy_model))
 }
 
 pub fn tune_value_and_policy_from_file<const S: usize, const N: usize, const M: usize>(
     value_file_name: &str,
     policy_file_name: &str,
-) -> Result<([f32; N], [f32; M]), DynError> {
+) -> Result<(ValueModel<N>, PolicyModel<M>), DynError> {
     let (games, move_scoress) =
         games_and_move_scoress_from_file::<S>(value_file_name, policy_file_name)?;
 
-    let mut rng = rand::rngs::StdRng::from_seed([0; 32]);
+    let cpu = Cpu::default();
 
-    let initial_value_params: [f32; N] = array_from_fn(|| rng.gen_range(-0.01..0.01));
+    let initial_value_params: ValueModel<N> = cpu.build_module();
 
-    let initial_policy_params: [f32; M] = array_from_fn(|| rng.gen_range(-0.01..0.01));
+    let initial_policy_params: PolicyModel<M> = cpu.build_module();
 
     tune_value_and_policy(
         &games,
@@ -658,16 +684,4 @@ pub fn positions_and_results_from_games<const S: usize>(
         }
     }
     (positions, results)
-}
-
-fn array_from_fn<F, T, const N: usize>(mut f: F) -> [T; N]
-where
-    F: FnMut() -> T,
-    T: Default + Copy,
-{
-    let mut output = [T::default(); N];
-    for e in output.iter_mut() {
-        *e = f();
-    }
-    output
 }

@@ -1,3 +1,6 @@
+use crate::evaluation::parameters::{
+    NUM_POLICY_FEATURES_5S, NUM_POLICY_FEATURES_6S, NUM_VALUE_FEATURES_5S, NUM_VALUE_FEATURES_6S,
+};
 use crate::position::{Move, Position};
 use crate::search::MctsSetting;
 use crate::search::{self, MonteCarloTree};
@@ -12,9 +15,10 @@ fn exclude_moves_test() {
         .iter()
         .map(|move_string| Move::from_string::<6>(move_string).unwrap())
         .collect::<Vec<Move>>();
-    let settings = MctsSetting::default()
-        .arena_size_for_nodes(1000)
-        .exclude_moves(excluded_moves.clone());
+    let settings: MctsSetting<6, NUM_VALUE_FEATURES_6S, NUM_POLICY_FEATURES_6S> =
+        MctsSetting::default()
+            .arena_size_for_nodes(1000)
+            .exclude_moves(excluded_moves.clone());
     let mut tree = MonteCarloTree::with_settings(<Position<6>>::start_position(), settings);
 
     for _ in 0..1000 {
@@ -32,7 +36,11 @@ fn exclude_moves_test() {
 fn play_on_low_time() {
     let time = Duration::from_millis(5);
     let position = <Position<5>>::default();
-    search::play_move_time(position, time, MctsSetting::default());
+    search::play_move_time::<5, NUM_VALUE_FEATURES_5S, NUM_POLICY_FEATURES_5S>(
+        position,
+        time,
+        MctsSetting::default(),
+    );
 }
 
 #[test]
@@ -40,7 +48,10 @@ fn win_in_two_moves_test() {
     let test_position =
         TestPosition::from_move_strings(&["e5", "c3", "c2", "d5", "c1", "c5", "d3", "a4", "e3"]);
 
-    test_position.plays_correct_move_short_prop::<5>(&["b4", "b5", "Cb4", "Cb5"]);
+    test_position
+        .plays_correct_move_short_prop::<5, NUM_VALUE_FEATURES_5S, NUM_POLICY_FEATURES_5S>(&[
+            "b4", "b5", "Cb4", "Cb5",
+        ]);
 }
 
 #[test]
@@ -51,7 +62,10 @@ fn black_win_in_one_move_test() {
         "d1", "e1<", "a5", "e1", "b5", "b3+", "2c4<", "e1+",
     ]);
 
-    test_position.plays_correct_move_short_prop::<5>(&["3b4-", "b3", "Cb3", "e4", "Ce4", "c3<"]);
+    test_position
+        .plays_correct_move_short_prop::<5, NUM_VALUE_FEATURES_5S, NUM_POLICY_FEATURES_5S>(&[
+            "3b4-", "b3", "Cb3", "e4", "Ce4", "c3<",
+        ]);
 }
 
 #[test]
@@ -59,7 +73,10 @@ fn white_can_win_in_one_move_test() {
     let test_position =
         TestPosition::from_move_strings(&["b4", "c2", "d2", "c4", "b2", "d4", "e2", "c3"]);
 
-    test_position.plays_correct_move_short_prop::<5>(&["a2", "Ca2"]);
+    test_position
+        .plays_correct_move_short_prop::<5, NUM_VALUE_FEATURES_5S, NUM_POLICY_FEATURES_5S>(&[
+            "a2", "Ca2",
+        ]);
 }
 
 #[test]
@@ -67,7 +84,10 @@ fn black_avoid_loss_in_one_test() {
     let test_position =
         TestPosition::from_move_strings(&["b4", "c2", "d2", "c4", "b2", "d4", "e2"]);
 
-    test_position.plays_correct_move_short_prop::<5>(&["a2", "Ca2", "Sa2"]);
+    test_position
+        .plays_correct_move_short_prop::<5, NUM_VALUE_FEATURES_5S, NUM_POLICY_FEATURES_5S>(&[
+            "a2", "Ca2", "Sa2",
+        ]);
 }
 
 #[test]
@@ -76,7 +96,10 @@ fn black_avoid_loss_in_one_test2() {
         "b4", "c2", "d2", "d4", "b2", "c4", "e2", "a2", "c3", "b3", "b2+", "c4-", "c2+", "b2",
         "b1", "d1", "c2", "a3", "2b3-", "a2>", "b1+",
     ]);
-    test_position.plays_correct_move_short_prop::<5>(&["d1+"]);
+    test_position
+        .plays_correct_move_short_prop::<5, NUM_VALUE_FEATURES_5S, NUM_POLICY_FEATURES_5S>(&[
+            "d1+",
+        ]);
 }
 
 #[test]
@@ -87,7 +110,10 @@ fn black_avoid_less_in_one_test5() {
         "c4", "b4", "3d4<12", "d2", "d1+", "4c2>", "3b4-", "b2+", "d4-", "3b3-12",
     ]);
 
-    test_position.plays_correct_move_short_prop::<5>(&["Sb4", "Cb4", "Sb5", "Cb5", "c4<", "2c4<"]);
+    test_position
+        .plays_correct_move_short_prop::<5, NUM_VALUE_FEATURES_5S, NUM_POLICY_FEATURES_5S>(&[
+            "Sb4", "Cb4", "Sb5", "Cb5", "c4<", "2c4<",
+        ]);
 }
 
 #[test]
@@ -99,7 +125,10 @@ fn white_avoid_loss_in_one_test() {
         "b4", "2c4<", "3b3+", "2c3-", "2b2>", "3d1<", "3c2-", "d1", "5b4-14",
     ]);
 
-    test_position.plays_correct_move_short_prop::<5>(&["Cb5", "Sb5", "b5", "c5<", "d1<"]);
+    test_position
+        .plays_correct_move_short_prop::<5, NUM_VALUE_FEATURES_5S, NUM_POLICY_FEATURES_5S>(&[
+            "Cb5", "Sb5", "b5", "c5<", "d1<",
+        ]);
 }
 
 #[test]
@@ -111,7 +140,10 @@ fn white_avoid_loss_in_one_test2() {
         "3b4-", "b4", "c4<", "d3", "c4", "d3+", "c4>", "e4", "2d4>", "2e3+", "2d4>", "d3", "a4",
     ]);
 
-    test_position.plays_correct_move_short_prop::<5>(&["Cd4", "Sd4", "Cc4", "Sc4"]);
+    test_position
+        .plays_correct_move_short_prop::<5, NUM_VALUE_FEATURES_5S, NUM_POLICY_FEATURES_5S>(&[
+            "Cd4", "Sd4", "Cc4", "Sc4",
+        ]);
 }
 
 #[test]
@@ -123,7 +155,8 @@ fn do_not_play_suicide_move_as_black_test() {
         "e5", "e2",
     ]);
 
-    test_position.avoid_move_short_prop::<5>(&["2a3-11"]);
+    test_position
+        .avoid_move_short_prop::<5, NUM_VALUE_FEATURES_5S, NUM_POLICY_FEATURES_5S>(&["2a3-11"]);
 }
 
 #[test]
@@ -134,7 +167,8 @@ fn do_not_play_suicide_move_as_black_test2() {
         "b1", "b2>", "d2<", "c3-", "c1", "3b3>12", "c1+", "c3-", "3d4-", "4c2<22", "b1+", "2a2>",
         "d2", "3b2<", "d2<", "2b2>", "d4", "d2", "5d3-14",
     ]);
-    test_position.avoid_move_short_prop::<5>(&["2c5>11"]);
+    test_position
+        .avoid_move_short_prop::<5, NUM_VALUE_FEATURES_5S, NUM_POLICY_FEATURES_5S>(&["2c5>11"]);
 }
 
 #[test]
@@ -145,7 +179,9 @@ fn do_not_instamove_into_loss() {
         "Sb1", "1d1<1", "d2", "1e1<1", "c2", "e1", "1d2-1", "1e1<1",
     ]);
 
-    test_position.avoid_move_short_prop::<5>(&["b2", "c5", "b4", "d4"]);
+    test_position.avoid_move_short_prop::<5, NUM_VALUE_FEATURES_5S, NUM_POLICY_FEATURES_5S>(&[
+        "b2", "c5", "b4", "d4",
+    ]);
 }
 
 #[test]
@@ -156,7 +192,8 @@ fn do_not_play_suicide_move_as_black_test3() {
         "b5", "b4+", "d3+",
     ]);
 
-    test_position.avoid_move_short_prop::<5>(&["2b5>11"]);
+    test_position
+        .avoid_move_short_prop::<5, NUM_VALUE_FEATURES_5S, NUM_POLICY_FEATURES_5S>(&["2b5>11"]);
 }
 
 #[test]

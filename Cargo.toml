@@ -13,7 +13,7 @@ debug = true
 lto = true
 
 [features]
-constant-tuning = ["rayon", "dfdx"]
+constant-tuning = ["rayon"]
 aws-lambda-runtime = ["lambda_runtime", "serde", "serde_json", "arrayvec/serde", "tokio"]
 aws-lambda-client = ["serde", "serde_json", "arrayvec/serde", "rusoto_core", "rusoto_lambda", "bytes", "tokio"]
 
@@ -38,7 +38,8 @@ rusoto_lambda = { version = "0.47", optional = true }
 bytes = { version = "1", optional = true }
 tokio = { version = "1.7", optional = true }
 lambda_runtime = { version = "0.4", optional = true }
-dfdx = { git = "https://github.com/coreylowman/dfdx", optional = true }
+dfdx = { git = "https://github.com/coreylowman/dfdx" }
+zip = "0.6.3"
 rand_distr = "0.4"
 log = "0.4"
 fern = "0.6"

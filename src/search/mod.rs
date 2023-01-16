@@ -2,13 +2,13 @@
 //!
 //! This implementation does not use full Monte Carlo rollouts, relying on a heuristic evaluation when expanding new nodes instead.
 
-use dfdx::prelude::LoadFromNpz;
-use dfdx::prelude::ModuleBuilder;
 use dfdx::tensor::Cpu;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 use std::{mem, time};
 
+use crate::evaluation::parameters::policy_model;
+use crate::evaluation::parameters::value_model;
 use crate::evaluation::parameters::PolicyModel;
 use crate::evaluation::parameters::ValueModel;
 use crate::position::Move;
@@ -36,9 +36,8 @@ pub enum TimeControl {
 pub struct MctsSetting<const S: usize, const N: usize, const M: usize> {
     arena_size: u32,
     pub cpu: Cpu,
-    value_params: ValueModel<N>, // TODO: Generic
+    pub value_params: ValueModel<N>,
     pub policy_model: PolicyModel<M>,
-    policy_params: Vec<f32>,
     search_params: Vec<Score>,
     dirichlet: Option<f32>,
     excluded_moves: Vec<Move>,
@@ -49,16 +48,11 @@ pub struct MctsSetting<const S: usize, const N: usize, const M: usize> {
 impl<const S: usize, const N: usize, const M: usize> Default for MctsSetting<S, N, M> {
     fn default() -> Self {
         let cpu: Cpu = Default::default(); // TODO: Hard-coded stuff
-        let mut value_params: ValueModel<N> = cpu.build_module();
-        value_params.load("model_49811.zip").unwrap();
-        let mut policy_model: PolicyModel<M> = cpu.build_module();
-        policy_model.load("policy_model_0037861.zip").unwrap();
         MctsSetting {
             arena_size: 2_u32.pow(26), // Default to 1.5GB max
             cpu,
-            value_params,
-            policy_model,
-            policy_params: Vec::from(<Position<S>>::policy_params()),
+            value_params: value_model::<S, N>(),
+            policy_model: policy_model::<S, M>(),
             search_params: vec![1.43, 2800.0, 0.61],
             dirichlet: None,
             excluded_moves: vec![],
@@ -90,14 +84,13 @@ impl<const S: usize, const N: usize, const M: usize> MctsSetting<S, N, M> {
         self
     }
 
-    pub fn add_value_params(self, _value_params: Vec<f32>) -> Self {
-        unimplemented!() // TODO: Repair
-                         //self.value_params = value_params;
-                         //self
+    pub fn add_value_params(mut self, value_model: ValueModel<N>) -> Self {
+        self.value_params = value_model;
+        self
     }
 
-    pub fn add_policy_params(mut self, policy_params: Vec<f32>) -> Self {
-        self.policy_params = policy_params;
+    pub fn add_policy_params(mut self, policy_params: PolicyModel<M>) -> Self {
+        self.policy_model = policy_params;
         self
     }
 

@@ -2,6 +2,7 @@ use board_game_traits::{Color, Position as PositionTrait};
 use board_game_traits::{GameResult, GameResult::*};
 use pgn_traits::PgnPosition;
 
+use crate::evaluation::parameters::{NUM_POLICY_FEATURES_6S, NUM_VALUE_FEATURES_6S};
 use crate::position::Direction::*;
 use crate::position::Move;
 use crate::position::Piece::{BlackCap, BlackFlat, WhiteFlat, WhiteWall};
@@ -428,5 +429,5 @@ fn parse_tps_test() {
 fn join_too_many_groups_test() {
     let tps = "1,x,1,x,1,x/21121111S,x4,1/1,x,1,x,1,x/x6/x,2,2,2,2,x/2,x5 1 18";
     let position = <Position<6>>::from_fen(tps).unwrap();
-    search::mcts(position, 1000);
+    search::mcts::<6, NUM_VALUE_FEATURES_6S, NUM_POLICY_FEATURES_6S>(position, 1000);
 }

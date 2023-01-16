@@ -3,9 +3,9 @@ use std::path::Path;
 use clap::{App, Arg, SubCommand};
 
 use tiltak::evaluation::parameters::{
-    NUM_POLICY_FEATURES_4S, NUM_POLICY_FEATURES_5S, NUM_POLICY_FEATURES_6S, NUM_VALUE_FEATURES_4S,
-    NUM_VALUE_FEATURES_5S, NUM_VALUE_FEATURES_6S, POLICY_PARAMS_4S, POLICY_PARAMS_5S,
-    POLICY_PARAMS_6S, VALUE_PARAMS_4S, VALUE_PARAMS_5S, VALUE_PARAMS_6S,
+    load_4s_policy_model, load_4s_value_model, load_5s_policy_model, load_5s_value_model,
+    load_6s_policy_model, load_6s_value_model, NUM_POLICY_FEATURES_4S, NUM_POLICY_FEATURES_5S,
+    NUM_POLICY_FEATURES_6S, NUM_VALUE_FEATURES_4S, NUM_VALUE_FEATURES_5S, NUM_VALUE_FEATURES_6S,
 };
 use tiltak::tune::{spsa, training};
 
@@ -75,7 +75,12 @@ fn main() {
                             NUM_VALUE_FEATURES_4S,
                             NUM_POLICY_FEATURES_4S,
                         >(
-                            i, &VALUE_PARAMS_4S, &POLICY_PARAMS_4S, vec![], vec![], 0
+                            i,
+                            &load_4s_value_model(),
+                            &load_4s_policy_model(),
+                            vec![],
+                            vec![],
+                            0,
                         )
                         .unwrap(),
                         5 => training::train_perpetually::<
@@ -83,7 +88,12 @@ fn main() {
                             NUM_VALUE_FEATURES_5S,
                             NUM_POLICY_FEATURES_5S,
                         >(
-                            i, &VALUE_PARAMS_5S, &POLICY_PARAMS_5S, vec![], vec![], 0
+                            i,
+                            &load_5s_value_model(),
+                            &load_5s_policy_model(),
+                            vec![],
+                            vec![],
+                            0,
                         )
                         .unwrap(),
                         6 => training::train_perpetually::<
@@ -91,7 +101,12 @@ fn main() {
                             NUM_VALUE_FEATURES_6S,
                             NUM_POLICY_FEATURES_6S,
                         >(
-                            i, &VALUE_PARAMS_6S, &POLICY_PARAMS_6S, vec![], vec![], 0
+                            i,
+                            &load_6s_value_model(),
+                            &load_6s_policy_model(),
+                            vec![],
+                            vec![],
+                            0,
                         )
                         .unwrap(),
                         _ => panic!("Size {} not supported.", size),

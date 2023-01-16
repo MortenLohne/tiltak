@@ -1,4 +1,10 @@
-use dfdx::prelude::{Linear, ReLU, Sigmoid, Tanh};
+use std::io;
+
+use dfdx::{
+    prelude::{Linear, LoadFromNpz, ModuleBuilder, ReLU, Sigmoid, Tanh},
+    tensor::Cpu,
+};
+use zip::ZipArchive;
 
 use crate::position::{num_line_symmetries, num_square_symmetries};
 
@@ -22,6 +28,90 @@ pub type PolicyModel<const N: usize> = (
     (Linear<8, 8>, ReLU),
     (Linear<8, 1>, Sigmoid),
 );
+
+fn create_value_model<const N: usize>(model_bytes: &[u8]) -> ValueModel<N> {
+    let mut reader = io::Cursor::new(model_bytes);
+    let mut zip = ZipArchive::new(&mut reader).unwrap();
+
+    let cpu: Cpu = Default::default();
+    let mut value_params: ValueModel<N> = cpu.build_module();
+    value_params.read("", &mut zip).unwrap();
+    value_params
+}
+
+pub fn value_model<const S: usize, const N: usize>() -> ValueModel<N> {
+    match S {
+        4 => {
+            let model_bytes = include_bytes!("value_model_4s.zip");
+            create_value_model::<N>(model_bytes)
+        }
+        5 => {
+            let model_bytes = include_bytes!("value_model_5s.zip");
+            create_value_model::<N>(model_bytes)
+        }
+        6 => {
+            let model_bytes = include_bytes!("value_model_6s.zip");
+            create_value_model::<N>(model_bytes)
+        }
+        _ => panic!("Unsupported size {}", S),
+    }
+}
+
+pub fn load_4s_value_model() -> ValueModel<NUM_VALUE_FEATURES_4S> {
+    let model_bytes = include_bytes!("value_model_4s.zip");
+    create_value_model::<NUM_VALUE_FEATURES_4S>(model_bytes)
+}
+
+pub fn load_5s_value_model() -> ValueModel<NUM_VALUE_FEATURES_5S> {
+    let model_bytes = include_bytes!("value_model_5s.zip");
+    create_value_model::<NUM_VALUE_FEATURES_5S>(model_bytes)
+}
+
+pub fn load_6s_value_model() -> ValueModel<NUM_VALUE_FEATURES_6S> {
+    let model_bytes = include_bytes!("value_model_6s.zip");
+    create_value_model::<NUM_VALUE_FEATURES_6S>(model_bytes)
+}
+
+fn create_policy_model<const N: usize>(model_bytes: &[u8]) -> PolicyModel<N> {
+    let mut reader = io::Cursor::new(model_bytes);
+    let mut zip = ZipArchive::new(&mut reader).unwrap();
+
+    let cpu: Cpu = Default::default();
+
+    let mut policy_params: PolicyModel<N> = cpu.build_module();
+    policy_params.read("", &mut zip).unwrap();
+    policy_params
+}
+
+pub fn policy_model<const S: usize, const N: usize>() -> PolicyModel<N> {
+    match S {
+        4 => {
+            let model_bytes = include_bytes!("policy_model_4s.zip");
+            create_policy_model::<N>(model_bytes)
+        }
+        5 => {
+            let model_bytes = include_bytes!("policy_model_5s.zip");
+            create_policy_model::<N>(model_bytes)
+        }
+        6 => {
+            let model_bytes = include_bytes!("policy_model_6s.zip");
+            create_policy_model::<N>(model_bytes)
+        }
+        _ => panic!("Unsupported size {}", S),
+    }
+}
+
+pub fn load_4s_policy_model() -> PolicyModel<NUM_POLICY_FEATURES_4S> {
+    policy_model::<4, NUM_POLICY_FEATURES_4S>()
+}
+
+pub fn load_5s_policy_model() -> PolicyModel<NUM_POLICY_FEATURES_5S> {
+    policy_model::<5, NUM_POLICY_FEATURES_5S>()
+}
+
+pub fn load_6s_policy_model() -> PolicyModel<NUM_POLICY_FEATURES_6S> {
+    policy_model::<6, NUM_POLICY_FEATURES_6S>()
+}
 
 #[derive(Debug)]
 pub struct ValueFeatures<'a> {

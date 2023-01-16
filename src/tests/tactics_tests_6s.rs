@@ -1,3 +1,5 @@
+use crate::evaluation::parameters::{NUM_POLICY_FEATURES_6S, NUM_VALUE_FEATURES_6S};
+
 use super::TestPosition;
 
 #[test]
@@ -9,7 +11,9 @@ fn tinue_5ply_test() {
         "1d2>1", "c1", "Sc2", "f4", "4e2>4", "Se3", "e1", "d2", "1e4>1", "1e3-1",
     ]);
 
-    test_position.plays_correct_move_long_prop::<6>(&["2f4-11"]);
+    test_position.plays_correct_move_long_prop::<6, NUM_VALUE_FEATURES_6S, NUM_POLICY_FEATURES_6S>(
+        &["2f4-11"],
+    );
 }
 
 #[test]
@@ -21,7 +25,9 @@ fn tinue_7ply_test() {
         "b4",
     ]);
 
-    test_position.plays_correct_move_long_prop::<6>(&["4b5<"]);
+    test_position.plays_correct_move_long_prop::<6, NUM_VALUE_FEATURES_6S, NUM_POLICY_FEATURES_6S>(
+        &["4b5<"],
+    );
 }
 
 #[test]
@@ -36,7 +42,9 @@ fn tinue_3ply_test() {
         "5f3<32", "Sf3", "2d6>", "f5", "a1", "f4",
     ]);
 
-    test_position.plays_correct_move_long_prop::<6>(&["3e6-111"]);
+    test_position.plays_correct_move_long_prop::<6, NUM_VALUE_FEATURES_6S, NUM_POLICY_FEATURES_6S>(
+        &["3e6-111"],
+    );
 }
 
 #[test]
@@ -49,7 +57,9 @@ fn tinue_3ply_test2() {
         "Se3", "c4", "e3-", "c5", "d4<", "Se3", "3e2-", "b3", "2e5-11", "d6>", "2e4+11", "Se4",
     ]);
 
-    test_position.plays_correct_move_long_prop::<6>(&["2e3-11"]);
+    test_position.plays_correct_move_long_prop::<6, NUM_VALUE_FEATURES_6S, NUM_POLICY_FEATURES_6S>(
+        &["2e3-11"],
+    );
 }
 
 #[test]
@@ -66,7 +76,9 @@ fn endgame_tinue_test() {
         "d2", "4b5>112",
     ]);
 
-    test_position.plays_correct_move_long_prop::<6>(&["3e2+"]);
+    test_position.plays_correct_move_long_prop::<6, NUM_VALUE_FEATURES_6S, NUM_POLICY_FEATURES_6S>(
+        &["3e2+"],
+    );
 }
 
 #[test]
@@ -80,7 +92,9 @@ fn tinue_nply_test() {
         "d1", "d5", "b2",
     ]);
 
-    test_position.plays_correct_move_long_prop::<6>(&["5d2>"]);
+    test_position.plays_correct_move_long_prop::<6, NUM_VALUE_FEATURES_6S, NUM_POLICY_FEATURES_6S>(
+        &["5d2>"],
+    );
 }
 
 #[test]
@@ -98,7 +112,9 @@ fn flatten_our_wall_to_win_test() {
         "4a1+1111", "6e6>",
     ]);
 
-    test_position.plays_correct_move_long_prop::<6>(&["2c5<11", "5c5<41"])
+    test_position.plays_correct_move_long_prop::<6, NUM_VALUE_FEATURES_6S, NUM_POLICY_FEATURES_6S>(
+        &["2c5<11", "5c5<41"],
+    )
 }
 
 #[test]
@@ -115,7 +131,8 @@ fn plus_two_fcd_move_in_endgame() {
         "5e3+", "e3", "6e4-", "a5", "b3-", "a1",
     ]);
 
-    test_position.plays_correct_move_long_prop::<6>(&["2f5-"])
+    test_position
+        .plays_correct_move_long_prop::<6, NUM_VALUE_FEATURES_6S, NUM_POLICY_FEATURES_6S>(&["2f5-"])
 }
 
 #[test]
@@ -127,25 +144,36 @@ fn double_tak_threat_to_win() {
         "e5+", "f5+", "f5", "e5", "f5+", "Sc6", "e4", "f4<", "a3", "d1", "f5", "e3", "c2", "e1",
         "a2", "b4+", "2b3+", "a1", "a6", "a4+", "c1", "2c3+", "f5<", "2e4+", "2e6-", "d5>", "Sd5",
     ]);
-    test_position.plays_correct_move_long_prop::<6>(&["6e5-15"])
+    test_position.plays_correct_move_long_prop::<6, NUM_VALUE_FEATURES_6S, NUM_POLICY_FEATURES_6S>(
+        &["6e5-15"],
+    )
 }
 
 #[test]
 fn play_instant_road_win_test() {
     let test_position = TestPosition::from_tps("1,2S,x,2,2,2/1,2,21,112,11121112,12S/12C,2,1121C,x,2,1/x,212211112112,x2,1,1/2,2S,x3,1/x,21S,x,2,21,2221S 2 53");
-    test_position.plays_correct_move_short_prop::<6>(&["6e5<24"]);
+    test_position
+        .plays_correct_move_short_prop::<6, NUM_VALUE_FEATURES_6S, NUM_POLICY_FEATURES_6S>(&[
+            "6e5<24",
+        ]);
 }
 
 #[test]
 fn play_instant_road_win_test2() {
     let test_position = TestPosition::from_tps("1,1,2,1,1,1/x2,2,2,1,x/x,2,2,1,2221S,x/1,x,2222221C,11112C,2,x/x,2121,2,1,21,2/21,2,2,1,12,x 1 36");
-    test_position.plays_correct_move_short_prop::<6>(&["6c3+114"]);
+    test_position
+        .plays_correct_move_short_prop::<6, NUM_VALUE_FEATURES_6S, NUM_POLICY_FEATURES_6S>(&[
+            "6c3+114",
+        ]);
 }
 
 #[test]
 fn smash_to_create_two_vulnerable_critical_squares() {
     let test_position = TestPosition::from_tps("x,221,221,x,2S,2/x,2,2,2S,1,x/x2,2C,1,1,1/1,12S,x,1222221C,2,2/x,12,21,1,1,1/x,2,2,x2,1 1 26");
-    test_position.plays_correct_move_short_prop::<6>(&["6d3<51"]);
+    test_position
+        .plays_correct_move_short_prop::<6, NUM_VALUE_FEATURES_6S, NUM_POLICY_FEATURES_6S>(&[
+            "6d3<51",
+        ]);
 }
 
 #[test]
@@ -156,7 +184,9 @@ fn setup_smash_in_strong_line_tinue() {
         "b3", "Cd3", "b2", "Sb4", "2e6<", "b4>", "e4", "b5", "e3", "e2", "b4", "a5", "f3", "f2",
         "d2", "e1", "f4", "d1", "b1", "c1", "a3", "a1",
     ]);
-    test_position.plays_correct_move_long_prop::<6>(&["3d6<"]);
+    test_position.plays_correct_move_long_prop::<6, NUM_VALUE_FEATURES_6S, NUM_POLICY_FEATURES_6S>(
+        &["3d6<"],
+    );
 }
 
 #[test]
@@ -172,7 +202,8 @@ fn smash_followed_by_negative_fcd_throw_tinue() {
         "2c3>", "Sd4", "c5", "5d2<14", "e4", "5b2>32", "2c1+", "2d2<", "a4", "4c2+13", "c1+",
         "b2>", "Sd2", "5c4+", "a4+",
     ]);
-    test_position.plays_correct_move_long_prop::<6>(&["c5<"]);
+    test_position
+        .plays_correct_move_long_prop::<6, NUM_VALUE_FEATURES_6S, NUM_POLICY_FEATURES_6S>(&["c5<"]);
 }
 
 #[test]
@@ -182,7 +213,9 @@ fn impure_stack_throw_onto_strong_line_tinue() {
         "b5", "f4", "f1", "c5", "f3", "f2", "e2", "d5", "e5", "Ce4", "f5", "d4", "e3", "a5", "e2>",
         "e4>", "e4", "2f4-11", "Cd3", "3f2+", "d2",
     ]);
-    test_position.plays_correct_move_long_prop::<6>(&["5f3+14"]);
+    test_position.plays_correct_move_long_prop::<6, NUM_VALUE_FEATURES_6S, NUM_POLICY_FEATURES_6S>(
+        &["5f3+14"],
+    );
 }
 
 #[test]
@@ -193,7 +226,8 @@ fn flat_capture_to_create_double_critical_square_tinue() {
         "d4", "Ce4", "c3", "Sc2", "d6", "e3", "e6", "f6", "d2", "e2", "d1", "e2<", "d3", "e2",
         "e1", "b2", "2a3+", "f5", "f2", "f4", "e1+", "e3<", "d4-", "b3>",
     ]);
-    test_position.plays_correct_move_long_prop::<6>(&["d1+"]);
+    test_position
+        .plays_correct_move_long_prop::<6, NUM_VALUE_FEATURES_6S, NUM_POLICY_FEATURES_6S>(&["d1+"]);
 }
 
 #[test]
@@ -205,7 +239,8 @@ fn create_hard_cap_next_to_critical_square_tinue() {
         "b5", "a5",
     ]);
 
-    test_position.plays_correct_move_long_prop::<6>(&["b6-"]);
+    test_position
+        .plays_correct_move_long_prop::<6, NUM_VALUE_FEATURES_6S, NUM_POLICY_FEATURES_6S>(&["b6-"]);
 }
 
 #[test]
@@ -215,7 +250,9 @@ fn pure_cap_spread_onto_strong_line_tinue() {
         "b5", "a6", "f2", "b4", "c2", "b3", "b2", "c3", "d2", "Cd3", "e2", "d3-", "Cd3", "b6",
         "c5", "c4", "d4", "b1", "a6>", "a5", "a6", "c6", "d6", "d5", "e3", "c4+", "d6<",
     ]);
-    test_position.plays_correct_move_long_prop::<6>(&["2d2<11"]);
+    test_position.plays_correct_move_long_prop::<6, NUM_VALUE_FEATURES_6S, NUM_POLICY_FEATURES_6S>(
+        &["2d2<11"],
+    );
 }
 
 #[test]
@@ -227,19 +264,24 @@ fn pure_stack_spread_setting_up_fortress_smash_tinue() {
         "f4-", "d2", "d1", "d2<", "Sc1", "3c2<12", "a1", "3e3>", "Se3", "2a2-", "b1+", "a2", "Sa3",
         "a6", "c2", "b4", "d2", "6f3-", "a3>", "a3", "Sa4",
     ]);
-    test_position.plays_correct_move_long_prop::<6>(&["6f2<1113", "6f2<2211"]);
+    test_position.plays_correct_move_long_prop::<6, NUM_VALUE_FEATURES_6S, NUM_POLICY_FEATURES_6S>(
+        &["6f2<1113", "6f2<2211"],
+    );
 }
 
 #[test]
 fn setup_double_tak_threat_test() {
     // Alion's Puzzle #8
     let test_position = TestPosition::from_tps("2,2,21,2,12S,2/2,2,2,211112C,22221C,21/12,2,x,1,21,221S/2,1,1,1,1,2/2,1,1,1,1,2/2S,1,1,x2,12 1 35");
-    test_position.plays_correct_move_long_prop::<6>(&["b3>"]);
+    test_position
+        .plays_correct_move_long_prop::<6, NUM_VALUE_FEATURES_6S, NUM_POLICY_FEATURES_6S>(&["b3>"]);
 }
 
 #[test]
 fn double_tak_threat_tinue() {
     // Alion's Puzzle #6
     let test_position = TestPosition::from_tps("x,1,x4/x,12S,x,2,x2/x,12,212S,x,2C,x/12,2111211C,1S,112,11112,x/2221,x,2,1,2,1S/2222221,x,2,2,2,2 1 44");
-    test_position.plays_correct_move_long_prop::<6>(&["6b3-"]);
+    test_position.plays_correct_move_long_prop::<6, NUM_VALUE_FEATURES_6S, NUM_POLICY_FEATURES_6S>(
+        &["6b3-"],
+    );
 }
