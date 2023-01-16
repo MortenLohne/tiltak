@@ -721,7 +721,14 @@ impl PlaytakSession {
         let mut our_time_left = game.time_left;
         'gameloop: loop {
             if position.game_result().is_some() {
-                break;
+                // Double check that the game is still over, if we remove information about move repetitions
+                // Playtak does not have this rule, so we want to play on, even if the position is a repetition
+                let position_without_history = <Position<S>>::from_fen(&position.to_fen()).unwrap();
+                if position_without_history.game_result().is_some() {
+                    break;
+                } else {
+                    position = position_without_history;
+                }
             }
             if position.side_to_move() == game.our_color && !restoring_previous_session {
                 let (best_move, score) =
