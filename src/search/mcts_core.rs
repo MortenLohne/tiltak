@@ -90,7 +90,7 @@ impl TreeEdge {
                 .total_action_value += self.mean_action_value as f64;
             Some(self.mean_action_value)
         } else {
-            let mut node = arena.get_mut(self.child.as_mut().unwrap());
+            let node = arena.get_mut(self.child.as_mut().unwrap());
             debug_assert_eq!(
                 self.visits,
                 arena
@@ -163,7 +163,7 @@ impl TreeEdge {
         debug_assert!(self.child.is_none());
         self.child = Some(arena.add(Tree::new_node())?);
 
-        let mut child = arena.get_mut(self.child.as_mut().unwrap());
+        let child = arena.get_mut(self.child.as_mut().unwrap());
 
         let (eval, is_terminal) = rollout(position, settings, settings.rollout_depth, temp_vectors);
 
