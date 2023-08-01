@@ -209,6 +209,13 @@ fn create_hard_cap_next_to_critical_square_tinue() {
 }
 
 #[test]
+fn create_hard_cap_next_to_critical_square_tinue_2() {
+    let test_position = TestPosition::from_tps(&"x2,1,2,1,1/2,2,1,2,2S,2/x,1,12C,221C,12,1/2,2,2,1,1,1/x,1,x,2,2,1/2,x4,121 1 20");
+
+    test_position.plays_correct_move_long_prop::<6>(&["3d4>21"]);
+}
+
+#[test]
 fn pure_cap_spread_onto_strong_line_tinue() {
     // 1,21,21,x3/2,2,12,2,x2/x,2,x,1,x2/x,2,2,1C,1,x/x,1,1,12C,1,1/x,2,x4 2 14
     let test_position = TestPosition::from_move_strings(&[
