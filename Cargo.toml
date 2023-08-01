@@ -2,7 +2,7 @@
 name = "tiltak"
 version = "0.1.0"
 authors = ["Morten Lohne <lohnemorten@gmail.com>"]
-edition = "2018"
+edition = "2021"
 repository = "https://github.com/MortenLohne/tiltak/"
 readme = "README.md"
 license = "GPL-3.0-or-later"
