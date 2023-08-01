@@ -829,7 +829,7 @@ impl<const S: usize> Position<S> {
                 .iter()
                 .enumerate()
                 .skip(1)
-                .find(|(_i, v)| (**v).0 == 0)
+                .find(|(_i, v)| v.0 == 0)
                 .map(|(i, _v)| i)
                 .unwrap_or(S * S + 1) as u8;
 

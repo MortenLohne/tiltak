@@ -300,7 +300,7 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usize>(
             }
 
             let their_open_critical_squares =
-                Them::critical_squares(&*group_data) & (!group_data.all_pieces());
+                Them::critical_squares(group_data) & (!group_data.all_pieces());
 
             // Apply PSQT
             match role {
@@ -396,7 +396,7 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usize>(
             }
 
             if *role == Flat || *role == Cap {
-                if Us::is_critical_square(&*group_data, *square) {
+                if Us::is_critical_square(group_data, *square) {
                     policy_features.place_our_critical_square[0] += 1.0;
                 } else if !their_open_critical_squares.is_empty() {
                     if their_open_critical_squares == BitBoard::empty().set(square.0) {
@@ -461,7 +461,7 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usize>(
                     }
                 }
             } else if *role == Cap {
-                if Us::is_critical_square(&*group_data, *square) {
+                if Us::is_critical_square(group_data, *square) {
                     policy_features.place_our_critical_square[0] += 1.0;
                 } else if !their_open_critical_squares.is_empty() {
                     if their_open_critical_squares == BitBoard::empty().set(square.0) {
@@ -624,12 +624,12 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usize>(
                 let destination_stack = &position[destination_square];
 
                 if Us::piece_is_ours(piece) {
-                    if Us::is_critical_square(&*group_data, destination_square)
+                    if Us::is_critical_square(group_data, destination_square)
                         && piece.is_road_piece()
                     {
                         captures_our_critical_square = Some(destination_square);
                     }
-                    if Them::is_critical_square(&*group_data, destination_square) {
+                    if Them::is_critical_square(group_data, destination_square) {
                         captures_their_critical_square = Some(destination_square);
                     }
                     if let Some(MovementSynopsis {
@@ -785,7 +785,7 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usize>(
             }
 
             let their_open_critical_squares =
-                Them::critical_squares(&*group_data) & (!group_data.all_pieces());
+                Them::critical_squares(group_data) & (!group_data.all_pieces());
 
             if !their_open_critical_squares.is_empty() {
                 if their_pieces_captured == 0 && captures_their_critical_square.is_none() {

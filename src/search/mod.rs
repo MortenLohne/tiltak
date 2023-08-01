@@ -182,7 +182,7 @@ impl<const S: usize> MonteCarloTree<S> {
                     heuristic_score: edge.heuristic_score,
                 })
                 .collect();
-            (*arena.get_mut(root_edge.child.as_mut().unwrap())).children =
+            arena.get_mut(root_edge.child.as_mut().unwrap()).children =
                 arena.add_slice(&mut filtered_edges).unwrap();
         }
 
@@ -296,7 +296,7 @@ impl<const S: usize> MonteCarloTree<S> {
     pub fn node_edge_sizes(&self, arena: &Arena) -> (usize, usize) {
         pub fn edge_sizes(edge: &TreeEdge, arena: &Arena) -> (usize, usize) {
             if let Some(child_index) = &edge.child {
-                let (child_nodes, child_edges) = node_sizes(&*arena.get(child_index), arena);
+                let (child_nodes, child_edges) = node_sizes(arena.get(child_index), arena);
                 (child_nodes, child_edges + 1)
             } else {
                 (0, 1)
