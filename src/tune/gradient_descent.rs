@@ -90,10 +90,7 @@ pub fn gradient_descent<const N: usize>(
         "Finished gradient descent in {:.1}s, error is {:.7}. Parameters:\n{:?}",
         elapsed.as_secs_f64(),
         lowest_error,
-        best_parameter_set
-            .iter()
-            .map(|f| *f as f32)
-            .collect::<Vec<f32>>()
+        best_parameter_set.to_vec()
     );
     best_parameter_set
 }
@@ -189,7 +186,7 @@ pub fn eval_from_params<const N: usize>(
 }
 
 pub fn sigmoid(x: f32) -> f32 {
-    1.0 / (1.0 + f32::exp(-x as f32))
+    1.0 / (1.0 + f32::exp(-x))
 }
 
 pub fn sigmoid_derived(x: f32) -> f32 {

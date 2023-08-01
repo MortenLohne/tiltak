@@ -22,7 +22,7 @@ pub struct Square(pub u8);
 impl Square {
     pub fn from_rank_file<const S: usize>(rank: u8, file: u8) -> Self {
         debug_assert!(rank < S as u8 && file < S as u8);
-        Square(rank * S as u8 + file as u8)
+        Square(rank * S as u8 + file)
     }
 
     pub fn rank<const S: usize>(self) -> u8 {
@@ -154,7 +154,7 @@ pub struct Komi {
 
 impl Komi {
     pub fn from_half_komi(half_komi: i8) -> Option<Self> {
-        if half_komi >= -10 && half_komi <= 10 {
+        if (-10..=10).contains(&half_komi) {
             Some(Komi { half_komi })
         } else {
             None
@@ -527,6 +527,7 @@ impl StackMovement {
         result
     }
 
+    #[allow(clippy::should_implement_trait)]
     pub fn into_iter<const S: usize>(self) -> impl Iterator<Item = Movement> {
         StackMovementIterator { data: self.data }
     }

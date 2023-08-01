@@ -553,7 +553,7 @@ impl<const S: usize> Position<S> {
             for i in 0..(stack.len() as usize + 6) / 8 {
                 hash ^= zobrist_stones_in_stack::<S>(
                     square,
-                    i as usize,
+                    i,
                     stack.bitboard.board as usize >> (i * 8) & 255,
                 )
             }

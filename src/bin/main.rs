@@ -196,10 +196,7 @@ fn generate_openings<const S: usize>(
 ) -> Vec<Vec<Move>> {
     let mut moves = vec![];
     position.generate_moves(&mut moves);
-    moves = moves
-        .into_iter()
-        .filter(|mv| matches!(mv, Move::Place(Role::Flat, _)))
-        .collect();
+    moves.retain(|mv| matches!(mv, Move::Place(Role::Flat, _)));
     moves
         .into_iter()
         .flat_map(|mv| {

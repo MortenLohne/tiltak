@@ -570,10 +570,7 @@ pub fn read_move_scores_from_file<const S: usize>(
         }
         move_scoress.last_mut().unwrap().push(scores_for_this_move);
     }
-    move_scoress = move_scoress
-        .into_iter()
-        .filter(|move_scores| !move_scores.is_empty())
-        .collect();
+    move_scoress.retain(|move_scores| !move_scores.is_empty());
 
     println!(
         "Read {} move scores from {} games",

@@ -34,7 +34,7 @@ impl<const S: usize> Position<S> {
                                 direction,
                                 square,
                                 square,
-                                self[square].len() as u8,
+                                self[square].len(),
                                 StackMovement::new(),
                                 &mut movements,
                             );
@@ -43,7 +43,7 @@ impl<const S: usize> Position<S> {
                                 direction,
                                 square,
                                 square,
-                                self[square].len() as u8,
+                                self[square].len(),
                                 StackMovement::new(),
                                 &mut movements,
                             );

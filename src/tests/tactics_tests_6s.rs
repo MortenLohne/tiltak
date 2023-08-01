@@ -210,7 +210,9 @@ fn create_hard_cap_next_to_critical_square_tinue() {
 
 #[test]
 fn create_hard_cap_next_to_critical_square_tinue_2() {
-    let test_position = TestPosition::from_tps(&"x2,1,2,1,1/2,2,1,2,2S,2/x,1,12C,221C,12,1/2,2,2,1,1,1/x,1,x,2,2,1/2,x4,121 1 20");
+    let test_position = TestPosition::from_tps(
+        &"x2,1,2,1,1/2,2,1,2,2S,2/x,1,12C,221C,12,1/2,2,2,1,1,1/x,1,x,2,2,1/2,x4,121 1 20",
+    );
 
     test_position.plays_correct_move_long_prop::<6>(&["3d4>21"]);
 }

@@ -352,14 +352,12 @@ fn critical_square_test() {
     assert_eq!(
         group_data
             .critical_squares(Color::White)
-            .into_iter()
             .collect::<Vec<_>>(),
         vec![e1]
     );
     assert_eq!(
         group_data
             .critical_squares(Color::Black)
-            .into_iter()
             .collect::<Vec<_>>(),
         vec![a5]
     );

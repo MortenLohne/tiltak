@@ -37,7 +37,7 @@ impl<T> Index<T> {
     fn new(data: NonZeroU32) -> Self {
         Self {
             data,
-            phantom: PhantomData::default(),
+            phantom: PhantomData,
         }
     }
 }
@@ -54,7 +54,7 @@ impl<T> SliceIndex<T> {
         Self {
             data,
             length,
-            phantom: PhantomData::default(),
+            phantom: PhantomData,
         }
     }
 }
