@@ -375,11 +375,13 @@ fn analyze_position<const S: usize>(position: &Position<S>) {
 
     let mut simple_moves = vec![];
     let mut moves = vec![];
+    let mut fcd_per_move = vec![];
 
     position.generate_moves_with_probabilities(
         &position.group_data(),
         &mut simple_moves,
         &mut moves,
+        &mut fcd_per_move,
         &mut vec![],
     );
     moves.sort_by(|(_mv, score1), (_, score2)| score1.partial_cmp(score2).unwrap().reverse());
@@ -392,7 +394,12 @@ fn analyze_position<const S: usize>(position: &Position<S>) {
 
     let simple_moves: Vec<Move> = moves.iter().map(|(mv, _)| mv.clone()).collect();
 
-    position.features_for_moves(&mut policy_feature_sets, &simple_moves, &group_data);
+    position.features_for_moves(
+        &mut policy_feature_sets,
+        &simple_moves,
+        &mut fcd_per_move,
+        &group_data,
+    );
 
     println!("Top 10 heuristic moves:");
     for ((mv, score), features) in moves.iter().zip(feature_sets).take(10) {

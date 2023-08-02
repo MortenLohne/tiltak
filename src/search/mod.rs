@@ -137,6 +137,7 @@ pub const ARENA_ELEMENT_SIZE: usize = 24;
 pub struct MonteCarloTree<const S: usize> {
     edge: TreeEdge, // A virtual edge to the first node, with fake move and heuristic score
     position: Position<S>,
+    temp_position: Position<S>,
     settings: MctsSetting<S>,
     temp_vectors: TempVectors,
     arena: Arena,
@@ -183,11 +184,12 @@ impl<const S: usize> MonteCarloTree<S> {
                 })
                 .collect();
             arena.get_mut(root_edge.child.as_mut().unwrap()).children =
-                arena.add_slice(&mut filtered_edges).unwrap();
+                arena.add_slice(&mut filtered_edges.drain(..)).unwrap();
         }
 
         MonteCarloTree {
             edge: root_edge,
+            temp_position: position.clone(),
             position,
             settings,
             temp_vectors,
@@ -274,8 +276,9 @@ impl<const S: usize> MonteCarloTree<S> {
     /// Run one iteration of MCTS
     #[must_use]
     pub fn select(&mut self) -> Option<f32> {
+        self.temp_position.clone_from(&self.position);
         self.edge.select::<S>(
-            &mut self.position.clone(),
+            &mut self.temp_position,
             &self.settings,
             &mut self.temp_vectors,
             &self.arena,

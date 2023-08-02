@@ -30,6 +30,7 @@ impl<const S: usize> Position<S> {
         params: &[f32],
         group_data: &GroupData<S>,
         simple_moves: &mut Vec<Move>,
+        fcd_per_move: &mut Vec<i8>,
         moves: &mut Vec<(Move, search::Score)>,
         feature_sets: &mut Vec<Box<[f32]>>,
     ) {
@@ -44,7 +45,12 @@ impl<const S: usize> Position<S> {
             .map(|feature_set| PolicyFeatures::new::<S>(feature_set))
             .collect();
 
-        self.features_for_moves(&mut policy_feature_sets, simple_moves, group_data);
+        self.features_for_moves(
+            &mut policy_feature_sets,
+            simple_moves,
+            fcd_per_move,
+            group_data,
+        );
 
         moves.extend(
             simple_moves
@@ -64,6 +70,8 @@ impl<const S: usize> Position<S> {
                 }),
         );
 
+        fcd_per_move.clear();
+
         let score_sum: f32 = moves.iter().map(|(_mv, score)| *score).sum();
 
         let score_factor = (1.0 - POLICY_BASELINE) / score_sum;
@@ -76,13 +84,13 @@ impl<const S: usize> Position<S> {
         &self,
         feature_sets: &mut [PolicyFeatures],
         moves: &[Move],
+        fcd_per_move: &mut Vec<i8>,
         group_data: &GroupData<S>,
     ) {
         assert!(feature_sets.len() >= moves.len());
 
         let mut immediate_win_exists = false;
 
-        let mut fcd_per_move = Vec::with_capacity(moves.len());
         let mut highest_fcd_per_square = <AbstractBoard<i8, S>>::new_with_value(-1);
         let mut highest_fcd = -1;
 
@@ -97,7 +105,8 @@ impl<const S: usize> Position<S> {
             fcd_per_move.push(fcd);
         }
 
-        for (features_set, (mv, fcd)) in feature_sets.iter_mut().zip(moves.iter().zip(fcd_per_move))
+        for (features_set, (mv, &mut fcd)) in
+            feature_sets.iter_mut().zip(moves.iter().zip(fcd_per_move))
         {
             self.features_for_move(features_set, mv, group_data);
 

@@ -198,7 +198,7 @@ impl ops::BitOr for GroupEdgeConnection {
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct GroupData<const S: usize> {
     pub(crate) groups: AbstractBoard<u8, S>,
-    pub(crate) amount_in_group: Box<[(u8, GroupEdgeConnection)]>,
+    pub(crate) amount_in_group: ArrayVec<(u8, GroupEdgeConnection), 65>, // Size is max_size^2 + 1
     pub(crate) white_critical_squares: BitBoard,
     pub(crate) black_critical_squares: BitBoard,
     pub(crate) white_flat_stones: BitBoard,
@@ -211,10 +211,9 @@ pub struct GroupData<const S: usize> {
 
 impl<const S: usize> Default for GroupData<S> {
     fn default() -> Self {
-        GroupData {
+        let mut group_data = GroupData {
             groups: Default::default(),
-            amount_in_group: vec![(0, GroupEdgeConnection::default()); S * S + 1]
-                .into_boxed_slice(),
+            amount_in_group: Default::default(),
             white_critical_squares: Default::default(),
             black_critical_squares: Default::default(),
             white_flat_stones: Default::default(),
@@ -223,7 +222,13 @@ impl<const S: usize> Default for GroupData<S> {
             black_caps: Default::default(),
             white_walls: Default::default(),
             black_walls: Default::default(),
+        };
+        for _ in 0..S * S + 1 {
+            group_data
+                .amount_in_group
+                .push((0, GroupEdgeConnection::default()));
         }
+        group_data
     }
 }
 
@@ -362,7 +367,6 @@ impl DetailedGameResult {
 }
 
 /// Complete representation of a Tak position
-#[derive(Clone)]
 pub struct Position<const S: usize> {
     cells: AbstractBoard<Stack, S>,
     to_move: Color,
@@ -375,6 +379,40 @@ pub struct Position<const S: usize> {
     komi: Komi,
     hash: u64,              // Zobrist hash of current position
     hash_history: Vec<u64>, // Zobrist hashes of previous board states, up to the last irreversible move. Does not include the corrent position
+}
+
+impl<const S: usize> Clone for Position<S> {
+    fn clone(&self) -> Self {
+        Self {
+            cells: self.cells.clone(),
+            to_move: self.to_move,
+            white_stones_left: self.white_stones_left,
+            black_stones_left: self.black_stones_left,
+            white_caps_left: self.white_caps_left,
+            black_caps_left: self.black_caps_left,
+            half_moves_played: self.half_moves_played,
+            moves: self.moves.clone(),
+            komi: self.komi,
+            hash: self.hash,
+            hash_history: self.hash_history.clone(),
+        }
+    }
+    fn clone_from(&mut self, source: &Self) {
+        self.cells = source.cells.clone();
+        self.to_move = source.to_move;
+        self.white_stones_left = source.white_stones_left;
+        self.black_stones_left = source.black_stones_left;
+        self.white_caps_left = source.white_caps_left;
+        self.black_caps_left = source.black_caps_left;
+        self.half_moves_played = source.half_moves_played;
+        self.moves.clone_from(&source.moves);
+        self.komi = source.komi;
+        self.hash = source.hash;
+        self.hash_history.clone_from(&source.hash_history);
+        debug_assert_eq!(self, source);
+        debug_assert_eq!(self.moves, source.moves);
+        debug_assert_eq!(self.hash_history, source.hash_history);
+    }
 }
 
 impl<const S: usize> PartialEq for Position<S> {
@@ -946,6 +984,7 @@ impl<const S: usize> Position<S> {
         group_data: &GroupData<S>,
         simple_moves: &mut Vec<<Self as PositionTrait>::Move>,
         moves: &mut Vec<(<Self as PositionTrait>::Move, f32)>,
+        fcd_per_move: &mut Vec<i8>,
         features: &mut Vec<Box<[f32]>>,
     ) {
         debug_assert!(simple_moves.is_empty());
@@ -955,6 +994,7 @@ impl<const S: usize> Position<S> {
                 params,
                 group_data,
                 simple_moves,
+                fcd_per_move,
                 moves,
                 features,
             ),
@@ -962,6 +1002,7 @@ impl<const S: usize> Position<S> {
                 params,
                 group_data,
                 simple_moves,
+                fcd_per_move,
                 moves,
                 features,
             ),
@@ -979,6 +1020,7 @@ impl<const S: usize> Position<S> {
         group_data: &GroupData<S>,
         simple_moves: &mut Vec<Move>,
         moves: &mut Vec<(Move, search::Score)>,
+        fcd_per_move: &mut Vec<i8>,
         features: &mut Vec<Box<[f32]>>,
     ) {
         self.generate_moves_with_params(
@@ -986,6 +1028,7 @@ impl<const S: usize> Position<S> {
             group_data,
             simple_moves,
             moves,
+            fcd_per_move,
             features,
         )
     }

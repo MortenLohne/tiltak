@@ -3,6 +3,7 @@ use crate::position::Move;
 use crate::position::{
     squares_iterator, Direction, Movement, Piece, Position, Role::*, Square, StackMovement,
 };
+use arrayvec::ArrayVec;
 use board_game_traits::Position as PositionTrait;
 use std::iter;
 
@@ -28,7 +29,7 @@ impl<const S: usize> Position<S> {
                 }
                 Some(piece) if Us::piece_is_ours(piece) => {
                     for direction in square.directions::<S>() {
-                        let mut movements = vec![];
+                        let mut movements = ArrayVec::new();
                         if piece == Us::cap_piece() {
                             self.generate_moving_moves_cap::<Us>(
                                 direction,
@@ -66,7 +67,7 @@ impl<const S: usize> Position<S> {
         square: Square,
         pieces_carried: u8,
         partial_movement: StackMovement,
-        movements: &mut Vec<StackMovement>,
+        movements: &mut ArrayVec<StackMovement, 255>, // 2^max_size - 1
     ) {
         if let Some(neighbour) = square.go_direction::<S>(direction) {
             let pieces_held = if square == origin_square {
@@ -117,7 +118,7 @@ impl<const S: usize> Position<S> {
         square: Square,
         pieces_carried: u8,
         partial_movement: StackMovement,
-        movements: &mut Vec<StackMovement>,
+        movements: &mut ArrayVec<StackMovement, 255>, // 2^max_size - 1
     ) {
         if let Some(neighbour) = square.go_direction::<S>(direction) {
             let neighbour_piece = self[neighbour].top_stone();

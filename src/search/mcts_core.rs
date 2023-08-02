@@ -34,6 +34,7 @@ pub struct TreeEdge {
 pub struct TempVectors {
     simple_moves: Vec<Move>,
     moves: Vec<(Move, f32)>,
+    fcd_per_move: Vec<i8>,
     value_scores: Vec<Score>,
     policy_score_sets: Vec<Box<[Score]>>,
 }
@@ -43,6 +44,7 @@ impl TempVectors {
         TempVectors {
             simple_moves: vec![],
             moves: vec![],
+            fcd_per_move: vec![],
             value_scores: vec![0.0; parameters::num_value_features::<S>()],
             policy_score_sets: vec![],
         }
@@ -199,20 +201,22 @@ impl Tree {
             group_data,
             &mut temp_vectors.simple_moves,
             &mut temp_vectors.moves,
+            &mut temp_vectors.fcd_per_move,
             &mut temp_vectors.policy_score_sets,
         );
-        let mut children_vec = Vec::with_capacity(temp_vectors.moves.len());
+        // let mut children_vec = arena.add_from_iter(length, source) Vec::with_capacity(temp_vectors.moves.len());
         let policy_sum: f32 = temp_vectors.moves.iter().map(|(_, score)| *score).sum();
         let inv_sum = 1.0 / policy_sum;
 
-        for (mv, heuristic_score) in temp_vectors.moves.drain(..) {
-            children_vec.push(TreeEdge::new(
+        let child_edges = temp_vectors.moves.drain(..).map(|(mv, heuristic_score)| {
+            TreeEdge::new(
                 mv.clone(),
                 heuristic_score * inv_sum,
                 settings.initial_mean_action_value(),
-            ));
-        }
-        self.children = arena.add_slice(&mut children_vec)?;
+            )
+        });
+
+        self.children = arena.add_slice(child_edges)?;
         Some(())
     }
 
@@ -283,6 +287,7 @@ pub fn rollout<const S: usize>(
             &group_data,
             &mut temp_vectors.simple_moves,
             &mut temp_vectors.moves,
+            &mut temp_vectors.fcd_per_move,
             &mut temp_vectors.policy_score_sets,
         );
 

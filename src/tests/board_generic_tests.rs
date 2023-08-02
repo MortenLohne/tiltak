@@ -94,7 +94,7 @@ fn play_random_games_prop<const S: usize>(num_games: usize) {
                 .map(|feature_set| PolicyFeatures::new::<S>(feature_set))
                 .collect();
 
-            position.features_for_moves(&mut policy_feature_sets, &moves, &group_data);
+            position.features_for_moves(&mut policy_feature_sets, &moves, &mut vec![], &group_data);
 
             // If the decline_win value is set, check that there really is a winning move
             if policy_feature_sets

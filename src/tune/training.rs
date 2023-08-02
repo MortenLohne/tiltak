@@ -432,7 +432,7 @@ pub fn tune_value_and_policy<const S: usize, const N: usize, const M: usize>(
                 .collect();
             let moves: Vec<Move> = move_scores.iter().map(|(mv, _score)| mv.clone()).collect();
 
-            position.features_for_moves(&mut policy_feature_sets, &moves, &group_data);
+            position.features_for_moves(&mut policy_feature_sets, &moves, &mut vec![], &group_data);
 
             for ((_, result), features) in move_scores.iter().zip(feature_sets) {
                 let offset = inverse_sigmoid(1.0 / move_scores.len().max(2) as f32);

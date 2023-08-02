@@ -15,7 +15,7 @@ fn supports_type_test() {
 #[test]
 fn slice_test() {
     let arena: Arena<4> = Arena::new(8).unwrap();
-    let slice_index = arena.add_slice(&mut vec![1u32, 2, 3]).unwrap();
+    let slice_index = arena.add_slice(vec![1u32, 2, 3].into_iter()).unwrap();
     let index = arena.add([4u32, 5]).unwrap();
     let index2 = arena.add([6u32, 7, 8]).unwrap();
     assert_eq!(arena.get_slice(&slice_index), &[1, 2, 3]);
@@ -27,7 +27,9 @@ fn slice_test() {
 fn slot_57_size() {
     let arena: Arena<57> = Arena::new(3).unwrap();
     let index = arena.add([3_u8; 57]).unwrap();
-    let slice_index = arena.add_slice(&mut vec![[4_u8; 57], [5_u8; 57]]).unwrap();
+    let slice_index = arena
+        .add_slice(vec![[4_u8; 57], [5_u8; 57]].into_iter())
+        .unwrap();
 
     assert_eq!(arena.add([3_u8; 57]), None);
     assert_eq!(arena.add(1_u8), None);

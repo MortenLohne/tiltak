@@ -181,26 +181,30 @@ impl<const S: usize> Arena<S> {
         Some(Index::new(NonZeroU32::new(index).unwrap()))
     }
 
-    pub fn add_slice<T>(&self, values: &mut Vec<T>) -> Option<SliceIndex<T>> {
+    pub fn add_slice<T, I: ExactSizeIterator<Item = T>>(
+        &self,
+        mut source: I,
+    ) -> Option<SliceIndex<T>> {
         assert!(self.supports_type::<T>());
 
-        let length = values.len();
+        let length = source.len();
 
         if length == 0 {
             return Some(SliceIndex::default());
         }
 
-        let index =
-            self.get_index_for_element(Self::num_slots_required::<T>() * values.len() as u32)?;
+        let index = self.get_index_for_element(Self::num_slots_required::<T>() * length as u32)?;
 
         let mut ptr = unsafe { self.ptr_to_index(index) as *mut T };
 
-        for value in values.drain(..) {
+        for _ in 0..length {
             unsafe {
-                *ptr = value;
+                *ptr = source.next().expect("Iterator yielded too few items");
                 ptr = ptr.add(1);
             }
         }
+
+        assert!(source.next().is_none());
 
         Some(SliceIndex::new(
             NonZeroU32::new(index).unwrap(),

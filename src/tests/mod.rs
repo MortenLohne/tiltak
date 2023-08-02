@@ -130,7 +130,7 @@ impl TestPosition {
             .map(|feature_set| PolicyFeatures::new::<S>(feature_set))
             .collect();
 
-        position.features_for_moves(&mut policy_feature_sets, &moves, &group_data);
+        position.features_for_moves(&mut policy_feature_sets, &moves, &mut vec![], &group_data);
 
         policy_feature_sets
             .iter()
@@ -191,6 +191,7 @@ fn moves_sorted_by_policy<const S: usize>(position: &Position<S>) -> Vec<(Move, 
         &group_data,
         &mut simple_moves,
         &mut legal_moves,
+        &mut vec![],
         &mut vec![],
     );
     legal_moves.sort_by(|(_, score1), (_, score2)| score1.partial_cmp(score2).unwrap().reverse());

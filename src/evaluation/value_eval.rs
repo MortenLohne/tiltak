@@ -1,3 +1,4 @@
+use arrayvec::ArrayVec;
 use board_game_traits::{Color, Position as EvalPosition};
 
 use crate::evaluation::parameters::ValueFeatures;
@@ -93,8 +94,11 @@ pub fn static_eval_game_phase<const S: usize>(
     let white_flatstone_lead = white_flat_count - black_flat_count;
 
     // Bonus/malus depending on the number of groups each side has
-    let mut seen_groups = vec![false; S * S + 1]; // TODO: Can be an array with full const-generics
-    seen_groups[0] = true;
+    let mut seen_groups: ArrayVec<bool, 257> = ArrayVec::new();
+    seen_groups.push(true);
+    for _ in 1..S * S + 1 {
+        seen_groups.push(false);
+    }
 
     let number_of_groups = squares_iterator::<S>()
         .map(|square| {
