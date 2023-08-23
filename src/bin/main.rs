@@ -27,14 +27,12 @@ pub mod playtak;
 pub mod tei;
 
 fn main() {
-    
     println!("Starting benchmark");
     const NODES: u32 = 5_000_000;
     let start_time = time::Instant::now();
-    
+
     let position = <Position<6>>::default();
-    let settings = search::MctsSetting::default()
-        .arena_size_for_nodes(NODES);
+    let settings = search::MctsSetting::default().arena_size_for_nodes(NODES);
     let mut tree = search::MonteCarloTree::with_settings(position, settings);
     let mut last_iteration_start_time = time::Instant::now();
     for n in 1..=NODES {
@@ -42,14 +40,24 @@ fn main() {
         if n % 500_000 == 0 {
             let knps = 500.0 / last_iteration_start_time.elapsed().as_secs_f32();
             last_iteration_start_time = time::Instant::now();
-            println!("n={}, {:.2}s, {:.1} knps", n, start_time.elapsed().as_secs_f32(), knps);
+            println!(
+                "n={}, {:.2}s, {:.1} knps",
+                n,
+                start_time.elapsed().as_secs_f32(),
+                knps
+            );
         }
     }
 
     let (mv, score) = tree.best_move();
 
-    println!("{}: {:.1}%, {:.2}s", mv.to_string::<6>(), score * 100.0, start_time.elapsed().as_secs_f32());
-    
+    println!(
+        "{}: {:.1}%, {:.2}s",
+        mv.to_string::<6>(),
+        score * 100.0,
+        start_time.elapsed().as_secs_f32()
+    );
+
     return;
 
     println!("play: Play against the engine through the command line");
