@@ -383,6 +383,7 @@ fn analyze_position<const S: usize>(position: &Position<S>) {
         &mut moves,
         &mut fcd_per_move,
         &mut vec![],
+        &mut Some(vec![]),
     );
     moves.sort_by(|(_mv, score1), (_, score2)| score1.partial_cmp(score2).unwrap().reverse());
 

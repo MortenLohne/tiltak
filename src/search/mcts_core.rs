@@ -4,7 +4,7 @@ use board_game_traits::{Color, GameResult, Position as PositionTrait};
 use rand::distributions::Distribution;
 use rand::Rng;
 
-use crate::evaluation::parameters;
+use crate::evaluation::parameters::{self, PolicyFeatures};
 use crate::position::Move;
 /// This module contains the core of the MCTS search algorithm
 use crate::position::{GroupData, Position};
@@ -30,13 +30,14 @@ pub struct TreeEdge {
 }
 
 /// Temporary vectors that are continually re-used during search to avoid unnecessary allocations
-#[derive(Clone, PartialEq, Debug)]
+#[derive(Debug)]
 pub struct TempVectors {
     simple_moves: Vec<Move>,
     moves: Vec<(Move, f32)>,
     fcd_per_move: Vec<i8>,
     value_scores: Vec<Score>,
     policy_score_sets: Vec<Box<[Score]>>,
+    policy_feature_sets: Option<Vec<PolicyFeatures<'static>>>,
 }
 
 impl TempVectors {
@@ -47,6 +48,7 @@ impl TempVectors {
             fcd_per_move: vec![],
             value_scores: vec![0.0; parameters::num_value_features::<S>()],
             policy_score_sets: vec![],
+            policy_feature_sets: Some(vec![]),
         }
     }
 }
@@ -203,6 +205,7 @@ impl Tree {
             &mut temp_vectors.moves,
             &mut temp_vectors.fcd_per_move,
             &mut temp_vectors.policy_score_sets,
+            &mut temp_vectors.policy_feature_sets,
         );
         // let mut children_vec = arena.add_from_iter(length, source) Vec::with_capacity(temp_vectors.moves.len());
         let policy_sum: f32 = temp_vectors.moves.iter().map(|(_, score)| *score).sum();
@@ -289,6 +292,7 @@ pub fn rollout<const S: usize>(
             &mut temp_vectors.moves,
             &mut temp_vectors.fcd_per_move,
             &mut temp_vectors.policy_score_sets,
+            &mut temp_vectors.policy_feature_sets,
         );
 
         let mut rng = rand::thread_rng();

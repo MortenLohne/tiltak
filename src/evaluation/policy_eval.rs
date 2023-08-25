@@ -25,6 +25,7 @@ pub fn inverse_sigmoid(x: f32) -> f32 {
 }
 
 impl<const S: usize> Position<S> {
+    #[allow(clippy::too_many_arguments)]
     pub(crate) fn generate_moves_with_probabilities_colortr<Us: ColorTr, Them: ColorTr>(
         &self,
         params: &[f32],
@@ -33,6 +34,7 @@ impl<const S: usize> Position<S> {
         fcd_per_move: &mut Vec<i8>,
         moves: &mut Vec<(Move, search::Score)>,
         feature_sets: &mut Vec<Box<[f32]>>,
+        policy_feature_sets: &mut Option<Vec<PolicyFeatures<'static>>>,
     ) {
         let num_moves = simple_moves.len();
 
@@ -40,17 +42,28 @@ impl<const S: usize> Position<S> {
             feature_sets.push(vec![0.0; parameters::num_policy_features::<S>()].into_boxed_slice());
         }
 
-        let mut policy_feature_sets: Vec<PolicyFeatures> = feature_sets
-            .iter_mut()
-            .map(|feature_set| PolicyFeatures::new::<S>(feature_set))
-            .collect();
+        {
+            // Ugly performance hack. `policy_feature_sets` is empty,
+            // but creating another vec from `into_iter::collect()` re-uses the memory,
+            // even though the new vector has a different type
+            let mut converted: Vec<PolicyFeatures<'_>> = policy_feature_sets
+                .take()
+                .unwrap()
+                .into_iter()
+                .map(|_| unreachable!())
+                .collect();
 
-        self.features_for_moves(
-            &mut policy_feature_sets,
-            simple_moves,
-            fcd_per_move,
-            group_data,
-        );
+            converted.extend(
+                feature_sets
+                    .iter_mut()
+                    .map(|feature_set| PolicyFeatures::new::<S>(feature_set)),
+            );
+
+            self.features_for_moves(&mut converted, simple_moves, fcd_per_move, group_data);
+
+            converted.clear();
+            *policy_feature_sets = Some(converted.into_iter().map(|_| unreachable!()).collect())
+        }
 
         moves.extend(
             simple_moves

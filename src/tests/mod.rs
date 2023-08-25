@@ -193,6 +193,7 @@ fn moves_sorted_by_policy<const S: usize>(position: &Position<S>) -> Vec<(Move, 
         &mut legal_moves,
         &mut vec![],
         &mut vec![],
+        &mut Some(vec![]),
     );
     legal_moves.sort_by(|(_, score1), (_, score2)| score1.partial_cmp(score2).unwrap().reverse());
     legal_moves

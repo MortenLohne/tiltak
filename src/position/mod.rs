@@ -28,8 +28,8 @@ pub(crate) use utils::AbstractBoard;
 pub use mv::{Move, ReverseMove};
 
 use crate::evaluation::parameters::{
-    ValueFeatures, POLICY_PARAMS_4S, POLICY_PARAMS_5S, POLICY_PARAMS_6S, VALUE_PARAMS_4S,
-    VALUE_PARAMS_5S, VALUE_PARAMS_6S,
+    PolicyFeatures, ValueFeatures, POLICY_PARAMS_4S, POLICY_PARAMS_5S, POLICY_PARAMS_6S,
+    VALUE_PARAMS_4S, VALUE_PARAMS_5S, VALUE_PARAMS_6S,
 };
 use crate::evaluation::value_eval;
 use crate::position::color_trait::ColorTr;
@@ -978,6 +978,7 @@ impl<const S: usize> Position<S> {
         value_eval::static_eval_game_phase(self, &group_data, &mut value_features);
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn generate_moves_with_params(
         &self,
         params: &[f32],
@@ -986,6 +987,7 @@ impl<const S: usize> Position<S> {
         moves: &mut Vec<(<Self as PositionTrait>::Move, f32)>,
         fcd_per_move: &mut Vec<i8>,
         features: &mut Vec<Box<[f32]>>,
+        policy_feature_sets: &mut Option<Vec<PolicyFeatures<'static>>>,
     ) {
         debug_assert!(simple_moves.is_empty());
         self.generate_moves(simple_moves);
@@ -997,6 +999,7 @@ impl<const S: usize> Position<S> {
                 fcd_per_move,
                 moves,
                 features,
+                policy_feature_sets,
             ),
             Color::Black => self.generate_moves_with_probabilities_colortr::<BlackTr, WhiteTr>(
                 params,
@@ -1005,6 +1008,7 @@ impl<const S: usize> Position<S> {
                 fcd_per_move,
                 moves,
                 features,
+                policy_feature_sets,
             ),
         }
     }
@@ -1022,6 +1026,7 @@ impl<const S: usize> Position<S> {
         moves: &mut Vec<(Move, search::Score)>,
         fcd_per_move: &mut Vec<i8>,
         features: &mut Vec<Box<[f32]>>,
+        policy_feature_sets: &mut Option<Vec<PolicyFeatures<'static>>>,
     ) {
         self.generate_moves_with_params(
             Self::policy_params(),
@@ -1030,6 +1035,7 @@ impl<const S: usize> Position<S> {
             moves,
             fcd_per_move,
             features,
+            policy_feature_sets,
         )
     }
 
