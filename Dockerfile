@@ -1,9 +1,15 @@
-FROM clux/muslrust:stable AS builder
+FROM --platform=$BUILDPLATFORM rust:alpine3.18 AS builder
+ARG TARGETARCH
+
 COPY Cargo.toml .
 COPY Cargo.lock .
 COPY src src
-RUN cargo build --release
-RUN mv target/x86_64-unknown-linux-musl/release/main /.
+
+# Annoying hack because Go and Rust have different names for the CPU instruction sets
+RUN export TARGET_TRIPLE=$(echo $TARGETARCH-unknown-linux-musl | sed 's/arm64/aarch64/' | sed 's/amd64/x86_64/') && \
+  rustup target add $TARGET_TRIPLE && \
+  RUSTFLAGS="-Clinker=rust-lld" cargo build --target $TARGET_TRIPLE --release && \
+  mv target/$TARGET_TRIPLE/release/main /.
 
 FROM alpine:3.18
 COPY --from=builder /main /app/
