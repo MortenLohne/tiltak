@@ -7,7 +7,7 @@ spec:
     spec:
       containers:
       - name: tiltak-bench
-        image: mortenlohne/tiltak-bench:0.0.2
+        image: mortenlohne/tiltak-bench:0.0.4
         resources:
           limits:
             memory: 2500Mi
