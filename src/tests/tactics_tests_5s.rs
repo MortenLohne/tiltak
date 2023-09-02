@@ -193,3 +193,24 @@ fn impure_spread_onto_string_line() {
     };
     test_position.plays_correct_move_long_prop::<5>(&["3b3>111"]);
 }
+
+#[test]
+fn cap_movement_creating_tak_threat() {
+    let test_position = TestPosition {
+        tps_string: Some("x2,2,1,x/x,2,2,1,1/x,12,12112C,111112S,1/2,x,2,1,12S/1S,1C,1,1,1 2 21"),
+        move_strings: &[],
+        komi: Komi::default(),
+    };
+    test_position.plays_correct_move_long_prop::<5>(&["3c3-"]);
+}
+
+/// This is the continuation of the above tactics test
+#[test]
+fn place_anchor_flat_to_tinue() {
+    let test_position = TestPosition {
+        tps_string: Some("x2,2,1,x/x2,212,x,1/x,12,12,111112S,1/2,x,2112C,1,12S/1S,x,11C,1,1 2 23"),
+        move_strings: &[],
+        komi: Komi::default(),
+    };
+    test_position.plays_correct_move_long_prop::<5>(&["b1"]);
+}
