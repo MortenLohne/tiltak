@@ -214,3 +214,56 @@ fn place_anchor_flat_to_tinue() {
     };
     test_position.plays_correct_move_long_prop::<5>(&["b1"]);
 }
+
+#[test]
+fn place_cap_in_strong_line_for_tinue() {
+    let test_position = TestPosition {
+        tps_string: Some("2,x2,1,x/2,x2,1,x/2,12,x,1C,x/x2,2121,x2/x,1,112,x2 2 13"),
+        move_strings: &[],
+        komi: Komi::default(),
+    };
+    test_position.plays_correct_move_long_prop::<5>(&["Ca2"]);
+}
+
+#[test]
+fn delay_cap_placement_for_tinue() {
+    let test_position = TestPosition {
+        tps_string: Some("1,1,1C,x,21/1,x,2,x,12/2S,x,112,12,x/1,x,2,x2/1,x,2,x2 2 14"),
+        move_strings: &[],
+        komi: Komi::default(),
+    };
+    test_position.plays_correct_move_long_prop::<5>(&["d5"]);
+}
+
+/// Tinue goes 26... a4> 27. a3> c3<*!, which Tiltak struggles to see from afar
+#[test]
+fn pure_spread_avoiding_draw() {
+    let test_position = TestPosition {
+        tps_string: Some(
+            "21112,x,1C,1,1/22,1,x2,1/21S,2121122,21212C,x,1/x2,1,1,2S/1,x2,12,x 2 26",
+        ),
+        move_strings: &[],
+        komi: Komi::default(),
+    };
+    test_position.plays_correct_move_long_prop::<5>(&["a4>"]);
+}
+
+#[test]
+fn cap_throw_with_tinue() {
+    let test_position = TestPosition {
+        tps_string: Some("x2,22221C,x2/x2,22,x2/x3,2,x/x2,121112112,x2/x2,1221,x2 1 25"),
+        move_strings: &[],
+        komi: Komi::default(),
+    };
+    test_position.plays_correct_move_long_prop::<5>(&["4c5-112", "3c5-111", "4c5-211"]);
+}
+
+#[test]
+fn simple_capture_to_tinue() {
+    let test_position = TestPosition {
+        tps_string: Some("1,x2,1,1/1,1C,2,2,1/x,1,12C,1,2/x3,2,x/2,x2,2,x 2 9"),
+        move_strings: &[],
+        komi: Komi::default(),
+    };
+    test_position.plays_correct_move_long_prop::<5>(&["d4-"]);
+}
