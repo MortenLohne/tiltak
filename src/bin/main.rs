@@ -12,6 +12,8 @@ use rayon::prelude::*;
 
 use tiltak::evaluation::{parameters, value_eval};
 use tiltak::minmax;
+#[cfg(feature = "sqlite")]
+use tiltak::policy_sqlite;
 #[cfg(feature = "constant-tuning")]
 use tiltak::position::Role;
 use tiltak::position::{Komi, Move};
@@ -35,6 +37,8 @@ fn main() {
     println!(
         "perft <size>: Generate perft numbers of a given position, provided from a tps string"
     );
+    #[cfg(feature = "sqlite")]
+    println!("test_policy: Test how well policy scores find immediate wins in real games");
     loop {
         let mut input = String::new();
         let bytes_read = io::stdin().read_line(&mut input).unwrap();
@@ -118,6 +122,8 @@ fn main() {
                 return;
             }
             "analyze_openings" => analyze_openings::<6>(6_000_000),
+            #[cfg(feature = "sqlite")]
+            "test_policy" => policy_sqlite::check_all_games(),
             "game" => {
                 println!("Enter move list or a full PTN, then press enter followed by CTRL+D");
                 let mut input = String::new();
