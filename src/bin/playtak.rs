@@ -38,6 +38,7 @@ pub struct PlaytakSettings {
     rollout_temperature: f64,
     seek_game_time: Duration,
     seek_increment: Duration,
+    target_move_time: Option<Duration>,
     komi: Komi,
 }
 
@@ -112,6 +113,12 @@ pub fn main() -> Result<()> {
                  .takes_value(true)
                  .required(true),
         )
+        .arg(
+            Arg::with_name("targetMoveTime")
+                .long("target-move-time")
+                .conflicts_with("fixedNodes")
+                .help("Try spending no more than this number of seconds per move. Will occasionally search longer, assuming the time control allows")
+                .takes_value(true))
         .arg(Arg::with_name("allowChoosingColor")
             .long("allow-choosing-color")
             .help("Allow users to change the bot's seek color through chat")
@@ -232,6 +239,11 @@ pub fn main() -> Result<()> {
 
     let tc = matches.value_of("tc").map(parse_tc);
 
+    let target_move_time: Option<Duration> = matches
+        .value_of("targetMoveTime")
+        .map(|v| v.parse().unwrap())
+        .map(Duration::from_secs_f32);
+
     let komi = matches.value_of("komi").unwrap().parse().unwrap();
 
     let playtak_settings = PlaytakSettings {
@@ -245,6 +257,7 @@ pub fn main() -> Result<()> {
         rollout_temperature,
         seek_game_time: tc.unwrap_or_default().0,
         seek_increment: tc.unwrap_or_default().1,
+        target_move_time,
         komi,
     };
 
@@ -797,7 +810,12 @@ impl PlaytakSession {
                                 playtak_settings.to_mcts_setting()
                                 .arena_size(2_u32.pow(31));
 
-                            let maximum_time = our_time_left / 6 + game.increment / 2;
+
+                            let maximum_time = if let Some(target_move_time) =  playtak_settings.target_move_time {
+                                (our_time_left / 6 + game.increment / 2).min(2 * target_move_time)
+                            } else {
+                                our_time_left / 6 + game.increment / 2
+                            };
 
                             search::play_move_time(position.clone(), maximum_time, settings)
                         }
