@@ -160,8 +160,9 @@ pub fn check_all_games() {
     println!("\nFalse positives: ");
     for wrongg in false_positives.iter() {
         println!(
-            "{}, {}",
+            "{}, {} komi, {}",
             wrongg.0.position.to_fen(),
+            wrongg.0.position.komi(),
             wrongg.1.to_string::<5>()
         );
     }
