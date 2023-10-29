@@ -456,6 +456,13 @@ impl Direction {
         }
     }
 
+    pub(crate) fn orthogonal_directions(self) -> [Direction; 2] {
+        match self {
+            North | South => [West, East],
+            West | East => [North, South],
+        }
+    }
+
     pub(crate) fn parse(ch: char) -> Option<Self> {
         match ch {
             '+' => Some(North),
