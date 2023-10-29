@@ -121,7 +121,7 @@ impl<const S: usize> Position<S> {
         for (features_set, (mv, &mut fcd)) in
             feature_sets.iter_mut().zip(moves.iter().zip(fcd_per_move))
         {
-            self.features_for_move(features_set, mv, group_data);
+            self.features_for_move(features_set, mv, fcd, group_data);
 
             // FCD bonus for all movements
             if let Move::Move(square, _, _) = mv {
@@ -151,6 +151,7 @@ impl<const S: usize> Position<S> {
         &self,
         policy_features: &mut PolicyFeatures,
         mv: &Move,
+        fcd: i8,
         group_data: &GroupData<S>,
     ) {
         match self.side_to_move() {
@@ -158,12 +159,14 @@ impl<const S: usize> Position<S> {
                 self,
                 policy_features,
                 mv,
+                fcd,
                 group_data,
             ),
             Color::Black => features_for_move_colortr::<BlackTr, WhiteTr, S>(
                 self,
                 policy_features,
                 mv,
+                fcd,
                 group_data,
             ),
         }
@@ -237,6 +240,7 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usize>(
     position: &Position<S>,
     policy_features: &mut PolicyFeatures,
     mv: &Move,
+    fcd: i8,
     group_data: &GroupData<S>,
 ) {
     // If it's the first move, give every move equal probability
@@ -246,34 +250,31 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usize>(
 
     match mv {
         Move::Place(role, square) => {
-            let our_flatcount = Us::flats(group_data).count();
-            let their_flatcount = Them::flats(group_data).count();
+            let our_flatcount = Us::flats(group_data).count() as i8;
+            let their_flatcount = Them::flats(group_data).count() as i8;
 
-            let our_flatcount_after_move = match *role {
-                Flat => our_flatcount + 1,
-                Wall | Cap => our_flatcount,
-            };
+            let our_flatcount_after_move = our_flatcount + fcd;
 
-            let our_flat_lead_after_move = our_flatcount_after_move as i8 - their_flatcount as i8;
+            let our_flat_lead_after_move = our_flatcount_after_move - their_flatcount;
 
             // Apply special bonuses if the game ends on this move
-            if Us::stones_left(position) == 1 && Us::caps_left(position) == 0
+            if Us::stones_left(position) + Us::caps_left(position) == 1
                 || group_data.all_pieces().count() as usize == S * S - 1
             {
                 if Us::color() == Color::White {
-                    match position.komi().game_result_with_flatcounts(
-                        our_flatcount_after_move as i8,
-                        their_flatcount as i8,
-                    ) {
+                    match position
+                        .komi()
+                        .game_result_with_flatcounts(our_flatcount_after_move, their_flatcount)
+                    {
                         GameResult::WhiteWin => policy_features.place_to_win[0] = 1.0,
                         GameResult::BlackWin => policy_features.place_to_loss[0] = 1.0,
                         GameResult::Draw => policy_features.place_to_draw[0] = 1.0,
                     }
                 } else {
-                    match position.komi().game_result_with_flatcounts(
-                        their_flatcount as i8,
-                        our_flatcount_after_move as i8,
-                    ) {
+                    match position
+                        .komi()
+                        .game_result_with_flatcounts(their_flatcount, our_flatcount_after_move)
+                    {
                         GameResult::WhiteWin => policy_features.place_to_loss[0] = 1.0,
                         GameResult::BlackWin => policy_features.place_to_win[0] = 1.0,
                         GameResult::Draw => policy_features.place_to_draw[0] = 1.0,
@@ -281,14 +282,14 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usize>(
                 }
             }
             // Bonuses if our opponent can finish on flats next turn
-            else if Them::stones_left(position) == 1 && Them::caps_left(position) == 0
+            else if Them::stones_left(position) + Them::caps_left(position) == 1
                 || group_data.all_pieces().count() as usize == S * S - 2
             {
                 if Us::color() == Color::White {
-                    match position.komi().game_result_with_flatcounts(
-                        our_flatcount_after_move as i8,
-                        their_flatcount as i8 + 1,
-                    ) {
+                    match position
+                        .komi()
+                        .game_result_with_flatcounts(our_flatcount_after_move, their_flatcount + 1)
+                    {
                         GameResult::WhiteWin => {
                             policy_features.place_to_allow_opponent_to_end[2] = 1.0
                         }
@@ -298,10 +299,10 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usize>(
                         GameResult::Draw => policy_features.place_to_allow_opponent_to_end[1] = 1.0,
                     }
                 } else {
-                    match position.komi().game_result_with_flatcounts(
-                        their_flatcount as i8 + 1,
-                        our_flatcount_after_move as i8,
-                    ) {
+                    match position
+                        .komi()
+                        .game_result_with_flatcounts(their_flatcount + 1, our_flatcount_after_move)
+                    {
                         GameResult::WhiteWin => {
                             policy_features.place_to_allow_opponent_to_end[0] = 1.0
                         }
