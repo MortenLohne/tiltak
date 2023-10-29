@@ -1,7 +1,11 @@
-use std::collections::HashMap;
+use std::{
+    collections::HashMap,
+    sync::{atomic::AtomicUsize, Mutex},
+};
 
 use board_game_traits::{Color, GameResult, Position as BoardTrait};
 use pgn_traits::PgnPosition;
+use rayon::prelude::*;
 use rusqlite::Connection;
 
 use crate::{
@@ -61,7 +65,7 @@ struct AnalysisPosition {
     solution_result: Option<String>,
 }
 
-fn policy_finds_win(position: &Position<5>) -> bool {
+fn policy_finds_win(position: &Position<5>) -> Option<Move> {
     let mut simple_moves = vec![];
     let mut moves = vec![];
     let mut fcd_per_move = vec![];
@@ -90,36 +94,61 @@ fn policy_finds_win(position: &Position<5>) -> bool {
         &mut fcd_per_move,
         &position.group_data(),
     );
-    simple_moves
+    if simple_moves
         .iter()
-        .zip(policy_feature_sets)
+        .zip(policy_feature_sets.iter())
         .any(|(_, score)| score.decline_win[0] != 0.0)
+    {
+        simple_moves
+            .iter()
+            .zip(policy_feature_sets)
+            .find(|(_, score)| score.decline_win[0] == 0.0)
+            .map(|(mv, _)| mv.clone())
+    } else {
+        None
+    }
 }
 
 pub fn check_all_games() {
     let games = read_all_games();
     println!("Read {} games from database", games.len());
-    let mut true_positives = 0;
-    let mut false_positives = vec![];
-    let mut true_negative = 0;
-    let mut false_negatives = vec![];
-    let mut wrong_groups = HashMap::new();
-    for game in games {
+    let mut true_positives = AtomicUsize::new(0);
+    let false_positives = Mutex::new(vec![]);
+    let mut true_negative = AtomicUsize::new(0);
+    let false_negatives = Mutex::new(vec![]);
+    let wrong_groups = Mutex::new(HashMap::new());
+    games.par_iter().for_each(|game| {
         for win_position in game.clone().analysis_positions() {
             match (
                 policy_finds_win(&win_position.position),
                 win_position.solution_result.as_ref(),
             ) {
-                (true, Some(_)) => true_positives += 1,
-                (true, None) => false_positives.push(win_position.clone()),
-                (false, Some(solution_result)) => {
-                    *wrong_groups.entry(solution_result.clone()).or_insert(0) += 1;
-                    false_negatives.push(win_position.clone());
+                (Some(_), Some(_)) => {
+                    true_positives.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                 }
-                (false, None) => true_negative += 1,
+                (Some(mv), None) => false_positives
+                    .lock()
+                    .unwrap()
+                    .push((win_position.clone(), mv)),
+                (None, Some(solution_result)) => {
+                    *wrong_groups
+                        .lock()
+                        .unwrap()
+                        .entry(solution_result.clone())
+                        .or_insert(0) += 1;
+                    false_negatives.lock().unwrap().push(win_position.clone());
+                }
+                (None, None) => {
+                    true_negative.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                }
             }
         }
-    }
+    });
+
+    let false_positives = false_positives.into_inner().unwrap();
+    let false_negatives = false_negatives.into_inner().unwrap();
+    let wrong_groups = wrong_groups.into_inner().unwrap();
+
     println!("\nFalse negatives: ");
     for wrongg in false_negatives.iter() {
         println!(
@@ -130,12 +159,19 @@ pub fn check_all_games() {
     }
     println!("\nFalse positives: ");
     for wrongg in false_positives.iter() {
-        println!("{}", wrongg.position.to_fen());
+        println!(
+            "{}, {}",
+            wrongg.0.position.to_fen(),
+            wrongg.1.to_string::<5>()
+        );
     }
     println!(
         "Analyzed {} games, got {} true positives, {} false positives and {} false negatives",
-        true_positives + false_positives.len() + true_negative + false_negatives.len(),
-        true_positives,
+        *true_positives.get_mut()
+            + false_positives.len()
+            + *true_negative.get_mut()
+            + false_negatives.len(),
+        true_positives.get_mut(),
         false_positives.len(),
         false_negatives.len()
     );

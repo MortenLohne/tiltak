@@ -16,7 +16,7 @@ lto = true
 constant-tuning = ["rayon"]
 aws-lambda-runtime = ["lambda_runtime", "serde", "serde_json", "arrayvec/serde", "tokio"]
 aws-lambda-client = ["serde", "serde_json", "arrayvec/serde", "rusoto_core", "rusoto_lambda", "bytes", "tokio"]
-sqlite = ["rusqlite"]
+sqlite = ["rusqlite", "rayon"]
 
 [[bin]]
 name = "bootstrap"
