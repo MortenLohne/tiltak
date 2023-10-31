@@ -943,9 +943,25 @@ impl<const S: usize> Position<S> {
         params: &[f32],
         features: &mut [f32],
     ) -> f32 {
-        let mut value_features = ValueFeatures::new::<S>(features);
-        value_eval::static_eval_game_phase(self, group_data, &mut value_features);
-        let eval = features.iter().zip(params).map(|(a, b)| a * b).sum();
+        let (white_features, black_features) = features.split_at_mut(features.len() / 2);
+        let mut white_value_features = ValueFeatures::new::<S>(white_features);
+        let mut black_value_features = ValueFeatures::new::<S>(black_features);
+        value_eval::static_eval_game_phase(
+            self,
+            group_data,
+            &mut white_value_features,
+            &mut black_value_features,
+        );
+        let eval = white_features
+            .iter()
+            .zip(params)
+            .map(|(a, b)| a * b)
+            .sum::<f32>()
+            - black_features
+                .iter()
+                .zip(params)
+                .map(|(a, b)| a * b)
+                .sum::<f32>();
         for c in features.iter_mut() {
             *c = 0.0;
         }
@@ -974,8 +990,17 @@ impl<const S: usize> Position<S> {
         debug_assert!(self.game_result().is_none());
 
         let group_data = self.group_data();
-        let mut value_features = ValueFeatures::new::<S>(features);
-        value_eval::static_eval_game_phase(self, &group_data, &mut value_features);
+
+        let (white_features, black_features) = features.split_at_mut(features.len() / 2);
+        let mut white_value_features = ValueFeatures::new::<S>(white_features);
+        let mut black_value_features = ValueFeatures::new::<S>(black_features);
+
+        value_eval::static_eval_game_phase(
+            self,
+            &group_data,
+            &mut white_value_features,
+            &mut black_value_features,
+        );
     }
 
     #[allow(clippy::too_many_arguments)]

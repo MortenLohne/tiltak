@@ -363,18 +363,64 @@ fn analyze_position<const S: usize>(position: &Position<S>) {
     let group_data = position.group_data();
 
     let mut coefficients = vec![0.0; parameters::num_value_features::<S>()];
+    let coefficients_mid_index = coefficients.len() / 2;
+
+    let (white_coefficients, black_coefficients) =
+        coefficients.split_at_mut(coefficients_mid_index);
+
     {
-        let mut value_features = parameters::ValueFeatures::new::<S>(&mut coefficients);
-        value_eval::static_eval_game_phase::<S>(position, &group_data, &mut value_features);
+        let mut white_value_features = parameters::ValueFeatures::new::<S>(white_coefficients);
+        let mut black_value_features = parameters::ValueFeatures::new::<S>(black_coefficients);
+        value_eval::static_eval_game_phase::<S>(
+            position,
+            &group_data,
+            &mut white_value_features,
+            &mut black_value_features,
+        );
     }
-    for (feature, param) in coefficients.iter_mut().zip(<Position<S>>::value_params()) {
+    for (feature, param) in white_coefficients
+        .iter_mut()
+        .zip(<Position<S>>::value_params())
+    {
         *feature *= param;
     }
 
-    let value_features = parameters::ValueFeatures::new::<S>(&mut coefficients);
-    let value_features_string = format!("{:?}", value_features);
+    for (feature, param) in black_coefficients
+        .iter_mut()
+        .zip(<Position<S>>::value_params())
+    {
+        *feature *= param;
+    }
 
-    for line in value_features_string.split("],") {
+    let mut mixed_coefficients: Vec<f32> = white_coefficients
+        .iter()
+        .zip(black_coefficients.iter())
+        .map(|(white, black)| *white - *black)
+        .collect();
+
+    let white_value_features = parameters::ValueFeatures::new::<S>(white_coefficients);
+    let white_value_features_string = format!("{:?}", white_value_features);
+
+    let black_value_features = parameters::ValueFeatures::new::<S>(black_coefficients);
+    let black_value_features_string = format!("{:?}", black_value_features);
+
+    let mixed_value_features = parameters::ValueFeatures::new::<S>(&mut mixed_coefficients);
+    let mixed_value_features_string = format!("{:?}", mixed_value_features);
+
+    println!("White features:");
+    for line in white_value_features_string.split("],") {
+        let (name, values) = line.split_once(": ").unwrap();
+        println!("{:32}: {}],", name, values);
+    }
+    println!();
+    println!("Black features:");
+    for line in black_value_features_string.split("],") {
+        let (name, values) = line.split_once(": ").unwrap();
+        println!("{:32}: {}],", name, values);
+    }
+    println!();
+    println!("Mixed features:");
+    for line in mixed_value_features_string.split("],") {
         let (name, values) = line.split_once(": ").unwrap();
         println!("{:32}: {}],", name, values);
     }
