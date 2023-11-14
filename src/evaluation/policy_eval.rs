@@ -28,7 +28,7 @@ impl<const S: usize> Position<S> {
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn generate_moves_with_probabilities_colortr<Us: ColorTr, Them: ColorTr>(
         &self,
-        params: &[f32],
+        params_for_color: &[f32],
         group_data: &GroupData<S>,
         simple_moves: &mut Vec<Move>,
         fcd_per_move: &mut Vec<i8>,
@@ -39,7 +39,8 @@ impl<const S: usize> Position<S> {
         let num_moves = simple_moves.len();
 
         while feature_sets.len() < num_moves {
-            feature_sets.push(vec![0.0; parameters::num_policy_features::<S>()].into_boxed_slice());
+            feature_sets
+                .push(vec![0.0; parameters::num_policy_features::<S>() / 2].into_boxed_slice());
         }
 
         {
@@ -71,9 +72,14 @@ impl<const S: usize> Position<S> {
                 .zip(feature_sets)
                 .map(|(mv, features)| {
                     let offset = inverse_sigmoid(1.0 / num_moves as f32);
+                    assert_eq!(features.len(), params_for_color.len());
 
-                    let total_value: f32 =
-                        features.iter().zip(params).map(|(c, p)| c * p).sum::<f32>() + offset;
+                    let total_value: f32 = features
+                        .iter()
+                        .zip(params_for_color)
+                        .map(|(c, p)| c * p)
+                        .sum::<f32>()
+                        + offset;
 
                     for c in features.iter_mut() {
                         *c = 0.0;

@@ -88,7 +88,7 @@ fn play_random_games_prop<const S: usize>(num_games: usize) {
             position.generate_moves(&mut moves);
 
             let mut feature_sets =
-                vec![vec![0.0; parameters::num_policy_features::<S>()]; moves.len()];
+                vec![vec![0.0; parameters::num_policy_features::<S>() / 2]; moves.len()];
             let mut policy_feature_sets: Vec<PolicyFeatures> = feature_sets
                 .iter_mut()
                 .map(|feature_set| PolicyFeatures::new::<S>(feature_set))
