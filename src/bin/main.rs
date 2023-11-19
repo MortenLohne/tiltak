@@ -131,6 +131,13 @@ fn main() {
                 Some(s) => println!("Unsupported size {}", s),
                 None => print_value_features::<5>(),
             },
+            "policy_features" => match words.get(1) {
+                Some(&"4") => print_policy_features::<4>(),
+                Some(&"5") => print_policy_features::<5>(),
+                Some(&"6") => print_policy_features::<6>(),
+                Some(s) => println!("Unsupported size {}", s),
+                None => print_policy_features::<5>(),
+            },
             "game" => {
                 println!("Enter move list or a full PTN, then press enter followed by CTRL+D");
                 let mut input = String::new();
@@ -355,6 +362,30 @@ fn print_value_features<const S: usize>() {
     for line in black_value_features_string.split("],") {
         let (name, values) = line.split_once(": ").unwrap();
         println!("{:40}: {}],", name, values);
+    }
+}
+
+fn print_policy_features<const S: usize>() {
+    let mut params = <Position<S>>::policy_params().to_vec();
+    let num: usize = params.len() / 2;
+    let (white_coefficients, black_coefficients) = params.split_at_mut(num);
+
+    let white_policy_features = parameters::PolicyFeatures::new::<S>(white_coefficients);
+    let white_policy_features_string = format!("{:?}", white_policy_features);
+
+    let black_policy_features = parameters::PolicyFeatures::new::<S>(black_coefficients);
+    let black_policy_features_string = format!("{:?}", black_policy_features);
+
+    println!("White features:");
+    for line in white_policy_features_string.split("],") {
+        let (name, values) = line.split_once(": ").unwrap();
+        println!("{:48}: {}],", name, values);
+    }
+    println!();
+    println!("Black features:");
+    for line in black_policy_features_string.split("],") {
+        let (name, values) = line.split_once(": ").unwrap();
+        println!("{:48}: {}],", name, values);
     }
 }
 
