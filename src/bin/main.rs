@@ -124,6 +124,13 @@ fn main() {
             "analyze_openings" => analyze_openings::<6>(6_000_000),
             #[cfg(feature = "sqlite")]
             "test_policy" => policy_sqlite::check_all_games(),
+            "value_features" => match words.get(1) {
+                Some(&"4") => print_value_features::<4>(),
+                Some(&"5") => print_value_features::<5>(),
+                Some(&"6") => print_value_features::<6>(),
+                Some(s) => println!("Unsupported size {}", s),
+                None => print_value_features::<5>(),
+            },
             "game" => {
                 println!("Enter move list or a full PTN, then press enter followed by CTRL+D");
                 let mut input = String::new();
@@ -325,6 +332,30 @@ fn mcts_vs_minmax(minmax_depth: u16, mcts_nodes: u64) {
     println!();
 
     println!("\n{:?}\nResult: {:?}", position, position.game_result());
+}
+
+fn print_value_features<const S: usize>() {
+    let mut params = <Position<S>>::value_params().to_vec();
+    let num: usize = params.len() / 2;
+    let (white_coefficients, black_coefficients) = params.split_at_mut(num);
+
+    let white_value_features = parameters::ValueFeatures::new::<S>(white_coefficients);
+    let white_value_features_string = format!("{:?}", white_value_features);
+
+    let black_value_features = parameters::ValueFeatures::new::<S>(black_coefficients);
+    let black_value_features_string = format!("{:?}", black_value_features);
+
+    println!("White features:");
+    for line in white_value_features_string.split("],") {
+        let (name, values) = line.split_once(": ").unwrap();
+        println!("{:40}: {}],", name, values);
+    }
+    println!();
+    println!("Black features:");
+    for line in black_value_features_string.split("],") {
+        let (name, values) = line.split_once(": ").unwrap();
+        println!("{:40}: {}],", name, values);
+    }
 }
 
 fn analyze_position_from_ptn<const S: usize>() {
