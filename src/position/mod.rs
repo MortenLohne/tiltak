@@ -954,14 +954,11 @@ impl<const S: usize> Position<S> {
         );
         let eval = white_features
             .iter()
+            .chain(black_features.iter())
             .zip(params)
             .map(|(a, b)| a * b)
-            .sum::<f32>()
-            - black_features
-                .iter()
-                .zip(params)
-                .map(|(a, b)| a * b)
-                .sum::<f32>();
+            .sum::<f32>();
+
         for c in features.iter_mut() {
             *c = 0.0;
         }

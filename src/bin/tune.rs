@@ -1,4 +1,5 @@
 use std::path::Path;
+use std::str::FromStr;
 
 use clap::{App, Arg, SubCommand};
 
@@ -7,6 +8,7 @@ use tiltak::evaluation::parameters::{
     NUM_VALUE_FEATURES_5S, NUM_VALUE_FEATURES_6S, POLICY_PARAMS_4S, POLICY_PARAMS_5S,
     POLICY_PARAMS_6S, VALUE_PARAMS_4S, VALUE_PARAMS_5S, VALUE_PARAMS_6S,
 };
+use tiltak::position::Komi;
 use tiltak::tune::{spsa, training};
 
 fn main() {
@@ -63,6 +65,11 @@ fn main() {
 
     let matches = app.get_matches();
     let size: usize = matches.value_of("size").unwrap().parse().unwrap();
+    let komis = [
+        // Komi::from_str("0.0").unwrap(),
+        // Komi::from_str("2.0").unwrap(),
+        Komi::from_str("4.0").unwrap(),
+    ];
 
     match matches.subcommand() {
         ("selfplay", _) => {
@@ -75,7 +82,13 @@ fn main() {
                             NUM_VALUE_FEATURES_4S,
                             NUM_POLICY_FEATURES_4S,
                         >(
-                            i, &VALUE_PARAMS_4S, &POLICY_PARAMS_4S, vec![], vec![], 0
+                            i,
+                            &komis,
+                            &VALUE_PARAMS_4S,
+                            &POLICY_PARAMS_4S,
+                            vec![],
+                            vec![],
+                            0,
                         )
                         .unwrap(),
                         5 => training::train_perpetually::<
@@ -83,7 +96,13 @@ fn main() {
                             NUM_VALUE_FEATURES_5S,
                             NUM_POLICY_FEATURES_5S,
                         >(
-                            i, &VALUE_PARAMS_5S, &POLICY_PARAMS_5S, vec![], vec![], 0
+                            i,
+                            &komis,
+                            &VALUE_PARAMS_5S,
+                            &POLICY_PARAMS_5S,
+                            vec![],
+                            vec![],
+                            0,
                         )
                         .unwrap(),
                         6 => training::train_perpetually::<
@@ -91,7 +110,13 @@ fn main() {
                             NUM_VALUE_FEATURES_6S,
                             NUM_POLICY_FEATURES_6S,
                         >(
-                            i, &VALUE_PARAMS_6S, &POLICY_PARAMS_6S, vec![], vec![], 0
+                            i,
+                            &komis,
+                            &VALUE_PARAMS_6S,
+                            &POLICY_PARAMS_6S,
+                            vec![],
+                            vec![],
+                            0,
                         )
                         .unwrap(),
                         _ => panic!("Size {} not supported.", size),
@@ -104,26 +129,26 @@ fn main() {
         }
         ("selfplay-from-scratch", _) => {
             for i in 0.. {
-                let file_name = format!("games{}_s{}_batch0.ptn", i, size);
+                let file_name = format!("games{}_{}s_batch0.ptn", i, size);
                 if !Path::new(&file_name).exists() {
                     match size {
                         4 => training::train_from_scratch::<
                             4,
                             NUM_VALUE_FEATURES_4S,
                             NUM_POLICY_FEATURES_4S,
-                        >(i)
+                        >(i, &komis)
                         .unwrap(),
                         5 => training::train_from_scratch::<
                             5,
                             NUM_VALUE_FEATURES_5S,
                             NUM_POLICY_FEATURES_5S,
-                        >(i)
+                        >(i, &komis)
                         .unwrap(),
                         6 => training::train_from_scratch::<
                             6,
                             NUM_VALUE_FEATURES_6S,
                             NUM_POLICY_FEATURES_6S,
-                        >(i)
+                        >(i, &komis)
                         .unwrap(),
                         _ => panic!("Size {} not supported.", size),
                     }
@@ -139,18 +164,21 @@ fn main() {
                 4 => {
                     training::continue_training::<4, NUM_VALUE_FEATURES_4S, NUM_POLICY_FEATURES_4S>(
                         training_id,
+                        &komis,
                     )
                     .unwrap()
                 }
                 5 => {
                     training::continue_training::<5, NUM_VALUE_FEATURES_5S, NUM_POLICY_FEATURES_5S>(
                         training_id,
+                        &komis,
                     )
                     .unwrap()
                 }
                 6 => {
                     training::continue_training::<6, NUM_VALUE_FEATURES_6S, NUM_POLICY_FEATURES_6S>(
                         training_id,
+                        &komis,
                     )
                     .unwrap()
                 }

@@ -1,4 +1,4 @@
-use crate::position::Move;
+use crate::position::{Komi, Move};
 use crate::search::{MctsSetting, TimeControl};
 use crate::tune::openings::openings_from_file;
 /// Tune search variable using a version of SPSA (Simultaneous perturbation stochastic approximation),
@@ -99,6 +99,7 @@ fn tuning_iteration<R: rand::Rng, const S: usize>(
     let (game, _) = play_game::<S>(
         &player1_settings,
         &player2_settings,
+        Komi::default(),
         opening,
         0.2,
         &TimeControl::Time(Duration::from_secs(20), Duration::from_millis(200)),

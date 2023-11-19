@@ -412,7 +412,7 @@ fn analyze_position_from_tps<const S: usize>() {
     println!("Enter TPS");
     let mut input = String::new();
     io::stdin().read_line(&mut input).unwrap();
-    let position = <Position<S>>::from_fen_with_komi(&input, Komi::try_from(0.0).unwrap()).unwrap();
+    let position = <Position<S>>::from_fen_with_komi(&input, Komi::try_from(4.0).unwrap()).unwrap();
     analyze_position(&position)
 }
 
@@ -440,17 +440,19 @@ fn analyze_position<const S: usize>(position: &Position<S>) {
             &mut black_value_features,
         );
     }
-    for (feature, param) in white_coefficients
-        .iter_mut()
-        .zip(<Position<S>>::value_params())
-    {
+    for (feature, param) in white_coefficients.iter_mut().zip(
+        <Position<S>>::value_params()
+            .iter()
+            .take(coefficients_mid_index),
+    ) {
         *feature *= param;
     }
 
-    for (feature, param) in black_coefficients
-        .iter_mut()
-        .zip(<Position<S>>::value_params())
-    {
+    for (feature, param) in black_coefficients.iter_mut().zip(
+        <Position<S>>::value_params()
+            .iter()
+            .skip(coefficients_mid_index),
+    ) {
         *feature *= param;
     }
 
@@ -502,9 +504,17 @@ fn analyze_position<const S: usize>(position: &Position<S>) {
     moves.sort_by(|(_mv, score1), (_, score2)| score1.partial_cmp(score2).unwrap().reverse());
 
     let mut feature_sets = vec![vec![0.0; parameters::num_policy_features::<S>()]; moves.len()];
+    let num_features = feature_sets[0].len();
     let mut policy_feature_sets: Vec<_> = feature_sets
         .iter_mut()
-        .map(|feature_set| parameters::PolicyFeatures::new::<S>(feature_set))
+        .map(|feature_set| match position.side_to_move() {
+            Color::White => {
+                parameters::PolicyFeatures::new::<S>(&mut feature_set[0..num_features / 2])
+            }
+            Color::Black => {
+                parameters::PolicyFeatures::new::<S>(&mut feature_set[num_features / 2..])
+            }
+        })
         .collect();
 
     let simple_moves: Vec<Move> = moves.iter().map(|(mv, _)| mv.clone()).collect();

@@ -6,6 +6,7 @@ use std::time;
 use std::{error, fs, io};
 
 use crate::evaluation::parameters::PolicyFeatures;
+use crate::position::Komi;
 use crate::search::TimeControl;
 use board_game_traits::Color;
 use board_game_traits::GameResult;
@@ -32,6 +33,7 @@ type MoveScoresForGame = Vec<Vec<MoveScore>>;
 
 pub fn train_from_scratch<const S: usize, const N: usize, const M: usize>(
     training_id: usize,
+    komis: &[Komi],
 ) -> Result<(), DynError> {
     let mut rng = rand::rngs::StdRng::from_seed([0; 32]);
 
@@ -41,6 +43,7 @@ pub fn train_from_scratch<const S: usize, const N: usize, const M: usize>(
 
     train_perpetually::<S, N, M>(
         training_id,
+        komis,
         &initial_value_params,
         &initial_policy_params,
         vec![],
@@ -51,6 +54,7 @@ pub fn train_from_scratch<const S: usize, const N: usize, const M: usize>(
 
 pub fn continue_training<const S: usize, const N: usize, const M: usize>(
     training_id: usize,
+    komis: &[Komi],
 ) -> Result<(), DynError> {
     let mut games = vec![];
     let mut move_scores = vec![];
@@ -89,6 +93,7 @@ pub fn continue_training<const S: usize, const N: usize, const M: usize>(
 
     train_perpetually::<S, N, M>(
         training_id,
+        komis,
         &<[f32; N]>::try_from(<Position<S>>::value_params())?,
         &<[f32; M]>::try_from(<Position<S>>::policy_params())?,
         games,
@@ -99,15 +104,16 @@ pub fn continue_training<const S: usize, const N: usize, const M: usize>(
 
 pub fn train_perpetually<const S: usize, const N: usize, const M: usize>(
     training_id: usize,
+    komis: &[Komi],
     initial_value_params: &[f32; N],
     initial_policy_params: &[f32; M],
     mut all_games: Vec<Game<Position<S>>>,
     mut all_move_scores: Vec<MoveScoresForGame>,
     mut batch_id: usize,
 ) -> Result<(), DynError> {
-    const BATCH_SIZE: usize = 1000;
+    const BATCH_SIZE: usize = 500;
     // Only train from the last n batches
-    const BATCHES_FOR_TRAINING: usize = 10;
+    const BATCHES_FOR_TRAINING: usize = 50;
 
     let mut last_value_params = *initial_value_params;
     let mut last_policy_params = *initial_policy_params;
@@ -128,6 +134,7 @@ pub fn train_perpetually<const S: usize, const N: usize, const M: usize>(
             .into_par_iter()
             .map(|i| {
                 play_game_pair::<S>(
+                    komis,
                     &last_value_params,
                     &last_policy_params,
                     &value_params,
@@ -244,7 +251,9 @@ pub fn train_perpetually<const S: usize, const N: usize, const M: usize>(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn play_game_pair<const S: usize>(
+    komis: &[Komi],
     last_value_params: &[f32],
     last_policy_params: &[f32],
     value_params: &[f32],
@@ -261,13 +270,15 @@ fn play_game_pair<const S: usize>(
         .add_value_params(last_value_params.to_vec())
         .add_policy_params(last_policy_params.to_vec())
         .add_dirichlet(0.2);
+    let komi = komis[i % komis.len()];
     if i % 2 == 0 {
         let game = play_game::<S>(
             &settings,
             &last_settings,
+            komi,
             &[],
             1.0,
-            &TimeControl::FixedNodes(100_000),
+            &TimeControl::FixedNodes(50_000),
         );
         match game.0.game_result() {
             Some(GameResult::WhiteWin) => {
@@ -283,9 +294,10 @@ fn play_game_pair<const S: usize>(
         let game = play_game::<S>(
             &last_settings,
             &settings,
+            komi,
             &[],
             1.0,
-            &TimeControl::FixedNodes(100_000),
+            &TimeControl::FixedNodes(50_000),
         );
         match game.0.game_result() {
             Some(GameResult::BlackWin) => {

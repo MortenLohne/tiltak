@@ -570,7 +570,7 @@ impl PlaytakSession {
         color: Option<Color>,
     ) -> Result<()> {
         self.send_line(&format!(
-            "Seek {} {} {} {} {} {} {} 0 0 ",
+            "Seek {} {} {} {} {} {} {} 1 0 ",
             size,
             playtak_settings.seek_game_time.as_secs(),
             playtak_settings.seek_increment.as_secs(),
