@@ -39,8 +39,7 @@ impl<const S: usize> Position<S> {
         let num_moves = simple_moves.len();
 
         while feature_sets.len() < num_moves {
-            feature_sets
-                .push(vec![0.0; parameters::num_policy_features::<S>() / 2].into_boxed_slice());
+            feature_sets.push(vec![0.0; parameters::num_policy_features::<S>()].into_boxed_slice());
         }
 
         {
@@ -298,14 +297,31 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usize>(
                 Them::critical_squares(group_data) & (!group_data.all_pieces());
 
             // Apply PSQT
-            match role {
-                Flat => {
-                    policy_features.flat_psqt[square_symmetries::<S>()[square.0 as usize]] = 1.0
+            match (role, position.side_to_move()) {
+                (Flat, Color::White) => {
+                    policy_features.flat_psqt_white[square_symmetries::<S>()[square.0 as usize]] =
+                        1.0
                 }
-                Wall => {
-                    policy_features.wall_psqt[square_symmetries::<S>()[square.0 as usize]] = 1.0
+                (Flat, Color::Black) => {
+                    policy_features.flat_psqt_black[square_symmetries::<S>()[square.0 as usize]] =
+                        1.0
                 }
-                Cap => policy_features.cap_psqt[square_symmetries::<S>()[square.0 as usize]] = 1.0,
+                (Wall, Color::White) => {
+                    policy_features.wall_psqt_white[square_symmetries::<S>()[square.0 as usize]] =
+                        1.0
+                }
+                (Wall, Color::Black) => {
+                    policy_features.wall_psqt_black[square_symmetries::<S>()[square.0 as usize]] =
+                        1.0
+                }
+                (Cap, Color::White) => {
+                    policy_features.cap_psqt_white[square_symmetries::<S>()[square.0 as usize]] =
+                        1.0
+                }
+                (Cap, Color::Black) => {
+                    policy_features.cap_psqt_black[square_symmetries::<S>()[square.0 as usize]] =
+                        1.0
+                }
             }
 
             let role_id = match *role {
@@ -446,8 +462,6 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usize>(
             }
 
             if *role == Wall {
-                policy_features.wall_psqt[square_symmetries::<S>()[square.0 as usize]] = 1.0;
-
                 if !their_open_critical_squares.is_empty() {
                     if their_open_critical_squares == BitBoard::empty().set(square.0) {
                         policy_features.place_their_critical_square[1] += 1.0;
@@ -547,8 +561,10 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usize>(
                 Wall => 1,
                 Cap => 2,
             };
-
-            policy_features.move_role_bonus[role_id] += 1.0;
+            match position.side_to_move() {
+                Color::White => policy_features.move_role_bonus_white[role_id] += 1.0,
+                Color::Black => policy_features.move_role_bonus_black[role_id] += 1.0,
+            }
 
             if stack_movement.len() == 1
                 && stack_movement.get_first::<S>().pieces_to_take == 1

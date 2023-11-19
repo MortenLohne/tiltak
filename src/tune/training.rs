@@ -8,7 +8,6 @@ use std::{error, fs, io};
 use crate::evaluation::parameters::PolicyFeatures;
 use crate::position::Komi;
 use crate::search::TimeControl;
-use board_game_traits::Color;
 use board_game_traits::GameResult;
 use board_game_traits::Position as PositionTrait;
 use pgn_traits::PgnPosition;
@@ -441,10 +440,7 @@ pub fn tune_value_and_policy<const S: usize, const N: usize, const M: usize>(
             let mut feature_sets = vec![[0.0; M]; move_scores.len()];
             let mut policy_feature_sets: Vec<PolicyFeatures> = feature_sets
                 .iter_mut()
-                .map(|feature_set| match position.side_to_move() {
-                    Color::White => PolicyFeatures::new::<S>(&mut feature_set[0..M / 2]),
-                    Color::Black => PolicyFeatures::new::<S>(&mut feature_set[M / 2..]),
-                })
+                .map(|feature_set| PolicyFeatures::new::<S>(feature_set))
                 .collect();
             let moves: Vec<Move> = move_scores.iter().map(|(mv, _score)| mv.clone()).collect();
 

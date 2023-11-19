@@ -504,17 +504,9 @@ fn analyze_position<const S: usize>(position: &Position<S>) {
     moves.sort_by(|(_mv, score1), (_, score2)| score1.partial_cmp(score2).unwrap().reverse());
 
     let mut feature_sets = vec![vec![0.0; parameters::num_policy_features::<S>()]; moves.len()];
-    let num_features = feature_sets[0].len();
     let mut policy_feature_sets: Vec<_> = feature_sets
         .iter_mut()
-        .map(|feature_set| match position.side_to_move() {
-            Color::White => {
-                parameters::PolicyFeatures::new::<S>(&mut feature_set[0..num_features / 2])
-            }
-            Color::Black => {
-                parameters::PolicyFeatures::new::<S>(&mut feature_set[num_features / 2..])
-            }
-        })
+        .map(|feature_set| parameters::PolicyFeatures::new::<S>(feature_set))
         .collect();
 
     let simple_moves: Vec<Move> = moves.iter().map(|(mv, _)| mv.clone()).collect();

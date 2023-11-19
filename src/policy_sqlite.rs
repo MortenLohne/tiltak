@@ -79,7 +79,7 @@ fn policy_finds_win(position: &Position<5>) -> Option<Move> {
         &mut Some(vec![]),
     );
 
-    let mut feature_sets = vec![vec![0.0; parameters::num_policy_features::<5>() / 2]; moves.len()];
+    let mut feature_sets = vec![vec![0.0; parameters::num_policy_features::<5>()]; moves.len()];
 
     let mut policy_feature_sets: Vec<_> = feature_sets
         .iter_mut()

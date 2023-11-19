@@ -1015,7 +1015,7 @@ impl<const S: usize> Position<S> {
         self.generate_moves(simple_moves);
         match self.side_to_move() {
             Color::White => self.generate_moves_with_probabilities_colortr::<WhiteTr, BlackTr>(
-                &params[0..params.len() / 2],
+                params,
                 group_data,
                 simple_moves,
                 fcd_per_move,
@@ -1024,7 +1024,7 @@ impl<const S: usize> Position<S> {
                 policy_feature_sets,
             ),
             Color::Black => self.generate_moves_with_probabilities_colortr::<BlackTr, WhiteTr>(
-                &params[params.len() / 2..],
+                params,
                 group_data,
                 simple_moves,
                 fcd_per_move,
