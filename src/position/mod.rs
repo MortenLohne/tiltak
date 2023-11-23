@@ -601,19 +601,23 @@ impl<const S: usize> Position<S> {
 
     fn is_critical_square_from_scratch(
         &self,
-        groups: &AbstractBoard<u8, S>,
-        amount_in_group: &[(u8, GroupEdgeConnection)],
+        group_data: &GroupData<S>,
         square: Square,
         color: Color,
     ) -> bool {
-        let sum_of_connections = square
-            .neighbours::<S>()
-            .filter(|neighbour| self[*neighbour].top_stone().map(Piece::color) == Some(color))
-            .map(|neighbour| amount_in_group[groups[neighbour] as usize].1)
-            .fold(
-                GroupEdgeConnection::default().connect_square::<S>(square),
-                |acc, connection| acc | connection,
-            );
+        let neighbors_bitboard = utils::lookup_neighbor_table::<S>(square);
+        let our_road_stones = match color {
+            Color::White => group_data.white_road_pieces(),
+            Color::Black => group_data.black_road_pieces(),
+        };
+
+        let mut our_neighbors = neighbors_bitboard & our_road_stones;
+        let mut sum_of_connections = GroupEdgeConnection::default().connect_square::<S>(square);
+        while let Some(neighbor_square) = our_neighbors.occupied_square() {
+            sum_of_connections = sum_of_connections
+                | group_data.amount_in_group[group_data.groups[neighbor_square] as usize].1;
+            our_neighbors = our_neighbors.clear(neighbor_square.0);
+        }
 
         sum_of_connections.is_winning()
     }
@@ -742,20 +746,10 @@ impl<const S: usize> Position<S> {
         }
 
         for square in utils::squares_iterator::<S>() {
-            if self.is_critical_square_from_scratch(
-                &group_data.groups,
-                &group_data.amount_in_group,
-                square,
-                Color::White,
-            ) {
+            if self.is_critical_square_from_scratch(&group_data, square, Color::White) {
                 group_data.white_critical_squares = group_data.white_critical_squares.set(square.0);
             }
-            if self.is_critical_square_from_scratch(
-                &group_data.groups,
-                &group_data.amount_in_group,
-                square,
-                Color::Black,
-            ) {
+            if self.is_critical_square_from_scratch(&group_data, square, Color::Black) {
                 group_data.black_critical_squares = group_data.black_critical_squares.set(square.0);
             }
         }
