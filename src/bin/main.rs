@@ -155,6 +155,7 @@ fn main() {
             }
             "mem_usage" => mem_usage(),
             "bench" => bench(),
+            "bench_old" => bench_old(),
             "selfplay" => mcts_selfplay(time::Duration::from_secs(10)),
             s => println!("Unknown option \"{}\"", s),
         }
@@ -572,6 +573,39 @@ fn play_human(mut position: Position<5>) {
 }
 
 fn bench() {
+    println!("Starting benchmark");
+    const NODES: u32 = 5_000_000;
+    let start_time = time::Instant::now();
+
+    let position = <Position<6>>::default();
+    let settings = search::MctsSetting::default().arena_size_for_nodes(NODES);
+    let mut tree = search::MonteCarloTree::with_settings(position, settings);
+    let mut last_iteration_start_time = time::Instant::now();
+    for n in 1..=NODES {
+        tree.select().unwrap();
+        if n % 500_000 == 0 {
+            let knps = 500.0 / last_iteration_start_time.elapsed().as_secs_f32();
+            last_iteration_start_time = time::Instant::now();
+            println!(
+                "n={}, {:.2}s, {:.1} knps",
+                n,
+                start_time.elapsed().as_secs_f32(),
+                knps
+            );
+        }
+    }
+
+    let (mv, score) = tree.best_move();
+
+    println!(
+        "{}: {:.2}%, {:.2}s",
+        mv.to_string::<6>(),
+        score * 100.0,
+        start_time.elapsed().as_secs_f32()
+    );
+}
+
+fn bench_old() {
     const NODES: u64 = 1_000_000;
     let start_time = time::Instant::now();
     {
