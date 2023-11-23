@@ -1,13 +1,22 @@
 use crate::position::{num_line_symmetries, num_square_symmetries};
 
 pub const NUM_VALUE_FEATURES_4S: usize = 87;
-pub const NUM_POLICY_FEATURES_4S: usize = 157;
+pub const NUM_POLICY_FEATURES_4S: usize = 160;
 
 pub const NUM_VALUE_FEATURES_5S: usize = 124;
 pub const NUM_POLICY_FEATURES_5S: usize = 176;
 
 pub const NUM_VALUE_FEATURES_6S: usize = 134;
-pub const NUM_POLICY_FEATURES_6S: usize = 186;
+pub const NUM_POLICY_FEATURES_6S: usize = 192;
+
+fn policy_padding<const S: usize>() -> usize {
+    match S {
+        4 => 3,
+        5 => 0,
+        6 => 6,
+        _ => panic!("Unsupported size {}", S),
+    }
+}
 
 #[derive(Debug)]
 pub struct ValueFeatures<'a> {
@@ -151,6 +160,7 @@ pub struct PolicyFeatures<'a> {
     pub continue_spread: &'a mut [f32],
     pub move_onto_critical_square: &'a mut [f32],
     pub spread_that_connects_groups_to_win: &'a mut [f32],
+    pub padding: &'a mut [f32],
 }
 
 impl<'a> PolicyFeatures<'a> {
@@ -211,6 +221,7 @@ impl<'a> PolicyFeatures<'a> {
         let (continue_spread, coefficients) = coefficients.split_at_mut(3);
         let (move_onto_critical_square, coefficients) = coefficients.split_at_mut(3);
         let (spread_that_connects_groups_to_win, coefficients) = coefficients.split_at_mut(1);
+        let (padding, coefficients) = coefficients.split_at_mut(policy_padding::<S>());
 
         assert!(coefficients.is_empty());
 
@@ -267,6 +278,7 @@ impl<'a> PolicyFeatures<'a> {
             continue_spread,
             move_onto_critical_square,
             spread_that_connects_groups_to_win,
+            padding,
         }
     }
 }
@@ -539,6 +551,9 @@ pub const POLICY_PARAMS_4S: [f32; NUM_POLICY_FEATURES_4S] = [
     1.9311372,
     0.45529217,
     3.3508844,
+    0.0,
+    0.0,
+    0.0,
 ];
 
 #[allow(clippy::unreadable_literal)]
@@ -1175,4 +1190,10 @@ pub const POLICY_PARAMS_6S: [f32; NUM_POLICY_FEATURES_6S] = [
     2.821259,
     0.94532365,
     3.0151558,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
 ];
