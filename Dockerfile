@@ -8,10 +8,11 @@ COPY src src
 # Annoying hack because Go and Rust have different names for the CPU instruction sets
 RUN export TARGET_TRIPLE=$(echo $TARGETARCH-unknown-linux-musl | sed 's/arm64/aarch64/' | sed 's/amd64/x86_64/') && \
   rustup target add $TARGET_TRIPLE && \
-  RUSTFLAGS="-Clinker=rust-lld" cargo build --target $TARGET_TRIPLE --release && \
+  RUSTFLAGS="-Clinker=rust-lld -C target-cpu=haswell" cargo build --target $TARGET_TRIPLE --release && \
   mv target/$TARGET_TRIPLE/release/main /.
 
 FROM alpine:3.18
 COPY --from=builder /main /app/
 EXPOSE 8080
+ENV BENCH=true
 ENTRYPOINT ["/app/main"]
