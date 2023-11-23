@@ -1,3 +1,5 @@
+use std::array;
+
 use crate::evaluation::parameters;
 use arrayvec::ArrayVec;
 use board_game_traits::{Color, GameResult, Position as PositionTrait};
@@ -72,8 +74,18 @@ impl<const S: usize> Position<S> {
                 .map(|(mv, features)| {
                     let offset = inverse_sigmoid(1.0 / num_moves as f32);
 
-                    let total_value: f32 =
-                        features.iter().zip(params).map(|(c, p)| c * p).sum::<f32>() + offset;
+                    const SIMD_WIDTH: usize = 8;
+                    assert_eq!(features.len() % SIMD_WIDTH, 0);
+                    assert_eq!(features.len(), params.len());
+
+                    let partial_sums: [f32; SIMD_WIDTH] = features
+                        .chunks_exact(SIMD_WIDTH)
+                        .zip(params.chunks_exact(SIMD_WIDTH))
+                        .fold([0.0; SIMD_WIDTH], |acc, (c, p)| {
+                            array::from_fn(|i| acc[i] + c[i] * p[i])
+                        });
+
+                    let total_value = partial_sums.iter().sum::<f32>() + offset;
 
                     for c in features.iter_mut() {
                         *c = 0.0;
