@@ -3,6 +3,8 @@ use crate::position::utils::Square;
 use serde::{Deserialize, Serialize};
 use std::{fmt, ops};
 
+use super::Direction;
+
 #[derive(PartialEq, Eq, Clone, Copy, Hash, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub(crate) struct BitBoard {
@@ -89,7 +91,7 @@ impl BitBoard {
     }
     // Sets the square to true
     #[inline]
-    pub fn set(self, i: u8) -> Self {
+    pub const fn set(self, i: u8) -> Self {
         debug_assert!(i < 64);
         BitBoard::from_u64(self.board | 1 << i)
     }
@@ -134,6 +136,34 @@ impl BitBoard {
     #[inline]
     pub fn count(self) -> u8 {
         self.board.count_ones() as u8
+    }
+
+    // Get a bitboard with only the square's neighbors set
+    // Note: The implementation is somewhat convoluted in order to work in const contexts.
+    pub const fn neighbors<const S: usize>(square: Square) -> BitBoard {
+        let mut board = BitBoard::empty();
+        if let Some(north) = square.go_direction::<S>(Direction::North) {
+            board = board.set(north.0);
+        }
+        if let Some(west) = square.go_direction::<S>(Direction::West) {
+            board = board.set(west.0);
+        }
+        if let Some(east) = square.go_direction::<S>(Direction::East) {
+            board = board.set(east.0);
+        }
+        if let Some(south) = square.go_direction::<S>(Direction::South) {
+            board = board.set(south.0);
+        }
+        board
+    }
+
+    #[inline]
+    pub fn occupied_square(self) -> Option<Square> {
+        if self.is_empty() {
+            None
+        } else {
+            Some(Square(self.board.trailing_zeros() as u8))
+        }
     }
 }
 

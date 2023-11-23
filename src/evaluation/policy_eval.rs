@@ -5,11 +5,11 @@ use board_game_traits::{Color, GameResult, Position as PositionTrait};
 use crate::evaluation::parameters::PolicyFeatures;
 use crate::position::bitboard::BitBoard;
 use crate::position::color_trait::{BlackTr, ColorTr, WhiteTr};
-use crate::position::AbstractBoard;
 use crate::position::Direction::*;
 use crate::position::Role::{Cap, Flat, Wall};
 use crate::position::{square_symmetries, GroupData, Piece, Position, Role};
 use crate::position::{squares_iterator, Move};
+use crate::position::{AbstractBoard, Direction};
 use crate::position::{GroupEdgeConnection, Square};
 use crate::search;
 
@@ -121,7 +121,7 @@ impl<const S: usize> Position<S> {
         for (features_set, (mv, &mut fcd)) in
             feature_sets.iter_mut().zip(moves.iter().zip(fcd_per_move))
         {
-            self.features_for_move(features_set, mv, group_data);
+            self.features_for_move(features_set, mv, fcd, group_data);
 
             // FCD bonus for all movements
             if let Move::Move(square, _, _) = mv {
@@ -151,6 +151,7 @@ impl<const S: usize> Position<S> {
         &self,
         policy_features: &mut PolicyFeatures,
         mv: &Move,
+        fcd: i8,
         group_data: &GroupData<S>,
     ) {
         match self.side_to_move() {
@@ -158,12 +159,14 @@ impl<const S: usize> Position<S> {
                 self,
                 policy_features,
                 mv,
+                fcd,
                 group_data,
             ),
             Color::Black => features_for_move_colortr::<BlackTr, WhiteTr, S>(
                 self,
                 policy_features,
                 mv,
+                fcd,
                 group_data,
             ),
         }
@@ -237,6 +240,7 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usize>(
     position: &Position<S>,
     policy_features: &mut PolicyFeatures,
     mv: &Move,
+    fcd: i8,
     group_data: &GroupData<S>,
 ) {
     // If it's the first move, give every move equal probability
@@ -244,73 +248,36 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usize>(
         return;
     }
 
+    let our_flatcount = Us::flats(group_data).count() as i8;
+    let their_flatcount = Them::flats(group_data).count() as i8;
+
+    let our_flatcount_after_move = our_flatcount + fcd;
+
     match mv {
         Move::Place(role, square) => {
-            let our_flatcount = Us::flats(group_data).count();
-            let their_flatcount = Them::flats(group_data).count();
-
-            let our_flatcount_after_move = match *role {
-                Flat => our_flatcount + 1,
-                Wall | Cap => our_flatcount,
-            };
-
-            let our_flat_lead_after_move = our_flatcount_after_move as i8 - their_flatcount as i8;
+            let our_flat_lead_after_move = our_flatcount_after_move - their_flatcount;
 
             // Apply special bonuses if the game ends on this move
-            if Us::stones_left(position) == 1 && Us::caps_left(position) == 0
+            if Us::stones_left(position) + Us::caps_left(position) == 1
                 || group_data.all_pieces().count() as usize == S * S - 1
             {
-                if Us::color() == Color::White {
-                    match position.komi().game_result_with_flatcounts(
-                        our_flatcount_after_move as i8,
-                        their_flatcount as i8,
-                    ) {
-                        GameResult::WhiteWin => policy_features.place_to_win[0] = 1.0,
-                        GameResult::BlackWin => policy_features.place_to_loss[0] = 1.0,
-                        GameResult::Draw => policy_features.place_to_draw[0] = 1.0,
-                    }
-                } else {
-                    match position.komi().game_result_with_flatcounts(
-                        their_flatcount as i8,
-                        our_flatcount_after_move as i8,
-                    ) {
-                        GameResult::WhiteWin => policy_features.place_to_loss[0] = 1.0,
-                        GameResult::BlackWin => policy_features.place_to_win[0] = 1.0,
-                        GameResult::Draw => policy_features.place_to_draw[0] = 1.0,
-                    }
-                }
+                check_flat_win::<Us, S>(
+                    position,
+                    our_flatcount_after_move,
+                    their_flatcount,
+                    policy_features,
+                );
             }
             // Bonuses if our opponent can finish on flats next turn
-            else if Them::stones_left(position) == 1 && Them::caps_left(position) == 0
+            else if Them::stones_left(position) + Them::caps_left(position) == 1
                 || group_data.all_pieces().count() as usize == S * S - 2
             {
-                if Us::color() == Color::White {
-                    match position.komi().game_result_with_flatcounts(
-                        our_flatcount_after_move as i8,
-                        their_flatcount as i8 + 1,
-                    ) {
-                        GameResult::WhiteWin => {
-                            policy_features.place_to_allow_opponent_to_end[2] = 1.0
-                        }
-                        GameResult::BlackWin => {
-                            policy_features.place_to_allow_opponent_to_end[0] = 1.0
-                        }
-                        GameResult::Draw => policy_features.place_to_allow_opponent_to_end[1] = 1.0,
-                    }
-                } else {
-                    match position.komi().game_result_with_flatcounts(
-                        their_flatcount as i8 + 1,
-                        our_flatcount_after_move as i8,
-                    ) {
-                        GameResult::WhiteWin => {
-                            policy_features.place_to_allow_opponent_to_end[0] = 1.0
-                        }
-                        GameResult::BlackWin => {
-                            policy_features.place_to_allow_opponent_to_end[2] = 1.0
-                        }
-                        GameResult::Draw => policy_features.place_to_allow_opponent_to_end[1] = 1.0,
-                    }
-                }
+                check_flat_win_next_move::<Us, S>(
+                    position,
+                    our_flatcount_after_move,
+                    their_flatcount,
+                    policy_features,
+                );
             }
             // TODO: These two bonuses don't take komi into account, but they should
             else if Us::stones_left(position) == 2 && Us::caps_left(position) == 0 {
@@ -612,6 +579,7 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usize>(
 
             let mut captures_our_critical_square = None;
             let mut captures_their_critical_square = None;
+            let mut loses_their_critical_square = None;
 
             // The groups that become connected through this move
             let mut our_groups_joined = <ArrayVec<u8, 10>>::new();
@@ -628,13 +596,18 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usize>(
             let mut their_pieces = 0;
             // Number of squares captured by us, that were previously held by them
             let mut their_pieces_captured = 0;
+            let mut num_squares_covered = group_data.all_pieces().count();
 
             // Special case for when we spread the whole stack
             if position[*square].len() == stack_movement.get_first::<S>().pieces_to_take {
-                let top_stone = position[*square].top_stone.unwrap();
+                num_squares_covered -= 1;
+                let top_stone: Piece = position[*square].top_stone.unwrap();
                 if top_stone.is_road_piece() {
                     our_squares_affected.push(*square);
-                    our_groups_affected.push(group_data.groups[*square]);
+
+                    if spread_damages_our_group::<S, Us>(position, *square, *direction) {
+                        our_groups_affected.push(group_data.groups[*square]);
+                    }
                 }
             }
 
@@ -665,6 +638,10 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usize>(
                     }
                 } else {
                     their_pieces += 1;
+                    if Them::is_critical_square(group_data, destination_square) {
+                        // TODO: Filling their critical square needs a malus
+                        loses_their_critical_square = Some(destination_square);
+                    }
                 }
 
                 if Us::piece_is_ours(piece) && piece.is_road_piece() {
@@ -750,7 +727,16 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usize>(
                             policy_features.stack_captured_by_movement[0] -=
                                 destination_stack.len() as f32;
                             our_squares_affected.push(destination_square);
-                            our_groups_affected.push(group_data.groups[destination_square]);
+
+                            if destination_square != *square
+                                || spread_damages_our_group::<S, Us>(
+                                    position,
+                                    destination_square,
+                                    *direction,
+                                )
+                            {
+                                our_groups_affected.push(group_data.groups[destination_square]);
+                            }
                         }
                     }
                     if Us::piece_is_ours(destination_top_stone) && piece.role() == Wall {
@@ -773,11 +759,32 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usize>(
                             }
                         }
                     }
+                } else {
+                    num_squares_covered += 1;
                 }
 
                 destination_square = destination_square
                     .go_direction::<S>(*direction)
                     .unwrap_or(destination_square);
+            }
+
+            // Check for board fill on this move and the next
+            if num_squares_covered == S as u8 * S as u8 && loses_their_critical_square.is_none() {
+                // TODO: Maybe add separate policy features for this?
+                // It's possible that the spread that board fills also makes them a road
+                check_flat_win::<Us, S>(
+                    position,
+                    our_flatcount_after_move,
+                    their_flatcount,
+                    policy_features,
+                );
+            } else if num_squares_covered == S as u8 * S as u8 - 1 {
+                check_flat_win_next_move::<Us, S>(
+                    position,
+                    our_flatcount_after_move,
+                    their_flatcount,
+                    policy_features,
+                );
             }
 
             if their_pieces == 0 {
@@ -821,45 +828,62 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usize>(
 
             // Bonus for moving onto a critical square
             if let Some(critical_square) = captures_our_critical_square {
-                // Check if reaching the critical square still wins, in case our
-                // stack spread lost some of our flats
-                let mut edge_connection =
-                    GroupEdgeConnection::default().connect_square::<S>(critical_square);
-                for neighbour in critical_square.neighbours::<S>() {
-                    if let Some(neighbour_piece) = position[neighbour].top_stone() {
-                        if Us::piece_is_ours(neighbour_piece) {
-                            let group_id = group_data.groups[neighbour];
-                            if our_groups_affected.iter().all(|g| *g != group_id) {
-                                edge_connection = edge_connection
-                                    | group_data.amount_in_group[group_id as usize].1;
+                // Start with a very simple check for throwing onto a straight road
+                let our_road_stones = Us::road_stones(group_data);
+                if our_road_stones
+                    .file::<S>(critical_square.file::<S>())
+                    .count()
+                    == S as u8 - 1
+                    && (*direction == East || *direction == West)
+                    || our_road_stones
+                        .rank::<S>(critical_square.rank::<S>())
+                        .count()
+                        == S as u8 - 1
+                        && (*direction == North || *direction == South)
+                {
+                    // Only this option is a guaranteed win:
+                    policy_features.move_onto_critical_square[0] += 1.0;
+                } else {
+                    // Check if reaching the critical square still wins, in case our
+                    // stack spread lost some of our flats
+                    let mut edge_connection =
+                        GroupEdgeConnection::default().connect_square::<S>(critical_square);
+                    for neighbour in critical_square.neighbours::<S>() {
+                        if let Some(neighbour_piece) = position[neighbour].top_stone() {
+                            if Us::piece_is_ours(neighbour_piece) {
+                                let group_id = group_data.groups[neighbour];
+                                if our_groups_affected.iter().all(|g| *g != group_id) {
+                                    edge_connection = edge_connection
+                                        | group_data.amount_in_group[group_id as usize].1;
+                                }
                             }
                         }
                     }
-                }
 
-                if edge_connection.is_winning() {
-                    // Only this option is a guaranteed win:
-                    policy_features.move_onto_critical_square[0] += 1.0;
-                }
-                // If the critical square has two neighbours of the same group,
-                // and neither the origin square nor the critical square is a wall,
-                // at least one of the spreads onto the critical square will be a road win
-                else if our_squares_affected.len() == 1
-                    && critical_square
-                        .neighbours::<S>()
-                        .any(|sq| sq == our_squares_affected[0])
-                    && critical_square
-                        .neighbours::<S>()
-                        .filter(|sq| {
-                            group_data.groups[*sq] == group_data.groups[our_squares_affected[0]]
-                        })
-                        .count()
-                        > 1
-                    && position[critical_square].top_stone().map(Piece::role) != Some(Wall)
-                {
-                    policy_features.move_onto_critical_square[1] += 1.0
-                } else {
-                    policy_features.move_onto_critical_square[2] += 1.0
+                    if edge_connection.is_winning() {
+                        // Only this option is a guaranteed win:
+                        policy_features.move_onto_critical_square[0] += 1.0;
+                    }
+                    // If the critical square has two neighbours of the same group,
+                    // and neither the origin square nor the critical square is a wall,
+                    // at least one of the spreads onto the critical square will be a road win
+                    else if our_squares_affected.len() == 1
+                        && critical_square
+                            .neighbours::<S>()
+                            .any(|sq| sq == our_squares_affected[0])
+                        && critical_square
+                            .neighbours::<S>()
+                            .filter(|sq| {
+                                group_data.groups[*sq] == group_data.groups[our_squares_affected[0]]
+                            })
+                            .count()
+                            > 1
+                        && position[critical_square].top_stone().map(Piece::role) != Some(Wall)
+                    {
+                        policy_features.move_onto_critical_square[1] += 1.0
+                    } else {
+                        policy_features.move_onto_critical_square[2] += 1.0
+                    }
                 }
             }
 
@@ -875,4 +899,99 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usize>(
             }
         }
     }
+}
+
+fn check_flat_win_next_move<Us: ColorTr, const S: usize>(
+    position: &Position<S>,
+    our_flatcount_after_move: i8,
+    their_flatcount: i8,
+    policy_features: &mut PolicyFeatures<'_>,
+) {
+    if Us::color() == Color::White {
+        match position
+            .komi()
+            .game_result_with_flatcounts(our_flatcount_after_move, their_flatcount + 1)
+        {
+            GameResult::WhiteWin => policy_features.place_to_allow_opponent_to_end[2] = 1.0,
+            GameResult::BlackWin => policy_features.place_to_allow_opponent_to_end[0] = 1.0,
+            GameResult::Draw => policy_features.place_to_allow_opponent_to_end[1] = 1.0,
+        }
+    } else {
+        match position
+            .komi()
+            .game_result_with_flatcounts(their_flatcount + 1, our_flatcount_after_move)
+        {
+            GameResult::WhiteWin => policy_features.place_to_allow_opponent_to_end[0] = 1.0,
+            GameResult::BlackWin => policy_features.place_to_allow_opponent_to_end[2] = 1.0,
+            GameResult::Draw => policy_features.place_to_allow_opponent_to_end[1] = 1.0,
+        }
+    }
+}
+
+fn check_flat_win<Us: ColorTr, const S: usize>(
+    position: &Position<S>,
+    our_flatcount_after_move: i8,
+    their_flatcount: i8,
+    policy_features: &mut PolicyFeatures<'_>,
+) {
+    if Us::color() == Color::White {
+        match position
+            .komi()
+            .game_result_with_flatcounts(our_flatcount_after_move, their_flatcount)
+        {
+            GameResult::WhiteWin => policy_features.place_to_win[0] = 1.0,
+            GameResult::BlackWin => policy_features.place_to_loss[0] = 1.0,
+            GameResult::Draw => policy_features.place_to_draw[0] = 1.0,
+        }
+    } else {
+        match position
+            .komi()
+            .game_result_with_flatcounts(their_flatcount, our_flatcount_after_move)
+        {
+            GameResult::WhiteWin => policy_features.place_to_loss[0] = 1.0,
+            GameResult::BlackWin => policy_features.place_to_win[0] = 1.0,
+            GameResult::Draw => policy_features.place_to_draw[0] = 1.0,
+        }
+    }
+}
+
+/// For a spread that starts from this square, determine if the spread does not damage the group it's part of,
+/// for example because of a citadel
+fn spread_damages_our_group<const S: usize, Us: ColorTr>(
+    position: &Position<S>,
+    square: Square,
+    direction: Direction,
+) -> bool {
+    let behind_square = square.go_direction::<S>(direction.reverse());
+
+    !direction
+        .orthogonal_directions()
+        .into_iter()
+        .filter(|orthogonal| square.go_direction::<S>(*orthogonal).is_some())
+        .any(|orthogonal| {
+            let flank_square = square.go_direction::<S>(orthogonal).unwrap();
+            let opposite_flank = square.go_direction::<S>(orthogonal.reverse());
+
+            position[flank_square]
+                .top_stone()
+                .is_some_and(Us::is_road_stone)
+                && position[flank_square.go_direction::<S>(direction).unwrap()]
+                    .top_stone()
+                    .is_some_and(Us::is_road_stone)
+                && (opposite_flank.is_none() // This is probably not fully correct, it assumes the connection to the edge will be restored because the next piece dropped is ours
+                || behind_square.is_none() // Ditto
+                || !position[opposite_flank.unwrap()]
+                    .top_stone()
+                    .is_some_and(Us::is_road_stone))
+                && (behind_square.is_none()
+                    || !position[behind_square.unwrap()]
+                        .top_stone()
+                        .is_some_and(Us::is_road_stone)
+                    || position[behind_square
+                        .unwrap()
+                        .go_direction::<S>(orthogonal)
+                        .unwrap()]
+                    .top_stone()
+                    .is_some_and(Us::is_road_stone))
+        })
 }

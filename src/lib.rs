@@ -36,6 +36,8 @@ pub use search::mcts;
 pub mod aws;
 pub mod minmax;
 pub mod move_gen;
+#[cfg(feature = "sqlite")]
+pub mod policy_sqlite;
 pub mod position;
 pub mod search;
 #[cfg(test)]

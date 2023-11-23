@@ -154,7 +154,6 @@ pub struct PolicyFeatures<'a> {
 }
 
 impl<'a> PolicyFeatures<'a> {
-    #[inline(never)]
     pub fn new<const S: usize>(coefficients: &'a mut [f32]) -> PolicyFeatures<'a> {
         assert_eq!(coefficients.len(), num_policy_features::<S>());
 
