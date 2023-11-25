@@ -87,9 +87,7 @@ impl<const S: usize> Position<S> {
 
                     let total_value = partial_sums.iter().sum::<f32>() + offset;
 
-                    for c in features.iter_mut() {
-                        *c = 0.0;
-                    }
+                    features.fill(0.0);
 
                     (mv, sigmoid(total_value))
                 }),

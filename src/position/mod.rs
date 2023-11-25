@@ -943,6 +943,8 @@ impl<const S: usize> Position<S> {
         for c in features.iter_mut() {
             *c = 0.0;
         }
+
+        features.fill(0.0);
         eval
     }
 
