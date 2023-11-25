@@ -4,9 +4,8 @@ use std::str::FromStr;
 use clap::{App, Arg, SubCommand};
 
 use tiltak::evaluation::parameters::{
-    NUM_POLICY_FEATURES_4S, NUM_POLICY_FEATURES_5S, NUM_POLICY_FEATURES_6S, NUM_VALUE_FEATURES_4S,
-    NUM_VALUE_FEATURES_5S, NUM_VALUE_FEATURES_6S, POLICY_PARAMS_4S, POLICY_PARAMS_5S,
-    POLICY_PARAMS_6S, VALUE_PARAMS_4S, VALUE_PARAMS_5S, VALUE_PARAMS_6S,
+    self, NUM_POLICY_FEATURES_4S, NUM_POLICY_FEATURES_5S, NUM_POLICY_FEATURES_6S,
+    NUM_VALUE_FEATURES_4S, NUM_VALUE_FEATURES_5S, NUM_VALUE_FEATURES_6S,
 };
 use tiltak::position::Komi;
 use tiltak::tune::{spsa, training};
@@ -65,11 +64,7 @@ fn main() {
 
     let matches = app.get_matches();
     let size: usize = matches.value_of("size").unwrap().parse().unwrap();
-    let komis = [
-        // Komi::from_str("0.0").unwrap(),
-        Komi::from_str("2.0").unwrap(),
-        // Komi::from_str("4.0").unwrap(),
-    ];
+    let komi = Komi::from_str("2.0").unwrap();
 
     match matches.subcommand() {
         ("selfplay", _) => {
@@ -83,9 +78,9 @@ fn main() {
                             NUM_POLICY_FEATURES_4S,
                         >(
                             i,
-                            &komis,
-                            &VALUE_PARAMS_4S,
-                            &POLICY_PARAMS_4S,
+                            komi,
+                            parameters::value_features_4s(komi),
+                            parameters::policy_features_4s(komi),
                             vec![],
                             vec![],
                             0,
@@ -97,9 +92,9 @@ fn main() {
                             NUM_POLICY_FEATURES_5S,
                         >(
                             i,
-                            &komis,
-                            &VALUE_PARAMS_5S,
-                            &POLICY_PARAMS_5S,
+                            komi,
+                            parameters::value_features_5s(komi),
+                            parameters::policy_features_5s(komi),
                             vec![],
                             vec![],
                             0,
@@ -111,9 +106,9 @@ fn main() {
                             NUM_POLICY_FEATURES_6S,
                         >(
                             i,
-                            &komis,
-                            &VALUE_PARAMS_6S,
-                            &POLICY_PARAMS_6S,
+                            komi,
+                            parameters::value_features_6s(komi),
+                            parameters::policy_features_6s(komi),
                             vec![],
                             vec![],
                             0,
@@ -136,19 +131,19 @@ fn main() {
                             4,
                             NUM_VALUE_FEATURES_4S,
                             NUM_POLICY_FEATURES_4S,
-                        >(i, &komis)
+                        >(i, komi)
                         .unwrap(),
                         5 => training::train_from_scratch::<
                             5,
                             NUM_VALUE_FEATURES_5S,
                             NUM_POLICY_FEATURES_5S,
-                        >(i, &komis)
+                        >(i, komi)
                         .unwrap(),
                         6 => training::train_from_scratch::<
                             6,
                             NUM_VALUE_FEATURES_6S,
                             NUM_POLICY_FEATURES_6S,
-                        >(i, &komis)
+                        >(i, komi)
                         .unwrap(),
                         _ => panic!("Size {} not supported.", size),
                     }
@@ -164,21 +159,21 @@ fn main() {
                 4 => {
                     training::continue_training::<4, NUM_VALUE_FEATURES_4S, NUM_POLICY_FEATURES_4S>(
                         training_id,
-                        &komis,
+                        komi,
                     )
                     .unwrap()
                 }
                 5 => {
                     training::continue_training::<5, NUM_VALUE_FEATURES_5S, NUM_POLICY_FEATURES_5S>(
                         training_id,
-                        &komis,
+                        komi,
                     )
                     .unwrap()
                 }
                 6 => {
                     training::continue_training::<6, NUM_VALUE_FEATURES_6S, NUM_POLICY_FEATURES_6S>(
                         training_id,
-                        &komis,
+                        komi,
                     )
                     .unwrap()
                 }

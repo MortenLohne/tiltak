@@ -125,18 +125,18 @@ fn main() {
             #[cfg(feature = "sqlite")]
             "test_policy" => policy_sqlite::check_all_games(),
             "value_features" => match words.get(1) {
-                Some(&"4") => print_value_features::<4>(),
-                Some(&"5") => print_value_features::<5>(),
-                Some(&"6") => print_value_features::<6>(),
+                Some(&"4") => print_value_features::<4>(Komi::default()), // TODO: Bad default komi
+                Some(&"5") => print_value_features::<5>(Komi::default()),
+                Some(&"6") => print_value_features::<6>(Komi::default()),
                 Some(s) => println!("Unsupported size {}", s),
-                None => print_value_features::<5>(),
+                None => print_value_features::<5>(Komi::default()),
             },
             "policy_features" => match words.get(1) {
-                Some(&"4") => print_policy_features::<4>(),
-                Some(&"5") => print_policy_features::<5>(),
-                Some(&"6") => print_policy_features::<6>(),
+                Some(&"4") => print_policy_features::<4>(Komi::default()), // TODO: Bad default komi
+                Some(&"5") => print_policy_features::<5>(Komi::default()),
+                Some(&"6") => print_policy_features::<6>(Komi::default()),
                 Some(s) => println!("Unsupported size {}", s),
-                None => print_policy_features::<5>(),
+                None => print_policy_features::<5>(Komi::default()),
             },
             "game" => {
                 println!("Enter move list or a full PTN, then press enter followed by CTRL+D");
@@ -341,8 +341,8 @@ fn mcts_vs_minmax(minmax_depth: u16, mcts_nodes: u64) {
     println!("\n{:?}\nResult: {:?}", position, position.game_result());
 }
 
-fn print_value_features<const S: usize>() {
-    let mut params = <Position<S>>::value_params().to_vec();
+fn print_value_features<const S: usize>(komi: Komi) {
+    let mut params = <Position<S>>::value_params(komi).to_vec();
     let num: usize = params.len() / 2;
     let (white_coefficients, black_coefficients) = params.split_at_mut(num);
 
@@ -365,8 +365,8 @@ fn print_value_features<const S: usize>() {
     }
 }
 
-fn print_policy_features<const S: usize>() {
-    let mut params = <Position<S>>::policy_params().to_vec();
+fn print_policy_features<const S: usize>(komi: Komi) {
+    let mut params = <Position<S>>::policy_params(komi).to_vec();
     let num: usize = params.len() / 2;
     let (white_coefficients, black_coefficients) = params.split_at_mut(num);
 
@@ -441,7 +441,7 @@ fn analyze_position<const S: usize>(position: &Position<S>) {
         );
     }
     for (feature, param) in white_coefficients.iter_mut().zip(
-        <Position<S>>::value_params()
+        <Position<S>>::value_params(position.komi())
             .iter()
             .take(coefficients_mid_index),
     ) {
@@ -449,7 +449,7 @@ fn analyze_position<const S: usize>(position: &Position<S>) {
     }
 
     for (feature, param) in black_coefficients.iter_mut().zip(
-        <Position<S>>::value_params()
+        <Position<S>>::value_params(position.komi())
             .iter()
             .skip(coefficients_mid_index),
     ) {

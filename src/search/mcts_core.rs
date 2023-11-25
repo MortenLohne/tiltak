@@ -199,7 +199,10 @@ impl Tree {
         arena: &Arena,
     ) -> Option<()> {
         position.generate_moves_with_params(
-            &settings.policy_params,
+            match settings.policy_params.as_ref() {
+                Some(params) => params,
+                None => <Position<S>>::policy_params(position.komi()),
+            },
             group_data,
             &mut temp_vectors.simple_moves,
             &mut temp_vectors.moves,
@@ -278,7 +281,10 @@ pub fn rollout<const S: usize>(
     } else if depth == 0 {
         let static_eval = cp_to_win_percentage(position.static_eval_with_params_and_data(
             &group_data,
-            &settings.value_params,
+            match settings.value_params.as_ref() {
+                Some(params) => params,
+                None => <Position<S>>::value_params(position.komi()),
+            },
             &mut temp_vectors.value_scores,
         ));
         match position.side_to_move() {

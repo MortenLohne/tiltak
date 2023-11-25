@@ -32,7 +32,7 @@ type MoveScoresForGame = Vec<Vec<MoveScore>>;
 
 pub fn train_from_scratch<const S: usize, const N: usize, const M: usize>(
     training_id: usize,
-    komis: &[Komi],
+    komi: Komi,
 ) -> Result<(), DynError> {
     let mut rng = rand::rngs::StdRng::from_seed([0; 32]);
 
@@ -42,7 +42,7 @@ pub fn train_from_scratch<const S: usize, const N: usize, const M: usize>(
 
     train_perpetually::<S, N, M>(
         training_id,
-        komis,
+        komi,
         &initial_value_params,
         &initial_policy_params,
         vec![],
@@ -53,7 +53,7 @@ pub fn train_from_scratch<const S: usize, const N: usize, const M: usize>(
 
 pub fn continue_training<const S: usize, const N: usize, const M: usize>(
     training_id: usize,
-    komis: &[Komi],
+    komi: Komi,
 ) -> Result<(), DynError> {
     let mut games = vec![];
     let mut move_scores = vec![];
@@ -90,11 +90,15 @@ pub fn continue_training<const S: usize, const N: usize, const M: usize>(
         move_scores.iter().map(Vec::len).sum::<usize>()
     );
 
+    let value_params = <Position<S>>::value_params(komi);
+
+    let policy_params = <Position<S>>::policy_params(komi);
+
     train_perpetually::<S, N, M>(
         training_id,
-        komis,
-        &<[f32; N]>::try_from(<Position<S>>::value_params())?,
-        &<[f32; M]>::try_from(<Position<S>>::policy_params())?,
+        komi,
+        &<[f32; N]>::try_from(value_params).unwrap(),
+        &<[f32; M]>::try_from(policy_params).unwrap(),
         games,
         move_scores,
         batch_id,
@@ -103,7 +107,7 @@ pub fn continue_training<const S: usize, const N: usize, const M: usize>(
 
 pub fn train_perpetually<const S: usize, const N: usize, const M: usize>(
     training_id: usize,
-    komis: &[Komi],
+    komi: Komi,
     initial_value_params: &[f32; N],
     initial_policy_params: &[f32; M],
     mut all_games: Vec<Game<Position<S>>>,
@@ -133,7 +137,7 @@ pub fn train_perpetually<const S: usize, const N: usize, const M: usize>(
             .into_par_iter()
             .map(|i| {
                 play_game_pair::<S>(
-                    komis,
+                    komi,
                     &last_value_params,
                     &last_policy_params,
                     &value_params,
@@ -252,7 +256,7 @@ pub fn train_perpetually<const S: usize, const N: usize, const M: usize>(
 
 #[allow(clippy::too_many_arguments)]
 fn play_game_pair<const S: usize>(
-    komis: &[Komi],
+    komi: Komi,
     last_value_params: &[f32],
     last_policy_params: &[f32],
     value_params: &[f32],
@@ -262,14 +266,13 @@ fn play_game_pair<const S: usize>(
     i: usize,
 ) -> (Game<Position<S>>, Vec<Vec<(Move, f32)>>) {
     let settings = MctsSetting::default()
-        .add_value_params(value_params.to_vec())
-        .add_policy_params(policy_params.to_vec())
+        .add_value_params(value_params.into())
+        .add_policy_params(policy_params.into())
         .add_dirichlet(0.2);
     let last_settings = MctsSetting::default()
-        .add_value_params(last_value_params.to_vec())
-        .add_policy_params(last_policy_params.to_vec())
+        .add_value_params(last_value_params.into())
+        .add_policy_params(last_policy_params.into())
         .add_dirichlet(0.2);
-    let komi = komis[i % komis.len()];
     if i % 2 == 0 {
         let game = play_game::<S>(
             &settings,

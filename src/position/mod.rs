@@ -27,10 +27,7 @@ pub(crate) use utils::AbstractBoard;
 
 pub use mv::{Move, ReverseMove};
 
-use crate::evaluation::parameters::{
-    PolicyFeatures, ValueFeatures, POLICY_PARAMS_4S, POLICY_PARAMS_5S, POLICY_PARAMS_6S,
-    VALUE_PARAMS_4S, VALUE_PARAMS_5S, VALUE_PARAMS_6S,
-};
+use crate::evaluation::parameters::{self, PolicyFeatures, ValueFeatures};
 use crate::evaluation::value_eval;
 use crate::position::color_trait::ColorTr;
 use crate::search;
@@ -965,21 +962,55 @@ impl<const S: usize> Position<S> {
         eval
     }
 
-    pub fn value_params() -> &'static [f32] {
-        match S {
-            4 => &VALUE_PARAMS_4S,
-            5 => &VALUE_PARAMS_5S,
-            6 => &VALUE_PARAMS_6S,
-            _ => unimplemented!("{}s is not supported.", S),
+    pub fn value_params(komi: Komi) -> &'static [f32] {
+        match komi.half_komi() {
+            0 => Self::value_params_0komi(),
+            4 => Self::value_params_2komi(),
+            _ => unimplemented!("{} komi not supported in {}s", komi, S),
         }
     }
 
-    pub fn policy_params() -> &'static [f32] {
+    pub fn policy_params(komi: Komi) -> &'static [f32] {
+        match komi.half_komi() {
+            0 => Self::policy_params_0komi(),
+            4 => Self::policy_params_2komi(),
+            _ => unimplemented!("{} komi not supported in {}s", komi, S),
+        }
+    }
+
+    pub fn value_params_0komi() -> &'static [f32] {
         match S {
-            4 => &POLICY_PARAMS_4S,
-            5 => &POLICY_PARAMS_5S,
-            6 => &POLICY_PARAMS_6S,
-            _ => unimplemented!("{}s is not supported.", S),
+            // 4 => &parameters::VALUE_PARAMS_4S_0KOMI,
+            5 => &parameters::VALUE_PARAMS_5S_0KOMI,
+            6 => &parameters::VALUE_PARAMS_6S_0KOMI,
+            _ => unimplemented!("{}s is not supported for 0 komi.", S),
+        }
+    }
+
+    pub fn value_params_2komi() -> &'static [f32] {
+        match S {
+            // 4 => &parameters::VALUE_PARAMS_4S_2KOMI,
+            5 => &parameters::VALUE_PARAMS_5S_2KOMI,
+            // 6 => &parameters::VALUE_PARAMS_6S_2KOMI,
+            _ => unimplemented!("{}s is not supported for 2 komi.", S),
+        }
+    }
+
+    pub fn policy_params_0komi() -> &'static [f32] {
+        match S {
+            // 4 => &parameters::POLICY_PARAMS_4S_0KOMI,
+            5 => &parameters::POLICY_PARAMS_5S_0KOMI,
+            6 => &parameters::POLICY_PARAMS_6S_0KOMI,
+            _ => unimplemented!("{}s is not supported for 0 komi.", S),
+        }
+    }
+
+    pub fn policy_params_2komi() -> &'static [f32] {
+        match S {
+            // 4 => &parameters::POLICY_PARAMS_4S_2KOMI,
+            5 => &parameters::POLICY_PARAMS_5S_2KOMI,
+            // 6 => &parameters::POLICY_PARAMS_6S_2KOMI,
+            _ => unimplemented!("{}s is not supported for 2 komi.", S),
         }
     }
 
@@ -1050,8 +1081,9 @@ impl<const S: usize> Position<S> {
         features: &mut Vec<Box<[f32]>>,
         policy_feature_sets: &mut Option<Vec<PolicyFeatures<'static>>>,
     ) {
+        let policy_params = Self::policy_params(self.komi());
         self.generate_moves_with_params(
-            Self::policy_params(),
+            policy_params,
             group_data,
             simple_moves,
             moves,
@@ -1356,8 +1388,9 @@ impl<const S: usize> Iterator for MoveIterator<S> {
 
 impl<const S: usize> EvalPositionTrait for Position<S> {
     fn static_eval(&self) -> f32 {
-        let params = Self::value_params();
-        let mut features: Vec<f32> = vec![0.0; Self::value_params().len()];
+        let params = Self::value_params(self.komi());
+
+        let mut features: Vec<f32> = vec![0.0; params.len()];
         self.static_eval_features(&mut features);
         features.iter().zip(params).map(|(a, b)| a * b).sum()
     }

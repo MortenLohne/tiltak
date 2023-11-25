@@ -30,9 +30,9 @@ pub enum TimeControl {
 #[derive(Clone, PartialEq, Debug)]
 pub struct MctsSetting<const S: usize> {
     arena_size: u32,
-    value_params: Vec<f32>,
-    policy_params: Vec<f32>,
-    search_params: Vec<Score>,
+    value_params: Option<Box<[f32]>>,
+    policy_params: Option<Box<[f32]>>,
+    search_params: Box<[Score]>,
     dirichlet: Option<f32>,
     excluded_moves: Vec<Move>,
     rollout_depth: u16,
@@ -43,9 +43,9 @@ impl<const S: usize> Default for MctsSetting<S> {
     fn default() -> Self {
         MctsSetting {
             arena_size: 2_u32.pow(26), // Default to 1.5GB max
-            value_params: Vec::from(<Position<S>>::value_params()),
-            policy_params: Vec::from(<Position<S>>::policy_params()),
-            search_params: vec![1.43, 2800.0, 0.61],
+            value_params: None,
+            policy_params: None,
+            search_params: vec![1.43, 2800.0, 0.61].into_boxed_slice(),
             dirichlet: None,
             excluded_moves: vec![],
             rollout_depth: 0,
@@ -76,17 +76,17 @@ impl<const N: usize> MctsSetting<N> {
         self
     }
 
-    pub fn add_value_params(mut self, value_params: Vec<f32>) -> Self {
-        self.value_params = value_params;
+    pub fn add_value_params(mut self, value_params: Box<[f32]>) -> Self {
+        self.value_params = Some(value_params);
         self
     }
 
-    pub fn add_policy_params(mut self, policy_params: Vec<f32>) -> Self {
-        self.policy_params = policy_params;
+    pub fn add_policy_params(mut self, policy_params: Box<[f32]>) -> Self {
+        self.policy_params = Some(policy_params);
         self
     }
 
-    pub fn add_search_params(mut self, search_params: Vec<f32>) -> Self {
+    pub fn add_search_params(mut self, search_params: Box<[f32]>) -> Self {
         self.search_params = search_params;
         self
     }
@@ -389,7 +389,7 @@ pub fn play_move_time<const S: usize>(
     max_time: time::Duration,
     settings: MctsSetting<S>,
 ) -> (Move, Score) {
-    let mut tree = MonteCarloTree::with_settings(board, settings);
+    let mut tree = MonteCarloTree::with_settings(board.clone(), settings);
     tree.search_for_time(max_time, |_| {});
     tree.best_move()
 }
