@@ -67,8 +67,8 @@ fn main() {
     let size: usize = matches.value_of("size").unwrap().parse().unwrap();
     let komis = [
         // Komi::from_str("0.0").unwrap(),
-        // Komi::from_str("2.0").unwrap(),
-        Komi::from_str("4.0").unwrap(),
+        Komi::from_str("2.0").unwrap(),
+        // Komi::from_str("4.0").unwrap(),
     ];
 
     match matches.subcommand() {

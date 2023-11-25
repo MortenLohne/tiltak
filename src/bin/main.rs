@@ -412,7 +412,7 @@ fn analyze_position_from_tps<const S: usize>() {
     println!("Enter TPS");
     let mut input = String::new();
     io::stdin().read_line(&mut input).unwrap();
-    let position = <Position<S>>::from_fen_with_komi(&input, Komi::try_from(4.0).unwrap()).unwrap();
+    let position = <Position<S>>::from_fen_with_komi(&input, Komi::try_from(2.0).unwrap()).unwrap();
     analyze_position(&position)
 }
 

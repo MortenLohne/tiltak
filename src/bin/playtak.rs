@@ -810,7 +810,6 @@ impl PlaytakSession {
                                 playtak_settings.to_mcts_setting()
                                 .arena_size(2_u32.pow(31));
 
-
                             let maximum_time = if let Some(target_move_time) =  playtak_settings.target_move_time {
                                 (our_time_left / 6 + game.increment / 2).min(2 * target_move_time)
                             } else {
