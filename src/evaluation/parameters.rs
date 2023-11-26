@@ -1,13 +1,22 @@
 use crate::position::{num_line_symmetries, num_square_symmetries, Komi};
 
 pub const NUM_VALUE_FEATURES_4S: usize = 254;
-pub const NUM_POLICY_FEATURES_4S: usize = 169;
+pub const NUM_POLICY_FEATURES_4S: usize = 176;
 
 pub const NUM_VALUE_FEATURES_5S: usize = 334;
-pub const NUM_POLICY_FEATURES_5S: usize = 197;
+pub const NUM_POLICY_FEATURES_5S: usize = 200;
 
 pub const NUM_VALUE_FEATURES_6S: usize = 354;
-pub const NUM_POLICY_FEATURES_6S: usize = 207;
+pub const NUM_POLICY_FEATURES_6S: usize = 208;
+
+fn policy_padding<const S: usize>() -> usize {
+    match S {
+        4 => 7,
+        5 => 3,
+        6 => 1,
+        _ => panic!("Unsupported size {}", S),
+    }
+}
 
 #[derive(Debug)]
 pub struct ValueFeatures<'a> {
@@ -173,10 +182,10 @@ pub struct PolicyFeatures<'a> {
     pub continue_spread: &'a mut [f32],
     pub move_onto_critical_square: &'a mut [f32],
     pub spread_that_connects_groups_to_win: &'a mut [f32],
+    pub padding: &'a mut [f32],
 }
 
 impl<'a> PolicyFeatures<'a> {
-    #[inline(never)]
     pub fn new<const S: usize>(coefficients: &'a mut [f32]) -> PolicyFeatures<'a> {
         assert_eq!(coefficients.len(), num_policy_features::<S>());
 
@@ -244,6 +253,7 @@ impl<'a> PolicyFeatures<'a> {
         let (continue_spread, coefficients) = coefficients.split_at_mut(3);
         let (move_onto_critical_square, coefficients) = coefficients.split_at_mut(3);
         let (spread_that_connects_groups_to_win, coefficients) = coefficients.split_at_mut(1);
+        let (padding, coefficients) = coefficients.split_at_mut(policy_padding::<S>());
 
         assert!(coefficients.is_empty());
 
@@ -304,6 +314,7 @@ impl<'a> PolicyFeatures<'a> {
             continue_spread,
             move_onto_critical_square,
             spread_that_connects_groups_to_win,
+            padding,
         }
     }
 }
@@ -801,6 +812,13 @@ pub const POLICY_PARAMS_4S_4KOMI: [f32; NUM_POLICY_FEATURES_4S] = [
     -0.03336984,
     0.61130196,
     2.8785355,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
 ];
 
 #[allow(clippy::unreadable_literal)]
@@ -1340,6 +1358,9 @@ pub const POLICY_PARAMS_5S_0KOMI: [f32; NUM_POLICY_FEATURES_5S] = [
     0.17248435,
     0.9139369,
     3.0342748,
+    0.0,
+    0.0,
+    0.0,
 ];
 
 #[allow(clippy::unreadable_literal)]
@@ -1879,6 +1900,9 @@ pub const POLICY_PARAMS_5S_2KOMI: [f32; NUM_POLICY_FEATURES_5S] = [
     -0.011423582,
     0.7850744,
     3.0451703,
+    0.0,
+    0.0,
+    0.0,
 ];
 
 #[allow(clippy::unreadable_literal)]
@@ -2448,6 +2472,7 @@ pub const POLICY_PARAMS_6S_0KOMI: [f32; NUM_POLICY_FEATURES_6S] = [
     3.0151558,
     -2.5490334,
     1.0907768,
+    0.0,
 ];
 
 #[allow(clippy::unreadable_literal)]
@@ -3017,4 +3042,5 @@ pub const POLICY_PARAMS_6S_2KOMI: [f32; NUM_POLICY_FEATURES_6S] = [
     0.0047606267,
     0.98567873,
     0.5070627,
+    0.0,
 ];

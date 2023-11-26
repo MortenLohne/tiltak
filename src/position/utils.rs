@@ -20,16 +20,16 @@ use crate::position::Role::{Cap, Flat, Wall};
 pub struct Square(pub u8);
 
 impl Square {
-    pub fn from_rank_file<const S: usize>(rank: u8, file: u8) -> Self {
+    pub const fn from_rank_file<const S: usize>(rank: u8, file: u8) -> Self {
         debug_assert!(rank < S as u8 && file < S as u8);
         Square(rank * S as u8 + file)
     }
 
-    pub fn rank<const S: usize>(self) -> u8 {
+    pub const fn rank<const S: usize>(self) -> u8 {
         self.0 / S as u8
     }
 
-    pub fn file<const S: usize>(self) -> u8 {
+    pub const fn file<const S: usize>(self) -> u8 {
         self.0 % S as u8
     }
 
@@ -81,13 +81,23 @@ impl Square {
         .cloned()
     }
 
-    pub fn go_direction<const S: usize>(self, direction: Direction) -> Option<Self> {
+    pub const fn go_direction<const S: usize>(self, direction: Direction) -> Option<Self> {
         self.jump_direction::<S>(direction, 1)
     }
 
-    pub fn jump_direction<const S: usize>(self, direction: Direction, len: u8) -> Option<Self> {
+    pub const fn jump_direction<const S: usize>(
+        self,
+        direction: Direction,
+        len: u8,
+    ) -> Option<Self> {
         match direction {
-            North => self.0.checked_sub((S as u8) * len).map(Square),
+            North => {
+                if let Some(i) = self.0.checked_sub((S as u8) * len) {
+                    Some(Square(i))
+                } else {
+                    None
+                }
+            }
             West => {
                 if self.file::<S>() < len {
                     None
@@ -571,10 +581,38 @@ pub(crate) struct AbstractBoard<T, const S: usize> {
 }
 
 impl<T: Copy, const S: usize> AbstractBoard<T, S> {
-    pub fn new_with_value(value: T) -> Self {
+    pub const fn new_with_value(value: T) -> Self {
         AbstractBoard {
             raw: [[value; S]; S],
         }
+    }
+}
+
+pub(crate) const fn generate_neighbor_table<const S: usize>() -> AbstractBoard<BitBoard, S> {
+    let mut table = AbstractBoard::new_with_value(BitBoard::empty());
+    let mut rank = 0;
+    while rank < S {
+        let mut file = 0;
+        while file < S {
+            let square = Square::from_rank_file::<S>(rank as u8, file as u8);
+            table.raw[file][rank] = BitBoard::neighbors::<S>(square);
+            file += 1;
+        }
+        rank += 1;
+    }
+    table
+}
+
+const NEIGHBOR_TABLE_4S: AbstractBoard<BitBoard, 4> = generate_neighbor_table::<4>();
+const NEIGHBOR_TABLE_5S: AbstractBoard<BitBoard, 5> = generate_neighbor_table::<5>();
+const NEIGHBOR_TABLE_6S: AbstractBoard<BitBoard, 6> = generate_neighbor_table::<6>();
+
+pub(crate) fn lookup_neighbor_table<const S: usize>(square: Square) -> BitBoard {
+    match S {
+        4 => NEIGHBOR_TABLE_4S[square],
+        5 => NEIGHBOR_TABLE_5S[square],
+        6 => NEIGHBOR_TABLE_6S[square],
+        _ => unimplemented!("Unsupported size {}", S),
     }
 }
 
