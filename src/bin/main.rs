@@ -368,23 +368,12 @@ fn print_value_features<const S: usize>(komi: Komi) {
 
 fn print_policy_features<const S: usize>(komi: Komi) {
     let mut params = <Position<S>>::policy_params(komi).to_vec();
-    let num: usize = params.len() / 2;
-    let (white_coefficients, black_coefficients) = params.split_at_mut(num);
 
-    let white_policy_features = parameters::PolicyFeatures::new::<S>(white_coefficients);
-    let white_policy_features_string = format!("{:?}", white_policy_features);
-
-    let black_policy_features = parameters::PolicyFeatures::new::<S>(black_coefficients);
-    let black_policy_features_string = format!("{:?}", black_policy_features);
+    let policy_features = parameters::PolicyFeatures::new::<S>(&mut params);
+    let policy_features_string = format!("{:?}", policy_features);
 
     println!("White features:");
-    for line in white_policy_features_string.split("],") {
-        let (name, values) = line.split_once(": ").unwrap();
-        println!("{:48}: {}],", name, values);
-    }
-    println!();
-    println!("Black features:");
-    for line in black_policy_features_string.split("],") {
+    for line in policy_features_string.split("],") {
         let (name, values) = line.split_once(": ").unwrap();
         println!("{:48}: {}],", name, values);
     }
