@@ -175,6 +175,7 @@ pub fn train_perpetually<const S: usize, const N: usize, const M: usize>(
                 training_id, S, batch_id
             ))
             .unwrap();
+        writer.flush()?;
 
         let mut writer = io::BufWriter::new(games_and_move_scores_outfile);
 
@@ -193,6 +194,7 @@ pub fn train_perpetually<const S: usize, const N: usize, const M: usize>(
             }
             writeln!(writer)?;
         }
+        writer.flush()?;
 
         let game_stats = GameStats::from_games(&games);
 
