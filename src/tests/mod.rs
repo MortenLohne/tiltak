@@ -100,7 +100,7 @@ impl TestPosition {
         let position: Position<S> = self.position();
         let candidate_moves = check_candidate_moves(&position, correct_moves);
 
-        let policy_moves = moves_sorted_by_policy(&position);
+        let policy_moves = moves_sorted_by_policy(&position, Komi::from_half_komi(4).unwrap());
 
         assert!(
             policy_moves
@@ -183,11 +183,17 @@ fn do_moves_and_check_validity<const S: usize>(position: &mut Position<S>, move_
     }
 }
 
-fn moves_sorted_by_policy<const S: usize>(position: &Position<S>) -> Vec<(Move, f32)> {
+fn moves_sorted_by_policy<const S: usize>(
+    position: &Position<S>,
+    eval_komi: Komi,
+) -> Vec<(Move, f32)> {
     let mut simple_moves = vec![];
     let mut legal_moves = vec![];
     let group_data = position.group_data();
-    position.generate_moves_with_probabilities(
+
+    let policy_params = <Position<S>>::policy_params(eval_komi);
+    position.generate_moves_with_params(
+        policy_params,
         &group_data,
         &mut simple_moves,
         &mut legal_moves,
