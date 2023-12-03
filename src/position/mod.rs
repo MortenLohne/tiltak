@@ -1068,6 +1068,7 @@ impl<const S: usize> Position<S> {
     ///
     /// * `simple_moves` - An empty vector to temporarily store moves without probabilities. The vector will be emptied before the function returns, and only serves to re-use allocated memory.
     /// * `moves` A vector to place the moves and associated probabilities.
+    #[allow(clippy::too_many_arguments)]
     pub fn generate_moves_with_probabilities(
         &self,
         group_data: &GroupData<S>,
@@ -1075,9 +1076,9 @@ impl<const S: usize> Position<S> {
         moves: &mut Vec<(Move, search::Score)>,
         fcd_per_move: &mut Vec<i8>,
         features: &mut Vec<Box<[f32]>>,
+        policy_params: &[f32],
         policy_feature_sets: &mut Option<Vec<PolicyFeatures<'static>>>,
     ) {
-        let policy_params = Self::policy_params(self.komi());
         self.generate_moves_with_params(
             policy_params,
             group_data,

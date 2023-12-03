@@ -298,6 +298,10 @@ pub fn rollout<const S: usize>(
             &mut temp_vectors.moves,
             &mut temp_vectors.fcd_per_move,
             &mut temp_vectors.policy_score_sets,
+            match settings.policy_params.as_ref() {
+                Some(params) => params,
+                None => <Position<S>>::policy_params(position.komi()),
+            },
             &mut temp_vectors.policy_feature_sets,
         );
 

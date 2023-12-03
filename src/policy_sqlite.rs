@@ -76,6 +76,7 @@ fn policy_finds_win(position: &Position<5>) -> Option<Move> {
         &mut moves,
         &mut fcd_per_move,
         &mut vec![],
+        <Position<5>>::policy_params(position.komi()),
         &mut Some(vec![]),
     );
 

@@ -4,8 +4,8 @@ use std::convert::TryFrom;
 use std::io::{Read, Write};
 use std::{io, time};
 
+use board_game_traits::Position as PositionTrait;
 use board_game_traits::{Color, GameResult};
-use board_game_traits::{EvalPosition, Position as PositionTrait};
 use pgn_traits::PgnPosition;
 #[cfg(feature = "constant-tuning")]
 use rayon::prelude::*;
@@ -410,6 +410,10 @@ fn analyze_position<const S: usize>(position: &Position<S>) {
     println!("TPS {}", position.to_fen());
     println!("{:?}", position);
 
+    // Change which sets of eval parameters to use in search
+    // Can be different from the komi used to determine the game result at terminal nodes
+    let eval_komi = position.komi();
+
     assert_eq!(position.game_result(), None, "Cannot analyze finished game");
 
     let group_data = position.group_data();
@@ -431,7 +435,7 @@ fn analyze_position<const S: usize>(position: &Position<S>) {
         );
     }
     for (feature, param) in white_coefficients.iter_mut().zip(
-        <Position<S>>::value_params(position.komi())
+        <Position<S>>::value_params(eval_komi)
             .iter()
             .take(coefficients_mid_index),
     ) {
@@ -439,7 +443,7 @@ fn analyze_position<const S: usize>(position: &Position<S>) {
     }
 
     for (feature, param) in black_coefficients.iter_mut().zip(
-        <Position<S>>::value_params(position.komi())
+        <Position<S>>::value_params(eval_komi)
             .iter()
             .skip(coefficients_mid_index),
     ) {
@@ -489,6 +493,7 @@ fn analyze_position<const S: usize>(position: &Position<S>) {
         &mut moves,
         &mut fcd_per_move,
         &mut vec![],
+        <Position<S>>::policy_params(eval_komi),
         &mut Some(vec![]),
     );
     moves.sort_by(|(_mv, score1), (_, score2)| score1.partial_cmp(score2).unwrap().reverse());
@@ -518,7 +523,9 @@ fn analyze_position<const S: usize>(position: &Position<S>) {
     }
     let settings: MctsSetting<S> = search::MctsSetting::default()
         .arena_size(2_u32.pow(31))
-        .exclude_moves(vec![]);
+        .exclude_moves(vec![])
+        .add_value_params(<Position<S>>::value_params_2komi().into())
+        .add_policy_params(<Position<S>>::policy_params_2komi().into());
     let start_time = time::Instant::now();
 
     let mut tree = search::MonteCarloTree::with_settings(position.clone(), settings);
@@ -528,12 +535,17 @@ fn analyze_position<const S: usize>(position: &Position<S>) {
             break;
         };
         if i % 100_000 == 0 {
+            let params = <Position<S>>::value_params(eval_komi);
+
+            let mut features: Vec<f32> = vec![0.0; params.len()];
+            position.static_eval_features(&mut features);
+            let static_eval: f32 = features.iter().zip(params).map(|(a, b)| a * b).sum();
             println!(
                 "{} visits, val={:.2}%, static eval={:.4}, static winning probability={:.2}%, {:.2}s",
                 tree.visits(),
                 tree.mean_action_value() * 100.0,
-                position.static_eval(),
-                search::cp_to_win_percentage(position.static_eval()) * 100.0,
+                static_eval,
+                search::cp_to_win_percentage(static_eval) * 100.0,
                 start_time.elapsed().as_secs_f64()
             );
             tree.print_info();
