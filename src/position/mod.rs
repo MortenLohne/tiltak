@@ -976,7 +976,7 @@ impl<const S: usize> Position<S> {
 
     pub fn value_params_0komi() -> &'static [f32] {
         match S {
-            // 4 => &parameters::VALUE_PARAMS_4S_0KOMI,
+            4 => &parameters::VALUE_PARAMS_4S_0KOMI,
             5 => &parameters::VALUE_PARAMS_5S_0KOMI,
             6 => &parameters::VALUE_PARAMS_6S_0KOMI,
             _ => unimplemented!("{}s is not supported for 0 komi.", S),
@@ -994,7 +994,7 @@ impl<const S: usize> Position<S> {
 
     pub fn policy_params_0komi() -> &'static [f32] {
         match S {
-            // 4 => &parameters::POLICY_PARAMS_4S_0KOMI,
+            4 => &parameters::POLICY_PARAMS_4S_0KOMI,
             5 => &parameters::POLICY_PARAMS_5S_0KOMI,
             6 => &parameters::POLICY_PARAMS_6S_0KOMI,
             _ => unimplemented!("{}s is not supported for 0 komi.", S),
