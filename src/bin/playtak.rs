@@ -787,6 +787,7 @@ impl PlaytakSession {
                                     .collect(),
                                 time_control: search::TimeControl::Time(our_time_left, game.increment),
                                 komi: position.komi().into(),
+                                eval_komi: None,
                                 dirichlet_noise: playtak_settings.dirichlet_noise,
                                 rollout_depth: playtak_settings.rollout_depth,
                                 rollout_temperature: playtak_settings.rollout_temperature,
