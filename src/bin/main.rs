@@ -409,6 +409,7 @@ fn analyze_position_from_tps<const S: usize>() {
 fn analyze_position<const S: usize>(position: &Position<S>) {
     println!("TPS {}", position.to_fen());
     println!("{:?}", position);
+    println!("Komi: {}", position.komi());
 
     // Change which sets of eval parameters to use in search
     // Can be different from the komi used to determine the game result at terminal nodes
@@ -539,11 +540,13 @@ fn analyze_position<const S: usize>(position: &Position<S>) {
 
             let mut features: Vec<f32> = vec![0.0; params.len()];
             position.static_eval_features(&mut features);
-            let static_eval: f32 = features.iter().zip(params).map(|(a, b)| a * b).sum();
+            let static_eval: f32 = features.iter().zip(params).map(|(a, b)| a * b).sum::<f32>()
+                * position.side_to_move().multiplier() as f32;
             println!(
-                "{} visits, val={:.2}%, static eval={:.4}, static winning probability={:.2}%, {:.2}s",
+                "{} visits, eval: {:.2}%, Wilem-style eval: {:+.2}, static eval: {:.4}, static winning probability: {:.2}%, {:.2}s",
                 tree.visits(),
                 tree.mean_action_value() * 100.0,
+                tree.mean_action_value() * 2.0 - 1.0,
                 static_eval,
                 search::cp_to_win_percentage(static_eval) * 100.0,
                 start_time.elapsed().as_secs_f64()
