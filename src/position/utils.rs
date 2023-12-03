@@ -603,15 +603,21 @@ pub(crate) const fn generate_neighbor_table<const S: usize>() -> AbstractBoard<B
     table
 }
 
+const NEIGHBOR_TABLE_3S: AbstractBoard<BitBoard, 3> = generate_neighbor_table::<3>();
 const NEIGHBOR_TABLE_4S: AbstractBoard<BitBoard, 4> = generate_neighbor_table::<4>();
 const NEIGHBOR_TABLE_5S: AbstractBoard<BitBoard, 5> = generate_neighbor_table::<5>();
 const NEIGHBOR_TABLE_6S: AbstractBoard<BitBoard, 6> = generate_neighbor_table::<6>();
+const NEIGHBOR_TABLE_7S: AbstractBoard<BitBoard, 7> = generate_neighbor_table::<7>();
+const NEIGHBOR_TABLE_8S: AbstractBoard<BitBoard, 8> = generate_neighbor_table::<8>();
 
 pub(crate) fn lookup_neighbor_table<const S: usize>(square: Square) -> BitBoard {
     match S {
+        3 => NEIGHBOR_TABLE_3S[square],
         4 => NEIGHBOR_TABLE_4S[square],
         5 => NEIGHBOR_TABLE_5S[square],
         6 => NEIGHBOR_TABLE_6S[square],
+        7 => NEIGHBOR_TABLE_7S[square],
+        8 => NEIGHBOR_TABLE_8S[square],
         _ => unimplemented!("Unsupported size {}", S),
     }
 }

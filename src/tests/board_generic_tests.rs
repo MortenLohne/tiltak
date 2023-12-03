@@ -74,13 +74,9 @@ fn play_random_games_prop<const S: usize>(num_games: usize) {
             );
 
             let eval = position.static_eval();
-            for rotation in position.symmetries_with_swapped_colors() {
-                if position.side_to_move() == rotation.side_to_move() {
-                    assert!(rotation.static_eval() - eval < 0.0001,
+            for rotation in position.symmetries() {
+                assert!(rotation.static_eval() - eval < 0.0001,
                             "Static eval changed with rotation from {} to {} on board\n{:?}Rotated board:\n{:?}", eval, rotation.static_eval(), position, rotation);
-                } else {
-                    assert!(rotation.static_eval() - eval.abs() < 0.0001);
-                }
             }
 
             moves.clear();
@@ -151,17 +147,13 @@ fn play_random_games_prop<const S: usize>(num_games: usize) {
             assert_ne!(hash_from_scratch, position.zobrist_hash_from_scratch());
 
             let result = position.game_result();
-            for rotation in position.symmetries_with_swapped_colors() {
-                if position.side_to_move() == rotation.side_to_move() {
-                    assert_eq!(rotation.game_result(), result);
-                } else {
-                    assert_eq!(rotation.game_result().map(|r| !r), result);
-                }
+            for rotation in position.symmetries() {
+                assert_eq!(rotation.game_result(), result);
             }
 
             if result.is_none() {
                 let static_eval = position.static_eval();
-                for rotation in position.symmetries_with_swapped_colors() {
+                for rotation in position.symmetries() {
                     assert!(
                         rotation.static_eval().abs() - static_eval.abs() < 0.0001,
                         "Original static eval {}, rotated static eval {}.Board:\n{:?}\nRotated board:\n{:?}",
