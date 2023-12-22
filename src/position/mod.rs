@@ -1120,7 +1120,7 @@ impl<const S: usize> Position<S> {
         if depth == 0 || self.game_result().is_some() {
             1
         } else {
-            let mut moves = vec![];
+            let mut moves = Vec::with_capacity(S * S * 4);
             self.generate_moves(&mut moves);
 
             if depth == 1 {
@@ -1129,17 +1129,9 @@ impl<const S: usize> Position<S> {
                 moves
                     .into_iter()
                     .map(|mv| {
-                        let old_position = self.clone();
-                        let reverse_move = self.do_move(mv.clone());
+                        let reverse_move = self.do_move(mv);
                         let num_moves = self.bulk_perft(depth - 1);
                         self.reverse_move(reverse_move);
-                        debug_assert_eq!(
-                            *self,
-                            old_position,
-                            "Failed to restore old board after {:?} on\n{:?}",
-                            mv.to_string::<S>(),
-                            old_position
-                        );
                         num_moves
                     })
                     .sum()
