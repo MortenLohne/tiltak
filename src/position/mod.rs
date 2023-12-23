@@ -3,7 +3,7 @@
 use std::fmt::Write;
 use std::hash::{Hash, Hasher};
 use std::ops::{Index, IndexMut};
-use std::{fmt, ops};
+use std::{array, fmt, ops};
 use std::{iter, mem};
 
 use arrayvec::ArrayVec;
@@ -292,7 +292,7 @@ impl<const S: usize> GroupData<S> {
 #[derive(PartialEq, Eq, Debug)]
 pub struct ZobristKeys<const S: usize> {
     top_stones: AbstractBoard<[u64; 6], S>,
-    stones_in_stack: [AbstractBoard<[u64; 256], S>; 8],
+    stones_in_stack: [Box<AbstractBoard<[u64; 256], S>>; 8],
     to_move: [u64; 2],
 }
 
@@ -339,14 +339,14 @@ pub fn zobrist_to_move<const S: usize>(color: Color) -> u64 {
 impl<const S: usize> ZobristKeys<S> {
     pub(crate) fn new() -> Box<Self> {
         let mut rng = rand::rngs::StdRng::from_seed([0; 32]);
-        let mut random_vec: Vec<u64> = vec![0; mem::size_of::<ZobristKeys<S>>() / 8];
-        for word in random_vec.iter_mut() {
-            *word = rng.gen();
-        }
-        let zobrist = unsafe { mem::transmute(Box::from_raw(random_vec.as_mut_ptr())) };
 
-        mem::forget(random_vec);
-        zobrist
+        Box::new(ZobristKeys {
+            top_stones: AbstractBoard::new_from_fn(|| array::from_fn(|_| rng.gen())),
+            stones_in_stack: array::from_fn(|_| {
+                Box::new(AbstractBoard::new_from_fn(|| array::from_fn(|_| rng.gen())))
+            }),
+            to_move: array::from_fn(|_| rng.gen()),
+        })
     }
 }
 

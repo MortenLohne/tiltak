@@ -1,8 +1,8 @@
 use std::convert::TryFrom;
 use std::fmt::{self, Write};
-use std::ops;
 use std::ops::{Index, IndexMut};
 use std::str::FromStr;
+use std::{array, ops};
 
 use board_game_traits::{Color, GameResult};
 #[cfg(feature = "serde")]
@@ -586,6 +586,17 @@ impl<T: Copy, const S: usize> AbstractBoard<T, S> {
     pub const fn new_with_value(value: T) -> Self {
         AbstractBoard {
             raw: [[value; S]; S],
+        }
+    }
+}
+
+impl<T: Copy, const S: usize> AbstractBoard<T, S> {
+    pub fn new_from_fn<F>(mut f: F) -> Self
+    where
+        F: FnMut() -> T,
+    {
+        AbstractBoard {
+            raw: array::from_fn(|_| array::from_fn(|_| f())),
         }
     }
 }
