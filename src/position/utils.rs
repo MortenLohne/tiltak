@@ -634,12 +634,12 @@ impl<T, const S: usize> Index<Square> for AbstractBoard<T, S> {
     type Output = T;
 
     fn index(&self, square: Square) -> &Self::Output {
-        &self.raw[square.0 as usize % S][square.0 as usize / S]
+        &self.raw[square.file::<S>() as usize][square.rank::<S>() as usize]
     }
 }
 
 impl<T, const S: usize> IndexMut<Square> for AbstractBoard<T, S> {
     fn index_mut(&mut self, square: Square) -> &mut Self::Output {
-        &mut self.raw[square.0 as usize % S][square.0 as usize / S]
+        &mut self.raw[square.file::<S>() as usize][square.rank::<S>() as usize]
     }
 }
