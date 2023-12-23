@@ -928,7 +928,7 @@ impl PlaytakSession {
 
         info!("Game finished. Pgn: ");
 
-        let date = Local::today();
+        let date = Local::now();
 
         let tags = vec![
             ("Event".to_string(), "Playtak challenge".to_string()),
