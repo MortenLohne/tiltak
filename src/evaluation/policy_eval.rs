@@ -9,7 +9,7 @@ use crate::position::bitboard::BitBoard;
 use crate::position::color_trait::{BlackTr, ColorTr, WhiteTr};
 use crate::position::Direction::*;
 use crate::position::Role::{Cap, Flat, Wall};
-use crate::position::{square_symmetries, GroupData, Piece, Position, Role};
+use crate::position::{lookup_square_symmetries, GroupData, Piece, Position, Role};
 use crate::position::{squares_iterator, Move};
 use crate::position::{AbstractBoard, Direction};
 use crate::position::{GroupEdgeConnection, Square};
@@ -305,28 +305,22 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usize>(
             // Apply PSQT
             match (role, position.side_to_move()) {
                 (Flat, Color::White) => {
-                    policy_features.flat_psqt_white[square_symmetries::<S>()[square.0 as usize]] =
-                        1.0
+                    policy_features.flat_psqt_white[lookup_square_symmetries::<S>(*square)] = 1.0
                 }
                 (Flat, Color::Black) => {
-                    policy_features.flat_psqt_black[square_symmetries::<S>()[square.0 as usize]] =
-                        1.0
+                    policy_features.flat_psqt_black[lookup_square_symmetries::<S>(*square)] = 1.0
                 }
                 (Wall, Color::White) => {
-                    policy_features.wall_psqt_white[square_symmetries::<S>()[square.0 as usize]] =
-                        1.0
+                    policy_features.wall_psqt_white[lookup_square_symmetries::<S>(*square)] = 1.0
                 }
                 (Wall, Color::Black) => {
-                    policy_features.wall_psqt_black[square_symmetries::<S>()[square.0 as usize]] =
-                        1.0
+                    policy_features.wall_psqt_black[lookup_square_symmetries::<S>(*square)] = 1.0
                 }
                 (Cap, Color::White) => {
-                    policy_features.cap_psqt_white[square_symmetries::<S>()[square.0 as usize]] =
-                        1.0
+                    policy_features.cap_psqt_white[lookup_square_symmetries::<S>(*square)] = 1.0
                 }
                 (Cap, Color::Black) => {
-                    policy_features.cap_psqt_black[square_symmetries::<S>()[square.0 as usize]] =
-                        1.0
+                    policy_features.cap_psqt_black[lookup_square_symmetries::<S>(*square)] = 1.0
                 }
             }
 

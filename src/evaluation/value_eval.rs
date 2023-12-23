@@ -5,8 +5,8 @@ use crate::evaluation::parameters::ValueFeatures;
 use crate::position::bitboard::BitBoard;
 use crate::position::color_trait::{BlackTr, ColorTr, WhiteTr};
 use crate::position::{
-    line_symmetries, square_symmetries, squares_iterator, GroupData, Piece, Piece::*, Position,
-    Role::*, Square,
+    line_symmetries, lookup_square_symmetries, squares_iterator, GroupData, Piece, Piece::*,
+    Position, Role::*, Square,
 };
 
 pub fn static_eval_game_phase<const S: usize>(
@@ -22,7 +22,7 @@ pub fn static_eval_game_phase<const S: usize>(
     } else if all_pieces.count() == 1 {
         for square in squares_iterator::<S>() {
             if position[square].top_stone().is_some() {
-                white_value_features.second_ply[square_symmetries::<S>()[square.0 as usize]] += 1.0;
+                white_value_features.second_ply[lookup_square_symmetries::<S>(square)] += 1.0;
                 return;
             }
         }
@@ -35,24 +35,27 @@ pub fn static_eval_game_phase<const S: usize>(
     for square in squares_iterator::<S>() {
         let stack = &position[square];
         if let Some(piece) = position[square].top_stone() {
-            let i = square.0 as usize;
             match piece {
                 WhiteFlat => {
-                    white_value_features.flat_psqt[square_symmetries::<S>()[i]] += 1.0;
+                    white_value_features.flat_psqt[lookup_square_symmetries::<S>(square)] += 1.0;
                     white_flat_count += 1;
                 }
                 BlackFlat => {
-                    black_value_features.flat_psqt[square_symmetries::<S>()[i]] += 1.0;
+                    black_value_features.flat_psqt[lookup_square_symmetries::<S>(square)] += 1.0;
                     black_flat_count += 1;
                 }
-                WhiteWall => white_value_features.wall_psqt[square_symmetries::<S>()[i]] += 1.0,
-                BlackWall => black_value_features.wall_psqt[square_symmetries::<S>()[i]] += 1.0,
+                WhiteWall => {
+                    white_value_features.wall_psqt[lookup_square_symmetries::<S>(square)] += 1.0
+                }
+                BlackWall => {
+                    black_value_features.wall_psqt[lookup_square_symmetries::<S>(square)] += 1.0
+                }
                 WhiteCap => {
-                    white_value_features.cap_psqt[square_symmetries::<S>()[i]] += 1.0;
+                    white_value_features.cap_psqt[lookup_square_symmetries::<S>(square)] += 1.0;
                     cap_activity::<WhiteTr, BlackTr, S>(position, square, white_value_features);
                 }
                 BlackCap => {
-                    black_value_features.cap_psqt[square_symmetries::<S>()[i]] += 1.0;
+                    black_value_features.cap_psqt[lookup_square_symmetries::<S>(square)] += 1.0;
                     cap_activity::<BlackTr, WhiteTr, S>(position, square, black_value_features);
                 }
             }
@@ -106,16 +109,20 @@ pub fn static_eval_game_phase<const S: usize>(
                     }
                     match (is_support, controlling_player) {
                         (true, Color::White) => {
-                            white_value_features.supports_psqt[square_symmetries::<S>()[i]] += 1.0
+                            white_value_features.supports_psqt
+                                [lookup_square_symmetries::<S>(square)] += 1.0
                         }
                         (true, Color::Black) => {
-                            black_value_features.supports_psqt[square_symmetries::<S>()[i]] += 1.0
+                            black_value_features.supports_psqt
+                                [lookup_square_symmetries::<S>(square)] += 1.0
                         }
                         (false, Color::White) => {
-                            white_value_features.captives_psqt[square_symmetries::<S>()[i]] -= 1.0
+                            white_value_features.captives_psqt
+                                [lookup_square_symmetries::<S>(square)] -= 1.0
                         }
                         (false, Color::Black) => {
-                            black_value_features.captives_psqt[square_symmetries::<S>()[i]] -= 1.0
+                            black_value_features.captives_psqt
+                                [lookup_square_symmetries::<S>(square)] -= 1.0
                         }
                     }
                 }
@@ -317,7 +324,7 @@ fn cap_activity<Us: ColorTr, Them: ColorTr, const S: usize>(
 
     // Malus if our capstone's line towards the center is blocked
     if square.neighbours::<S>().any(|neighbour| {
-        square_symmetries::<S>()[neighbour.0 as usize] > square_symmetries::<S>()[square.0 as usize]
+        lookup_square_symmetries::<S>(neighbour) > lookup_square_symmetries::<S>(square)
             && position[neighbour].top_stone().map(Piece::role) == Some(Cap)
     }) {
         our_value_features.sidelined_cap[height_index] += 1.0

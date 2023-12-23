@@ -34,13 +34,13 @@ impl Square {
     }
 
     pub fn neighbours<const S: usize>(self) -> impl Iterator<Item = Square> {
-        (if self.0 as usize == 0 {
+        (if self.rank::<S>() == 0 && self.file::<S>() == 0 {
             [1, S as i8].iter()
-        } else if self.0 as usize == S - 1 {
+        } else if self.rank::<S>() == 0 && self.file::<S>() == S as u8 - 1 {
             [-1, S as i8].iter()
-        } else if self.0 as usize == S * S - S {
+        } else if self.rank::<S>() == S as u8 - 1 && self.file::<S>() == 0 {
             [1, -(S as i8)].iter()
-        } else if self.0 as usize == S * S - 1 {
+        } else if self.rank::<S>() == S as u8 - 1 && self.file::<S>() == S as u8 - 1 {
             [-1, -(S as i8)].iter()
         } else if self.rank::<S>() == 0 {
             [-1, 1, S as i8].iter()
@@ -59,13 +59,13 @@ impl Square {
     }
 
     pub fn directions<const S: usize>(self) -> impl Iterator<Item = Direction> {
-        (if self.0 as usize == 0 {
+        (if self.rank::<S>() == 0 && self.file::<S>() == 0 {
             [East, South].iter()
-        } else if self.0 as usize == S - 1 {
+        } else if self.rank::<S>() == 0 && self.file::<S>() == S as u8 - 1 {
             [West, South].iter()
-        } else if self.0 as usize == S * S - S {
+        } else if self.rank::<S>() == S as u8 - 1 && self.file::<S>() == 0 {
             [East, North].iter()
-        } else if self.0 as usize == S * S - 1 {
+        } else if self.rank::<S>() == S as u8 - 1 && self.file::<S>() == S as u8 - 1 {
             [West, North].iter()
         } else if self.rank::<S>() == 0 {
             [West, East, South].iter()

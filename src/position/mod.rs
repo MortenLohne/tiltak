@@ -81,17 +81,39 @@ pub(crate) const fn num_square_symmetries<const S: usize>() -> usize {
     }
 }
 
-pub(crate) const fn square_symmetries<const S: usize>() -> &'static [usize] {
+const fn generate_square_symmetries_table<const S: usize>() -> AbstractBoard<usize, S> {
+    let mut table = AbstractBoard::new_with_value(0);
+    let mut i = 0;
+    let mut rank = 0;
+    while rank < S.div_ceil(2) {
+        let mut file = rank;
+        while file < S.div_ceil(2) {
+            table.raw[file][rank] = i;
+            table.raw[rank][file] = i;
+            table.raw[S - file - 1][rank] = i;
+            table.raw[S - rank - 1][file] = i;
+            table.raw[file][S - rank - 1] = i;
+            table.raw[rank][S - file - 1] = i;
+            table.raw[S - file - 1][S - rank - 1] = i;
+            table.raw[S - rank - 1][S - file - 1] = i;
+            file += 1;
+            i += 1;
+        }
+        rank += 1;
+    }
+    table
+}
+
+pub(crate) const SQUARE_SYMMETRIES_4S: AbstractBoard<usize, 4> = generate_square_symmetries_table();
+pub(crate) const SQUARE_SYMMETRIES_5S: AbstractBoard<usize, 5> = generate_square_symmetries_table();
+pub(crate) const SQUARE_SYMMETRIES_6S: AbstractBoard<usize, 6> = generate_square_symmetries_table();
+
+pub(crate) fn lookup_square_symmetries<const S: usize>(square: Square) -> usize {
     match S {
-        4 => &[0, 1, 1, 0, 1, 2, 2, 1, 1, 2, 2, 1, 0, 1, 1, 0],
-        5 => &[
-            0, 1, 2, 1, 0, 1, 3, 4, 3, 1, 2, 4, 5, 4, 2, 1, 3, 4, 3, 1, 0, 1, 2, 1, 0,
-        ],
-        6 => &[
-            0, 1, 2, 2, 1, 0, 1, 3, 4, 4, 3, 1, 2, 4, 5, 5, 4, 2, 2, 4, 5, 5, 4, 2, 1, 3, 4, 4, 3,
-            1, 0, 1, 2, 2, 1, 0,
-        ],
-        _ => &[],
+        4 => SQUARE_SYMMETRIES_4S[square],
+        5 => SQUARE_SYMMETRIES_5S[square],
+        6 => SQUARE_SYMMETRIES_6S[square],
+        _ => unimplemented!("Unsupported size {}", S),
     }
 }
 
