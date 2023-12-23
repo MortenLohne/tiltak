@@ -104,14 +104,14 @@ impl BitBoard {
     }
 
     #[inline]
-    pub fn rank<const S: usize>(self, i: u8) -> Self {
+    pub fn file<const S: usize>(self, i: u8) -> Self {
         debug_assert!(i < S as u8);
         let mask = (1 << S) - 1;
         BitBoard::from_u64(self.board & (mask << (i as u64 * S as u64)))
     }
 
     #[inline]
-    pub fn file<const S: usize>(self, i: u8) -> Self {
+    pub fn rank<const S: usize>(self, i: u8) -> Self {
         debug_assert!(i < S as u8);
         #[allow(clippy::unusual_byte_groupings)]
         let mask = match S {

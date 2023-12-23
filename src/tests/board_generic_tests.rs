@@ -113,8 +113,14 @@ fn play_random_games_prop<const S: usize>(num_games: usize) {
                         );
                         game_result == Some(WhiteWin) || game_result == Some(BlackWin)
                     }),
-                    "TPS {} shows a win, but no winning move.",
-                    position.to_fen()
+                    "TPS {} shows a policy win with {:?}, but no winning move.",
+                    position.to_fen(),
+                    policy_feature_sets
+                        .iter()
+                        .zip(moves)
+                        .filter(|(features, _)| features.decline_win[0] == 0.0)
+                        .map(|(_, mv)| mv.to_string::<S>())
+                        .collect::<Vec<_>>()
                 )
             }
 

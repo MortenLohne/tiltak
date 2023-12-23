@@ -22,36 +22,36 @@ pub struct Square(pub u8);
 impl Square {
     pub const fn from_rank_file<const S: usize>(rank: u8, file: u8) -> Self {
         debug_assert!(rank < S as u8 && file < S as u8);
-        Square(rank * S as u8 + file)
+        Square(file * S as u8 + rank)
     }
 
     pub const fn rank<const S: usize>(self) -> u8 {
-        self.0 / S as u8
+        self.0 % S as u8
     }
 
     pub const fn file<const S: usize>(self) -> u8 {
-        self.0 % S as u8
+        self.0 / S as u8
     }
 
     pub fn neighbours<const S: usize>(self) -> impl Iterator<Item = Square> {
         (if self.rank::<S>() == 0 && self.file::<S>() == 0 {
-            [1, S as i8].iter()
+            [(S as i8), 1].iter()
         } else if self.rank::<S>() == 0 && self.file::<S>() == S as u8 - 1 {
-            [-1, S as i8].iter()
+            [-(S as i8), 1].iter()
         } else if self.rank::<S>() == S as u8 - 1 && self.file::<S>() == 0 {
-            [1, -(S as i8)].iter()
+            [(S as i8), -1].iter()
         } else if self.rank::<S>() == S as u8 - 1 && self.file::<S>() == S as u8 - 1 {
-            [-1, -(S as i8)].iter()
+            [-(S as i8), -1].iter()
         } else if self.rank::<S>() == 0 {
-            [-1, 1, S as i8].iter()
+            [-(S as i8), (S as i8), 1].iter()
         } else if self.rank::<S>() == S as u8 - 1 {
-            [-(S as i8), -1, 1].iter()
+            [-1, -(S as i8), (S as i8)].iter()
         } else if self.file::<S>() == 0 {
-            [-(S as i8), 1, S as i8].iter()
+            [-1, (S as i8), 1].iter()
         } else if self.file::<S>() == S as u8 - 1 {
-            [-(S as i8), -1, S as i8].iter()
+            [-1, -(S as i8), 1].iter()
         } else {
-            [-(S as i8), -1, 1, S as i8].iter()
+            [-1, -(S as i8), (S as i8), 1].iter()
         })
         .cloned()
         .map(move |sq| sq + self.0 as i8)
@@ -90,33 +90,35 @@ impl Square {
         direction: Direction,
         len: u8,
     ) -> Option<Self> {
+        let rank = self.rank::<S>();
+        let file = self.file::<S>();
         match direction {
             North => {
-                if let Some(i) = self.0.checked_sub((S as u8) * len) {
-                    Some(Square(i))
+                if let Some(new_rank) = rank.checked_sub(len) {
+                    Some(Square::from_rank_file::<S>(new_rank, file))
                 } else {
                     None
                 }
             }
             West => {
-                if self.file::<S>() < len {
+                if file < len {
                     None
                 } else {
-                    Some(Square(self.0 - len))
+                    Some(Square::from_rank_file::<S>(rank, file - len))
                 }
             }
             East => {
-                if self.file::<S>() >= S as u8 - len {
+                if file >= S as u8 - len {
                     None
                 } else {
-                    Some(Square(self.0 + len))
+                    Some(Square::from_rank_file::<S>(rank, file + len))
                 }
             }
             South => {
-                if self.0 + (S as u8) * len >= (S * S) as u8 {
+                if rank + len >= S as u8 {
                     None
                 } else {
-                    Some(Square(self.0 + len * S as u8))
+                    Some(Square::from_rank_file::<S>(rank + len, file))
                 }
             }
         }
@@ -140,7 +142,7 @@ impl Square {
                 input, S
             )))
         } else {
-            Ok(Square(file + rank * S as u8))
+            Ok(Square::from_rank_file::<S>(rank, file))
         }
     }
 
