@@ -643,9 +643,10 @@ impl<const S: usize> Position<S> {
 
     pub fn flip_board_y(&self) -> Position<S> {
         let mut new_board = self.clone();
-        for x in 0..S as u8 {
-            for y in 0..S as u8 {
-                new_board[Square(y * S as u8 + x)] = self[Square((S as u8 - y - 1) * S as u8 + x)];
+        for file in 0..S as u8 {
+            for rank in 0..S as u8 {
+                new_board[Square::from_rank_file::<S>(rank, file)] =
+                    self[Square::from_rank_file::<S>(S as u8 - rank - 1, file)];
             }
         }
         new_board
@@ -653,9 +654,10 @@ impl<const S: usize> Position<S> {
 
     pub fn flip_board_x(&self) -> Position<S> {
         let mut new_board = self.clone();
-        for x in 0..S as u8 {
-            for y in 0..S as u8 {
-                new_board[Square(y * S as u8 + x)] = self[Square(y * S as u8 + (S as u8 - x - 1))];
+        for file in 0..S as u8 {
+            for rank in 0..S as u8 {
+                new_board[Square::from_rank_file::<S>(rank, file)] =
+                    self[Square::from_rank_file::<S>(rank, S as u8 - file - 1)];
             }
         }
         new_board
@@ -663,11 +665,12 @@ impl<const S: usize> Position<S> {
 
     pub fn rotate_board(&self) -> Position<S> {
         let mut new_board = self.clone();
-        for x in 0..S as u8 {
-            for y in 0..S as u8 {
-                let new_x = y;
-                let new_y = S as u8 - x - 1;
-                new_board[Square(y * S as u8 + x)] = self[Square(new_y * S as u8 + new_x)];
+        for file in 0..S as u8 {
+            for rank in 0..S as u8 {
+                let new_file = rank;
+                let new_rank = S as u8 - file - 1;
+                new_board[Square::from_rank_file::<S>(rank, file)] =
+                    self[Square::from_rank_file::<S>(new_rank, new_file)];
             }
         }
         new_board

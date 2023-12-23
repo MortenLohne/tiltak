@@ -15,7 +15,7 @@ use crate::position::Piece::{BlackCap, BlackFlat, BlackWall, WhiteCap, WhiteFlat
 use crate::position::Role::{Cap, Flat, Wall};
 
 /// A location on the board. Can be used to index a `Board`.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Square(pub u8);
 

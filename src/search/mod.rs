@@ -153,7 +153,7 @@ impl<const S: usize> MonteCarloTree<S> {
         let mut temp_vectors = TempVectors::new::<S>();
         let mut root_edge = TreeEdge {
             child: None,
-            mv: Move::Place(Role::Flat, Square(0)),
+            mv: Move::Place(Role::Flat, Square::default()),
             mean_action_value: 0.0,
             visits: 0,
             heuristic_score: 0.0,
