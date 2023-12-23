@@ -305,11 +305,27 @@ fn bitboard_full_board_file_rank_prop<const S: usize>() {
 }
 
 #[test]
-fn square_rank_file_test() {
+fn square_rank_file_4s_test() {
     square_rank_file_prop::<4>();
+}
+
+#[test]
+fn square_rank_file_5s_test() {
     square_rank_file_prop::<5>();
+}
+
+#[test]
+fn square_rank_file_6s_test() {
     square_rank_file_prop::<6>();
+}
+
+#[test]
+fn square_rank_file_7s_test() {
     square_rank_file_prop::<7>();
+}
+
+#[test]
+fn square_rank_file_8s_test() {
     square_rank_file_prop::<8>();
 }
 
