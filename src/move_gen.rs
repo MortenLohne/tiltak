@@ -1,8 +1,8 @@
 use crate::position::color_trait::ColorTr;
-use crate::position::Move;
 use crate::position::{
-    squares_iterator, Direction, Movement, Piece, Position, Role::*, Square, StackMovement,
+    squares_iterator, Direction, Movement, Position, Role::*, Square, StackMovement,
 };
+use crate::position::{Move, Piece};
 use arrayvec::ArrayVec;
 use board_game_traits::Position as PositionTrait;
 use std::iter;
@@ -122,11 +122,10 @@ impl<const S: usize> Position<S> {
     ) {
         if let Some(neighbour) = square.go_direction::<S>(direction) {
             let neighbour_piece = self[neighbour].top_stone();
-            if neighbour_piece.is_some() && neighbour_piece.unwrap().role() != Flat {
+            if neighbour_piece.is_some_and(|piece| piece.role() != Flat) {
                 return;
             }
 
-            let neighbour = square.go_direction::<S>(direction).unwrap();
             let pieces_held = if square == origin_square {
                 S as u8
             } else {
