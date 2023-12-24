@@ -645,14 +645,29 @@ impl<T: Default + Copy, const S: usize> Default for AbstractBoard<T, S> {
 
 impl<T, const S: usize> Index<Square> for AbstractBoard<T, S> {
     type Output = T;
-
-    fn index(&self, square: Square) -> &Self::Output {
-        &self.raw[square.file::<S>() as usize][square.rank::<S>() as usize]
+    #[allow(clippy::needless_lifetimes)]
+    fn index<'a>(&'a self, square: Square) -> &'a Self::Output {
+        assert!((square.0 as usize) < S * S);
+        // Compared to the safe code, this is roughly a 10% speedup of the entire engine
+        unsafe {
+            (self.raw.as_ptr() as *const T)
+                .offset(square.0 as isize)
+                .as_ref()
+                .unwrap_unchecked()
+        }
     }
 }
 
 impl<T, const S: usize> IndexMut<Square> for AbstractBoard<T, S> {
-    fn index_mut(&mut self, square: Square) -> &mut Self::Output {
-        &mut self.raw[square.file::<S>() as usize][square.rank::<S>() as usize]
+    #[allow(clippy::needless_lifetimes)]
+    fn index_mut<'a>(&'a mut self, square: Square) -> &'a mut Self::Output {
+        assert!((square.0 as usize) < S * S);
+        // Compared to the safe code, this is roughly a 10% speedup of the entire engine
+        unsafe {
+            (self.raw.as_mut_ptr() as *mut T)
+                .offset(square.0 as isize)
+                .as_mut()
+                .unwrap_unchecked()
+        }
     }
 }
