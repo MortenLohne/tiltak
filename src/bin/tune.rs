@@ -17,12 +17,12 @@ fn main() {
         .arg(
             Arg::with_name("size")
                 .global(true)
-                .short("s")
+                .short('s')
                 .long("size")
                 .help("Board size")
                 .takes_value(true)
                 .default_value("5")
-                .possible_values(&["4", "5", "6"]),
+                .possible_values(["4", "5", "6"]),
         )
         .subcommand(SubCommand::with_name("selfplay")
             .about("Tune value and policy constants by playing against itself. Will write the games to text files in the working directory."))
@@ -60,14 +60,14 @@ fn main() {
                 .long("book")
                 .help("Opening book for the games.")
                 .value_name("book.txt")
-            ));
+            )).arg_required_else_help(true);
 
     let matches = app.get_matches();
     let size: usize = matches.value_of("size").unwrap().parse().unwrap();
     let komi = Komi::from_str("2.0").unwrap();
 
     match matches.subcommand() {
-        ("selfplay", _) => {
+        Some(("selfplay", _)) => {
             for i in 0.. {
                 let file_name = format!("games{}_s{}_batch0.ptn", i, size);
                 if !Path::new(&file_name).exists() {
@@ -122,7 +122,7 @@ fn main() {
                 }
             }
         }
-        ("selfplay-from-scratch", _) => {
+        Some(("selfplay-from-scratch", _)) => {
             for i in 0.. {
                 let file_name = format!("games{}_{}s_batch0.ptn", i, size);
                 if !Path::new(&file_name).exists() {
@@ -153,7 +153,7 @@ fn main() {
                 }
             }
         }
-        ("continue-selfplay", Some(arg)) => {
+        Some(("continue-selfplay", arg)) => {
             let training_id: usize = arg.value_of("training-id").unwrap().parse().unwrap();
             match size {
                 4 => {
@@ -180,7 +180,7 @@ fn main() {
                 _ => panic!("Size {} not supported.", size),
             }
         }
-        ("value-from-file", Some(arg)) => {
+        Some(("value-from-file", arg)) => {
             let file_name = arg.value_of("file-name").unwrap();
             match size {
                 4 => {
@@ -204,7 +204,7 @@ fn main() {
                 _ => panic!("Size {} not supported.", size),
             }
         }
-        ("both-from-file", Some(arg)) => {
+        Some(("both-from-file", arg)) => {
             let value_file_name = arg.value_of("value-file-name").unwrap();
             let policy_file_name = arg.value_of("policy-file-name").unwrap();
             match size {
@@ -244,7 +244,7 @@ fn main() {
                 _ => panic!("Size {} not supported.", size),
             }
         }
-        ("spsa", Some(arg)) => {
+        Some(("spsa", arg)) => {
             let mut variables = vec![
                 spsa::Variable {
                     value: 1.43,
@@ -269,10 +269,9 @@ fn main() {
                 _ => panic!("Size {} not supported.", size),
             }
         }
-        ("", None) => {
+        Some((command, args)) => panic!("Invalid command {} with arguments {:?}", command, args),
+        None => {
             println!("Error: No subcommand selected. Try the 'help' subcommand for a list.");
-            println!("{}", matches.usage());
         }
-        (command, args) => panic!("Invalid command {} with arguments {:?}", command, args),
     }
 }

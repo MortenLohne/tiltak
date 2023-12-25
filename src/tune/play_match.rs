@@ -99,7 +99,7 @@ pub fn play_game<const S: usize>(
         move_scores.push(moves_scores);
     }
 
-    let date = chrono::Local::today();
+    let date = chrono::Local::now();
 
     let tags = vec![
         ("Event".to_string(), "Tiltak training".to_string()),
