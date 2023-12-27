@@ -68,7 +68,7 @@ pub fn main() -> Result<()> {
                 .long("username")
                 .value_name("USER")
                 .help("playtak.com username")
-                .takes_value(true),
+                .num_args(1),
         )
         .arg(
             Arg::new("password")
@@ -76,14 +76,14 @@ pub fn main() -> Result<()> {
                 .long("password")
                 .value_name("PASS")
                 .help("playtak.com password")
-                .takes_value(true),
+                .num_args(1),
         )
         .arg(
             Arg::new("size")
                 .short('s')
                 .long("size")
                 .help("Board size")
-                .takes_value(true)
+                .num_args(1)
                 .default_value("5")
                 .value_parser(clap::value_parser!(u64).range(4..=8)),
         )
@@ -93,7 +93,7 @@ pub fn main() -> Result<()> {
                 .long("logfile")
                 .value_name("tiltak.log")
                 .help("Name of debug logfile")
-                .takes_value(true),
+                .num_args(1),
         )
         .arg(
             Arg::new("playBot")
@@ -101,7 +101,7 @@ pub fn main() -> Result<()> {
                 .value_name("botname")
                 .help("Instead of seeking any game, accept any seek from the specified bot. Mutually exclusive with --tc")
                 .conflicts_with("tc")
-                .takes_value(true)
+                .num_args(1)
                 .required(true),
 
         )
@@ -110,7 +110,7 @@ pub fn main() -> Result<()> {
                  .long("tc")
                  .help("Time control to seek games for. Mutually exclusive with --play-bot")
                  .conflicts_with("playBot")
-                 .takes_value(true)
+                 .num_args(1)
                  .required(true),
         )
         .arg(
@@ -118,49 +118,49 @@ pub fn main() -> Result<()> {
                 .long("target-move-time")
                 .conflicts_with("fixedNodes")
                 .help("Try spending no more than this number of seconds per move. Will occasionally search longer, assuming the time control allows")
-                .takes_value(true))
+                .num_args(1))
         .arg(Arg::new("allowChoosingColor")
             .long("allow-choosing-color")
             .help("Allow users to change the bot's seek color through chat")
             .action(ArgAction::SetTrue)
-            .takes_value(false))
+            .num_args(0))
         .arg(Arg::new("allowChoosingSize")
             .long("allow-choosing-size")
             .help("Allow users to change the bot's board size through chat")
             .action(ArgAction::SetTrue)
-            .takes_value(false))
+            .num_args(0))
         .arg(Arg::new("seekColor")
             .long("seek-color")
             .help("Color of games to seek")
-            .takes_value(true)
+            .num_args(1)
             .value_parser(["white", "black", "either"])
             .default_value("either"))
         .arg(Arg::new("policyNoise")
             .long("policy-noise")
             .help("Add dirichlet noise to the policy scores of the root node in search. This gives the bot a small amount of randomness in its play, especially on low nodecounts.")
-            .takes_value(true)
+            .num_args(1)
             .value_parser(["none", "low", "medium", "high"])
             .default_value("none"))
         .arg(Arg::new("rolloutDepth")
             .long("rollout-depth")
             .help("Depth of MCTS rollouts. Once a rollout reaches the maximum depth, the heuristic eval function is returned. Can be set to 0 to disable rollouts entirely.")
-            .takes_value(true)
+            .num_args(1)
             .default_value("0")
             .value_parser(clap::value_parser!(u16)))
         .arg(Arg::new("rolloutNoise")
             .long("rollout-noise")
             .help("Add a random component to move selection in MCTS rollouts. Has no effect if --rollout-depth is 0. For full rollouts, even the 'low' setting is enough to give highly variable play.")
-            .takes_value(true)
+            .num_args(1)
             .value_parser(["low", "medium", "high"])
             .default_value("low"))
         .arg(Arg::new("fixedNodes")
             .long("fixed-nodes")
             .help("Normally, the bot will search a variable number of nodes, depending on hardware on time control. This option overrides that to calculate a fixed amount of nodes each move")
-            .takes_value(true))
+            .num_args(1))
         .arg(Arg::new("komi")
             .long("komi")
             .help("Seek games with komi")
-            .takes_value(true)
+            .num_args(1)
             .default_value("0"));
 
     if cfg!(feature = "aws-lambda-client") {
@@ -173,7 +173,7 @@ pub fn main() -> Result<()> {
                 .help(
                     "Run the engine on AWS instead of locally. Requires aws cli installed locally.",
                 )
-                .takes_value(true),
+                .num_args(1),
         );
     }
     let matches = app.get_matches();
@@ -270,7 +270,7 @@ pub fn main() -> Result<()> {
     loop {
         #[cfg(feature = "aws-lambda-client")]
         let connection_result =
-            if let Some(aws_function_name) = matches.value_of("aws-function-name") {
+            if let Some(aws_function_name) = matches.get_one::<String>("aws-function-name") {
                 PlaytakSession::with_aws(aws_function_name.to_string())
             } else {
                 PlaytakSession::new()
