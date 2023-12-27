@@ -10,7 +10,7 @@ use std::{io, net, thread};
 use board_game_traits::{Color, GameResult, Position as PositionTrait};
 use bufstream::BufStream;
 use chrono::{Datelike, Local};
-use clap::{App, Arg};
+use clap::{Arg, ArgAction, Command};
 use log::error;
 use log::{debug, info, warn};
 use pgn_traits::PgnPosition;
@@ -58,11 +58,11 @@ impl PlaytakSettings {
 }
 
 pub fn main() -> Result<()> {
-    let mut app = App::new("Tiltak playtak client")
+    let mut app = Command::new("Tiltak playtak client")
         .version("0.1")
         .author("Morten Lohne")
         .arg(
-            Arg::with_name("username")
+            Arg::new("username")
                 .requires("password")
                 .short('u')
                 .long("username")
@@ -71,7 +71,7 @@ pub fn main() -> Result<()> {
                 .takes_value(true),
         )
         .arg(
-            Arg::with_name("password")
+            Arg::new("password")
                 .short('p')
                 .long("password")
                 .value_name("PASS")
@@ -79,16 +79,16 @@ pub fn main() -> Result<()> {
                 .takes_value(true),
         )
         .arg(
-            Arg::with_name("size")
+            Arg::new("size")
                 .short('s')
                 .long("size")
                 .help("Board size")
                 .takes_value(true)
                 .default_value("5")
-                .possible_values(["4", "5", "6"]),
+                .value_parser(clap::value_parser!(u64).range(4..=8)),
         )
         .arg(
-            Arg::with_name("logfile")
+            Arg::new("logfile")
                 .short('l')
                 .long("logfile")
                 .value_name("tiltak.log")
@@ -96,7 +96,7 @@ pub fn main() -> Result<()> {
                 .takes_value(true),
         )
         .arg(
-            Arg::with_name("playBot")
+            Arg::new("playBot")
                 .long("play-bot")
                 .value_name("botname")
                 .help("Instead of seeking any game, accept any seek from the specified bot. Mutually exclusive with --tc")
@@ -106,7 +106,7 @@ pub fn main() -> Result<()> {
 
         )
         .arg(
-            Arg::with_name("tc")
+            Arg::new("tc")
                  .long("tc")
                  .help("Time control to seek games for. Mutually exclusive with --play-bot")
                  .conflicts_with("playBot")
@@ -114,47 +114,50 @@ pub fn main() -> Result<()> {
                  .required(true),
         )
         .arg(
-            Arg::with_name("targetMoveTime")
+            Arg::new("targetMoveTime")
                 .long("target-move-time")
                 .conflicts_with("fixedNodes")
                 .help("Try spending no more than this number of seconds per move. Will occasionally search longer, assuming the time control allows")
                 .takes_value(true))
-        .arg(Arg::with_name("allowChoosingColor")
+        .arg(Arg::new("allowChoosingColor")
             .long("allow-choosing-color")
             .help("Allow users to change the bot's seek color through chat")
+            .action(ArgAction::SetTrue)
             .takes_value(false))
-        .arg(Arg::with_name("allowChoosingSize")
+        .arg(Arg::new("allowChoosingSize")
             .long("allow-choosing-size")
             .help("Allow users to change the bot's board size through chat")
+            .action(ArgAction::SetTrue)
             .takes_value(false))
-        .arg(Arg::with_name("seekColor")
+        .arg(Arg::new("seekColor")
             .long("seek-color")
             .help("Color of games to seek")
             .takes_value(true)
-            .possible_values(["white", "black", "either"])
+            .value_parser(["white", "black", "either"])
             .default_value("either"))
-        .arg(Arg::with_name("policyNoise")
+        .arg(Arg::new("policyNoise")
             .long("policy-noise")
             .help("Add dirichlet noise to the policy scores of the root node in search. This gives the bot a small amount of randomness in its play, especially on low nodecounts.")
             .takes_value(true)
-            .possible_values(&["none", "low", "medium", "high"])
+            .value_parser(["none", "low", "medium", "high"])
             .default_value("none"))
-        .arg(Arg::with_name("rolloutDepth")
+        .arg(Arg::new("rolloutDepth")
             .long("rollout-depth")
             .help("Depth of MCTS rollouts. Once a rollout reaches the maximum depth, the heuristic eval function is returned. Can be set to 0 to disable rollouts entirely.")
             .takes_value(true)
-            .default_value("0"))
-        .arg(Arg::with_name("rolloutNoise")
+            .default_value("0")
+            .value_parser(clap::value_parser!(u16)))
+        .arg(Arg::new("rolloutNoise")
             .long("rollout-noise")
             .help("Add a random component to move selection in MCTS rollouts. Has no effect if --rollout-depth is 0. For full rollouts, even the 'low' setting is enough to give highly variable play.")
             .takes_value(true)
-            .possible_values(["low", "medium", "high"])
+            .value_parser(["low", "medium", "high"])
             .default_value("low"))
-        .arg(Arg::with_name("fixedNodes")
+        .arg(Arg::new("fixedNodes")
             .long("fixed-nodes")
             .help("Normally, the bot will search a variable number of nodes, depending on hardware on time control. This option overrides that to calculate a fixed amount of nodes each move")
             .takes_value(true))
-        .arg(Arg::with_name("komi")
+        .arg(Arg::new("komi")
             .long("komi")
             .help("Seek games with komi")
             .takes_value(true)
@@ -162,7 +165,7 @@ pub fn main() -> Result<()> {
 
     if cfg!(feature = "aws-lambda-client") {
         app = app.arg(
-            Arg::with_name("aws-function-name")
+            Arg::new("aws-function-name")
                 .long("aws-function-name")
                 .value_name("tiltak")
                 .required(true)
@@ -185,7 +188,7 @@ pub fn main() -> Result<()> {
         ))
     });
 
-    if let Some(log_file) = matches.value_of("logfile") {
+    if let Some(log_file) = matches.get_one::<String>("logfile") {
         log_dispatcher
             .chain(
                 fern::Dispatch::new()
@@ -207,43 +210,47 @@ pub fn main() -> Result<()> {
             .unwrap()
     }
 
-    let size: usize = matches.value_of("size").unwrap().parse().unwrap();
+    let size: usize = *matches.get_one::<u64>("size").unwrap() as usize;
 
-    let allow_choosing_color = matches.is_present("allowChoosingColor");
-    let allow_choosing_size = matches.is_present("allowChoosingSize");
-    let default_seek_color = match matches.value_of("seekColor").unwrap() {
+    let allow_choosing_color = matches.get_flag("allowChoosingColor");
+    let allow_choosing_size = matches.get_flag("allowChoosingSize");
+    let default_seek_color = match matches.get_one::<String>("seekColor").unwrap().as_str() {
         "white" => Some(Color::White),
         "black" => Some(Color::Black),
         "either" => None,
         _ => unreachable!(),
     };
 
-    let dirichlet_noise: Option<f32> = match matches.value_of("policyNoise").unwrap() {
-        "none" => None,
-        "low" => Some(0.5),
-        "medium" => Some(0.25),
-        "high" => Some(0.1),
-        s => panic!("policyNoise cannot be {}", s),
-    };
+    let dirichlet_noise: Option<f32> =
+        match matches.get_one::<String>("policyNoise").unwrap().as_ref() {
+            "none" => None,
+            "low" => Some(0.5),
+            "medium" => Some(0.25),
+            "high" => Some(0.1),
+            s => panic!("policyNoise cannot be {}", s),
+        };
 
-    let rollout_depth: u16 = matches.value_of("rolloutDepth").unwrap().parse().unwrap();
-    let rollout_temperature: f64 = match matches.value_of("rolloutNoise").unwrap() {
+    let rollout_depth: u16 = *matches.get_one::<u16>("rolloutDepth").unwrap();
+    let rollout_temperature: f64 = match matches.get_one::<String>("rolloutNoise").unwrap().as_ref()
+    {
         "low" => 0.2,
         "medium" => 0.3,
         "high" => 0.5,
         s => panic!("rolloutTemperature cannot be {}", s),
     };
 
-    let fixed_nodes: Option<u64> = matches.value_of("fixedNodes").map(|v| v.parse().unwrap());
+    let fixed_nodes: Option<u64> = matches
+        .get_one::<String>("fixedNodes")
+        .map(|v| v.parse().unwrap());
 
-    let tc = matches.value_of("tc").map(parse_tc);
+    let tc = matches.get_one::<String>("tc").map(|tc| parse_tc(tc));
 
     let target_move_time: Option<Duration> = matches
-        .value_of("targetMoveTime")
+        .get_one::<String>("targetMoveTime")
         .map(|v| v.parse().unwrap())
         .map(Duration::from_secs_f32);
 
-    let komi = matches.value_of("komi").unwrap().parse().unwrap();
+    let komi = matches.get_one::<String>("komi").unwrap().parse().unwrap();
 
     let playtak_settings = PlaytakSettings {
         allow_choosing_size,
@@ -280,9 +287,10 @@ pub fn main() -> Result<()> {
             }
         };
 
-        if let (Some(user), Some(pwd)) =
-            (matches.value_of("username"), matches.value_of("password"))
-        {
+        if let (Some(user), Some(pwd)) = (
+            matches.get_one::<String>("username"),
+            matches.get_one::<String>("password"),
+        ) {
             session.username = Some(user.to_string());
             session.login("Tiltak", user, pwd)?;
         } else {
@@ -291,7 +299,7 @@ pub fn main() -> Result<()> {
         }
 
         // Re-connect if we get disconnected from the server
-        let error = match matches.value_of("playBot") {
+        let error = match matches.get_one::<String>("playBot") {
             Some(bot_name) => {
                 match match size {
                     4 => session.accept_seek::<4>(playtak_settings, bot_name),
