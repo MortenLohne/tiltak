@@ -38,6 +38,7 @@ pub struct PlaytakSettings {
     rollout_temperature: f64,
     seek_game_time: Duration,
     seek_increment: Duration,
+    seek_unrated: bool,
     target_move_time: Option<Duration>,
     komi: Komi,
 }
@@ -161,7 +162,12 @@ pub fn main() -> Result<()> {
             .long("komi")
             .help("Seek games with komi")
             .num_args(1)
-            .default_value("0"));
+            .default_value("0"))
+        .arg(Arg::new("seekUnrated")
+            .long("seek-unrated")
+            .help("Seek unrated games")
+            .action(ArgAction::SetTrue)
+            .num_args(0));
 
     if cfg!(feature = "aws-lambda-client") {
         app = app.arg(
@@ -252,6 +258,8 @@ pub fn main() -> Result<()> {
 
     let komi = matches.get_one::<String>("komi").unwrap().parse().unwrap();
 
+    let seek_unrated = matches.get_flag("seekUnrated");
+
     let playtak_settings = PlaytakSettings {
         allow_choosing_size,
         allow_choosing_color,
@@ -263,6 +271,7 @@ pub fn main() -> Result<()> {
         rollout_temperature,
         seek_game_time: tc.unwrap_or_default().0,
         seek_increment: tc.unwrap_or_default().1,
+        seek_unrated,
         target_move_time,
         komi,
     };
@@ -577,7 +586,7 @@ impl PlaytakSession {
         color: Option<Color>,
     ) -> Result<()> {
         self.send_line(&format!(
-            "Seek {} {} {} {} {} {} {} 1 0 ",
+            "Seek {} {} {} {} {} {} {} {} 0 ",
             size,
             playtak_settings.seek_game_time.as_secs(),
             playtak_settings.seek_increment.as_secs(),
@@ -589,6 +598,7 @@ impl PlaytakSession {
             playtak_settings.komi.half_komi(),
             position::starting_stones(size),
             position::starting_capstones(size),
+            if playtak_settings.seek_unrated { 1 } else { 0 },
         ))
     }
 
