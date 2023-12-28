@@ -183,7 +183,20 @@ pub fn main() -> Result<()> {
             .env("SEEK_UNRATED")
             .help("Seek unrated games")
             .action(ArgAction::SetTrue)
-            .num_args(0));
+            .num_args(0))
+        .arg(Arg::new("playtakBaseUrl")
+            .long("playtak-base-url")
+            .env("PLAYTAK_BASE_URL")
+            .help("Base URL to connect to")
+            .num_args(1)
+            .default_value("playtak.com"))
+        .arg(Arg::new("playtakPort")
+            .long("playtak-url")
+            .env("PLAYTAK_PORT")
+            .help("Network port to connect to")
+            .num_args(1)
+            .default_value("10000")
+            .value_parser(clap::value_parser!(u16)));
 
     if cfg!(feature = "aws-lambda-client") {
         app = app.arg(
@@ -277,6 +290,11 @@ pub fn main() -> Result<()> {
 
     let seek_unrated = matches.get_flag("seekUnrated");
 
+    let playtak_base_url = matches.get_one::<String>("playtakBaseUrl").unwrap();
+    let playtak_port = *matches.get_one::<u16>("playtakPort").unwrap();
+
+    let playtak_url = format!("{}:{}", playtak_base_url, playtak_port);
+
     let playtak_settings = PlaytakSettings {
         allow_choosing_size,
         allow_choosing_color,
@@ -297,12 +315,12 @@ pub fn main() -> Result<()> {
         #[cfg(feature = "aws-lambda-client")]
         let connection_result =
             if let Some(aws_function_name) = matches.get_one::<String>("aws-function-name") {
-                PlaytakSession::with_aws(aws_function_name.to_string())
+                PlaytakSession::with_aws(&playtak_url, aws_function_name.to_string())
             } else {
-                PlaytakSession::new()
+                PlaytakSession::new(&playtak_url)
             };
         #[cfg(not(feature = "aws-lambda-client"))]
-        let connection_result = PlaytakSession::new();
+        let connection_result = PlaytakSession::new(&playtak_url);
 
         let mut session = match connection_result {
             Ok(ok) => ok,
@@ -504,8 +522,8 @@ impl<'a> PlaytakGame<'a> {
 
 impl PlaytakSession {
     /// Initialize a connection to playtak.com. Does not log in or play games.
-    fn new() -> Result<Self> {
-        let connection = connect()?;
+    fn new(playtak_url: &str) -> Result<Self> {
+        let connection = connect(playtak_url)?;
         let mut ping_thread_connection = connection.get_ref().try_clone()?;
         let ping_thread = Some(thread::spawn(move || loop {
             thread::sleep(Duration::from_secs(30));
@@ -522,8 +540,8 @@ impl PlaytakSession {
     }
 
     #[cfg(feature = "aws-lambda-client")]
-    fn with_aws(aws_function_name: String) -> Result<Self> {
-        let mut session = Self::new()?;
+    fn with_aws(playtak_url: &str, aws_function_name: String) -> Result<Self> {
+        let mut session = Self::new(playtak_url)?;
         session.aws_function_name = Some(aws_function_name);
         Ok(session)
     }
@@ -1007,11 +1025,11 @@ impl PlaytakSession {
     }
 }
 
-fn connect() -> Result<BufStream<TcpStream>> {
-    let connection = dial()?;
+fn connect(playtak_url: &str) -> Result<BufStream<TcpStream>> {
+    let connection = dial(playtak_url)?;
     Ok(connection)
 }
 
-fn dial() -> Result<BufStream<TcpStream>> {
-    net::TcpStream::connect("playtak.com:10000").map(BufStream::new)
+fn dial(playtak_url: &str) -> Result<BufStream<TcpStream>> {
+    net::TcpStream::connect(playtak_url).map(BufStream::new)
 }
