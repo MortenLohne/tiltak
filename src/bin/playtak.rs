@@ -67,7 +67,7 @@ pub fn main() -> Result<()> {
                 .requires("password")
                 .short('u')
                 .long("username")
-                .env("USERNAME")
+                .env("PLAYTAK_USERNAME")
                 .value_name("USER")
                 .help("playtak.com username")
                 .num_args(1),
@@ -76,7 +76,7 @@ pub fn main() -> Result<()> {
             Arg::new("password")
                 .short('p')
                 .long("password")
-                .env("PASSWORD")
+                .env("PLAYTAK_PASSWORD")
                 .value_name("PASS")
                 .help("playtak.com password")
                 .num_args(1),
