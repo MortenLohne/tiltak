@@ -1,7 +1,9 @@
 use std::{
     alloc,
     alloc::Layout,
-    any, fmt,
+    any,
+    error::Error,
+    fmt::{self, Display},
     marker::PhantomData,
     mem,
     num::NonZeroU32,
@@ -78,20 +80,41 @@ const fn raw_alignment(mut alignment: usize) -> usize {
     raw_alignment
 }
 
+#[derive(Debug)]
+pub enum ArenaError {
+    AllocationFailed(usize),
+    InvalidSettings,
+}
+
+impl Display for ArenaError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ArenaError::AllocationFailed(num_bytes) => {
+                write!(f, "Failed to allocate {} bytes for arena", num_bytes)
+            }
+            ArenaError::InvalidSettings => write!(f, "Invalid settings for arena"),
+        }
+    }
+}
+
+impl Error for ArenaError {}
+
 impl<const S: usize> Arena<S> {
-    pub fn new(num_slots: u32) -> Option<Self> {
+    pub fn new(num_slots: u32) -> Result<Self, ArenaError> {
         if S == 0 || num_slots == 0 || num_slots >= u32::MAX - 1 {
-            return None;
+            return Err(ArenaError::InvalidSettings);
         }
         let raw_alignment = raw_alignment(S);
+        let size = (num_slots as usize + 2) * S;
 
-        let layout = Layout::from_size_align((num_slots as usize + 2) * S, raw_alignment).ok()?;
+        let layout = Layout::from_size_align(size, raw_alignment)
+            .map_err(|_| ArenaError::InvalidSettings)?;
 
         let (data, orig_pointer) = unsafe {
             let ptr = alloc::alloc(layout);
 
             if ptr.is_null() {
-                return None;
+                return Err(ArenaError::AllocationFailed(size));
             }
 
             // Make sure the pointer is correctly aligned
@@ -102,7 +125,7 @@ impl<const S: usize> Arena<S> {
             }
         };
 
-        Some(Self {
+        Ok(Self {
             data,
             orig_pointer,
             layout,

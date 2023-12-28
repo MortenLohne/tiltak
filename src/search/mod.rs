@@ -4,6 +4,7 @@
 
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
+use std::process;
 use std::{mem, time};
 
 use crate::position::Move;
@@ -12,6 +13,7 @@ use crate::position::{Role, Square};
 pub use crate::search::mcts_core::best_move;
 use crate::search::mcts_core::{TempVectors, Tree, TreeEdge};
 
+use self::arena::ArenaError;
 use self::mcts_core::Pv;
 
 mod arena;
@@ -149,7 +151,14 @@ impl<const S: usize> MonteCarloTree<S> {
     }
 
     pub fn with_settings(position: Position<S>, settings: MctsSetting<S>) -> Self {
-        let arena = Arena::new(settings.arena_size).unwrap();
+        let arena = match Arena::new(settings.arena_size) {
+            Ok(arena) => arena,
+            Err(ArenaError::AllocationFailed(num_bytes)) => {
+                eprintln!("Fatal error: failed to allocate {}MB memory for search tree. Try reducing the search time.", num_bytes / (1024 * 1024));
+                process::exit(1)
+            }
+            Err(err) => panic!("{}", err),
+        };
         let mut temp_vectors = TempVectors::new::<S>();
         let mut root_edge = TreeEdge {
             child: None,

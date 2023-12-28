@@ -841,15 +841,22 @@ impl PlaytakSession {
 
                         #[cfg(not(feature = "aws-lambda-client"))]
                         {
-                            let settings =
-                                playtak_settings.to_mcts_setting()
-                                .arena_size(2_u32.pow(31));
-
                             let maximum_time = if let Some(target_move_time) =  playtak_settings.target_move_time {
                                 (our_time_left / 6 + game.increment / 2).min(2 * target_move_time)
                             } else {
                                 our_time_left / 6 + game.increment / 2
                             };
+
+                            // Give enough memory for a CPU calculating at 500K nps.
+                            let max_nodes = (maximum_time.as_secs() as u32).saturating_mul(500_000);
+
+                            // For 6s, the toughest position I've found required 40 elements/node searched
+                            // This formula gives 108, which is hopefully plenty
+                            let max_arena_size = (S * S) as u32 * 3 * max_nodes;
+
+                            let settings =
+                                playtak_settings.to_mcts_setting()
+                                .arena_size(max_arena_size.min(2_u32.pow(31)));
 
                             search::play_move_time(position.clone(), maximum_time, settings)
                         }
