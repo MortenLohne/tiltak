@@ -191,7 +191,7 @@ pub fn main() -> Result<()> {
             .num_args(1)
             .default_value("playtak.com"))
         .arg(Arg::new("playtakPort")
-            .long("playtak-url")
+            .long("playtak-port")
             .env("PLAYTAK_PORT")
             .help("Network port to connect to")
             .num_args(1)
