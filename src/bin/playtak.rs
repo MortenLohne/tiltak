@@ -865,12 +865,12 @@ impl PlaytakSession {
                                 our_time_left / 6 + game.increment / 2
                             };
 
-                            // Give enough memory for a CPU calculating at 500K nps.
-                            let max_nodes = (maximum_time.as_secs() as u32).saturating_mul(500_000);
+                            // Give enough memory for a CPU calculating at roughly 200K nps.
+                            let max_nodes = (maximum_time.as_secs() as u32).saturating_mul(200_000);
 
                             // For 6s, the toughest position I've found required 40 elements/node searched
-                            // This formula gives 108, which is hopefully plenty
-                            let max_arena_size = (S * S) as u32 * 3 * max_nodes;
+                            // This formula gives 72, which is hopefully plenty
+                            let max_arena_size = max_nodes.saturating_mul((S * S) as u32 * 2);
 
                             let settings =
                                 playtak_settings.to_mcts_setting()
