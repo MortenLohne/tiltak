@@ -44,7 +44,7 @@ pub struct MctsSetting<const S: usize> {
 impl<const S: usize> Default for MctsSetting<S> {
     fn default() -> Self {
         MctsSetting {
-            arena_size: 2_u32.pow(26), // Default to 1.5GB max
+            arena_size: 2_u32.pow(27), // Default to 3GB max
             value_params: None,
             policy_params: None,
             search_params: vec![1.43, 2800.0, 0.61].into_boxed_slice(),
