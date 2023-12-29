@@ -2,6 +2,10 @@
 use std::collections::HashSet;
 use std::convert::TryFrom;
 use std::io::{Read, Write};
+#[cfg(feature = "constant-tuning")]
+use std::str::FromStr;
+#[cfg(feature = "constant-tuning")]
+use std::sync::atomic::{self, AtomicU64};
 use std::{io, time};
 
 use board_game_traits::Position as PositionTrait;
@@ -89,21 +93,37 @@ fn main() {
             },
             #[cfg(feature = "constant-tuning")]
             "openings" => {
-                let depth = 6;
+                let depth = 4;
+                let komi = Komi::from_str("2.0").unwrap();
                 let mut positions = HashSet::new();
-                let openings =
-                    generate_openings::<6>(&mut Position::start_position(), &mut positions, depth);
+                let openings = generate_openings::<6>(
+                    &mut Position::start_position_with_komi(komi),
+                    &mut positions,
+                    depth,
+                );
                 println!("{} openings generated, evaluating...", openings.len());
+
+                let start_time = time::Instant::now();
+                let evaled: AtomicU64 = AtomicU64::default();
 
                 let mut evaled_openings: Vec<_> = openings
                     .into_par_iter()
                     .filter(|opening| opening.len() == depth as usize)
                     .map(|opening| {
-                        let mut position = <Position<6>>::start_position();
+                        let mut position = <Position<6>>::start_position_with_komi(komi);
                         for mv in opening.iter() {
                             position.do_move(mv.clone());
                         }
-                        (opening, search::mcts(position, 30_000))
+                        let result = (opening, search::mcts(position, 100_000));
+                        let total = evaled.fetch_add(1, atomic::Ordering::Relaxed);
+                        if total % 1000 == 0 {
+                            eprintln!(
+                                "Evaluted {} openings in {}s",
+                                total,
+                                start_time.elapsed().as_secs()
+                            );
+                        }
+                        result
                     })
                     .collect();
 
@@ -111,7 +131,7 @@ fn main() {
                     score1.partial_cmp(score2).unwrap()
                 });
                 for (p, (mv, s)) in evaled_openings {
-                    let mut position = <Position<6>>::start_position();
+                    let mut position = <Position<6>>::start_position_with_komi(komi);
                     for mv in p {
                         print!("{} ", position.move_to_san(&mv));
                         position.do_move(mv);
@@ -121,7 +141,8 @@ fn main() {
                 }
                 return;
             }
-            "analyze_openings" => analyze_openings::<6>(6_000_000),
+            #[cfg(feature = "constant-tuning")]
+            "analyze_openings" => analyze_openings::<6>(Komi::default(), 500_000),
             #[cfg(feature = "sqlite")]
             "test_policy" => policy_sqlite::check_all_games(),
             "value_features" => match words.get(1) {
@@ -176,37 +197,45 @@ fn main() {
     }
 }
 
-fn analyze_openings<const S: usize>(nodes: u32) {
+#[cfg(feature = "constant-tuning")]
+fn analyze_openings<const S: usize>(komi: Komi, nodes: u32) {
     let mut input = String::new();
     io::stdin().read_to_string(&mut input).unwrap();
-    for line in input.lines() {
-        let mut position = <Position<6>>::start_position();
-        for word in line.split_whitespace() {
-            let mv = position.move_from_san(word).unwrap();
-            position.do_move(mv);
-        }
-        let start_time = time::Instant::now();
-        let settings = search::MctsSetting::default().arena_size_for_nodes(nodes);
-        let mut tree = search::MonteCarloTree::with_settings(position.clone(), settings);
-        for _ in 0..nodes {
-            if tree.select().is_none() {
-                eprintln!("Warning: Search stopped early due to OOM");
-                break;
-            };
-        }
-        let pv: Vec<Move> = tree.pv().take(4).collect();
-        print!(
-            "{}, {:.3}, {:.1}s, ",
-            line.trim(),
-            tree.best_move().1,
-            start_time.elapsed().as_secs_f32()
-        );
-        for mv in pv {
-            print!("{} ", position.move_to_san(&mv));
-            position.do_move(mv);
-        }
-        println!();
-    }
+    input
+        .lines()
+        .flat_map(|line| line.split(':').take(1))
+        .par_bridge()
+        .for_each(|line| {
+            let mut position = <Position<6>>::start_position_with_komi(komi);
+            for word in line
+                .split_whitespace()
+                .take_while(|word| !word.contains(':'))
+            {
+                let mv = position.move_from_san(word).unwrap();
+                position.do_move(mv);
+            }
+            let start_time = time::Instant::now();
+            let settings = search::MctsSetting::default().arena_size_for_nodes(nodes);
+            let mut tree = search::MonteCarloTree::with_settings(position.clone(), settings);
+            for _ in 0..nodes {
+                if tree.select().is_none() {
+                    eprintln!("Warning: Search stopped early due to OOM");
+                    break;
+                };
+            }
+            let pv: Vec<Move> = tree.pv().take(4).collect();
+            print!(
+                "{}: {:.4}, {:.1}s, ",
+                line.trim(),
+                tree.best_move().1,
+                start_time.elapsed().as_secs_f32()
+            );
+            for mv in pv {
+                print!("{} ", position.move_to_san(&mv));
+                position.do_move(mv);
+            }
+            println!();
+        });
 }
 
 #[cfg(feature = "constant-tuning")]
