@@ -647,7 +647,7 @@ impl<T, const S: usize> Index<Square> for AbstractBoard<T, S> {
     type Output = T;
     #[allow(clippy::needless_lifetimes)]
     fn index<'a>(&'a self, square: Square) -> &'a Self::Output {
-        assert!((square.0 as usize) < S * S);
+        debug_assert!((square.0 as usize) < S * S);
         // Compared to the safe code, this is roughly a 10% speedup of the entire engine
         unsafe {
             (self.raw.as_ptr() as *const T)
@@ -661,7 +661,7 @@ impl<T, const S: usize> Index<Square> for AbstractBoard<T, S> {
 impl<T, const S: usize> IndexMut<Square> for AbstractBoard<T, S> {
     #[allow(clippy::needless_lifetimes)]
     fn index_mut<'a>(&'a mut self, square: Square) -> &'a mut Self::Output {
-        assert!((square.0 as usize) < S * S);
+        debug_assert!((square.0 as usize) < S * S);
         // Compared to the safe code, this is roughly a 10% speedup of the entire engine
         unsafe {
             (self.raw.as_mut_ptr() as *mut T)
