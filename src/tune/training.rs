@@ -10,6 +10,7 @@ use crate::position::Komi;
 use crate::search::TimeControl;
 use board_game_traits::GameResult;
 use board_game_traits::Position as PositionTrait;
+use half::f16;
 use pgn_traits::PgnPosition;
 use rand::prelude::*;
 use rayon::prelude::*;
@@ -369,7 +370,7 @@ pub fn tune_value_from_file<const S: usize, const N: usize>(
                 GameResult::BlackWin => 0.0,
             };
             TrainingSample {
-                features,
+                features: features.map(f16::from_f32),
                 offset: 0.0,
                 result,
             }
@@ -420,7 +421,7 @@ pub fn tune_value_and_policy<const S: usize, const N: usize, const M: usize>(
                 GameResult::BlackWin => 0.0,
             };
             TrainingSample {
-                features,
+                features: features.map(f16::from_f32),
                 offset: 0.0,
                 result,
             }
@@ -456,7 +457,7 @@ pub fn tune_value_and_policy<const S: usize, const N: usize, const M: usize>(
 
                 policy_training_samples.push({
                     TrainingSample {
-                        features,
+                        features: features.map(f16::from_f32),
                         offset,
                         result: *result,
                     }
@@ -515,12 +516,12 @@ pub fn games_and_move_scoress_from_file<const S: usize>(
 
     match S {
         5 => {
-            move_scoress.truncate(10_000);
-            games.truncate(10_000);
+            move_scoress.truncate(16_000);
+            games.truncate(16_000);
         }
         6 => {
-            move_scoress.truncate(8000);
-            games.truncate(8000);
+            move_scoress.truncate(12000);
+            games.truncate(12000);
         }
         _ => (),
     }
