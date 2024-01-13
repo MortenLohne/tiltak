@@ -11,7 +11,6 @@ use crate::search::TimeControl;
 use board_game_traits::GameResult;
 use board_game_traits::Position as PositionTrait;
 use half::f16;
-use pgn_traits::PgnPosition;
 use rand::prelude::*;
 use rayon::prelude::*;
 
@@ -343,11 +342,16 @@ impl GameStats {
 pub fn read_games_from_file<const S: usize>(
     file_name: &str,
 ) -> Result<Vec<Game<Position<S>>>, DynError> {
+    let start_time = time::Instant::now();
     let mut file = fs::File::open(file_name)?;
     let mut input = String::new();
     file.read_to_string(&mut input)?;
     let games = ptn_parser::parse_ptn(&input)?;
-    println!("Read {} games from PTN", games.len());
+    println!(
+        "Read {} games from PTN in {:.1}s",
+        games.len(),
+        start_time.elapsed().as_secs_f32()
+    );
     Ok(games)
 }
 
@@ -407,8 +411,9 @@ pub fn tune_value_and_policy<const S: usize, const N: usize, const M: usize>(
     let (positions, results) =
         positions_and_results_from_games(games.iter().cloned().cloned().collect());
 
+    let start_time = time::Instant::now();
     let value_training_samples = positions
-        .iter()
+        .par_iter()
         .zip(results)
         .map(|(position, game_result)| {
             let mut features = [0.0; N];
@@ -426,11 +431,17 @@ pub fn tune_value_and_policy<const S: usize, const N: usize, const M: usize>(
         })
         .collect::<Vec<_>>();
 
+    println!(
+        "Generated value training samples in {:.1}s",
+        start_time.elapsed().as_secs_f32()
+    );
+
     let number_of_feature_sets = move_scoress.iter().flat_map(|a| *a).flatten().count();
 
+    let start_time: time::Instant = time::Instant::now();
     let mut policy_training_samples = Vec::with_capacity(number_of_feature_sets);
 
-    for (game, move_scores) in games.iter().zip(move_scoress) {
+    for (game, move_scores) in games.into_iter().zip(move_scoress) {
         let mut position = game.start_position.clone();
 
         for (mv, move_scores) in game
@@ -465,6 +476,13 @@ pub fn tune_value_and_policy<const S: usize, const N: usize, const M: usize>(
         }
     }
 
+    println!(
+        "Generated {} {} policy training samples in {:.1}s",
+        policy_training_samples.len(),
+        policy_training_samples.capacity(),
+        start_time.elapsed().as_secs_f32()
+    );
+
     let tuned_value_parameters =
         gradient_descent::gradient_descent(&value_training_samples, initial_value_params, 50.0);
 
@@ -480,7 +498,6 @@ pub fn tune_value_and_policy_from_file<const S: usize, const N: usize, const M: 
 ) -> Result<([f32; N], [f32; M]), DynError> {
     let (games, move_scoress) =
         games_and_move_scoress_from_file::<S>(value_file_name, policy_file_name)?;
-
     let mut rng = rand::rngs::StdRng::from_seed([0; 32]);
 
     let initial_value_params: [f32; N] = array_from_fn(|| rng.gen_range(-0.01..0.01));
@@ -554,42 +571,50 @@ pub fn games_and_move_scoress_from_file<const S: usize>(
 pub fn read_move_scores_from_file<const S: usize>(
     file_name: &str,
 ) -> Result<Vec<MoveScoresForGame>, DynError> {
-    let mut file = fs::File::open(file_name)?;
-    let mut input = String::new();
-    file.read_to_string(&mut input)?;
+    let start_time = time::Instant::now();
 
-    let position = <Position<S>>::start_position();
+    // Read entire file into memory. Because it's a single allocation, this allows the memory to be cleanly reclaimed later
+    let contents = fs::read_to_string(file_name)?;
 
-    // Move scores grouped by the game they were played
-    let mut move_scoress: Vec<Vec<Vec<(Move, f32)>>> = vec![vec![]];
-    for line in input.lines() {
-        // Start a new game
-        if line.trim().is_empty() {
-            move_scoress.push(vec![]);
-            continue;
-        }
-        let mut scores_for_this_move = vec![];
-        let _played_move = line.split(':').next().unwrap();
-        let possible_moves = line.split(':').nth(1).unwrap();
-        for move_score_string in possible_moves.split(',') {
-            if move_score_string.len() < 3 {
-                continue;
-            }
-            let mut words = move_score_string.split_whitespace();
-            let mv = position.move_from_san(words.next().unwrap())?;
-            let score = str::parse::<f32>(words.next().unwrap())?;
-            scores_for_this_move.push((mv, score));
-        }
-        move_scoress.last_mut().unwrap().push(scores_for_this_move);
-    }
+    // Games are separated by empty lines. Split here, to allow parallel parsing later
+    let games: Vec<&str> = contents.split("\n\n").collect();
+
+    let mut move_scoress: Vec<Vec<Vec<(Move, f32)>>> = games
+        .into_par_iter()
+        .map(|line_group| {
+            line_group
+                .lines()
+                .map(|line| {
+                    let mut scores_for_this_move =
+                        Vec::with_capacity(line.chars().filter(|ch| *ch == ',').count());
+                    let _played_move = line.split(':').next().unwrap();
+                    let possible_moves = line.split(':').nth(1).unwrap();
+                    for move_score_string in possible_moves.split(',') {
+                        if move_score_string.len() < 3 {
+                            continue;
+                        }
+                        let mut words = move_score_string.split_whitespace();
+                        let mv = Move::from_string::<S>(words.next().unwrap()).unwrap();
+                        let score = str::parse::<f32>(words.next().unwrap()).unwrap();
+                        scores_for_this_move.push((mv, score));
+                    }
+                    // This assert is only a performance check
+                    assert_eq!(scores_for_this_move.len(), scores_for_this_move.capacity());
+                    scores_for_this_move
+                })
+                .collect()
+        })
+        .collect();
+
+    // Extra empty lines may be interpreted as empty games, remove them
     move_scoress.retain(|move_scores| !move_scores.is_empty());
 
     println!(
-        "Read {} move scores from {} games",
+        "Read {} move scores from {} games in {:.1}s",
         move_scoress.iter().map(Vec::len).sum::<usize>(),
-        move_scoress.len()
+        move_scoress.len(),
+        start_time.elapsed().as_secs_f32()
     );
-    // Extra empty lines may be interpreted as empty games, remove them
     Ok(move_scoress)
 }
 
