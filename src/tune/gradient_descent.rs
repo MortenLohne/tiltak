@@ -19,7 +19,7 @@ pub fn gradient_descent<const N: usize>(
 
     // If error is not reduced this number of times, reduce eta, or abort if eta is already low
     const MAX_TRIES: usize = 50;
-    const ERROR_THRESHOLD: f32 = 1.000_000_5;
+    const ERROR_THRESHOLD: f64 = 1.000_000_1;
 
     let initial_error = average_error(samples, params);
     println!("Running gradient descent on {} positions", samples.len(),);
@@ -88,7 +88,7 @@ pub fn gradient_descent<const N: usize>(
     let elapsed = start_time.elapsed();
 
     println!(
-        "Finished gradient descent in {:.1}s, error is {:.7}. Parameters:\n{:?}",
+        "Finished gradient descent in {:.1}s, error is {:.8}. Parameters:\n{:?}",
         elapsed.as_secs_f64(),
         lowest_error,
         best_parameter_set.to_vec()
@@ -162,7 +162,7 @@ fn calc_slope<const N: usize>(samples: &[TrainingSample<N>], params: &[f32; N]) 
 }
 
 /// Mean squared error of the parameter set, measured against given results and positions
-fn average_error<const N: usize>(samples: &[TrainingSample<N>], params: &[f32; N]) -> f32 {
+fn average_error<const N: usize>(samples: &[TrainingSample<N>], params: &[f32; N]) -> f64 {
     samples
         .into_par_iter()
         .map(
@@ -175,8 +175,8 @@ fn average_error<const N: usize>(samples: &[TrainingSample<N>], params: &[f32; N
             },
         )
         .map(|f| f as f64)
-        .sum::<f64>() as f32
-        / (samples.len() as f32)
+        .sum::<f64>()
+        / (samples.len() as f64)
 }
 
 pub fn eval_from_params<const N: usize>(
