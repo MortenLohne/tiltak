@@ -386,8 +386,6 @@ pub fn tune_value_from_file<const S: usize, const N: usize>(
 
     let tuned_parameters = gradient_descent::gradient_descent(&samples, &initial_params, 50.0);
 
-    println!("Final parameters: {:?}", tuned_parameters);
-
     Ok(tuned_parameters)
 }
 
@@ -470,12 +468,8 @@ pub fn tune_value_and_policy<const S: usize, const N: usize, const M: usize>(
     let tuned_value_parameters =
         gradient_descent::gradient_descent(&value_training_samples, initial_value_params, 50.0);
 
-    println!("Final parameters: {:?}", tuned_value_parameters);
-
     let tuned_policy_parameters =
         gradient_descent::gradient_descent(&policy_training_samples, initial_policy_params, 5000.0);
-
-    println!("Final parameters: {:?}", tuned_policy_parameters);
 
     Ok((tuned_value_parameters, tuned_policy_parameters))
 }
