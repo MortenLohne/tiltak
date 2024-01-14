@@ -1,13 +1,22 @@
 use crate::position::{num_line_symmetries, num_square_symmetries, Komi};
 
-pub const NUM_VALUE_FEATURES_4S: usize = 254;
+pub const NUM_VALUE_FEATURES_4S: usize = 256;
 pub const NUM_POLICY_FEATURES_4S: usize = 176;
 
-pub const NUM_VALUE_FEATURES_5S: usize = 334;
+pub const NUM_VALUE_FEATURES_5S: usize = 336;
 pub const NUM_POLICY_FEATURES_5S: usize = 200;
 
-pub const NUM_VALUE_FEATURES_6S: usize = 354;
+pub const NUM_VALUE_FEATURES_6S: usize = 360;
 pub const NUM_POLICY_FEATURES_6S: usize = 208;
+
+fn value_padding<const S: usize>() -> usize {
+    match S {
+        4 => 2,
+        5 => 2,
+        6 => 6,
+        _ => panic!("Unsupported size {}", S),
+    }
+}
 
 fn policy_padding<const S: usize>() -> usize {
     match S {
@@ -49,6 +58,7 @@ pub struct ValueFeatures<'a> {
     pub sidelined_cap: &'a mut [f32],
     pub fully_isolated_cap: &'a mut [f32],
     pub semi_isolated_cap: &'a mut [f32],
+    pub padding: &'a mut [f32],
 }
 
 impl<'a> ValueFeatures<'a> {
@@ -87,6 +97,7 @@ impl<'a> ValueFeatures<'a> {
         let (sidelined_cap, coefficients) = coefficients.split_at_mut(3);
         let (fully_isolated_cap, coefficients) = coefficients.split_at_mut(3);
         let (semi_isolated_cap, coefficients) = coefficients.split_at_mut(3);
+        let (padding, coefficients) = coefficients.split_at_mut(value_padding::<S>() / 2);
 
         assert!(coefficients.is_empty());
 
@@ -120,6 +131,7 @@ impl<'a> ValueFeatures<'a> {
             sidelined_cap,
             fully_isolated_cap,
             semi_isolated_cap,
+            padding,
         }
     }
 }
@@ -514,6 +526,7 @@ pub const VALUE_PARAMS_4S_0KOMI: [f32; NUM_VALUE_FEATURES_4S] = [
     -0.0016289,
     0.0021942016,
     -0.0044462606,
+    0.0,
     0.005722007,
     0.0051122922,
     0.0010959748,
@@ -641,6 +654,7 @@ pub const VALUE_PARAMS_4S_0KOMI: [f32; NUM_VALUE_FEATURES_4S] = [
     0.0015487336,
     -0.007857392,
     0.00948292,
+    0.0,
 ];
 
 #[allow(clippy::unreadable_literal)]
@@ -952,6 +966,7 @@ pub const VALUE_PARAMS_4S_4KOMI: [f32; NUM_VALUE_FEATURES_4S] = [
     0.096440665,
     -0.18568857,
     -0.06007227,
+    0.0,
     -0.32495067,
     -0.15810497,
     -0.04672917,
@@ -1079,6 +1094,7 @@ pub const VALUE_PARAMS_4S_4KOMI: [f32; NUM_VALUE_FEATURES_4S] = [
     -0.0025578667,
     -0.0025578667,
     -0.0025578667,
+    0.0,
 ];
 
 #[allow(clippy::unreadable_literal)]
@@ -1430,6 +1446,7 @@ pub const VALUE_PARAMS_5S_0KOMI: [f32; NUM_VALUE_FEATURES_5S] = [
     -0.41476908,
     -0.03297643,
     -0.20575568,
+    0.0,
     -0.0077517964,
     -0.0077192923,
     -0.009022991,
@@ -1597,6 +1614,7 @@ pub const VALUE_PARAMS_5S_0KOMI: [f32; NUM_VALUE_FEATURES_5S] = [
     0.30926326,
     -0.2270425,
     0.17481883,
+    0.0,
 ];
 
 #[allow(clippy::unreadable_literal)]
@@ -1972,6 +1990,7 @@ pub const VALUE_PARAMS_5S_2KOMI: [f32; NUM_VALUE_FEATURES_5S] = [
     -0.30192456,
     0.09646648,
     -0.49319115,
+    0.0,
     -0.0077517964,
     -0.0077192923,
     -0.009022991,
@@ -2139,6 +2158,7 @@ pub const VALUE_PARAMS_5S_2KOMI: [f32; NUM_VALUE_FEATURES_5S] = [
     0.051024795,
     -0.08350881,
     0.20085889,
+    0.0,
 ];
 
 #[allow(clippy::unreadable_literal)]
@@ -2524,6 +2544,9 @@ pub const VALUE_PARAMS_6S_0KOMI: [f32; NUM_VALUE_FEATURES_6S] = [
     -0.29640517,
     -0.06223435,
     -0.18048343,
+    0.0,
+    0.0,
+    0.0,
     0.004368524,
     0.0076928716,
     0.004360006,
@@ -2701,6 +2724,9 @@ pub const VALUE_PARAMS_6S_0KOMI: [f32; NUM_VALUE_FEATURES_6S] = [
     0.2583021,
     -0.07523897,
     0.18546148,
+    0.0,
+    0.0,
+    0.0,
 ];
 
 #[allow(clippy::unreadable_literal)]
@@ -3094,6 +3120,9 @@ pub const VALUE_PARAMS_6S_2KOMI: [f32; NUM_VALUE_FEATURES_6S] = [
     -0.41691345,
     -0.27906847,
     -0.3231879,
+    0.0,
+    0.0,
+    0.0,
     0.004368524,
     0.0076928716,
     0.004360006,
@@ -3271,6 +3300,9 @@ pub const VALUE_PARAMS_6S_2KOMI: [f32; NUM_VALUE_FEATURES_6S] = [
     0.23263969,
     -0.034471672,
     0.16508807,
+    0.0,
+    0.0,
+    0.0,
 ];
 
 #[allow(clippy::unreadable_literal)]

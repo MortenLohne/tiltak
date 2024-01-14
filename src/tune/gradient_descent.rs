@@ -1,7 +1,7 @@
 use half::f16;
 use log::trace;
 use rayon::prelude::*;
-use std::time::Instant;
+use std::{array, time::Instant};
 
 pub struct TrainingSample<const N: usize> {
     pub features: [f16; N],
@@ -126,8 +126,8 @@ fn calc_slope<const N: usize>(samples: &[TrainingSample<N>], params: &[f32; N]) 
         .chunks(256)
         .map(|chunks: Vec<[f32; N]>| {
             chunks.into_iter().fold([0.0; N], |mut a, b| {
-                for (c, d) in a.iter_mut().zip(b.iter()) {
-                    *c += *d;
+                for i in 0..N {
+                    a[i] += b[i]
                 }
                 a
             })
@@ -135,8 +135,8 @@ fn calc_slope<const N: usize>(samples: &[TrainingSample<N>], params: &[f32; N]) 
         .fold(
             || [0.0; N],
             |mut a, b| {
-                for (c, d) in a.iter_mut().zip(b.iter()) {
-                    *c += *d as f64;
+                for i in 0..N {
+                    a[i] += b[i] as f64;
                 }
                 a
             },
@@ -144,8 +144,8 @@ fn calc_slope<const N: usize>(samples: &[TrainingSample<N>], params: &[f32; N]) 
         .reduce(
             || [0.0; N],
             |mut a, b| {
-                for (c, d) in a.iter_mut().zip(b.iter()) {
-                    *c += *d;
+                for i in 0..N {
+                    a[i] += b[i];
                 }
                 a
             },
@@ -184,12 +184,18 @@ pub fn eval_from_params<const N: usize>(
     params: &[f32; N],
     offset: f32,
 ) -> f32 {
-    features
-        .iter()
-        .zip(params)
-        .map(|(c, p)| c.to_f32() * p)
-        .sum::<f32>()
-        + offset
+    const SIMD_WIDTH: usize = 8;
+    assert_eq!(features.len() % SIMD_WIDTH, 0);
+    assert_eq!(features.len(), params.len());
+
+    let partial_sums: [f32; SIMD_WIDTH] = features
+        .chunks_exact(SIMD_WIDTH)
+        .zip(params.chunks_exact(SIMD_WIDTH))
+        .fold([0.0; SIMD_WIDTH], |acc, (c, p)| {
+            array::from_fn(|i| acc[i] + c[i].to_f32() * p[i])
+        });
+
+    partial_sums.iter().sum::<f32>() + offset
 }
 
 pub fn sigmoid(x: f32) -> f32 {
