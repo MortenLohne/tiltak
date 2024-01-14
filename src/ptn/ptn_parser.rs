@@ -152,9 +152,7 @@ fn parse_moves<B: PgnPosition>(
 
             match position.move_from_san(move_string) {
                 Ok(mv) => {
-                    let mut legal_moves = vec![];
-                    position.generate_moves(&mut legal_moves);
-                    if !legal_moves.contains(&mv) {
+                    if !position.move_is_legal(mv.clone()) {
                         return Err(Box::new(pgn_traits::Error::new(
                             pgn_traits::ErrorKind::IllegalMove,
                             word,

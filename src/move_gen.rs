@@ -17,46 +17,58 @@ impl<const S: usize> Position<S> {
         moves: &mut E,
     ) {
         for square in squares_iterator::<S>() {
-            match self[square].top_stone() {
-                None => {
-                    if Us::stones_left(self) > 0 {
-                        moves.extend(iter::once(Move::Place(Flat, square)));
-                        moves.extend(iter::once(Move::Place(Wall, square)));
-                    }
-                    if Us::caps_left(self) > 0 {
-                        moves.extend(iter::once(Move::Place(Cap, square)));
-                    }
+            self.generate_moves_for_square_colortr::<E, Us, Them>(moves, square)
+        }
+    }
+
+    pub(crate) fn generate_moves_for_square_colortr<
+        E: Extend<<Self as PositionTrait>::Move>,
+        Us: ColorTr,
+        Them: ColorTr,
+    >(
+        &self,
+        moves: &mut E,
+        square: Square,
+    ) {
+        match self[square].top_stone() {
+            None => {
+                if Us::stones_left(self) > 0 {
+                    moves.extend(iter::once(Move::Place(Flat, square)));
+                    moves.extend(iter::once(Move::Place(Wall, square)));
                 }
-                Some(piece) if Us::piece_is_ours(piece) => {
-                    for direction in square.directions::<S>() {
-                        let mut movements = ArrayVec::new();
-                        if piece == Us::cap_piece() {
-                            self.generate_moving_moves_cap::<Us>(
-                                direction,
-                                square,
-                                square,
-                                self[square].len(),
-                                StackMovement::new(),
-                                &mut movements,
-                            );
-                        } else if Us::piece_is_ours(piece) {
-                            self.generate_moving_moves_non_cap::<Us>(
-                                direction,
-                                square,
-                                square,
-                                self[square].len(),
-                                StackMovement::new(),
-                                &mut movements,
-                            );
-                        }
-                        for movements in movements.into_iter().filter(|mv| !mv.is_empty()) {
-                            let mv = Move::Move(square, direction, movements);
-                            moves.extend(iter::once(mv));
-                        }
-                    }
+                if Us::caps_left(self) > 0 {
+                    moves.extend(iter::once(Move::Place(Cap, square)));
                 }
-                Some(_) => (),
             }
+            Some(piece) if Us::piece_is_ours(piece) => {
+                for direction in square.directions::<S>() {
+                    let mut movements = ArrayVec::new();
+                    if piece == Us::cap_piece() {
+                        self.generate_moving_moves_cap::<Us>(
+                            direction,
+                            square,
+                            square,
+                            self[square].len(),
+                            StackMovement::new(),
+                            &mut movements,
+                        );
+                    } else if Us::piece_is_ours(piece) {
+                        self.generate_moving_moves_non_cap::<Us>(
+                            direction,
+                            square,
+                            square,
+                            self[square].len(),
+                            StackMovement::new(),
+                            &mut movements,
+                        );
+                    }
+                    for movements in movements.into_iter().filter(|mv| !mv.is_empty()) {
+                        let mv = Move::Move(square, direction, movements);
+                        moves.extend(iter::once(mv));
+                    }
+                }
+            }
+            Some(_) => (),
         }
     }
 

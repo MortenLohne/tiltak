@@ -190,9 +190,9 @@ dependencies = [
 
 [[package]]
 name = "board-game-traits"
-version = "0.3.0"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3f0c0fc76324ee558f1c6239a069c3101d74286eedd7d9b1e307d47b4f039c23"
+checksum = "e1d684e168b753f20bf1dff8ee54af14d132c5ed1d90e35cb0fe626391a6cb9a"
 
 [[package]]
 name = "bufstream"
@@ -991,9 +991,9 @@ checksum = "e3148f5046208a5d56bcfc03053e3ca6334e51da8dfb19b6cdc8b306fae3283e"
 
 [[package]]
 name = "pgn-traits"
-version = "0.4.1"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ad0713afb11d4fdae8aa73ffae0fe04a287bcc3b5a23a07251e189c51c452c81"
+checksum = "dfd96e0880acc28befbafb7e4fa9a1c5b52e3556b7e60ff8dbf11ed0884d2f0f"
 dependencies = [
  "board-game-traits",
 ]

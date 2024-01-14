@@ -1200,6 +1200,39 @@ impl<const S: usize> PositionTrait for Position<S> {
         }
     }
 
+    fn move_is_legal(&self, mv: Self::Move) -> bool {
+        match (mv.clone(), self.side_to_move()) {
+            (Move::Place(Flat | Wall, square), Color::White) => {
+                self[square].is_empty() && self.white_reserves_left() > 0
+            }
+            (Move::Place(Flat | Wall, square), Color::Black) => {
+                self[square].is_empty() && self.black_reserves_left() > 0
+            }
+            (Move::Place(Cap, square), Color::White) => {
+                self[square].is_empty() && self.white_caps_left() > 0
+            }
+            (Move::Place(Cap, square), Color::Black) => {
+                self[square].is_empty() && self.black_caps_left() > 0
+            }
+            (Move::Move(square, _, _), Color::White) => {
+                let mut legal_moves = vec![];
+                self.generate_moves_for_square_colortr::<_, WhiteTr, BlackTr>(
+                    &mut legal_moves,
+                    square,
+                );
+                legal_moves.contains(&mv)
+            }
+            (Move::Move(square, _, _), Color::Black) => {
+                let mut legal_moves = vec![];
+                self.generate_moves_for_square_colortr::<_, BlackTr, WhiteTr>(
+                    &mut legal_moves,
+                    square,
+                );
+                legal_moves.contains(&mv)
+            }
+        }
+    }
+
     fn do_move(&mut self, mv: Self::Move) -> Self::ReverseMove {
         self.hash_history.push(self.hash);
         let reverse_move = match mv {

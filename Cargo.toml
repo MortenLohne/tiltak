@@ -27,8 +27,8 @@ name = "tune"
 required-features = ["constant-tuning"]
 
 [dependencies]
-board-game-traits = "0.3.0"
-pgn-traits = "0.4.1"
+board-game-traits = "0.4.0"
+pgn-traits = "0.5.0"
 arrayvec = "0.7"
 rand = "0.8"
 rayon = { version = "1.5", optional = true }
