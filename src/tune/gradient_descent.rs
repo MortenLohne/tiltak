@@ -28,6 +28,7 @@ pub fn gradient_descent<const N: usize>(
 
     let mut lowest_error = initial_error;
     let mut best_parameter_set = *params;
+    let mut i = 0;
 
     'eta_loop: for eta in [
         initial_learning_rate,
@@ -59,7 +60,35 @@ pub fn gradient_descent<const N: usize>(
             trace!("New parameters: {:?}", parameter_set);
 
             let error = average_error(samples, &parameter_set);
-            trace!("Error now {}, eta={}\n", error, eta);
+
+            if i % 100 == 0 {
+                println!(
+                    "\n{:04} iterations in {:.1}s: Error {:.8}, eta={:.4}, {} ({}) iterations since (large) improvement, {:.8} error ratio\n",
+                    i,
+                    start_time.elapsed().as_secs_f32(),
+                    error,
+                    eta,
+                    iterations_since_improvement,
+                    iterations_since_large_improvement,
+                    lowest_error / error
+                );
+                if i % 1000 == 0 {
+                    println!("New parameters: {:?}", parameter_set);
+                }
+            } else {
+                trace!(
+                    "\n{:04} iterations in {:.1}s: Error {:.8}, eta={:.4}, {} ({}) iterations since (large) improvement, {:.8} error ratio\n",
+                    i,
+                    start_time.elapsed().as_secs_f32(),
+                    error,
+                    eta,
+                    iterations_since_improvement,
+                    iterations_since_large_improvement,
+                    lowest_error / error
+                );
+                trace!("New parameters: {:?}", parameter_set);
+            }
+            i += 1;
 
             if error < lowest_error {
                 iterations_since_improvement = 0;
@@ -68,6 +97,13 @@ pub fn gradient_descent<const N: usize>(
                 } else {
                     iterations_since_large_improvement += 1;
                     if iterations_since_large_improvement >= MAX_TRIES {
+                        println!(
+                            "\n{:04} iterations in {:.1}s, error {:.8}. Reducing eta because improvements have been insignificant for {} iterations\n",
+                            i,
+                            start_time.elapsed().as_secs_f32(),
+                            error,
+                            iterations_since_large_improvement
+                        );
                         // If we can only get minute improvements with this eta,
                         // going to smaller etas will be no good
                         break 'eta_loop;
@@ -79,6 +115,13 @@ pub fn gradient_descent<const N: usize>(
                 iterations_since_improvement += 1;
                 iterations_since_large_improvement += 1;
                 if iterations_since_improvement >= MAX_TRIES {
+                    println!(
+                        "\n{:04} iterations in {:.1}s, error {:.8}. Reducing eta because no improvements were seen for {} iterations\n",
+                        i,
+                        start_time.elapsed().as_secs_f32(),
+                        error,
+                        iterations_since_improvement
+                    );
                     break;
                 }
             }
