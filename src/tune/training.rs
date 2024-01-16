@@ -360,10 +360,17 @@ pub fn tune_value_from_file<const S: usize, const N: usize>(
 ) -> Result<[f32; N], DynError> {
     let games = read_games_from_file::<S>(file_name)?;
 
+    let start_time = time::Instant::now();
     let (positions, results) = positions_and_results_from_games(games);
+    println!(
+        "Extracted {} positions in {:.1}s",
+        positions.len(),
+        start_time.elapsed().as_secs_f32()
+    );
 
+    let start_time = time::Instant::now();
     let samples = positions
-        .iter()
+        .par_iter()
         .zip(results)
         .map(|(position, game_result)| {
             let mut features = [0.0; N];
@@ -380,6 +387,12 @@ pub fn tune_value_from_file<const S: usize, const N: usize>(
             }
         })
         .collect::<Vec<_>>();
+
+    println!(
+        "Vectorized {} training samples in {:.1}s",
+        samples.len(),
+        start_time.elapsed().as_secs_f32()
+    );
 
     let mut rng = rand::rngs::StdRng::from_seed([0; 32]);
     let mut initial_params = [0.00; N];
@@ -621,22 +634,23 @@ pub fn read_move_scores_from_file<const S: usize>(
 pub fn positions_and_results_from_games<const S: usize>(
     games: Vec<Game<Position<S>>>,
 ) -> (Vec<Position<S>>, Vec<GameResult>) {
-    let mut positions = vec![];
-    let mut results = vec![];
-    for game in games.into_iter() {
-        let game_result = game.game_result();
-        let mut position = game.start_position;
-        for PtnMove { mv, .. } in game.moves {
-            if position.game_result().is_some() {
-                break;
+    games
+        .into_par_iter()
+        .flat_map_iter(|game| {
+            let game_result = game.game_result();
+            let mut position = game.start_position;
+            let mut output: Vec<(Position<S>, GameResult)> = Vec::with_capacity(200);
+            for PtnMove { mv, .. } in game.moves {
+                if position.game_result().is_some() {
+                    break;
+                }
+                output.push((position.clone(), game_result.unwrap_or(GameResult::Draw)));
+                position.do_move(mv.clone());
+                // Deliberately skip the final position
             }
-            positions.push(position.clone());
-            results.push(game_result.unwrap_or(GameResult::Draw));
-            position.do_move(mv.clone());
-            // Deliberately skip the final position
-        }
-    }
-    (positions, results)
+            output
+        })
+        .unzip()
 }
 
 fn array_from_fn<F, T, const N: usize>(mut f: F) -> [T; N]
