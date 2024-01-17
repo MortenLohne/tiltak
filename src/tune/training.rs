@@ -369,7 +369,7 @@ pub fn tune_value_from_file<const S: usize, const N: usize>(
     );
 
     let start_time = time::Instant::now();
-    let samples = positions
+    let mut samples = positions
         .par_iter()
         .zip(results)
         .map(|(position, game_result)| {
@@ -401,7 +401,10 @@ pub fn tune_value_from_file<const S: usize, const N: usize>(
         *param = rng.gen_range(-0.01..0.01)
     }
 
-    let tuned_parameters = gradient_descent::gradient_descent(&samples, &initial_params, 50.0);
+    samples.shuffle(&mut rng);
+
+    let tuned_parameters =
+        gradient_descent::gradient_descent(&samples, &initial_params, 10.0, &mut rng);
 
     Ok(tuned_parameters)
 }
@@ -425,7 +428,7 @@ pub fn tune_value_and_policy<const S: usize, const N: usize, const M: usize>(
         positions_and_results_from_games(games.iter().cloned().cloned().collect());
 
     let start_time = time::Instant::now();
-    let value_training_samples = positions
+    let mut value_training_samples = positions
         .par_iter()
         .zip(results)
         .map(|(position, game_result)| {
@@ -443,6 +446,8 @@ pub fn tune_value_and_policy<const S: usize, const N: usize, const M: usize>(
             }
         })
         .collect::<Vec<_>>();
+
+    value_training_samples.shuffle(&mut rng);
 
     println!(
         "Generated value training samples in {:.1}s",
@@ -489,6 +494,7 @@ pub fn tune_value_and_policy<const S: usize, const N: usize, const M: usize>(
         }
     }
 
+    policy_training_samples.shuffle(&mut rng);
     println!(
         "Generated {} {} policy training samples in {:.1}s",
         policy_training_samples.len(),
@@ -496,11 +502,19 @@ pub fn tune_value_and_policy<const S: usize, const N: usize, const M: usize>(
         start_time.elapsed().as_secs_f32()
     );
 
-    let tuned_value_parameters =
-        gradient_descent::gradient_descent(&value_training_samples, initial_value_params, 50.0);
+    let tuned_value_parameters = gradient_descent::gradient_descent(
+        &value_training_samples,
+        initial_value_params,
+        10.0,
+        &mut rng,
+    );
 
-    let tuned_policy_parameters =
-        gradient_descent::gradient_descent(&policy_training_samples, initial_policy_params, 5000.0);
+    let tuned_policy_parameters = gradient_descent::gradient_descent(
+        &policy_training_samples,
+        initial_policy_params,
+        100.0,
+        &mut rng,
+    );
 
     Ok((tuned_value_parameters, tuned_policy_parameters))
 }
