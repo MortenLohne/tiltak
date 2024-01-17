@@ -173,15 +173,6 @@ fn calc_slope<const N: usize>(samples: &[TrainingSample<N>], params: &[f32; N]) 
                 })
             },
         )
-        // Sum each individual chunk as f32
-        // Then sum those chunks as f64, to avoid rounding errors
-        .fold_chunks_with(256, [0.0; N], |mut a, b| {
-            for i in 0..N {
-                a[i] += b[i]
-            }
-            a
-        })
-        .map(|chunk: [f32; N]| chunk.map(|a| a as f64))
         .reduce(
             || [0.0; N],
             |mut a, b| {
@@ -193,19 +184,15 @@ fn calc_slope<const N: usize>(samples: &[TrainingSample<N>], params: &[f32; N]) 
         );
 
     for slope in slopes.iter_mut() {
-        *slope /= samples.len() as f64;
+        *slope /= samples.len() as f32;
     }
-    let mut f32_slopes = [0.0; N];
-    for (f64_slope, slope) in f32_slopes.iter_mut().zip(&slopes) {
-        *f64_slope = *slope as f32;
-    }
-    f32_slopes
+    slopes
 }
 
 /// Mean squared error of the parameter set, measured against given results and positions
 fn average_error<const N: usize>(samples: &[TrainingSample<N>], params: &[f32; N]) -> f64 {
     samples
-        .into_par_iter()
+        .par_iter()
         .map(
             |TrainingSample {
                  features,
