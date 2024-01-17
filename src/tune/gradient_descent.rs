@@ -168,37 +168,20 @@ fn calc_slope<const N: usize>(samples: &[TrainingSample<N>], params: &[f32; N]) 
                 let estimated_sigmoid = sigmoid(estimated_result);
                 let derived_sigmoid_result = sigmoid_derived(estimated_result);
 
-                let mut gradients_for_this_training_sample = [0.0; N];
-                gradients_for_this_training_sample
-                    .iter_mut()
-                    .zip(features)
-                    .for_each(|(gradient, feature)| {
-                        *gradient =
-                            (estimated_sigmoid - result) * derived_sigmoid_result * feature.to_f32()
-                    });
-                gradients_for_this_training_sample
+                features.map(|feature| {
+                    (estimated_sigmoid - result) * derived_sigmoid_result * feature.to_f32()
+                })
             },
         )
         // Sum each individual chunk as f32
         // Then sum those chunks as f64, to avoid rounding errors
-        .chunks(256)
-        .map(|chunks: Vec<[f32; N]>| {
-            chunks.into_iter().fold([0.0; N], |mut a, b| {
-                for i in 0..N {
-                    a[i] += b[i]
-                }
-                a
-            })
+        .fold_chunks_with(256, [0.0; N], |mut a, b| {
+            for i in 0..N {
+                a[i] += b[i]
+            }
+            a
         })
-        .fold(
-            || [0.0; N],
-            |mut a, b| {
-                for i in 0..N {
-                    a[i] += b[i] as f64;
-                }
-                a
-            },
-        )
+        .map(|chunk: [f32; N]| chunk.map(|a| a as f64))
         .reduce(
             || [0.0; N],
             |mut a, b| {
