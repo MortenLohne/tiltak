@@ -199,7 +199,7 @@ fn average_error<const N: usize>(samples: &[TrainingSample<N>], params: &[f32; N
                  result,
                  offset,
              }| {
-                (sigmoid(eval_from_params(features, params, *offset)) - result).powf(2.0)
+                (sigmoid(eval_from_params(features, params, *offset)) - result).powi(2)
             },
         )
         .map(|f| f as f64)
@@ -213,8 +213,7 @@ pub fn eval_from_params<const N: usize>(
     offset: f32,
 ) -> f32 {
     const SIMD_WIDTH: usize = 8;
-    assert_eq!(features.len() % SIMD_WIDTH, 0);
-    assert_eq!(features.len(), params.len());
+    assert_eq!(N % SIMD_WIDTH, 0);
 
     let partial_sums: [f32; SIMD_WIDTH] = features
         .chunks_exact(SIMD_WIDTH)
