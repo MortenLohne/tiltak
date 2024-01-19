@@ -186,19 +186,19 @@ fn main() {
             match size {
                 4 => {
                     let value_params =
-                        training::tune_value_from_file::<4, NUM_VALUE_FEATURES_4S>(file_name)
+                        training::tune_value_from_file::<4, NUM_VALUE_FEATURES_4S>(file_name, komi)
                             .unwrap();
                     println!("{:?}", value_params);
                 }
                 5 => {
                     let value_params =
-                        training::tune_value_from_file::<5, NUM_VALUE_FEATURES_5S>(file_name)
+                        training::tune_value_from_file::<5, NUM_VALUE_FEATURES_5S>(file_name, komi)
                             .unwrap();
                     println!("{:?}", value_params);
                 }
                 6 => {
                     let value_params =
-                        training::tune_value_from_file::<6, NUM_VALUE_FEATURES_6S>(file_name)
+                        training::tune_value_from_file::<6, NUM_VALUE_FEATURES_6S>(file_name, komi)
                             .unwrap();
                     println!("{:?}", value_params);
                 }
@@ -215,7 +215,7 @@ fn main() {
                             4,
                             NUM_VALUE_FEATURES_4S,
                             NUM_POLICY_FEATURES_4S,
-                        >(value_file_name, policy_file_name)
+                        >(value_file_name, policy_file_name, komi)
                         .unwrap();
                     println!("Value: {:?}", value_params);
                     println!("Policy: {:?}", policy_params);
@@ -226,7 +226,7 @@ fn main() {
                             5,
                             NUM_VALUE_FEATURES_5S,
                             NUM_POLICY_FEATURES_5S,
-                        >(value_file_name, policy_file_name)
+                        >(value_file_name, policy_file_name, komi)
                         .unwrap();
                     println!("Value: {:?}", value_params);
                     println!("Policy: {:?}", policy_params);
@@ -237,7 +237,7 @@ fn main() {
                             6,
                             NUM_VALUE_FEATURES_6S,
                             NUM_POLICY_FEATURES_6S,
-                        >(value_file_name, policy_file_name)
+                        >(value_file_name, policy_file_name, komi)
                         .unwrap();
                     println!("Value: {:?}", value_params);
                     println!("Policy: {:?}", policy_params);

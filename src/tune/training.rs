@@ -1,6 +1,7 @@
 use std::convert::TryFrom;
 use std::io::Read;
 use std::io::Write;
+use std::str::FromStr;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time;
 use std::{error, fs, io};
@@ -59,10 +60,10 @@ pub fn continue_training<const S: usize, const N: usize, const M: usize>(
     let mut move_scores = vec![];
     let mut batch_id = 0;
     loop {
-        match read_games_from_file::<S>(&format!(
-            "games{}_{}s_batch{}.ptn",
-            training_id, S, batch_id
-        )) {
+        match read_games_from_file::<S>(
+            &format!("games{}_{}s_batch{}.ptn", training_id, S, batch_id),
+            komi,
+        ) {
             Ok(mut game_batch) => {
                 games.append(&mut game_batch);
             }
@@ -234,6 +235,7 @@ pub fn train_perpetually<const S: usize, const N: usize, const M: usize>(
         let (new_value_params, new_policy_params): ([f32; N], [f32; M]) = tune_value_and_policy(
             &games_in_training_batch,
             &move_scores_in_training_batch,
+            komi,
             &value_params,
             &policy_params,
         )?;
@@ -341,12 +343,24 @@ impl GameStats {
 
 pub fn read_games_from_file<const S: usize>(
     file_name: &str,
+    komi: Komi,
 ) -> Result<Vec<Game<Position<S>>>, DynError> {
     let start_time = time::Instant::now();
     let mut file = fs::File::open(file_name)?;
     let mut input = String::new();
     file.read_to_string(&mut input)?;
-    let games = ptn_parser::parse_ptn(&input)?;
+    let mut games = ptn_parser::parse_ptn::<Position<S>>(&input)?;
+    for game in games.iter_mut() {
+        if let Some((_, komi_str)) = game
+            .tags
+            .iter()
+            .find(|(tag, _)| tag.eq_ignore_ascii_case("Komi"))
+        {
+            game.start_position
+                .set_komi(Komi::from_str(komi_str).unwrap());
+        }
+        assert_eq!(komi, game.start_position.komi());
+    }
     println!(
         "Read {} games from PTN in {:.1}s",
         games.len(),
@@ -357,11 +371,12 @@ pub fn read_games_from_file<const S: usize>(
 
 pub fn tune_value_from_file<const S: usize, const N: usize>(
     file_name: &str,
+    komi: Komi,
 ) -> Result<[f32; N], DynError> {
-    let games = read_games_from_file::<S>(file_name)?;
+    let games = read_games_from_file::<S>(file_name, komi)?;
 
     let start_time = time::Instant::now();
-    let (positions, results) = positions_and_results_from_games(games);
+    let (positions, results) = positions_and_results_from_games(games, komi);
     println!(
         "Extracted {} positions in {:.1}s",
         positions.len(),
@@ -412,6 +427,7 @@ pub fn tune_value_from_file<const S: usize, const N: usize>(
 pub fn tune_value_and_policy<const S: usize, const N: usize, const M: usize>(
     games: &[Game<Position<S>>],
     move_scoress: &[MoveScoresForGame],
+    komi: Komi,
     initial_value_params: &[f32; N],
     initial_policy_params: &[f32; M],
 ) -> Result<([f32; N], [f32; M]), DynError> {
@@ -425,7 +441,7 @@ pub fn tune_value_and_policy<const S: usize, const N: usize, const M: usize>(
     let (games, move_scoress): (Vec<_>, Vec<_>) = games_and_move_scoress.into_iter().unzip();
 
     let (positions, results) =
-        positions_and_results_from_games(games.iter().cloned().cloned().collect());
+        positions_and_results_from_games(games.iter().cloned().cloned().collect(), komi);
 
     let start_time = time::Instant::now();
     let mut value_training_samples = positions
@@ -522,9 +538,10 @@ pub fn tune_value_and_policy<const S: usize, const N: usize, const M: usize>(
 pub fn tune_value_and_policy_from_file<const S: usize, const N: usize, const M: usize>(
     value_file_name: &str,
     policy_file_name: &str,
+    komi: Komi,
 ) -> Result<([f32; N], [f32; M]), DynError> {
     let (games, move_scoress) =
-        games_and_move_scoress_from_file::<S>(value_file_name, policy_file_name)?;
+        games_and_move_scoress_from_file::<S>(value_file_name, policy_file_name, komi)?;
     let mut rng = rand::rngs::StdRng::from_seed([0; 32]);
 
     let initial_value_params: [f32; N] = array_from_fn(|| rng.gen_range(-0.01..0.01));
@@ -534,6 +551,7 @@ pub fn tune_value_and_policy_from_file<const S: usize, const N: usize, const M: 
     tune_value_and_policy(
         &games,
         &move_scoress,
+        komi,
         &initial_value_params,
         &initial_policy_params,
     )
@@ -544,9 +562,10 @@ type DynError = Box<dyn error::Error + Send + Sync>;
 pub fn games_and_move_scoress_from_file<const S: usize>(
     value_file_name: &str,
     policy_file_name: &str,
+    komi: Komi,
 ) -> Result<(Vec<Game<Position<S>>>, Vec<MoveScoresForGame>), DynError> {
     let mut move_scoress = read_move_scores_from_file::<S>(policy_file_name)?;
-    let mut games = read_games_from_file(value_file_name)?;
+    let mut games = read_games_from_file(value_file_name, komi)?;
 
     // Only keep the last n games, since all the training data doesn't fit in memory while training
     move_scoress.reverse();
@@ -647,12 +666,21 @@ pub fn read_move_scores_from_file<const S: usize>(
 
 pub fn positions_and_results_from_games<const S: usize>(
     games: Vec<Game<Position<S>>>,
+    komi: Komi,
 ) -> (Vec<Position<S>>, Vec<GameResult>) {
     games
         .into_par_iter()
         .flat_map_iter(|game| {
             let game_result = game.game_result();
             let mut position = game.start_position;
+            if let Some((_, komi_str)) = game
+                .tags
+                .iter()
+                .find(|(tag, _)| tag.eq_ignore_ascii_case("Komi"))
+            {
+                position.set_komi(Komi::from_str(komi_str).unwrap());
+            }
+            assert_eq!(komi, position.komi());
             let mut output: Vec<(Position<S>, GameResult)> = Vec::with_capacity(200);
             for PtnMove { mv, .. } in game.moves {
                 if position.game_result().is_some() {
