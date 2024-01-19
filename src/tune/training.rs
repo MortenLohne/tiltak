@@ -512,7 +512,7 @@ pub fn tune_value_and_policy<const S: usize, const N: usize, const M: usize>(
     let tuned_policy_parameters = gradient_descent::gradient_descent(
         &policy_training_samples,
         initial_policy_params,
-        100.0,
+        500.0,
         &mut rng,
     );
 
