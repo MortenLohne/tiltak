@@ -419,7 +419,7 @@ pub fn tune_value_from_file<const S: usize, const N: usize>(
     samples.shuffle(&mut rng);
 
     let tuned_parameters =
-        gradient_descent::gradient_descent(&samples, &initial_params, 10.0, &mut rng);
+        gradient_descent::gradient_descent(&samples, &initial_params, 50.0, &mut rng);
 
     Ok(tuned_parameters)
 }
@@ -521,7 +521,7 @@ pub fn tune_value_and_policy<const S: usize, const N: usize, const M: usize>(
     let tuned_value_parameters = gradient_descent::gradient_descent(
         &value_training_samples,
         initial_value_params,
-        10.0,
+        50.0,
         &mut rng,
     );
 
