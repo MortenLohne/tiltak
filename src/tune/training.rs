@@ -1,6 +1,7 @@
 use std::convert::TryFrom;
 use std::io::Read;
 use std::io::Write;
+use std::mem;
 use std::str::FromStr;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time;
@@ -376,7 +377,7 @@ pub fn tune_value_from_file<const S: usize, const N: usize>(
     let games = read_games_from_file::<S>(file_name, komi)?;
 
     let start_time = time::Instant::now();
-    let (positions, results) = positions_and_results_from_games(games, komi);
+    let (positions, results) = positions_and_results_from_games(&games, komi);
     println!(
         "Extracted {} positions in {:.1}s",
         positions.len(),
@@ -431,17 +432,9 @@ pub fn tune_value_and_policy<const S: usize, const N: usize, const M: usize>(
     initial_value_params: &[f32; N],
     initial_policy_params: &[f32; M],
 ) -> Result<([f32; N], [f32; M]), DynError> {
-    let mut games_and_move_scoress: Vec<(&Game<Position<S>>, &MoveScoresForGame)> =
-        games.iter().zip(move_scoress).collect();
-
     let mut rng = rand::rngs::StdRng::from_seed([0; 32]);
 
-    games_and_move_scoress.shuffle(&mut rng);
-
-    let (games, move_scoress): (Vec<_>, Vec<_>) = games_and_move_scoress.into_iter().unzip();
-
-    let (positions, results) =
-        positions_and_results_from_games(games.iter().cloned().cloned().collect(), komi);
+    let (positions, results) = positions_and_results_from_games(games, komi);
 
     let start_time = time::Instant::now();
     let mut value_training_samples = positions
@@ -466,56 +459,71 @@ pub fn tune_value_and_policy<const S: usize, const N: usize, const M: usize>(
     value_training_samples.shuffle(&mut rng);
 
     println!(
-        "Generated value training samples in {:.1}s",
-        start_time.elapsed().as_secs_f32()
+        "Generated {} value training samples in {:.1}s, {:.2}GiB total",
+        value_training_samples.len(),
+        start_time.elapsed().as_secs_f32(),
+        (value_training_samples.len() * mem::size_of::<TrainingSample<N>>()) as f32
+            / f32::powf(2.0, 30.0),
     );
 
-    let number_of_feature_sets = move_scoress.iter().flat_map(|a| *a).flatten().count();
+    let number_of_feature_sets = move_scoress.iter().flatten().flatten().count();
 
     let start_time: time::Instant = time::Instant::now();
+
     let mut policy_training_samples = Vec::with_capacity(number_of_feature_sets);
 
-    for (game, move_scores) in games.into_iter().zip(move_scoress) {
-        let mut position = game.start_position.clone();
+    policy_training_samples.extend(games.iter().zip(move_scoress.iter()).flat_map(
+        |(game, move_scores)| {
+            let mut position = game.start_position.clone();
 
-        for (mv, move_scores) in game
-            .moves
-            .iter()
-            .map(|PtnMove { mv, .. }| mv)
-            .zip(move_scores)
-        {
-            let group_data = position.group_data();
+            game.moves
+                .iter()
+                .map(|PtnMove { mv, .. }| mv)
+                .zip(move_scores.iter())
+                .flat_map(move |(mv, move_scores)| {
+                    let mut local_policy_training_samples = Vec::with_capacity(move_scores.len());
 
-            let mut feature_sets = vec![[0.0; M]; move_scores.len()];
-            let mut policy_feature_sets: Vec<PolicyFeatures> = feature_sets
-                .iter_mut()
-                .map(|feature_set| PolicyFeatures::new::<S>(feature_set))
-                .collect();
-            let moves: Vec<Move> = move_scores.iter().map(|(mv, _score)| mv.clone()).collect();
+                    let group_data = position.group_data();
 
-            position.features_for_moves(&mut policy_feature_sets, &moves, &mut vec![], &group_data);
+                    let mut feature_sets = vec![[0.0; M]; move_scores.len()];
+                    let mut policy_feature_sets: Vec<PolicyFeatures> = feature_sets
+                        .iter_mut()
+                        .map(|feature_set| PolicyFeatures::new::<S>(feature_set))
+                        .collect();
+                    let moves: Vec<Move> =
+                        move_scores.iter().map(|(mv, _score)| mv.clone()).collect();
 
-            for ((_, result), features) in move_scores.iter().zip(feature_sets) {
-                let offset = inverse_sigmoid(1.0 / move_scores.len().max(2) as f32);
+                    position.features_for_moves(
+                        &mut policy_feature_sets,
+                        &moves,
+                        &mut vec![],
+                        &group_data,
+                    );
 
-                policy_training_samples.push({
-                    TrainingSample {
-                        features: features.map(f16::from_f32),
-                        offset,
-                        result: *result,
+                    for ((_, result), features) in move_scores.iter().zip(feature_sets) {
+                        let offset = inverse_sigmoid(1.0 / move_scores.len().max(2) as f32);
+
+                        local_policy_training_samples.push({
+                            TrainingSample {
+                                features: features.map(f16::from_f32),
+                                offset,
+                                result: *result,
+                            }
+                        });
                     }
-                });
-            }
-            position.do_move(mv.clone());
-        }
-    }
+                    position.do_move(mv.clone());
+                    local_policy_training_samples
+                })
+        },
+    ));
 
     policy_training_samples.shuffle(&mut rng);
     println!(
-        "Generated {} {} policy training samples in {:.1}s",
+        "Generated {} policy training samples in {:.1}s, {:.2}GiB total",
         policy_training_samples.len(),
-        policy_training_samples.capacity(),
-        start_time.elapsed().as_secs_f32()
+        start_time.elapsed().as_secs_f32(),
+        (policy_training_samples.len() * mem::size_of::<TrainingSample<M>>()) as f32
+            / f32::powf(2.0, 30.0),
     );
 
     let tuned_value_parameters = gradient_descent::gradient_descent(
@@ -665,14 +673,14 @@ pub fn read_move_scores_from_file<const S: usize>(
 }
 
 pub fn positions_and_results_from_games<const S: usize>(
-    games: Vec<Game<Position<S>>>,
+    games: &[Game<Position<S>>],
     komi: Komi,
 ) -> (Vec<Position<S>>, Vec<GameResult>) {
     games
         .into_par_iter()
         .flat_map_iter(|game| {
             let game_result = game.game_result();
-            let mut position = game.start_position;
+            let mut position = game.start_position.clone();
             if let Some((_, komi_str)) = game
                 .tags
                 .iter()
@@ -682,7 +690,7 @@ pub fn positions_and_results_from_games<const S: usize>(
             }
             assert_eq!(komi, position.komi());
             let mut output: Vec<(Position<S>, GameResult)> = Vec::with_capacity(200);
-            for PtnMove { mv, .. } in game.moves {
+            for PtnMove { mv, .. } in game.moves.iter() {
                 if position.game_result().is_some() {
                     break;
                 }
