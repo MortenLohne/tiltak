@@ -226,6 +226,7 @@ pub fn static_eval_game_phase<const S: usize>(
     for critical_square in group_data.critical_squares(Color::White) {
         critical_squares_eval::<WhiteTr, BlackTr, S>(
             position,
+            group_data,
             critical_square,
             white_value_features,
         );
@@ -234,6 +235,7 @@ pub fn static_eval_game_phase<const S: usize>(
     for critical_square in group_data.critical_squares(Color::Black) {
         critical_squares_eval::<BlackTr, WhiteTr, S>(
             position,
+            group_data,
             critical_square,
             black_value_features,
         );
@@ -359,10 +361,12 @@ fn cap_activity<Us: ColorTr, Them: ColorTr, const S: usize>(
 /// Give bonus for our critical squares
 fn critical_squares_eval<Us: ColorTr, Them: ColorTr, const S: usize>(
     position: &Position<S>,
+    group_data: &GroupData<S>,
     critical_square: Square,
     our_value_features: &mut ValueFeatures,
 ) {
     let top_stone = position[critical_square].top_stone;
+    let top_stone_role = top_stone.map(Piece::role);
     if top_stone.is_none() {
         our_value_features.critical_squares[0] += 1.0;
     } else if top_stone == Some(Us::wall_piece()) {
@@ -375,16 +379,50 @@ fn critical_squares_eval<Us: ColorTr, Them: ColorTr, const S: usize>(
         our_value_features.critical_squares[3] += 1.0
     }
 
-    // Bonus for having our cap next to our critical square
-    for neighbour in critical_square.neighbours::<S>() {
-        if position[neighbour].top_stone() == Some(Us::cap_piece()) {
-            our_value_features.critical_squares[4] += 1.0;
-            // Further bonus for a capped stack next to our critical square
-            for piece in position[neighbour].into_iter() {
-                if piece == Us::flat_piece() {
-                    our_value_features.critical_squares[5] += 1.0;
+    let rank = critical_square.rank::<S>();
+    let file = critical_square.file::<S>();
+
+    let capstone_square_in_line = {
+        let capstone_in_rank = BitBoard::full().rank::<S>(rank) & Us::caps(group_data);
+        let capstone_in_file = BitBoard::full().file::<S>(file) & Us::caps(group_data);
+        capstone_in_rank
+            .occupied_square()
+            .or(capstone_in_file.occupied_square())
+    };
+
+    // Bonuses when our capstone can spread to the critical square
+    // TODO: Don't give bonuses if walls/caps block the spread
+    if let Some(capstone_square) = capstone_square_in_line {
+        let distance =
+            file.abs_diff(capstone_square.file::<S>()) + rank.abs_diff(capstone_square.rank::<S>());
+        let cap_stack = position[capstone_square];
+        let is_hard_cap = cap_stack
+            .get(cap_stack.len() - 2)
+            .is_some_and(Us::piece_is_ours);
+        let num_high_supports = cap_stack
+            .into_iter()
+            .skip((cap_stack.len() as usize).saturating_sub(S + 1))
+            .filter(|piece| Us::piece_is_ours(*piece))
+            .count() as u8
+            - 1;
+        if top_stone_role != Some(Cap) && distance <= cap_stack.len() {
+            let has_pure_spread =
+                distance <= num_high_supports && (top_stone_role != Some(Wall) || is_hard_cap);
+            if has_pure_spread {
+                if position.side_to_move() == Us::color() {
+                    our_value_features.critical_square_cap_attack[0] += 1.0;
+                } else {
+                    our_value_features.critical_square_cap_attack[1] += 1.0;
                 }
+            } else if position.side_to_move() == Us::color() {
+                our_value_features.critical_square_cap_attack[2] += 1.0;
+            } else {
+                our_value_features.critical_square_cap_attack[3] += 1.0;
             }
+        }
+        if distance == 1 && top_stone_role != Some(Cap) {
+            our_value_features.critical_square_cap_attack[4] += 1.0;
+            our_value_features.critical_square_cap_attack[5] += num_high_supports as f32;
         }
     }
 }
