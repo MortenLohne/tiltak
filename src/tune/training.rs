@@ -269,7 +269,7 @@ fn play_game_pair<const S: usize>(
     current_params_wins: &AtomicU64,
     last_params_wins: &AtomicU64,
     i: usize,
-) -> (Game<Position<S>>, Vec<Vec<(Move, f32)>>) {
+) -> (Game<Position<S>>, MoveScoresForGame) {
     let settings = MctsSetting::default()
         .add_value_params(value_params.into())
         .add_policy_params(policy_params.into())
@@ -470,7 +470,8 @@ pub fn tune_value_and_policy<const S: usize, const N: usize, const M: usize>(
 
     let start_time: time::Instant = time::Instant::now();
 
-    let mut policy_training_samples = Vec::with_capacity(number_of_feature_sets);
+    let mut policy_training_samples: Vec<TrainingSample<M>> =
+        Vec::with_capacity(number_of_feature_sets);
 
     policy_training_samples.extend(games.iter().zip(move_scoress.iter()).flat_map(
         |(game, move_scores)| {
@@ -481,8 +482,6 @@ pub fn tune_value_and_policy<const S: usize, const N: usize, const M: usize>(
                 .map(|PtnMove { mv, .. }| mv)
                 .zip(move_scores.iter())
                 .flat_map(move |(mv, move_scores)| {
-                    let mut local_policy_training_samples = Vec::with_capacity(move_scores.len());
-
                     let group_data = position.group_data();
 
                     let mut feature_sets = vec![[0.0; M]; move_scores.len()];
@@ -496,23 +495,25 @@ pub fn tune_value_and_policy<const S: usize, const N: usize, const M: usize>(
                     position.features_for_moves(
                         &mut policy_feature_sets,
                         &moves,
-                        &mut vec![],
+                        &mut Vec::with_capacity(moves.len()),
                         &group_data,
                     );
 
-                    for ((_, result), features) in move_scores.iter().zip(feature_sets) {
-                        let offset = inverse_sigmoid(1.0 / move_scores.len().max(2) as f32);
-
-                        local_policy_training_samples.push({
-                            TrainingSample {
-                                features: features.map(f16::from_f32),
-                                offset,
-                                result: *result,
-                            }
-                        });
-                    }
                     position.do_move(mv.clone());
-                    local_policy_training_samples
+
+                    move_scores
+                        .iter()
+                        .zip(feature_sets)
+                        .map(|((_, result), features)| {
+                            let offset = inverse_sigmoid(1.0 / move_scores.len().max(2) as f32);
+                            {
+                                TrainingSample {
+                                    features: features.map(f16::from_f32),
+                                    offset,
+                                    result: *result,
+                                }
+                            }
+                        })
                 })
         },
     ));
@@ -633,7 +634,7 @@ pub fn read_move_scores_from_file<const S: usize>(
     // Games are separated by empty lines. Split here, to allow parallel parsing later
     let games: Vec<&str> = contents.split("\n\n").collect();
 
-    let mut move_scoress: Vec<Vec<Vec<(Move, f32)>>> = games
+    let mut move_scoress: Vec<MoveScoresForGame> = games
         .into_par_iter()
         .map(|line_group| {
             line_group
