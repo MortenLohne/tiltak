@@ -146,18 +146,18 @@ fn main() {
             #[cfg(feature = "sqlite")]
             "test_policy" => policy_sqlite::check_all_games(),
             "value_features" => match words.get(1) {
-                Some(&"4") => print_value_features::<4>(Komi::default()), // TODO: Bad default komi
-                Some(&"5") => print_value_features::<5>(Komi::default()),
-                Some(&"6") => print_value_features::<6>(Komi::default()),
+                Some(&"4") => print_value_features::<4>(Komi::from_half_komi(4).unwrap()), // TODO: Bad default komi
+                Some(&"5") => print_value_features::<5>(Komi::from_half_komi(4).unwrap()),
+                Some(&"6") => print_value_features::<6>(Komi::from_half_komi(4).unwrap()),
                 Some(s) => println!("Unsupported size {}", s),
-                None => print_value_features::<5>(Komi::default()),
+                None => print_value_features::<5>(Komi::from_half_komi(4).unwrap()),
             },
             "policy_features" => match words.get(1) {
-                Some(&"4") => print_policy_features::<4>(Komi::default()), // TODO: Bad default komi
-                Some(&"5") => print_policy_features::<5>(Komi::default()),
-                Some(&"6") => print_policy_features::<6>(Komi::default()),
+                Some(&"4") => print_policy_features::<4>(Komi::from_half_komi(4).unwrap()), // TODO: Bad default komi
+                Some(&"5") => print_policy_features::<5>(Komi::from_half_komi(4).unwrap()),
+                Some(&"6") => print_policy_features::<6>(Komi::from_half_komi(4).unwrap()),
                 Some(s) => println!("Unsupported size {}", s),
-                None => print_policy_features::<5>(Komi::default()),
+                None => print_policy_features::<5>(Komi::from_half_komi(4).unwrap()),
             },
             "game" => {
                 println!("Enter move list or a full PTN, then press enter followed by CTRL+D");
