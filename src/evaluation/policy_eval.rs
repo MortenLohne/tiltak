@@ -192,8 +192,8 @@ fn has_immediate_win(policy_features: &PolicyFeatures) -> bool {
         policy_features.move_onto_critical_square[1],
         policy_features.spread_that_connects_groups_to_win[0],
     ]
-    .iter()
-    .any(|p| *p != 0.0)
+    .into_iter()
+    .any(|p| p != 0.0)
 }
 
 struct MovementSynopsis<const S: usize> {

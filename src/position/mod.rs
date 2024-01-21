@@ -763,7 +763,7 @@ impl<const S: usize> Position<S> {
 
         for square in square::squares_iterator::<S>() {
             group_data.amount_in_group[group_data.groups[square] as usize].0 += 1;
-            if self[square].top_stone().map(Piece::is_road_piece) == Some(true) {
+            if self[square].top_stone().is_some_and(Piece::is_road_piece) {
                 group_data.amount_in_group[group_data.groups[square] as usize].1 =
                     group_data.amount_in_group[group_data.groups[square] as usize].1
                         | square.group_edge_connection();
