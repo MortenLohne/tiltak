@@ -20,7 +20,7 @@ use tiltak::minmax;
 use tiltak::policy_sqlite;
 #[cfg(feature = "constant-tuning")]
 use tiltak::position::Role;
-use tiltak::position::{Komi, Move};
+use tiltak::position::{AbstractBoard, Direction, Komi, Move, Square, SquareCacheEntry};
 use tiltak::position::{Position, Stack};
 use tiltak::ptn::{Game, PtnMove};
 use tiltak::search::MctsSetting;
@@ -731,12 +731,14 @@ fn bench() {
     }
 
     let (mv, score) = tree.best_move();
+    let knps = 5000.0 / start_time.elapsed().as_secs_f32();
 
     println!(
-        "{}: {:.2}%, {:.2}s",
+        "{}: {:.2}%, {:.2}s, {:.1} knps",
         mv,
         score * 100.0,
-        start_time.elapsed().as_secs_f32()
+        start_time.elapsed().as_secs_f32(),
+        knps,
     );
 }
 
@@ -785,13 +787,14 @@ fn bench_old() {
 fn mem_usage<const S: usize>() {
     use std::mem;
     println!(
-        "Tak board: {} bytes",
-        mem::size_of::<position::Position<5>>()
+        "{}s tak board: {} bytes",
+        S,
+        mem::size_of::<position::Position<S>>()
     );
     println!("Tak board cell: {} bytes", mem::size_of::<Stack>());
     println!("Tak move: {} bytes", mem::size_of::<Move<S>>());
-    println!("MCTS edge 6s: {} bytes", search::edge_mem_usage::<S>());
-    println!("MCTS node 6s: {} bytes", search::node_mem_usage::<S>());
+    println!("MCTS edge {}s: {} bytes", S, search::edge_mem_usage::<S>());
+    println!("MCTS node {}s: {} bytes", S, search::node_mem_usage::<S>());
     println!(
         "Zobrist keys 5s: {} bytes",
         mem::size_of::<position::ZobristKeys<5>>()
@@ -799,6 +802,18 @@ fn mem_usage<const S: usize>() {
     println!(
         "Zobrist keys 6s: {} bytes",
         mem::size_of::<position::ZobristKeys<6>>()
+    );
+    println!(
+        "Direction {} bytes, optional direction {} bytes",
+        mem::size_of::<Direction>(),
+        mem::size_of::<Option<Direction>>()
+    );
+    println!(
+        "{}s square {} bytes, square cache entry: {} bytes, square cache table {} bytes",
+        S,
+        mem::size_of::<Square<S>>(),
+        mem::size_of::<SquareCacheEntry<S>>(),
+        mem::size_of::<AbstractBoard<SquareCacheEntry<6>, 6>>(),
     );
 }
 
