@@ -4,11 +4,13 @@
 use board_game_traits::Color;
 
 use crate::position::bitboard::BitBoard;
+use crate::position::utils::Piece;
 use crate::position::utils::Piece::{
     BlackCap, BlackFlat, BlackWall, WhiteCap, WhiteFlat, WhiteWall,
 };
-use crate::position::utils::{Piece, Square};
 use crate::position::{GroupData, Position};
+
+use super::Square;
 
 pub(crate) trait ColorTr {
     fn color() -> Color;

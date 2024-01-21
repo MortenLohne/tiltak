@@ -1,9 +1,8 @@
-use crate::position::utils::Square;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 use std::{fmt, ops};
 
-use super::Direction;
+use super::{Direction, Square};
 
 #[derive(PartialEq, Eq, Clone, Copy, Hash, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]

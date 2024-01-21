@@ -6,11 +6,12 @@ use arrayvec::ArrayVec;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
-use crate::position::utils;
 use crate::position::utils::Direction::{East, North, South, West};
 use crate::position::utils::Role::{Cap, Flat, Wall};
-use crate::position::utils::{Direction, Movement, Role, Square, StackMovement};
+use crate::position::utils::{Direction, Movement, Role, StackMovement};
 use std::cmp::Ordering;
+
+use super::Square;
 
 /// A legal move for a position.
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -209,9 +210,8 @@ impl<const S: usize> Move<S> {
             };
             Move::Place(role, square)
         } else if words[0] == "M" {
-            let start_square = utils::Square::parse_square(&words[1].to_lowercase()).unwrap();
-            let end_square: Square<S> =
-                utils::Square::parse_square(&words[2].to_lowercase()).unwrap();
+            let start_square = Square::parse_square(&words[1].to_lowercase()).unwrap();
+            let end_square: Square<S> = Square::parse_square(&words[2].to_lowercase()).unwrap();
             let pieces_dropped: Vec<u8> = words
                 .iter()
                 .skip(3)

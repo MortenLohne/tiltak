@@ -18,10 +18,9 @@ use serde::{Deserialize, Serialize};
 use bitboard::BitBoard;
 use color_trait::{BlackTr, WhiteTr};
 
-pub use utils::{
-    squares_iterator, Direction, Komi, Movement, Piece, Piece::*, Role, Role::*, Square, Stack,
-    StackMovement,
-};
+pub use utils::{Direction, Komi, Movement, Piece, Piece::*, Role, Role::*, Stack, StackMovement};
+
+pub use square::{squares_iterator, Square};
 
 pub(crate) use utils::AbstractBoard;
 
@@ -35,6 +34,7 @@ use crate::search;
 pub(crate) mod bitboard;
 pub(crate) mod color_trait;
 mod mv;
+mod square;
 mod utils;
 
 lazy_static! {
@@ -595,7 +595,7 @@ impl<const S: usize> Position<S> {
         let mut hash = 0;
         hash ^= zobrist_to_move::<S>(self.to_move);
 
-        for square in utils::squares_iterator::<S>() {
+        for square in square::squares_iterator::<S>() {
             hash ^= self.zobrist_hash_for_square(square);
         }
         hash
@@ -678,7 +678,7 @@ impl<const S: usize> Position<S> {
 
     pub fn flip_colors(&self) -> Position<S> {
         let mut new_board = self.clone();
-        for square in utils::squares_iterator::<S>() {
+        for square in square::squares_iterator::<S>() {
             new_board[square] = Stack::default();
             for piece in self[square] {
                 new_board[square].push(piece.flip_color());
@@ -728,7 +728,7 @@ impl<const S: usize> Position<S> {
     pub fn group_data(&self) -> GroupData<S> {
         let mut group_data = GroupData::default();
 
-        for square in utils::squares_iterator::<S>() {
+        for square in square::squares_iterator::<S>() {
             match self[square].top_stone() {
                 Some(WhiteFlat) => {
                     group_data.white_flat_stones = group_data.white_flat_stones.set_square(square)
@@ -761,7 +761,7 @@ impl<const S: usize> Position<S> {
             &mut highest_component_id,
         );
 
-        for square in utils::squares_iterator::<S>() {
+        for square in square::squares_iterator::<S>() {
             group_data.amount_in_group[group_data.groups[square] as usize].0 += 1;
             if self[square].top_stone().map(Piece::is_road_piece) == Some(true) {
                 group_data.amount_in_group[group_data.groups[square] as usize].1 = group_data
@@ -771,7 +771,7 @@ impl<const S: usize> Position<S> {
             }
         }
 
-        for square in utils::squares_iterator::<S>() {
+        for square in square::squares_iterator::<S>() {
             if self.is_critical_square_from_scratch(&group_data, square, Color::White) {
                 group_data.white_critical_squares =
                     group_data.white_critical_squares.set_square(square);
@@ -946,7 +946,7 @@ impl<const S: usize> Position<S> {
                 || ((0..S).any(|y| components.raw[y][0] == id)
                     && (0..S).any(|y| components.raw[y][S - 1] == id))
             {
-                let square = utils::squares_iterator::<S>()
+                let square = square::squares_iterator::<S>()
                     .find(|&sq| components[sq] == id)
                     .unwrap();
                 if self[square].top_stone.unwrap().color() == self.side_to_move() {
@@ -1195,7 +1195,7 @@ impl<const S: usize> PositionTrait for Position<S> {
     fn generate_moves<E: Extend<Self::Move>>(&self, moves: &mut E) {
         match self.half_moves_played() {
             0 | 1 => moves.extend(
-                utils::squares_iterator::<S>()
+                square::squares_iterator::<S>()
                     .filter(|square| self[*square].is_empty())
                     .map(|square| Move::Place(Flat, square)),
             ),
@@ -1535,7 +1535,7 @@ impl<const S: usize> pgn_traits::PgnPosition for Position<S> {
                 )
             })?;
         let mut position = Position::start_position_with_settings(settings);
-        for square in utils::squares_iterator::<S>() {
+        for square in square::squares_iterator::<S>() {
             let (file, rank) = (square.file(), square.rank());
             let stack = rows[rank as usize][file as usize];
             for piece in stack.into_iter() {
@@ -1707,7 +1707,7 @@ pub(crate) fn connected_components_graph<const S: usize>(
     components: &mut AbstractBoard<u8, S>,
     id: &mut u8,
 ) {
-    for square in utils::squares_iterator::<S>() {
+    for square in square::squares_iterator::<S>() {
         if components[square] == 0 && road_pieces.get_square(square) {
             connect_component(road_pieces, components, square, *id);
             *id += 1;
