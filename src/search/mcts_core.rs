@@ -40,8 +40,8 @@ pub struct TempVectors<const S: usize> {
     policy_feature_sets: Option<Vec<PolicyFeatures<'static>>>,
 }
 
-impl<const S: usize> TempVectors<S> {
-    pub fn new() -> Self {
+impl<const S: usize> Default for TempVectors<S> {
+    fn default() -> Self {
         TempVectors {
             simple_moves: vec![],
             moves: vec![],

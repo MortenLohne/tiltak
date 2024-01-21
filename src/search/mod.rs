@@ -159,7 +159,7 @@ impl<const S: usize> MonteCarloTree<S> {
             }
             Err(err) => panic!("{}", err),
         };
-        let mut temp_vectors = TempVectors::new();
+        let mut temp_vectors = TempVectors::default();
         let mut root_edge = TreeEdge {
             child: None,
             mv: Move::Place(Role::Flat, Square::default()),
