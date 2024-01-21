@@ -622,24 +622,20 @@ impl<const S: usize> Position<S> {
         hash
     }
 
-    fn is_critical_square_from_scratch(
+    fn is_critical_square_from_scratch<Us: ColorTr>(
         &self,
         group_data: &GroupData<S>,
         square: Square<S>,
-        color: Color,
     ) -> bool {
         let neighbors_bitboard = utils::lookup_neighbor_table::<S>(square);
-        let our_road_stones = match color {
-            Color::White => group_data.white_road_pieces(),
-            Color::Black => group_data.black_road_pieces(),
-        };
+        let our_road_stones = Us::road_stones(group_data);
 
         let mut our_neighbors = neighbors_bitboard & our_road_stones;
         let mut sum_of_connections = square.group_edge_connection();
         while let Some(neighbor_square) = our_neighbors.occupied_square() {
             sum_of_connections = sum_of_connections
                 | group_data.amount_in_group[group_data.groups[neighbor_square] as usize].1;
-            our_neighbors = our_neighbors.clear(neighbor_square.into_inner());
+            our_neighbors = our_neighbors.clear_square(neighbor_square);
         }
 
         sum_of_connections.is_winning()
@@ -775,11 +771,11 @@ impl<const S: usize> Position<S> {
         }
 
         for square in square::squares_iterator::<S>() {
-            if self.is_critical_square_from_scratch(&group_data, square, Color::White) {
+            if self.is_critical_square_from_scratch::<WhiteTr>(&group_data, square) {
                 group_data.white_critical_squares =
                     group_data.white_critical_squares.set_square(square);
             }
-            if self.is_critical_square_from_scratch(&group_data, square, Color::Black) {
+            if self.is_critical_square_from_scratch::<BlackTr>(&group_data, square) {
                 group_data.black_critical_squares =
                     group_data.black_critical_squares.set_square(square);
             }

@@ -119,6 +119,14 @@ impl BitBoard {
         BitBoard::from_u64(self.board & !(1 << i))
     }
 
+    // Sets the square to false
+    #[inline]
+    #[must_use]
+    pub fn clear_square<const S: usize>(self, square: Square<S>) -> Self {
+        debug_assert!(square.into_inner() < 64);
+        BitBoard::from_u64(self.board & !(1 << square.into_inner()))
+    }
+
     #[inline]
     pub fn file<const S: usize>(self, i: u8) -> Self {
         debug_assert!(i < S as u8);
