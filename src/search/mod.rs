@@ -366,7 +366,7 @@ impl<const S: usize> MonteCarloTree<S> {
         });
     }
 
-    pub fn visits(&self) -> u64 {
+    pub fn visits(&self) -> u32 {
         self.edge.visits
     }
 
@@ -428,7 +428,7 @@ pub fn mcts_training<const S: usize>(
         }
     }
 
-    let child_visits: u64 = tree.children().iter().map(|edge| edge.visits).sum();
+    let child_visits: u32 = tree.children().iter().map(|edge| edge.visits).sum();
     tree.children()
         .iter()
         .map(|edge| {

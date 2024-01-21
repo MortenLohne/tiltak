@@ -26,7 +26,7 @@ pub struct TreeEdge<const S: usize> {
     pub child: Option<arena::Index<Tree<S>>>,
     pub mv: Move<S>,
     pub mean_action_value: Score,
-    pub visits: u64,
+    pub visits: u32,
     pub heuristic_score: f16,
 }
 
@@ -88,6 +88,8 @@ impl<const S: usize> TreeEdge<S> {
     ) -> Option<Score> {
         if self.visits == 0 {
             self.expand(position, settings, temp_vectors, arena)
+        } else if self.visits == u32::MAX {
+            return None;
         } else if arena.get(self.child.as_ref().unwrap()).is_terminal {
             self.visits += 1;
             arena
@@ -102,7 +104,7 @@ impl<const S: usize> TreeEdge<S> {
                     .get_slice(&node.children)
                     .iter()
                     .map(|edge| edge.visits)
-                    .sum::<u64>()
+                    .sum::<u32>()
                     + 1,
                 "{} visits, {} total action value, {} mean action value",
                 self.visits,
