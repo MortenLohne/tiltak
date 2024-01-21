@@ -27,7 +27,7 @@ use crate::tune::gradient_descent::TrainingSample;
 use crate::tune::play_match::play_game;
 
 // The score, or probability of being played, for a given move
-type MoveScore<const S: usize> = (Move<S>, f32);
+type MoveScore<const S: usize> = (Move<S>, f16);
 
 // The probability of each possible move being played, through a whole game.
 type MoveScoresForGame<const S: usize> = Vec<Vec<MoveScore<S>>>;
@@ -389,15 +389,15 @@ pub fn tune_value_from_file<const S: usize, const N: usize>(
         .par_iter()
         .zip(results)
         .map(|(position, game_result)| {
-            let mut features = [0.0; N];
+            let mut features = [f16::ZERO; N];
             position.static_eval_features(&mut features);
             let result = match game_result {
-                GameResult::WhiteWin => 1.0,
-                GameResult::Draw => 0.5,
-                GameResult::BlackWin => 0.0,
+                GameResult::WhiteWin => f16::ONE,
+                GameResult::Draw => f16::ONE / (f16::ONE + f16::ONE),
+                GameResult::BlackWin => f16::ONE,
             };
             TrainingSample {
-                features: features.map(f16::from_f32),
+                features,
                 offset: 0.0,
                 result,
             }
@@ -441,15 +441,15 @@ pub fn tune_value_and_policy<const S: usize, const N: usize, const M: usize>(
         .par_iter()
         .zip(results)
         .map(|(position, game_result)| {
-            let mut features = [0.0; N];
+            let mut features = [f16::ZERO; N];
             position.static_eval_features(&mut features);
             let result = match game_result {
-                GameResult::WhiteWin => 1.0,
-                GameResult::Draw => 0.5,
-                GameResult::BlackWin => 0.0,
+                GameResult::WhiteWin => f16::ONE,
+                GameResult::Draw => f16::ONE / (f16::ONE + f16::ONE),
+                GameResult::BlackWin => f16::ONE,
             };
             TrainingSample {
-                features: features.map(f16::from_f32),
+                features,
                 offset: 0.0,
                 result,
             }
@@ -484,7 +484,7 @@ pub fn tune_value_and_policy<const S: usize, const N: usize, const M: usize>(
                 .flat_map(move |(mv, move_scores)| {
                     let group_data = position.group_data();
 
-                    let mut feature_sets = vec![[0.0; M]; move_scores.len()];
+                    let mut feature_sets = vec![[f16::ZERO; M]; move_scores.len()];
                     let mut policy_feature_sets: Vec<PolicyFeatures> = feature_sets
                         .iter_mut()
                         .map(|feature_set| PolicyFeatures::new::<S>(feature_set))
@@ -508,7 +508,7 @@ pub fn tune_value_and_policy<const S: usize, const N: usize, const M: usize>(
                             let offset = inverse_sigmoid(1.0 / move_scores.len().max(2) as f32);
                             {
                                 TrainingSample {
-                                    features: features.map(f16::from_f32),
+                                    features,
                                     offset,
                                     result: *result,
                                 }
@@ -609,7 +609,7 @@ pub fn games_and_move_scoress_from_file<const S: usize>(
                 i,
                 move_score
                     .iter()
-                    .map(|(mv, score)| format!("{}: {:.2}%", mv, score * 100.0))
+                    .map(|(mv, score)| format!("{}: {:.2}%", mv, score.to_f32() * 100.0))
                     .collect::<Vec<_>>(),
                 game.moves
                     .iter()
@@ -650,7 +650,7 @@ pub fn read_move_scores_from_file<const S: usize>(
                         }
                         let mut words = move_score_string.split_whitespace();
                         let mv = Move::from_string(words.next().unwrap()).unwrap();
-                        let score = str::parse::<f32>(words.next().unwrap()).unwrap();
+                        let score = str::parse::<f16>(words.next().unwrap()).unwrap();
                         scores_for_this_move.push((mv, score));
                     }
                     // This assert is only a performance check

@@ -4,6 +4,7 @@ use std::{
 };
 
 use board_game_traits::{Color, GameResult, Position as BoardTrait};
+use half::f16;
 use pgn_traits::PgnPosition;
 use rayon::prelude::*;
 use rusqlite::Connection;
@@ -80,7 +81,8 @@ fn policy_finds_win(position: &Position<5>) -> Option<Move<5>> {
         &mut Some(vec![]),
     );
 
-    let mut feature_sets = vec![vec![0.0; parameters::num_policy_features::<5>()]; moves.len()];
+    let mut feature_sets =
+        vec![vec![f16::ZERO; parameters::num_policy_features::<5>()]; moves.len()];
 
     let mut policy_feature_sets: Vec<_> = feature_sets
         .iter_mut()
@@ -98,12 +100,12 @@ fn policy_finds_win(position: &Position<5>) -> Option<Move<5>> {
     if simple_moves
         .iter()
         .zip(policy_feature_sets.iter())
-        .any(|(_, score)| score.decline_win[0] != 0.0)
+        .any(|(_, score)| score.decline_win[0] != f16::ZERO)
     {
         simple_moves
             .iter()
             .zip(policy_feature_sets)
-            .find(|(_, score)| score.decline_win[0] == 0.0)
+            .find(|(_, score)| score.decline_win[0] == f16::ZERO)
             .map(|(mv, _)| mv.clone())
     } else {
         None

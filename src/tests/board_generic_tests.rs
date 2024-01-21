@@ -1,6 +1,7 @@
 use crate::evaluation::parameters;
 use crate::evaluation::parameters::PolicyFeatures;
 use board_game_traits::{Color, EvalPosition, GameResult::*, Position as PositionTrait};
+use half::f16;
 use pgn_traits::PgnPosition;
 use rand::seq::SliceRandom;
 
@@ -84,7 +85,7 @@ fn play_random_games_prop<const S: usize>(num_games: usize) {
             position.generate_moves(&mut moves);
 
             let mut feature_sets =
-                vec![vec![0.0; parameters::num_policy_features::<S>()]; moves.len()];
+                vec![vec![f16::ZERO; parameters::num_policy_features::<S>()]; moves.len()];
             let mut policy_feature_sets: Vec<PolicyFeatures> = feature_sets
                 .iter_mut()
                 .map(|feature_set| PolicyFeatures::new::<S>(feature_set))
@@ -95,7 +96,7 @@ fn play_random_games_prop<const S: usize>(num_games: usize) {
             // If the decline_win value is set, check that there really is a winning move
             if policy_feature_sets
                 .iter()
-                .any(|features| features.decline_win[0] != 0.0)
+                .any(|features| features.decline_win[0] != f16::ZERO)
             {
                 assert!(
                     moves.iter().any(|mv| {
@@ -116,7 +117,7 @@ fn play_random_games_prop<const S: usize>(num_games: usize) {
                     policy_feature_sets
                         .iter()
                         .zip(moves)
-                        .filter(|(features, _)| features.decline_win[0] == 0.0)
+                        .filter(|(features, _)| features.decline_win[0] == f16::ZERO)
                         .map(|(_, mv)| mv.to_string())
                         .collect::<Vec<_>>()
                 )

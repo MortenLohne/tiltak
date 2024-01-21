@@ -38,7 +38,7 @@ fn place_into_komi_win() {
         matches!(top_move, Move::Place(Role::Flat, _)),
         "Got move {} with score {:.2}%, expected flat placement",
         top_move,
-        top_score * 100.0
+        top_score.to_f32() * 100.0
     );
 }
 
@@ -55,7 +55,7 @@ fn do_not_place_to_allow_win() {
         matches!(top_move, Move::Move(_, _, _)),
         "Got move {} with score {:.2}%, expected stack movement",
         top_move,
-        top_score * 100.0
+        top_score.to_f32() * 100.0
     );
 }
 
@@ -72,6 +72,6 @@ fn place_to_allow_komi_loss() {
         matches!(top_move, Move::Place(Role::Flat, _)),
         "Got move {} with score {:.2}%, expected flat placement",
         top_move,
-        top_score * 100.0
+        top_score.to_f32() * 100.0
     );
 }

@@ -9,6 +9,7 @@ use std::{iter, mem};
 use arrayvec::ArrayVec;
 use board_game_traits::{Color, GameResult};
 use board_game_traits::{EvalPosition as EvalPositionTrait, Position as PositionTrait};
+use half::f16;
 use lazy_static::lazy_static;
 use pgn_traits::PgnPosition;
 use rand::{Rng, SeedableRng};
@@ -29,7 +30,6 @@ pub use mv::{Move, ReverseMove};
 use crate::evaluation::parameters::{self, PolicyFeatures, ValueFeatures};
 use crate::evaluation::value_eval;
 use crate::position::color_trait::ColorTr;
-use crate::search;
 
 pub(crate) mod bitboard;
 pub(crate) mod color_trait;
@@ -962,7 +962,7 @@ impl<const S: usize> Position<S> {
         &self,
         group_data: &GroupData<S>,
         params: &[f32],
-        features: &mut [f32],
+        features: &mut [f16],
     ) -> f32 {
         let (white_features, black_features) = features.split_at_mut(features.len() / 2);
         let mut white_value_features = ValueFeatures::new::<S>(white_features);
@@ -977,14 +977,14 @@ impl<const S: usize> Position<S> {
             .iter()
             .chain(black_features.iter())
             .zip(params)
-            .map(|(a, b)| a * b)
+            .map(|(a, b)| a.to_f32() * b)
             .sum::<f32>();
 
         for c in features.iter_mut() {
-            *c = 0.0;
+            *c = f16::ZERO;
         }
 
-        features.fill(0.0);
+        features.fill(f16::ZERO);
         eval
     }
 
@@ -1040,7 +1040,7 @@ impl<const S: usize> Position<S> {
         }
     }
 
-    pub fn static_eval_features(&self, features: &mut [f32]) {
+    pub fn static_eval_features(&self, features: &mut [f16]) {
         debug_assert!(self.game_result().is_none());
 
         let group_data = self.group_data();
@@ -1063,9 +1063,9 @@ impl<const S: usize> Position<S> {
         params: &[f32],
         group_data: &GroupData<S>,
         simple_moves: &mut Vec<<Self as PositionTrait>::Move>,
-        moves: &mut Vec<(<Self as PositionTrait>::Move, f32)>,
+        moves: &mut Vec<(<Self as PositionTrait>::Move, f16)>,
         fcd_per_move: &mut Vec<i8>,
-        features: &mut Vec<Box<[f32]>>,
+        features: &mut Vec<Box<[f16]>>,
         policy_feature_sets: &mut Option<Vec<PolicyFeatures<'static>>>,
     ) {
         debug_assert!(simple_moves.is_empty());
@@ -1103,9 +1103,9 @@ impl<const S: usize> Position<S> {
         &self,
         group_data: &GroupData<S>,
         simple_moves: &mut Vec<Move<S>>,
-        moves: &mut Vec<(Move<S>, search::Score)>,
+        moves: &mut Vec<(Move<S>, f16)>,
         fcd_per_move: &mut Vec<i8>,
-        features: &mut Vec<Box<[f32]>>,
+        features: &mut Vec<Box<[f16]>>,
         policy_params: &[f32],
         policy_feature_sets: &mut Option<Vec<PolicyFeatures<'static>>>,
     ) {
@@ -1442,9 +1442,13 @@ impl<const S: usize> EvalPositionTrait for Position<S> {
     fn static_eval(&self) -> f32 {
         let params = Self::value_params(self.komi());
 
-        let mut features: Vec<f32> = vec![0.0; params.len()];
+        let mut features: Vec<f16> = vec![f16::ZERO; params.len()];
         self.static_eval_features(&mut features);
-        features.iter().zip(params).map(|(a, b)| a * b).sum()
+        features
+            .iter()
+            .zip(params)
+            .map(|(a, b)| a.to_f32() * b)
+            .sum()
     }
 }
 

@@ -1,6 +1,7 @@
 use std::ops;
 
 use board_game_traits::{Color, GameResult, Position as PositionTrait};
+use half::f16;
 use rand::distributions::Distribution;
 use rand::Rng;
 
@@ -26,17 +27,17 @@ pub struct TreeEdge<const S: usize> {
     pub mv: Move<S>,
     pub mean_action_value: Score,
     pub visits: u64,
-    pub heuristic_score: Score,
+    pub heuristic_score: f16,
 }
 
 /// Temporary vectors that are continually re-used during search to avoid unnecessary allocations
 #[derive(Debug)]
 pub struct TempVectors<const S: usize> {
     simple_moves: Vec<Move<S>>,
-    moves: Vec<(Move<S>, f32)>,
+    moves: Vec<(Move<S>, f16)>,
     fcd_per_move: Vec<i8>,
-    value_scores: Vec<Score>,
-    policy_score_sets: Vec<Box<[Score]>>,
+    value_scores: Vec<f16>,
+    policy_score_sets: Vec<Box<[f16]>>,
     policy_feature_sets: Option<Vec<PolicyFeatures<'static>>>,
 }
 
@@ -46,7 +47,7 @@ impl<const S: usize> Default for TempVectors<S> {
             simple_moves: vec![],
             moves: vec![],
             fcd_per_move: vec![],
-            value_scores: vec![0.0; parameters::num_value_features::<S>()],
+            value_scores: vec![f16::ZERO; parameters::num_value_features::<S>()],
             policy_score_sets: vec![],
             policy_feature_sets: Some(vec![]),
         }
@@ -54,7 +55,7 @@ impl<const S: usize> Default for TempVectors<S> {
 }
 
 impl<const S: usize> TreeEdge<S> {
-    pub fn new(mv: Move<S>, heuristic_score: Score, mean_action_value: Score) -> Self {
+    pub fn new(mv: Move<S>, heuristic_score: f16, mean_action_value: Score) -> Self {
         TreeEdge {
             child: None,
             mv,
@@ -181,7 +182,8 @@ impl<const S: usize> TreeEdge<S> {
     #[inline]
     pub fn exploration_value(&self, parent_visits_sqrt: Score, cpuct: Score) -> Score {
         (1.0 - self.mean_action_value)
-            + cpuct * self.heuristic_score * parent_visits_sqrt / (1 + self.visits) as Score
+            + cpuct * self.heuristic_score.to_f32() * parent_visits_sqrt
+                / (1 + self.visits) as Score
     }
 }
 
@@ -211,13 +213,17 @@ impl<const S: usize> Tree<S> {
             &mut temp_vectors.policy_feature_sets,
         );
         // let mut children_vec = arena.add_from_iter(length, source) Vec::with_capacity(temp_vectors.moves.len());
-        let policy_sum: f32 = temp_vectors.moves.iter().map(|(_, score)| *score).sum();
+        let policy_sum: f32 = temp_vectors
+            .moves
+            .iter()
+            .map(|(_, score)| score.to_f32())
+            .sum();
         let inv_sum = 1.0 / policy_sum;
 
         let child_edges = temp_vectors.moves.drain(..).map(|(mv, heuristic_score)| {
             TreeEdge::new(
                 mv.clone(),
-                heuristic_score * inv_sum,
+                f16::from_f32(heuristic_score.to_f32() * inv_sum),
                 settings.initial_mean_action_value(),
             )
         });
@@ -250,7 +256,7 @@ impl<const S: usize> Tree<S> {
             .map(|child| &mut child.heuristic_score)
             .zip(noise_vec)
         {
-            *child_prior = *child_prior * (1.0 - epsilon) + epsilon * eta;
+            *child_prior = f16::from_f32(child_prior.to_f32() * (1.0 - epsilon) + epsilon * eta);
         }
     }
 }
@@ -390,13 +396,13 @@ impl<'a, const S: usize> Iterator for Pv<'a, S> {
 pub fn best_move<R: Rng, const S: usize>(
     rng: &mut R,
     temperature: f64,
-    move_scores: &[(Move<S>, Score)],
+    move_scores: &[(Move<S>, f16)],
 ) -> Move<S> {
     let mut move_probabilities = vec![];
     let mut cumulative_prob = 0.0;
 
     for (mv, individual_prob) in move_scores.iter() {
-        cumulative_prob += (*individual_prob as f64).powf(1.0 / temperature);
+        cumulative_prob += (individual_prob.to_f64()).powf(1.0 / temperature);
         move_probabilities.push((mv, cumulative_prob));
     }
 

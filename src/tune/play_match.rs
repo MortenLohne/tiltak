@@ -3,6 +3,7 @@ use std::time::Instant;
 
 use board_game_traits::{Color, Position as PositionTrait};
 use chrono::Datelike;
+use half::f16;
 use pgn_traits::PgnPosition;
 use rand::seq::SliceRandom;
 
@@ -12,8 +13,8 @@ use crate::position::Position;
 use crate::position::Role;
 use crate::ptn::{Game, PtnMove};
 use crate::search;
+use crate::search::MctsSetting;
 use crate::search::TimeControl;
-use crate::search::{MctsSetting, Score};
 
 /// Play a single training game between two parameter sets
 pub fn play_game<const S: usize>(
@@ -23,7 +24,7 @@ pub fn play_game<const S: usize>(
     opening: &[Move<S>],
     temperature: f64,
     time_control: &TimeControl,
-) -> (Game<Position<S>>, Vec<Vec<(Move<S>, Score)>>) {
+) -> (Game<Position<S>>, Vec<Vec<(Move<S>, f16)>>) {
     let mut position = Position::start_position_with_komi(komi);
     let mut game_moves = opening.to_vec();
     let mut move_scores = vec![vec![]; opening.len()];

@@ -6,7 +6,7 @@ use std::{array, time::Instant};
 pub struct TrainingSample<const N: usize> {
     pub features: [f16; N],
     pub offset: f32,
-    pub result: f32,
+    pub result: f16,
 }
 
 pub fn gradient_descent<R: rand::Rng, const N: usize>(
@@ -169,7 +169,9 @@ fn calc_slope<const N: usize>(samples: &[TrainingSample<N>], params: &[f32; N]) 
                 let derived_sigmoid_result = sigmoid_derived(estimated_result);
 
                 features.map(|feature| {
-                    (estimated_sigmoid - result) * derived_sigmoid_result * feature.to_f32()
+                    (estimated_sigmoid - result.to_f32())
+                        * derived_sigmoid_result
+                        * feature.to_f32()
                 })
             },
         )
@@ -199,7 +201,7 @@ fn average_error<const N: usize>(samples: &[TrainingSample<N>], params: &[f32; N
                  result,
                  offset,
              }| {
-                (sigmoid(eval_from_params(features, params, *offset)) - result).powi(2)
+                (sigmoid(eval_from_params(features, params, *offset)) - result.to_f32()).powi(2)
             },
         )
         .map(|f| f as f64)

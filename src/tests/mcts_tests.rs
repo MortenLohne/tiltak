@@ -3,6 +3,7 @@ use crate::search::MctsSetting;
 use crate::search::{self, MonteCarloTree};
 use crate::tests::TestPosition;
 use board_game_traits::Position as PositionTrait;
+use half::f16;
 use pgn_traits::PgnPosition;
 use std::time::Duration;
 
@@ -164,12 +165,12 @@ fn do_not_play_suicide_move_as_black_test3() {
 fn best_move_temperature_test() {
     let position = <Position<5>>::start_position();
     let moves = vec![
-        (position.move_from_san("a1").unwrap(), 0.5),
-        (position.move_from_san("a2").unwrap(), 0.1),
-        (position.move_from_san("a3").unwrap(), 0.1),
-        (position.move_from_san("a4").unwrap(), 0.1),
-        (position.move_from_san("a5").unwrap(), 0.1),
-        (position.move_from_san("b1").unwrap(), 0.1),
+        (position.move_from_san("a1").unwrap(), f16::from_f32(0.5)),
+        (position.move_from_san("a2").unwrap(), f16::from_f32(0.1)),
+        (position.move_from_san("a3").unwrap(), f16::from_f32(0.1)),
+        (position.move_from_san("a4").unwrap(), f16::from_f32(0.1)),
+        (position.move_from_san("a5").unwrap(), f16::from_f32(0.1)),
+        (position.move_from_san("b1").unwrap(), f16::from_f32(0.1)),
     ];
 
     let mut rng = rand::thread_rng();

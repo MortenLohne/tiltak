@@ -10,6 +10,7 @@ use std::{io, time};
 
 use board_game_traits::Position as PositionTrait;
 use board_game_traits::{Color, GameResult};
+use half::f16;
 use pgn_traits::PgnPosition;
 #[cfg(feature = "constant-tuning")]
 use rayon::prelude::*;
@@ -372,7 +373,10 @@ fn mcts_vs_minmax(minmax_depth: u16, mcts_nodes: u64) {
 }
 
 fn print_value_features<const S: usize>(komi: Komi) {
-    let mut params = <Position<S>>::value_params(komi).to_vec();
+    let mut params: Vec<f16> = <Position<S>>::value_params(komi)
+        .iter()
+        .map(|p| f16::from_f32(*p))
+        .collect();
     let num: usize = params.len() / 2;
     let (white_coefficients, black_coefficients) = params.split_at_mut(num);
 
@@ -396,7 +400,10 @@ fn print_value_features<const S: usize>(komi: Komi) {
 }
 
 fn print_policy_features<const S: usize>(komi: Komi) {
-    let mut params = <Position<S>>::policy_params(komi).to_vec();
+    let mut params: Vec<f16> = <Position<S>>::policy_params(komi)
+        .iter()
+        .map(|p| f16::from_f32(*p))
+        .collect();
 
     let policy_features = parameters::PolicyFeatures::new::<S>(&mut params);
     let policy_features_string = format!("{:?}", policy_features);
@@ -448,7 +455,7 @@ fn analyze_position<const S: usize>(position: &Position<S>) {
 
     let group_data = position.group_data();
 
-    let mut coefficients = vec![0.0; parameters::num_value_features::<S>()];
+    let mut coefficients = vec![f16::ZERO; parameters::num_value_features::<S>()];
     let coefficients_mid_index = coefficients.len() / 2;
 
     let (white_coefficients, black_coefficients) =
@@ -469,7 +476,7 @@ fn analyze_position<const S: usize>(position: &Position<S>) {
             .iter()
             .take(coefficients_mid_index),
     ) {
-        *feature *= param;
+        *feature *= f16::from_f32(*param);
     }
 
     for (feature, param) in black_coefficients.iter_mut().zip(
@@ -477,10 +484,10 @@ fn analyze_position<const S: usize>(position: &Position<S>) {
             .iter()
             .skip(coefficients_mid_index),
     ) {
-        *feature *= param;
+        *feature *= f16::from_f32(*param);
     }
 
-    let mut mixed_coefficients: Vec<f32> = white_coefficients
+    let mut mixed_coefficients: Vec<f16> = white_coefficients
         .iter()
         .zip(black_coefficients.iter())
         .map(|(white, black)| *white - *black)
@@ -528,7 +535,8 @@ fn analyze_position<const S: usize>(position: &Position<S>) {
     );
     moves.sort_by(|(_mv, score1), (_, score2)| score1.partial_cmp(score2).unwrap().reverse());
 
-    let mut feature_sets = vec![vec![0.0; parameters::num_policy_features::<S>()]; moves.len()];
+    let mut feature_sets =
+        vec![vec![f16::ZERO; parameters::num_policy_features::<S>()]; moves.len()];
     let mut policy_feature_sets: Vec<_> = feature_sets
         .iter_mut()
         .map(|feature_set| parameters::PolicyFeatures::new::<S>(feature_set))
@@ -545,7 +553,7 @@ fn analyze_position<const S: usize>(position: &Position<S>) {
 
     println!("Top 10 heuristic moves:");
     for ((mv, score), features) in moves.iter().zip(feature_sets).take(10) {
-        println!("{}: {:.3}%", mv, score * 100.0);
+        println!("{}: {:.3}%", mv, score.to_f32() * 100.0);
         for feature in features {
             print!("{:.1}, ", feature);
         }
@@ -567,9 +575,13 @@ fn analyze_position<const S: usize>(position: &Position<S>) {
         if i % 100_000 == 0 {
             let params = <Position<S>>::value_params(eval_komi);
 
-            let mut features: Vec<f32> = vec![0.0; params.len()];
+            let mut features: Vec<f16> = vec![f16::ZERO; params.len()];
             position.static_eval_features(&mut features);
-            let static_eval: f32 = features.iter().zip(params).map(|(a, b)| a * b).sum::<f32>()
+            let static_eval: f32 = features
+                .iter()
+                .zip(params)
+                .map(|(a, b)| a.to_f32() * b)
+                .sum::<f32>()
                 * position.side_to_move().multiplier() as f32;
             println!(
                 "{} visits, eval: {:.2}%, Wilem-style eval: {:+.2}, static eval: {:.4}, static winning probability: {:.2}%, {:.2}s",
@@ -795,6 +807,7 @@ fn mem_usage<const S: usize>() {
     println!("Tak move: {} bytes", mem::size_of::<Move<S>>());
     println!("MCTS edge {}s: {} bytes", S, search::edge_mem_usage::<S>());
     println!("MCTS node {}s: {} bytes", S, search::node_mem_usage::<S>());
+    println!("f16: {} bytes", mem::size_of::<f16>());
     println!(
         "Zobrist keys 5s: {} bytes",
         mem::size_of::<position::ZobristKeys<5>>()

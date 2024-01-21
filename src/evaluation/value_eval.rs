@@ -1,5 +1,7 @@
 use arrayvec::ArrayVec;
 use board_game_traits::{Color, Position as EvalPosition};
+use half::f16;
+use rand_distr::num_traits::FromPrimitive;
 
 use crate::evaluation::parameters::ValueFeatures;
 use crate::position::bitboard::BitBoard;
@@ -17,12 +19,12 @@ pub fn static_eval_game_phase<const S: usize>(
 ) {
     let all_pieces = group_data.all_pieces();
     if all_pieces.count() == 0 {
-        white_value_features.first_ply[0] = 1.0;
+        white_value_features.first_ply[0] = f16::ONE;
         return;
     } else if all_pieces.count() == 1 {
         for square in squares_iterator::<S>() {
             if position[square].top_stone().is_some() {
-                white_value_features.second_ply[lookup_square_symmetries::<S>(square)] += 1.0;
+                white_value_features.second_ply[lookup_square_symmetries::<S>(square)] += f16::ONE;
                 return;
             }
         }
@@ -37,25 +39,31 @@ pub fn static_eval_game_phase<const S: usize>(
         if let Some(piece) = position[square].top_stone() {
             match piece {
                 WhiteFlat => {
-                    white_value_features.flat_psqt[lookup_square_symmetries::<S>(square)] += 1.0;
+                    white_value_features.flat_psqt[lookup_square_symmetries::<S>(square)] +=
+                        f16::ONE;
                     white_flat_count += 1;
                 }
                 BlackFlat => {
-                    black_value_features.flat_psqt[lookup_square_symmetries::<S>(square)] += 1.0;
+                    black_value_features.flat_psqt[lookup_square_symmetries::<S>(square)] +=
+                        f16::ONE;
                     black_flat_count += 1;
                 }
                 WhiteWall => {
-                    white_value_features.wall_psqt[lookup_square_symmetries::<S>(square)] += 1.0
+                    white_value_features.wall_psqt[lookup_square_symmetries::<S>(square)] +=
+                        f16::ONE
                 }
                 BlackWall => {
-                    black_value_features.wall_psqt[lookup_square_symmetries::<S>(square)] += 1.0
+                    black_value_features.wall_psqt[lookup_square_symmetries::<S>(square)] +=
+                        f16::ONE
                 }
                 WhiteCap => {
-                    white_value_features.cap_psqt[lookup_square_symmetries::<S>(square)] += 1.0;
+                    white_value_features.cap_psqt[lookup_square_symmetries::<S>(square)] +=
+                        f16::ONE;
                     cap_activity::<WhiteTr, BlackTr, S>(position, square, white_value_features);
                 }
                 BlackCap => {
-                    black_value_features.cap_psqt[lookup_square_symmetries::<S>(square)] += 1.0;
+                    black_value_features.cap_psqt[lookup_square_symmetries::<S>(square)] +=
+                        f16::ONE;
                     cap_activity::<BlackTr, WhiteTr, S>(position, square, black_value_features);
                 }
             }
@@ -83,46 +91,50 @@ pub fn static_eval_game_phase<const S: usize>(
                     // and whether the stack piece is below the carry limit in the stack
                     match (is_support, depth > S + 1, controlling_player) {
                         (true, true, Color::White) => {
-                            white_value_features.deep_supports_per_piece[top_role_index] += 1.0
+                            white_value_features.deep_supports_per_piece[top_role_index] += f16::ONE
                         }
                         (true, true, Color::Black) => {
-                            black_value_features.deep_supports_per_piece[top_role_index] += 1.0
+                            black_value_features.deep_supports_per_piece[top_role_index] += f16::ONE
                         }
                         (true, false, Color::White) => {
-                            white_value_features.shallow_supports_per_piece[top_role_index] += 1.0
+                            white_value_features.shallow_supports_per_piece[top_role_index] +=
+                                f16::ONE
                         }
                         (true, false, Color::Black) => {
-                            black_value_features.shallow_supports_per_piece[top_role_index] += 1.0
+                            black_value_features.shallow_supports_per_piece[top_role_index] +=
+                                f16::ONE
                         }
                         (false, true, Color::White) => {
-                            white_value_features.deep_captives_per_piece[top_role_index] += 1.0
+                            white_value_features.deep_captives_per_piece[top_role_index] += f16::ONE
                         }
                         (false, true, Color::Black) => {
-                            black_value_features.deep_captives_per_piece[top_role_index] += 1.0
+                            black_value_features.deep_captives_per_piece[top_role_index] += f16::ONE
                         }
                         (false, false, Color::White) => {
-                            white_value_features.shallow_captives_per_piece[top_role_index] += 1.0
+                            white_value_features.shallow_captives_per_piece[top_role_index] +=
+                                f16::ONE
                         }
                         (false, false, Color::Black) => {
-                            black_value_features.shallow_captives_per_piece[top_role_index] += 1.0
+                            black_value_features.shallow_captives_per_piece[top_role_index] +=
+                                f16::ONE
                         }
                     }
                     match (is_support, controlling_player) {
                         (true, Color::White) => {
                             white_value_features.supports_psqt
-                                [lookup_square_symmetries::<S>(square)] += 1.0
+                                [lookup_square_symmetries::<S>(square)] += f16::ONE
                         }
                         (true, Color::Black) => {
                             black_value_features.supports_psqt
-                                [lookup_square_symmetries::<S>(square)] += 1.0
+                                [lookup_square_symmetries::<S>(square)] += f16::ONE
                         }
                         (false, Color::White) => {
                             white_value_features.captives_psqt
-                                [lookup_square_symmetries::<S>(square)] -= 1.0
+                                [lookup_square_symmetries::<S>(square)] -= f16::ONE
                         }
                         (false, Color::Black) => {
                             black_value_features.captives_psqt
-                                [lookup_square_symmetries::<S>(square)] -= 1.0
+                                [lookup_square_symmetries::<S>(square)] -= f16::ONE
                         }
                     }
                 }
@@ -155,18 +167,18 @@ pub fn static_eval_game_phase<const S: usize>(
         }
     }
 
-    let opening_scale_factor = f32::min(
+    let opening_scale_factor = f16::from_f32(f32::min(
         f32::max((24.0 - position.half_moves_played() as f32) / 12.0, 0.0),
         1.0,
-    );
-    let endgame_scale_factor = f32::min(
+    ));
+    let endgame_scale_factor = f16::from_f32(f32::min(
         f32::max((position.half_moves_played() as f32 - 24.0) / 24.0, 0.0),
         1.0,
-    );
-    let middlegame_scale_factor = 1.0 - opening_scale_factor - endgame_scale_factor;
+    ));
+    let middlegame_scale_factor = f16::ONE - opening_scale_factor - endgame_scale_factor;
 
-    debug_assert!(middlegame_scale_factor <= 1.0);
-    debug_assert!(opening_scale_factor == 0.0 || endgame_scale_factor == 0.0);
+    debug_assert!(middlegame_scale_factor <= f16::ONE);
+    debug_assert!(opening_scale_factor == f16::ZERO || endgame_scale_factor == f16::ZERO);
 
     if position.side_to_move() == Color::White {
         let index = (white_flatstone_lead + 3).clamp(0, 6) as usize;
@@ -200,8 +212,10 @@ pub fn static_eval_game_phase<const S: usize>(
     // }
     // white_value_features.flatstone_lead[0] = white_flatstone_lead as f32 * opening_scale_factor;
 
-    white_value_features.i_number_of_groups[0] = num_white_groups as f32 * opening_scale_factor;
-    black_value_features.i_number_of_groups[0] = num_black_groups as f32 * opening_scale_factor;
+    white_value_features.i_number_of_groups[0] =
+        f16::from_i32(num_white_groups).unwrap() * opening_scale_factor;
+    black_value_features.i_number_of_groups[0] =
+        f16::from_i32(num_black_groups).unwrap() * opening_scale_factor;
 
     // if position.side_to_move() == Color::White {
     //     white_value_features.side_to_move[1] = middlegame_scale_factor;
@@ -210,8 +224,10 @@ pub fn static_eval_game_phase<const S: usize>(
     // }
     // white_value_features.flatstone_lead[1] = white_flatstone_lead as f32 * middlegame_scale_factor;
 
-    white_value_features.i_number_of_groups[1] = num_white_groups as f32 * middlegame_scale_factor;
-    black_value_features.i_number_of_groups[1] = num_black_groups as f32 * middlegame_scale_factor;
+    white_value_features.i_number_of_groups[1] =
+        f16::from_i32(num_white_groups).unwrap() * middlegame_scale_factor;
+    black_value_features.i_number_of_groups[1] =
+        f16::from_i32(num_black_groups).unwrap() * middlegame_scale_factor;
 
     // if position.side_to_move() == Color::White {
     //     white_value_features.side_to_move[2] = endgame_scale_factor;
@@ -220,8 +236,10 @@ pub fn static_eval_game_phase<const S: usize>(
     // }
     // white_value_features.flatstone_lead[2] = white_flatstone_lead as f32 * endgame_scale_factor;
 
-    white_value_features.i_number_of_groups[2] = num_white_groups as f32 * endgame_scale_factor;
-    black_value_features.i_number_of_groups[2] = num_black_groups as f32 * endgame_scale_factor;
+    white_value_features.i_number_of_groups[2] =
+        f16::from_i32(num_white_groups).unwrap() * endgame_scale_factor;
+    black_value_features.i_number_of_groups[2] =
+        f16::from_i32(num_black_groups).unwrap() * endgame_scale_factor;
 
     for critical_square in group_data.critical_squares(Color::White) {
         critical_squares_eval::<WhiteTr, BlackTr, S>(
@@ -255,22 +273,28 @@ pub fn static_eval_game_phase<const S: usize>(
                     {
                         match (neighbour_top_stone.role(), top_stone.color()) {
                             (Flat, Color::White) => {
-                                white_value_features.flat_next_to_our_stack[0] += stack.len() as f32
+                                white_value_features.flat_next_to_our_stack[0] +=
+                                    f16::from_u8(stack.len()).unwrap()
                             }
                             (Flat, Color::Black) => {
-                                black_value_features.flat_next_to_our_stack[0] += stack.len() as f32
+                                black_value_features.flat_next_to_our_stack[0] +=
+                                    f16::from_u8(stack.len()).unwrap()
                             }
                             (Wall, Color::White) => {
-                                white_value_features.wall_next_to_our_stack[0] += stack.len() as f32
+                                white_value_features.wall_next_to_our_stack[0] +=
+                                    f16::from_u8(stack.len()).unwrap()
                             }
                             (Wall, Color::Black) => {
-                                black_value_features.wall_next_to_our_stack[0] += stack.len() as f32
+                                black_value_features.wall_next_to_our_stack[0] +=
+                                    f16::from_u8(stack.len()).unwrap()
                             }
                             (Cap, Color::White) => {
-                                white_value_features.cap_next_to_our_stack[0] += stack.len() as f32
+                                white_value_features.cap_next_to_our_stack[0] +=
+                                    f16::from_u8(stack.len()).unwrap()
                             }
                             (Cap, Color::Black) => {
-                                black_value_features.cap_next_to_our_stack[0] += stack.len() as f32
+                                black_value_features.cap_next_to_our_stack[0] +=
+                                    f16::from_u8(stack.len()).unwrap()
                             }
                         }
                     }
@@ -310,10 +334,10 @@ pub fn static_eval_game_phase<const S: usize>(
         }
     }
 
-    white_value_features.num_lines_occupied[num_ranks_occupied_white] += 1.0;
-    white_value_features.num_lines_occupied[num_files_occupied_white] += 1.0;
-    black_value_features.num_lines_occupied[num_ranks_occupied_black] += 1.0;
-    black_value_features.num_lines_occupied[num_files_occupied_black] += 1.0;
+    white_value_features.num_lines_occupied[num_ranks_occupied_white] += f16::ONE;
+    white_value_features.num_lines_occupied[num_files_occupied_white] += f16::ONE;
+    black_value_features.num_lines_occupied[num_ranks_occupied_black] += f16::ONE;
+    black_value_features.num_lines_occupied[num_files_occupied_black] += f16::ONE;
 }
 
 fn cap_activity<Us: ColorTr, Them: ColorTr, const S: usize>(
@@ -329,7 +353,7 @@ fn cap_activity<Us: ColorTr, Them: ColorTr, const S: usize>(
         lookup_square_symmetries::<S>(neighbour) > lookup_square_symmetries::<S>(square)
             && position[neighbour].top_stone().map(Piece::role) == Some(Cap)
     }) {
-        our_value_features.sidelined_cap[height_index] += 1.0
+        our_value_features.sidelined_cap[height_index] += f16::ONE
     }
 
     let is_soft_cap = stack
@@ -342,7 +366,7 @@ fn cap_activity<Us: ColorTr, Them: ColorTr, const S: usize>(
             Some(WhiteCap) | Some(BlackCap) | None
         )
     }) {
-        our_value_features.fully_isolated_cap[height_index] += 1.0
+        our_value_features.fully_isolated_cap[height_index] += f16::ONE
     } else if square.neighbors().all(|neighbour| {
         if let Some(neighbour_top_stone) = position[neighbour].top_stone() {
             if neighbour_top_stone == Them::wall_piece() {
@@ -354,7 +378,7 @@ fn cap_activity<Us: ColorTr, Them: ColorTr, const S: usize>(
             true
         }
     }) {
-        our_value_features.semi_isolated_cap[height_index] += 1.0
+        our_value_features.semi_isolated_cap[height_index] += f16::ONE
     }
 }
 
@@ -368,15 +392,15 @@ fn critical_squares_eval<Us: ColorTr, Them: ColorTr, const S: usize>(
     let top_stone = position[critical_square].top_stone;
     let top_stone_role = top_stone.map(Piece::role);
     if top_stone.is_none() {
-        our_value_features.critical_squares[0] += 1.0;
+        our_value_features.critical_squares[0] += f16::ONE;
     } else if top_stone == Some(Us::wall_piece()) {
-        our_value_features.critical_squares[1] += 1.0;
+        our_value_features.critical_squares[1] += f16::ONE;
     } else if top_stone == Some(Them::flat_piece()) {
-        our_value_features.critical_squares[2] += 1.0;
+        our_value_features.critical_squares[2] += f16::ONE;
     }
     // Their capstone or wall
     else {
-        our_value_features.critical_squares[3] += 1.0
+        our_value_features.critical_squares[3] += f16::ONE
     }
 
     let rank = critical_square.rank();
@@ -410,19 +434,20 @@ fn critical_squares_eval<Us: ColorTr, Them: ColorTr, const S: usize>(
                 distance <= num_high_supports && (top_stone_role != Some(Wall) || is_hard_cap);
             if has_pure_spread {
                 if position.side_to_move() == Us::color() {
-                    our_value_features.critical_square_cap_attack[0] += 1.0;
+                    our_value_features.critical_square_cap_attack[0] += f16::ONE;
                 } else {
-                    our_value_features.critical_square_cap_attack[1] += 1.0;
+                    our_value_features.critical_square_cap_attack[1] += f16::ONE;
                 }
             } else if position.side_to_move() == Us::color() {
-                our_value_features.critical_square_cap_attack[2] += 1.0;
+                our_value_features.critical_square_cap_attack[2] += f16::ONE;
             } else {
-                our_value_features.critical_square_cap_attack[3] += 1.0;
+                our_value_features.critical_square_cap_attack[3] += f16::ONE;
             }
         }
         if distance == 1 && top_stone_role != Some(Cap) {
-            our_value_features.critical_square_cap_attack[4] += 1.0;
-            our_value_features.critical_square_cap_attack[5] += num_high_supports as f32;
+            our_value_features.critical_square_cap_attack[4] += f16::ONE;
+            our_value_features.critical_square_cap_attack[5] +=
+                f16::from_u8(num_high_supports).unwrap();
         }
     }
 }
@@ -437,10 +462,10 @@ fn line_score<Us: ColorTr, Them: ColorTr, const S: usize>(
     let index = road_pieces_in_line + line_symmetries::<S>()[i as usize] * S;
 
     if !(Them::blocking_stones(group_data) & line).is_empty() {
-        value_features.line_control_their_blocking_piece[index] += 1.0;
+        value_features.line_control_their_blocking_piece[index] += f16::ONE;
     } else if !((Us::walls(group_data) | Them::flats(group_data)) & line).is_empty() {
-        value_features.line_control_other[index] += 1.0;
+        value_features.line_control_other[index] += f16::ONE;
     } else {
-        value_features.line_control_empty[index] += 1.0;
+        value_features.line_control_empty[index] += f16::ONE;
     }
 }

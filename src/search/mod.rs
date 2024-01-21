@@ -2,6 +2,7 @@
 //!
 //! This implementation does not use full Monte Carlo rollouts, relying on a heuristic evaluation when expanding new nodes instead.
 
+use half::f16;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 use std::process;
@@ -165,7 +166,7 @@ impl<const S: usize> MonteCarloTree<S> {
             mv: Move::Place(Role::Flat, Square::default()),
             mean_action_value: 0.0,
             visits: 0,
-            heuristic_score: 0.0,
+            heuristic_score: f16::ZERO,
         };
 
         root_edge
@@ -358,7 +359,7 @@ impl<const S: usize> MonteCarloTree<S> {
         best_children.iter().take(8).for_each(|edge| {
             println!(
                 "Move {}: {} visits, {:.2}% mean action value, {:.3}% static score, {:.3} exploration value, pv {}",
-                edge.mv, edge.visits, edge.mean_action_value * 100.0, edge.heuristic_score * 100.0,
+                edge.mv, edge.visits, edge.mean_action_value * 100.0, edge.heuristic_score.to_f32() * 100.0,
                 edge.exploration_value((self.visits() as Score).sqrt(), dynamic_cpuct),
                 Pv::new(edge, &self.arena).map(|mv| mv.to_string() + " ").collect::<String>()
             )
@@ -409,7 +410,7 @@ pub fn mcts_training<const S: usize>(
     position: Position<S>,
     time_control: &TimeControl,
     settings: MctsSetting<S>,
-) -> Vec<(Move<S>, Score)> {
+) -> Vec<(Move<S>, f16)> {
     let mut tree = MonteCarloTree::with_settings(position, settings);
 
     match time_control {
@@ -430,7 +431,12 @@ pub fn mcts_training<const S: usize>(
     let child_visits: u64 = tree.children().iter().map(|edge| edge.visits).sum();
     tree.children()
         .iter()
-        .map(|edge| (edge.mv.clone(), edge.visits as f32 / child_visits as f32))
+        .map(|edge| {
+            (
+                edge.mv.clone(),
+                f16::from_f32(edge.visits as f32 / child_visits as f32),
+            )
+        })
         .collect()
 }
 

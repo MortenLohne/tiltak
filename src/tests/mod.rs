@@ -15,6 +15,7 @@ use crate::evaluation::parameters::{self, PolicyFeatures};
 use crate::position::{Komi, Move, Position};
 use crate::search;
 use board_game_traits::Position as PositionTrait;
+use half::f16;
 use pgn_traits::PgnPosition;
 
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
@@ -112,7 +113,7 @@ impl TestPosition {
             policy_moves
                 .iter()
                 .take(n)
-                .map(|(mv, score)| format!("{}, {:.1}%", mv, score * 100.0))
+                .map(|(mv, score)| format!("{}, {:.1}%", mv, score.to_f32() * 100.0))
                 .collect::<Vec<_>>(),
         );
     }
@@ -124,7 +125,8 @@ impl TestPosition {
         let mut moves = vec![];
         position.generate_moves(&mut moves);
 
-        let mut feature_sets = vec![vec![0.0; parameters::num_policy_features::<S>()]; moves.len()];
+        let mut feature_sets =
+            vec![vec![f16::ZERO; parameters::num_policy_features::<S>()]; moves.len()];
         let mut policy_feature_sets: Vec<PolicyFeatures> = feature_sets
             .iter_mut()
             .map(|feature_set| PolicyFeatures::new::<S>(feature_set))
@@ -134,7 +136,7 @@ impl TestPosition {
 
         policy_feature_sets
             .iter()
-            .any(|features| features.decline_win[0] != 0.0)
+            .any(|features| features.decline_win[0] != f16::ZERO)
     }
 }
 
@@ -183,7 +185,7 @@ fn do_moves_and_check_validity<const S: usize>(position: &mut Position<S>, move_
 fn moves_sorted_by_policy<const S: usize>(
     position: &Position<S>,
     eval_komi: Komi,
-) -> Vec<(Move<S>, f32)> {
+) -> Vec<(Move<S>, f16)> {
     let mut simple_moves = vec![];
     let mut legal_moves = vec![];
     let group_data = position.group_data();
