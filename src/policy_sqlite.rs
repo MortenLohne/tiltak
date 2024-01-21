@@ -164,7 +164,7 @@ pub fn check_all_games() {
             "{}, {} komi, {}",
             wrongg.0.position.to_fen(),
             wrongg.0.position.komi(),
-            wrongg.1.to_string()
+            wrongg.1
         );
     }
     println!(

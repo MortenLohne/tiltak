@@ -188,9 +188,9 @@ pub fn train_perpetually<const S: usize, const N: usize, const M: usize>(
                 .map(|PtnMove { mv, .. }| mv)
                 .zip(move_scores)
             {
-                write!(writer, "{}: ", mv.to_string())?;
+                write!(writer, "{}: ", mv)?;
                 for (mv, score) in move_scores {
-                    write!(writer, "{} {}, ", mv.to_string(), score)?;
+                    write!(writer, "{} {}, ", mv, score)?;
                 }
                 writeln!(writer)?;
             }
@@ -605,11 +605,11 @@ pub fn games_and_move_scoress_from_file<const S: usize>(
                     .iter()
                     .any(|(scored_move, _score)| *mv == *scored_move),
                 "Played move {} in game {} not among move scores {:?}\nGame: {:?}\nBoard:\n{:?}",
-                mv.to_string(),
+                mv,
                 i,
                 move_score
                     .iter()
-                    .map(|(mv, score)| format!("{}: {:.2}%", mv.to_string(), score * 100.0))
+                    .map(|(mv, score)| format!("{}: {:.2}%", mv, score * 100.0))
                     .collect::<Vec<_>>(),
                 game.moves
                     .iter()

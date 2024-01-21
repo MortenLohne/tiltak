@@ -1,4 +1,4 @@
-use std::fmt::Write;
+use std::fmt;
 use std::mem;
 
 #[cfg(feature = "serde")]
@@ -167,12 +167,12 @@ impl<const S: usize> Square<S> {
             Ok(Square::from_rank_file(rank, file))
         }
     }
+}
 
-    pub fn to_string(self) -> String {
-        let mut string = String::new();
-        write!(string, "{}", (self.file() + b'a') as char).unwrap();
-        write!(string, "{}", S as u8 - self.rank()).unwrap();
-        string
+impl<const S: usize> fmt::Display for Square<S> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", (self.file() + b'a') as char)?;
+        write!(f, "{}", S as u8 - self.rank())
     }
 }
 

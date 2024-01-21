@@ -1,4 +1,4 @@
-use std::fmt::Write;
+use std::fmt::{self, Write};
 use std::iter;
 use std::str::FromStr;
 
@@ -27,41 +27,6 @@ impl<const S: usize> Move<S> {
             Move::Place(_, square) => *square,
             Move::Move(square, _, _) => *square,
         }
-    }
-
-    pub fn to_string(&self) -> String {
-        let mut string = String::new();
-        match self {
-            Move::Place(role, square) => match role {
-                Cap => write!(string, "C{}", square.to_string()).unwrap(),
-                Flat => write!(string, "{}", square.to_string()).unwrap(),
-                Wall => write!(string, "S{}", square.to_string()).unwrap(),
-            },
-            Move::Move(square, direction, stack_movements) => {
-                let mut pieces_held = stack_movements.get_first().pieces_to_take;
-                if pieces_held == 1 {
-                    write!(string, "{}", square.to_string()).unwrap();
-                } else {
-                    write!(string, "{}{}", pieces_held, square.to_string()).unwrap();
-                }
-                match direction {
-                    North => string.push('+'),
-                    West => string.push('<'),
-                    East => string.push('>'),
-                    South => string.push('-'),
-                }
-                // Omit number of pieces dropped, if all stones are dropped immediately
-                if stack_movements.len() > 1 {
-                    for movement in stack_movements.into_iter().skip(1) {
-                        let pieces_to_drop = pieces_held - movement.pieces_to_take;
-                        write!(string, "{}", pieces_to_drop).unwrap();
-                        pieces_held -= pieces_to_drop;
-                    }
-                    write!(string, "{}", pieces_held).unwrap();
-                }
-            }
-        }
-        string
     }
 
     pub fn from_string(input: &str) -> Result<Self, pgn_traits::Error> {
@@ -248,6 +213,43 @@ impl<const S: usize> Move<S> {
             Move::Move(start_square, direction, pieces_taken)
         } else {
             unreachable!()
+        }
+    }
+}
+
+impl<const S: usize> fmt::Display for Move<S> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Move::Place(role, square) => match role {
+                Cap => write!(f, "C{}", square),
+                Flat => write!(f, "{}", square),
+                Wall => write!(f, "S{}", square),
+            },
+            Move::Move(square, direction, stack_movements) => {
+                let mut pieces_held = stack_movements.get_first().pieces_to_take;
+                if pieces_held == 1 {
+                    write!(f, "{}", square).unwrap();
+                } else {
+                    write!(f, "{}{}", pieces_held, square).unwrap();
+                }
+                match direction {
+                    North => f.write_char('+')?,
+                    West => f.write_char('<')?,
+                    East => f.write_char('>')?,
+                    South => f.write_char('-')?,
+                }
+                // Omit number of pieces dropped, if all stones are dropped immediately
+                if stack_movements.len() > 1 {
+                    for movement in stack_movements.into_iter().skip(1) {
+                        let pieces_to_drop = pieces_held - movement.pieces_to_take;
+                        write!(f, "{}", pieces_to_drop)?;
+                        pieces_held -= pieces_to_drop;
+                    }
+                    write!(f, "{}", pieces_held)
+                } else {
+                    Ok(())
+                }
+            }
         }
     }
 }

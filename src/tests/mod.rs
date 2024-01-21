@@ -112,7 +112,7 @@ impl TestPosition {
             policy_moves
                 .iter()
                 .take(n)
-                .map(|(mv, score)| format!("{}, {:.1}%", mv.to_string(), score * 100.0))
+                .map(|(mv, score)| format!("{}, {:.1}%", mv, score * 100.0))
                 .collect::<Vec<_>>(),
         );
     }
@@ -151,7 +151,7 @@ fn check_candidate_moves<const S: usize>(
             assert!(
                 legal_moves.contains(&mv),
                 "Candidate move {} was not among legal moves {:?} in position\n{:?}",
-                mv.to_string(),
+                mv,
                 legal_moves
                     .iter()
                     .map(|mv| mv.to_string())

@@ -545,7 +545,7 @@ fn analyze_position<const S: usize>(position: &Position<S>) {
 
     println!("Top 10 heuristic moves:");
     for ((mv, score), features) in moves.iter().zip(feature_sets).take(10) {
-        println!("{}: {:.3}%", mv.to_string(), score * 100.0);
+        println!("{}: {:.3}%", mv, score * 100.0);
         for feature in features {
             print!("{:.1}, ", feature);
         }
@@ -582,7 +582,7 @@ fn analyze_position<const S: usize>(position: &Position<S>) {
             );
             tree.print_info();
             let (mv, value) = tree.best_move();
-            println!("Best move: ({}, {})", mv.to_string(), value);
+            println!("Best move: ({}, {})", mv, value);
         }
     }
 }
@@ -625,10 +625,10 @@ fn analyze_game<const S: usize>(game: Game<Position<S>>) {
                 GameResult::Draw => "1/2-1/2",
             };
             if ply_number % 2 == 0 {
-                print!("{}. {} {}", ply_number / 2, mv.to_string(), result_string);
+                print!("{}. {} {}", ply_number / 2, mv, result_string);
                 io::stdout().flush().unwrap();
             } else {
-                println!("{}... {} {}", ply_number / 2, mv.to_string(), result_string);
+                println!("{}... {} {}", ply_number / 2, mv, result_string);
             }
         } else {
             let (best_move, score) = search::mcts(position.clone(), 1_000_000);
@@ -638,7 +638,7 @@ fn analyze_game<const S: usize>(game: Game<Position<S>>) {
                     ply_number / 2,
                     position.move_to_san(&mv),
                     (1.0 - score) * 100.0,
-                    best_move.to_string()
+                    best_move
                 );
                 io::stdout().flush().unwrap();
             } else {
@@ -647,7 +647,7 @@ fn analyze_game<const S: usize>(game: Game<Position<S>>) {
                     ply_number / 2,
                     position.move_to_san(&mv),
                     (1.0 - score) * 100.0,
-                    best_move.to_string()
+                    best_move
                 );
             }
         }
@@ -734,7 +734,7 @@ fn bench() {
 
     println!(
         "{}: {:.2}%, {:.2}s",
-        mv.to_string(),
+        mv,
         score * 100.0,
         start_time.elapsed().as_secs_f32()
     );

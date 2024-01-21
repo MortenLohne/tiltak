@@ -105,11 +105,9 @@ fn play_random_games_prop<const S: usize>(num_games: usize) {
                         let game_result = position.game_result();
                         position.reverse_move(reverse_move);
                         assert_eq!(
-                            position,
-                            old_position,
+                            position, old_position,
                             "Failed to restore board after {}\n{:?}",
-                            mv.to_string(),
-                            temp_position
+                            mv, temp_position
                         );
                         game_result == Some(WhiteWin) || game_result == Some(BlackWin)
                     }),
