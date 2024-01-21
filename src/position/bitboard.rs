@@ -89,15 +89,32 @@ impl BitBoard {
         debug_assert!(i < 64);
         self.board & (1 << i) != 0
     }
+
+    #[inline]
+    pub fn get_square(self, square: Square) -> bool {
+        debug_assert!(square.into_inner() < 64);
+        self.board & (1 << square.into_inner()) != 0
+    }
+
     // Sets the square to true
     #[inline]
+    #[must_use]
     pub const fn set(self, i: u8) -> Self {
         debug_assert!(i < 64);
         BitBoard::from_u64(self.board | 1 << i)
     }
 
+    // Sets the square to true
+    #[inline]
+    #[must_use]
+    pub const fn set_square(self, square: Square) -> Self {
+        debug_assert!(square.into_inner() < 64);
+        BitBoard::from_u64(self.board | 1 << square.into_inner())
+    }
+
     // Sets the square to false
     #[inline]
+    #[must_use]
     pub fn clear(self, i: u8) -> Self {
         debug_assert!(i < 64);
         BitBoard::from_u64(self.board & !(1 << i))
@@ -143,16 +160,16 @@ impl BitBoard {
     pub const fn neighbors<const S: usize>(square: Square) -> BitBoard {
         let mut board = BitBoard::empty();
         if let Some(north) = square.go_direction::<S>(Direction::North) {
-            board = board.set(north.0);
+            board = board.set_square(north);
         }
         if let Some(west) = square.go_direction::<S>(Direction::West) {
-            board = board.set(west.0);
+            board = board.set_square(west);
         }
         if let Some(east) = square.go_direction::<S>(Direction::East) {
-            board = board.set(east.0);
+            board = board.set_square(east);
         }
         if let Some(south) = square.go_direction::<S>(Direction::South) {
-            board = board.set(south.0);
+            board = board.set_square(south);
         }
         board
     }
@@ -162,7 +179,7 @@ impl BitBoard {
         if self.is_empty() {
             None
         } else {
-            Some(Square(self.board.trailing_zeros() as u8))
+            Some(Square::from_u8(self.board.trailing_zeros() as u8))
         }
     }
 }
@@ -195,7 +212,7 @@ impl Iterator for BitBoardIter {
         } else {
             let i = self.board.board.trailing_zeros() as u8;
             self.board = self.board.clear(i);
-            Some(Square(i))
+            Some(Square::from_u8(i))
         }
     }
 }

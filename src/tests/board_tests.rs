@@ -24,39 +24,44 @@ fn default_board_test() {
 
 #[test]
 fn get_set_test() {
-    let pieces = vec![WhiteFlat, BlackFlat, BlackFlat, WhiteWall];
+    let pieces = [WhiteFlat, BlackFlat, BlackFlat, WhiteWall];
     let mut position = <Position<5>>::default();
     for &piece in pieces.iter() {
-        position[Square(12)].push(piece);
+        position[Square::from_u8(12)].push(piece);
     }
-    assert_eq!(position[Square(12)].len(), 4);
-    assert_eq!(position[Square(12)].top_stone(), Some(WhiteWall));
+    assert_eq!(position[Square::from_u8(12)].len(), 4);
+    assert_eq!(position[Square::from_u8(12)].top_stone(), Some(WhiteWall));
 
     for (i, &piece) in pieces.iter().enumerate() {
         assert_eq!(
             Some(piece),
-            position[Square(12)].get(i as u8),
+            position[Square::from_u8(12)].get(i as u8),
             "{:?}",
-            position[Square(12)]
+            position[Square::from_u8(12)]
         );
     }
 
     for &piece in pieces.iter().rev() {
-        assert_eq!(Some(piece), position[Square(12)].pop(), "{:?}", position);
+        assert_eq!(
+            Some(piece),
+            position[Square::from_u8(12)].pop(),
+            "{:?}",
+            position
+        );
     }
 
-    assert!(position[Square(12)].is_empty());
+    assert!(position[Square::from_u8(12)].is_empty());
 
     for &piece in pieces.iter() {
-        position[Square(12)].push(piece);
+        position[Square::from_u8(12)].push(piece);
     }
 
     for &piece in pieces.iter() {
         assert_eq!(
             piece,
-            position[Square(12)].remove(0),
+            position[Square::from_u8(12)].remove(0),
             "{:?}",
-            position[Square(12)]
+            position[Square::from_u8(12)]
         );
     }
 }
@@ -161,21 +166,21 @@ fn black_can_win_with_road_test() {
 fn game_win_test() {
     let mut position = <Position<5>>::default();
     for mv in [
-        Move::Place(Role::Flat, Square(13)),
-        Move::Place(Role::Flat, Square(12)),
-        Move::Place(Role::Flat, Square(7)),
-        Move::Place(Role::Flat, Square(14)),
-        Move::Place(Role::Flat, Square(2)),
-        Move::Place(Role::Flat, Square(11)),
-        Move::Place(Role::Flat, Square(17)),
-        Move::Place(Role::Flat, Square(10)),
+        Move::Place(Role::Flat, Square::from_u8(13)),
+        Move::Place(Role::Flat, Square::from_u8(12)),
+        Move::Place(Role::Flat, Square::from_u8(7)),
+        Move::Place(Role::Flat, Square::from_u8(14)),
+        Move::Place(Role::Flat, Square::from_u8(2)),
+        Move::Place(Role::Flat, Square::from_u8(11)),
+        Move::Place(Role::Flat, Square::from_u8(17)),
+        Move::Place(Role::Flat, Square::from_u8(10)),
     ]
     .iter()
     {
         position.do_move(mv.clone());
         assert!(position.game_result().is_none());
     }
-    position.do_move(Move::Place(Role::Flat, Square(22)));
+    position.do_move(Move::Place(Role::Flat, Square::from_u8(22)));
     assert_eq!(position.game_result(), Some(GameResult::WhiteWin));
 }
 
@@ -183,21 +188,21 @@ fn game_win_test() {
 fn game_win_test2() {
     let mut position = <Position<5>>::default();
     for mv in [
-        Move::Place(Role::Flat, Square(7)),
-        Move::Place(Role::Flat, Square(12)),
-        Move::Place(Role::Flat, Square(14)),
-        Move::Place(Role::Flat, Square(2)),
-        Move::Place(Role::Flat, Square(13)),
-        Move::Place(Role::Flat, Square(17)),
-        Move::Place(Role::Flat, Square(11)),
-        Move::Place(Role::Flat, Square(22)),
+        Move::Place(Role::Flat, Square::from_u8(7)),
+        Move::Place(Role::Flat, Square::from_u8(12)),
+        Move::Place(Role::Flat, Square::from_u8(14)),
+        Move::Place(Role::Flat, Square::from_u8(2)),
+        Move::Place(Role::Flat, Square::from_u8(13)),
+        Move::Place(Role::Flat, Square::from_u8(17)),
+        Move::Place(Role::Flat, Square::from_u8(11)),
+        Move::Place(Role::Flat, Square::from_u8(22)),
     ]
     .iter()
     {
         position.do_move(mv.clone());
         assert!(position.game_result().is_none());
     }
-    position.do_move(Move::Place(Role::Flat, Square(10)));
+    position.do_move(Move::Place(Role::Flat, Square::from_u8(10)));
     assert_eq!(position.game_result(), Some(GameResult::WhiteWin));
 }
 

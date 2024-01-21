@@ -98,7 +98,7 @@ impl ColorTr for WhiteTr {
     }
 
     fn is_critical_square<const S: usize>(group_data: &GroupData<S>, square: Square) -> bool {
-        group_data.white_critical_squares.get(square.0)
+        group_data.white_critical_squares.get_square(square)
     }
 
     fn critical_squares<const S: usize>(group_data: &GroupData<S>) -> BitBoard {
@@ -162,7 +162,7 @@ impl ColorTr for BlackTr {
     }
 
     fn is_critical_square<const S: usize>(group_data: &GroupData<S>, square: Square) -> bool {
-        group_data.black_critical_squares.get(square.0)
+        group_data.black_critical_squares.get_square(square)
     }
 
     fn critical_squares<const S: usize>(group_data: &GroupData<S>) -> BitBoard {

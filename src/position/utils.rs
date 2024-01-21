@@ -17,9 +17,26 @@ use crate::position::Role::{Cap, Flat, Wall};
 /// A location on the board. Can be used to index a `Board`.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-pub struct Square(pub u8);
+pub struct Square(u8);
 
 impl Square {
+    pub const fn from_u8(i: u8) -> Self {
+        Square(i)
+    }
+
+    pub const fn into_inner(self) -> u8 {
+        self.0
+    }
+
+    pub const fn corners<const S: usize>() -> [Self; 4] {
+        [
+            Self::from_u8(0),
+            Self::from_u8(S as u8 - 1),
+            Self::from_u8((S * (S - 1)) as u8),
+            Self::from_u8((S * S - 1) as u8),
+        ]
+    }
+
     pub const fn from_rank_file<const S: usize>(rank: u8, file: u8) -> Self {
         debug_assert!(rank < S as u8 && file < S as u8);
         Square(file * S as u8 + rank)

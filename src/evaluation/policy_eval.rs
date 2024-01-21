@@ -410,7 +410,7 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usize>(
                 if Us::is_critical_square(group_data, *square) {
                     policy_features.place_our_critical_square[0] += 1.0;
                 } else if !their_open_critical_squares.is_empty() {
-                    if their_open_critical_squares == BitBoard::empty().set(square.0) {
+                    if their_open_critical_squares == BitBoard::empty().set_square(*square) {
                         policy_features.place_their_critical_square[0] += 1.0;
                     } else {
                         policy_features.ignore_their_critical_square[0] += 1.0;
@@ -463,7 +463,7 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usize>(
 
             if *role == Wall {
                 if !their_open_critical_squares.is_empty() {
-                    if their_open_critical_squares == BitBoard::empty().set(square.0) {
+                    if their_open_critical_squares == BitBoard::empty().set_square(*square) {
                         policy_features.place_their_critical_square[1] += 1.0;
                     } else {
                         policy_features.ignore_their_critical_square[0] += 1.0;
@@ -473,7 +473,7 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usize>(
                 if Us::is_critical_square(group_data, *square) {
                     policy_features.place_our_critical_square[0] += 1.0;
                 } else if !their_open_critical_squares.is_empty() {
-                    if their_open_critical_squares == BitBoard::empty().set(square.0) {
+                    if their_open_critical_squares == BitBoard::empty().set_square(*square) {
                         policy_features.place_their_critical_square[2] += 1.0;
                     } else {
                         policy_features.ignore_their_critical_square[0] += 1.0;

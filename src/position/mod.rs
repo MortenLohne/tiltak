@@ -635,7 +635,7 @@ impl<const S: usize> Position<S> {
         while let Some(neighbor_square) = our_neighbors.occupied_square() {
             sum_of_connections = sum_of_connections
                 | group_data.amount_in_group[group_data.groups[neighbor_square] as usize].1;
-            our_neighbors = our_neighbors.clear(neighbor_square.0);
+            our_neighbors = our_neighbors.clear(neighbor_square.into_inner());
         }
 
         sum_of_connections.is_winning()
@@ -731,15 +731,19 @@ impl<const S: usize> Position<S> {
         for square in utils::squares_iterator::<S>() {
             match self[square].top_stone() {
                 Some(WhiteFlat) => {
-                    group_data.white_flat_stones = group_data.white_flat_stones.set(square.0)
+                    group_data.white_flat_stones = group_data.white_flat_stones.set_square(square)
                 }
                 Some(BlackFlat) => {
-                    group_data.black_flat_stones = group_data.black_flat_stones.set(square.0)
+                    group_data.black_flat_stones = group_data.black_flat_stones.set_square(square)
                 }
-                Some(WhiteWall) => group_data.white_walls = group_data.white_walls.set(square.0),
-                Some(BlackWall) => group_data.black_walls = group_data.black_walls.set(square.0),
-                Some(WhiteCap) => group_data.white_caps = group_data.white_caps.set(square.0),
-                Some(BlackCap) => group_data.black_caps = group_data.black_caps.set(square.0),
+                Some(WhiteWall) => {
+                    group_data.white_walls = group_data.white_walls.set_square(square)
+                }
+                Some(BlackWall) => {
+                    group_data.black_walls = group_data.black_walls.set_square(square)
+                }
+                Some(WhiteCap) => group_data.white_caps = group_data.white_caps.set_square(square),
+                Some(BlackCap) => group_data.black_caps = group_data.black_caps.set_square(square),
                 None => (),
             }
         }
@@ -769,10 +773,12 @@ impl<const S: usize> Position<S> {
 
         for square in utils::squares_iterator::<S>() {
             if self.is_critical_square_from_scratch(&group_data, square, Color::White) {
-                group_data.white_critical_squares = group_data.white_critical_squares.set(square.0);
+                group_data.white_critical_squares =
+                    group_data.white_critical_squares.set_square(square);
             }
             if self.is_critical_square_from_scratch(&group_data, square, Color::Black) {
-                group_data.black_critical_squares = group_data.black_critical_squares.set(square.0);
+                group_data.black_critical_squares =
+                    group_data.black_critical_squares.set_square(square);
             }
         }
         group_data
@@ -1702,7 +1708,7 @@ pub(crate) fn connected_components_graph<const S: usize>(
     id: &mut u8,
 ) {
     for square in utils::squares_iterator::<S>() {
-        if components[square] == 0 && road_pieces.get(square.0) {
+        if components[square] == 0 && road_pieces.get_square(square) {
             connect_component(road_pieces, components, square, *id);
             *id += 1;
         }
@@ -1717,7 +1723,7 @@ fn connect_component<const S: usize>(
 ) {
     components[square] = id;
     for neighbour in square.neighbours::<S>() {
-        if road_pieces.get(neighbour.0) && components[neighbour] == 0 {
+        if road_pieces.get_square(neighbour) && components[neighbour] == 0 {
             connect_component(road_pieces, components, neighbour, id);
         }
     }

@@ -800,13 +800,9 @@ impl PlaytakSession {
                     // On the very first move, always place instantly in a random corner
                     if squares_iterator::<S>().all(|square| position[square].is_empty()) {
                         let mut rng = rand::thread_rng();
-                        let moves = vec![
-                            Move::Place(Role::Flat, Square(0)),
-                            Move::Place(Role::Flat, Square(S as u8 - 1)),
-                            Move::Place(Role::Flat, Square((S * (S - 1)) as u8)),
-                            Move::Place(Role::Flat, Square((S * S - 1) as u8)),
-                        ];
-                        (moves.choose(&mut rng).unwrap().clone(), 0.0)
+                        let corner_placements: Vec<Move> = Square::corners::<S>().into_iter().map(|square| Move::Place(Role::Flat, square)).collect();
+
+                        (corner_placements.choose(&mut rng).unwrap().clone(), 0.0)
                     } else if let Some(fixed_nodes) = playtak_settings.fixed_nodes {
                         let settings =
                             playtak_settings.to_mcts_setting()
