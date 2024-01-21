@@ -14,8 +14,7 @@ use crate::position::utils::Direction::*;
 use crate::position::Piece::{BlackCap, BlackFlat, BlackWall, WhiteCap, WhiteFlat, WhiteWall};
 use crate::position::Role::{Cap, Flat, Wall};
 
-use super::square::ConstNeighborArray;
-use super::Square;
+use super::{Square, SquareCacheEntry};
 
 #[derive(Clone, Copy, Debug, Default, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Komi {
@@ -310,10 +309,10 @@ impl IntoIterator for Stack {
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum Direction {
-    North,
-    West,
-    East,
-    South,
+    North = 0,
+    West = 1,
+    East = 2,
+    South = 3,
 }
 
 impl Direction {
@@ -436,7 +435,7 @@ pub struct Movement {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub(crate) struct AbstractBoard<T, const S: usize> {
+pub struct AbstractBoard<T, const S: usize> {
     pub(crate) raw: [[T; S]; S],
 }
 
@@ -494,14 +493,14 @@ pub(crate) fn lookup_neighbor_table<const S: usize>(square: Square<S>) -> BitBoa
 }
 
 pub(crate) const fn generate_neighbor_array_table<const S: usize>(
-) -> AbstractBoard<ConstNeighborArray<S>, S> {
-    let mut table = AbstractBoard::new_with_value(ConstNeighborArray::empty());
+) -> AbstractBoard<SquareCacheEntry<S>, S> {
+    let mut table = AbstractBoard::new_with_value(SquareCacheEntry::empty());
     let mut rank = 0;
     while rank < S {
         let mut file = 0;
         while file < S {
             let square = Square::from_rank_file(rank as u8, file as u8);
-            table.raw[file][rank] = square.neighbors_array();
+            table.raw[file][rank] = square.cache_data();
             file += 1;
         }
         rank += 1;
@@ -509,22 +508,22 @@ pub(crate) const fn generate_neighbor_array_table<const S: usize>(
     table
 }
 
-const NEIGHBOR_ARRAY_TABLE_3S: AbstractBoard<ConstNeighborArray<3>, 3> =
+const NEIGHBOR_ARRAY_TABLE_3S: AbstractBoard<SquareCacheEntry<3>, 3> =
     generate_neighbor_array_table::<3>();
-const NEIGHBOR_ARRAY_TABLE_4S: AbstractBoard<ConstNeighborArray<4>, 4> =
+const NEIGHBOR_ARRAY_TABLE_4S: AbstractBoard<SquareCacheEntry<4>, 4> =
     generate_neighbor_array_table::<4>();
-const NEIGHBOR_ARRAY_TABLE_5S: AbstractBoard<ConstNeighborArray<5>, 5> =
+const NEIGHBOR_ARRAY_TABLE_5S: AbstractBoard<SquareCacheEntry<5>, 5> =
     generate_neighbor_array_table::<5>();
-const NEIGHBOR_ARRAY_TABLE_6S: AbstractBoard<ConstNeighborArray<6>, 6> =
+const NEIGHBOR_ARRAY_TABLE_6S: AbstractBoard<SquareCacheEntry<6>, 6> =
     generate_neighbor_array_table::<6>();
-const NEIGHBOR_ARRAY_TABLE_7S: AbstractBoard<ConstNeighborArray<7>, 7> =
+const NEIGHBOR_ARRAY_TABLE_7S: AbstractBoard<SquareCacheEntry<7>, 7> =
     generate_neighbor_array_table::<7>();
-const NEIGHBOR_ARRAY_TABLE_8S: AbstractBoard<ConstNeighborArray<8>, 8> =
+const NEIGHBOR_ARRAY_TABLE_8S: AbstractBoard<SquareCacheEntry<8>, 8> =
     generate_neighbor_array_table::<8>();
 
 pub(crate) fn lookup_neighbor_array_table<const S: usize>(
     square: Square<S>,
-) -> ConstNeighborArray<S> {
+) -> SquareCacheEntry<S> {
     match S {
         3 => NEIGHBOR_ARRAY_TABLE_3S[square.downcast_size()].downcast_size(),
         4 => NEIGHBOR_ARRAY_TABLE_4S[square.downcast_size()].downcast_size(),
@@ -538,7 +537,23 @@ pub(crate) fn lookup_neighbor_array_table<const S: usize>(
 
 impl<const S: usize> Square<S> {
     pub fn neighbors(self) -> impl Iterator<Item = Square<S>> {
+        lookup_neighbor_array_table::<S>(self)
+            .into_iter()
+            .map(|(_, neighbor)| neighbor)
+    }
+
+    pub fn directions(self) -> impl Iterator<Item = Direction> {
+        lookup_neighbor_array_table::<S>(self)
+            .into_iter()
+            .map(|(direction, _)| direction)
+    }
+
+    pub fn direction_neighbors(self) -> impl Iterator<Item = (Direction, Square<S>)> {
         lookup_neighbor_array_table::<S>(self).into_iter()
+    }
+
+    pub fn go_direction(self, direction: Direction) -> Option<Square<S>> {
+        lookup_neighbor_array_table::<S>(self).go_direction(self, direction)
     }
 }
 

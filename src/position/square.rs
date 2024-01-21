@@ -59,49 +59,42 @@ impl<const S: usize> Square<S> {
         }
     }
 
-    pub const fn neighbors_array(self) -> ConstNeighborArray<S> {
-        let mut neighbors = ConstNeighborArray::empty();
+    pub const fn cache_data(self) -> SquareCacheEntry<S> {
+        let mut neighbors = SquareCacheEntry {
+            neighbor_squares: [Square::from_u8(0); 4],
+            directions: [None; 4],
+            go_direction: [self; 4],
+        };
 
-        if let Some(north) = self.go_direction(North) {
-            neighbors = neighbors.push(north);
+        let mut i = 0;
+        if let Some(neighbor) = self.go_direction_const(North) {
+            neighbors.neighbor_squares[i] = neighbor;
+            neighbors.directions[i] = Some(North);
+            neighbors.go_direction[North as u8 as usize] = neighbor;
+            i += 1;
         }
-        if let Some(west) = self.go_direction(West) {
-            neighbors = neighbors.push(west);
+        if let Some(neighbor) = self.go_direction_const(West) {
+            neighbors.neighbor_squares[i] = neighbor;
+            neighbors.directions[i] = Some(West);
+            neighbors.go_direction[West as u8 as usize] = neighbor;
+            i += 1;
         }
-        if let Some(east) = self.go_direction(East) {
-            neighbors = neighbors.push(east);
+        if let Some(neighbor) = self.go_direction_const(East) {
+            neighbors.neighbor_squares[i] = neighbor;
+            neighbors.directions[i] = Some(East);
+            neighbors.go_direction[East as u8 as usize] = neighbor;
+            i += 1;
         }
-        if let Some(south) = self.go_direction(South) {
-            neighbors = neighbors.push(south);
+        if let Some(neighbor) = self.go_direction_const(South) {
+            neighbors.neighbor_squares[i] = neighbor;
+            neighbors.directions[i] = Some(South);
+            neighbors.go_direction[South as u8 as usize] = neighbor;
         }
 
         neighbors
     }
 
-    pub fn directions(self) -> impl Iterator<Item = Direction> {
-        (if self.rank() == 0 && self.file() == 0 {
-            [East, South].iter()
-        } else if self.rank() == 0 && self.file() == S as u8 - 1 {
-            [West, South].iter()
-        } else if self.rank() == S as u8 - 1 && self.file() == 0 {
-            [East, North].iter()
-        } else if self.rank() == S as u8 - 1 && self.file() == S as u8 - 1 {
-            [West, North].iter()
-        } else if self.rank() == 0 {
-            [West, East, South].iter()
-        } else if self.rank() == S as u8 - 1 {
-            [North, West, East].iter()
-        } else if self.file() == 0 {
-            [North, East, South].iter()
-        } else if self.file() == S as u8 - 1 {
-            [North, West, South].iter()
-        } else {
-            [North, West, East, South].iter()
-        })
-        .cloned()
-    }
-
-    pub const fn go_direction(self, direction: Direction) -> Option<Self> {
+    pub const fn go_direction_const(self, direction: Direction) -> Option<Self> {
         self.jump_direction(direction, 1)
     }
 
@@ -177,27 +170,36 @@ pub fn squares_iterator<const S: usize>() -> impl Iterator<Item = Square<S>> {
 }
 
 #[derive(Clone, Copy, Debug)]
-pub struct ConstNeighborArray<const S: usize> {
-    len: u8,
-    array: [Square<S>; 4],
+#[repr(align(4))]
+pub struct SquareCacheEntry<const S: usize> {
+    neighbor_squares: [Square<S>; 4],
+    directions: [Option<Direction>; 4], // Safety: The first two elements are never `None`
+    go_direction: [Square<S>; 4],
 }
 
-impl<const S: usize> ConstNeighborArray<S> {
+impl<const S: usize> SquareCacheEntry<S> {
     pub const fn empty() -> Self {
-        Self {
-            len: 0,
-            array: [Square::from_u8(0); 4],
+        SquareCacheEntry {
+            neighbor_squares: [Square::from_u8(0); 4],
+            directions: [Some(North), Some(North), None, None],
+            go_direction: [Square::from_u8(0); 4],
         }
     }
 
-    #[must_use]
-    pub const fn push(mut self, square: Square<S>) -> Self {
-        self.array[self.len as usize] = square;
-        self.len += 1;
-        self
+    pub fn go_direction(
+        &self,
+        origin_square: Square<S>,
+        direction: Direction,
+    ) -> Option<Square<S>> {
+        let square = self.go_direction[direction as u8 as usize];
+        if square == origin_square {
+            None
+        } else {
+            Some(square)
+        }
     }
 
-    pub fn downcast_size<const N: usize>(self) -> ConstNeighborArray<N> {
+    pub fn downcast_size<const N: usize>(self) -> SquareCacheEntry<N> {
         if S == N {
             unsafe { mem::transmute(self) }
         } else {
@@ -209,35 +211,48 @@ impl<const S: usize> ConstNeighborArray<S> {
     }
 }
 
-impl<const S: usize> IntoIterator for ConstNeighborArray<S> {
-    type Item = Square<S>;
+impl<const S: usize> IntoIterator for SquareCacheEntry<S> {
+    type Item = (Direction, Square<S>);
 
-    type IntoIter = ConstNeighborArrayIter<S>;
+    type IntoIter = SquareCacheEntryIter<S>;
 
     fn into_iter(self) -> Self::IntoIter {
-        ConstNeighborArrayIter {
-            len: self.len,
-            array: self.array,
+        SquareCacheEntryIter {
+            neighbor_squares: self.neighbor_squares,
+            directions: self.directions,
             position: 0,
+            len: if self.directions[2].is_none() {
+                2
+            } else if self.directions[3].is_none() {
+                3
+            } else {
+                4
+            },
         }
     }
 }
 
-pub struct ConstNeighborArrayIter<const S: usize> {
-    len: u8,
-    array: [Square<S>; 4],
-    position: u8,
+pub struct SquareCacheEntryIter<const S: usize> {
+    directions: [Option<Direction>; 4],
+    neighbor_squares: [Square<S>; 4],
+    position: usize,
+    len: usize,
 }
 
-impl<const S: usize> Iterator for ConstNeighborArrayIter<S> {
-    type Item = Square<S>;
+impl<const S: usize> Iterator for SquareCacheEntryIter<S> {
+    type Item = (Direction, Square<S>);
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.position == self.len {
-            None
-        } else {
+        if self.position < self.len {
+            let output = Some((
+                // Safety: Directions are only `None` outside the length
+                unsafe { self.directions[self.position].unwrap_unchecked() },
+                self.neighbor_squares[self.position],
+            ));
             self.position += 1;
-            Some(self.array[self.position as usize - 1])
+            output
+        } else {
+            None
         }
     }
 }

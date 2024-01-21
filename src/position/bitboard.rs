@@ -158,16 +158,16 @@ impl BitBoard {
     // Note: The implementation is somewhat convoluted in order to work in const contexts.
     pub const fn neighbors<const S: usize>(square: Square<S>) -> BitBoard {
         let mut board = BitBoard::empty();
-        if let Some(north) = square.go_direction(Direction::North) {
+        if let Some(north) = square.go_direction_const(Direction::North) {
             board = board.set_square(north);
         }
-        if let Some(west) = square.go_direction(Direction::West) {
+        if let Some(west) = square.go_direction_const(Direction::West) {
             board = board.set_square(west);
         }
-        if let Some(east) = square.go_direction(Direction::East) {
+        if let Some(east) = square.go_direction_const(Direction::East) {
             board = board.set_square(east);
         }
-        if let Some(south) = square.go_direction(Direction::South) {
+        if let Some(south) = square.go_direction_const(Direction::South) {
             board = board.set_square(south);
         }
         board

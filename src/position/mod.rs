@@ -20,9 +20,9 @@ use color_trait::{BlackTr, WhiteTr};
 
 pub use utils::{Direction, Komi, Movement, Piece, Piece::*, Role, Role::*, Stack, StackMovement};
 
-pub use square::{squares_iterator, Square};
+pub use square::{squares_iterator, Square, SquareCacheEntry};
 
-pub(crate) use utils::AbstractBoard;
+pub use utils::AbstractBoard;
 
 pub use mv::{Move, ReverseMove};
 

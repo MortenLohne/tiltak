@@ -476,9 +476,7 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usize>(
                 }
             }
             if *role == Wall || *role == Cap {
-                for direction in square.directions() {
-                    let neighbour = square.go_direction(direction).unwrap();
-
+                for (direction, neighbour) in square.direction_neighbors() {
                     // If square blocks an extension of two flats
                     if position[neighbour]
                         .top_stone()
