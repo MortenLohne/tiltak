@@ -5,7 +5,7 @@ use half::f16;
 use pgn_traits::PgnPosition;
 use rand::seq::SliceRandom;
 
-use crate::position::{squares_iterator, Role, Square};
+use crate::position::{squares_iterator, CompressedMove, Role, Square};
 use crate::position::{GroupData, Move};
 use crate::position::{GroupEdgeConnection, Position};
 use crate::tests::do_moves_and_check_validity;
@@ -83,6 +83,10 @@ fn play_random_games_prop<const S: usize>(num_games: usize) {
             moves.clear();
 
             position.generate_moves(&mut moves);
+
+            for mv in moves.iter() {
+                assert_eq!(*mv, CompressedMove::compress(mv.clone()).uncompress());
+            }
 
             let mut feature_sets =
                 vec![vec![f16::ZERO; parameters::num_policy_features::<S>()]; moves.len()];

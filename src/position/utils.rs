@@ -1,8 +1,8 @@
 use std::convert::TryFrom;
-use std::fmt;
 use std::ops::{Index, IndexMut};
 use std::str::FromStr;
 use std::{array, ops};
+use std::{fmt, mem};
 
 use board_game_traits::{Color, GameResult};
 #[cfg(feature = "serde")]
@@ -106,14 +106,19 @@ impl fmt::Display for Komi {
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum Role {
-    Flat,
-    Wall,
-    Cap,
+    Flat = 0,
+    Wall = 1,
+    Cap = 2,
 }
 
 impl Role {
     pub fn disc(self) -> usize {
         self as u16 as usize
+    }
+
+    pub fn from_disc(disc: u8) -> Self {
+        assert!(disc < 3);
+        unsafe { mem::transmute::<u8, Self>(disc) }
     }
 }
 
@@ -316,6 +321,11 @@ pub enum Direction {
 }
 
 impl Direction {
+    pub(crate) fn from_disc(disc: u8) -> Self {
+        assert!(disc < 4);
+        unsafe { mem::transmute(disc) }
+    }
+
     pub(crate) fn reverse(self) -> Direction {
         match self {
             North => South,
@@ -355,6 +365,15 @@ pub struct StackMovement<const S: usize> {
 impl<const S: usize> StackMovement<S> {
     pub fn new() -> Self {
         StackMovement { data: 0 }
+    }
+
+    pub fn into_inner(self) -> u8 {
+        self.data
+    }
+
+    pub fn from_u8(data: u8) -> Self {
+        assert_eq!(data.checked_shr(S as u32).unwrap_or_default(), 0);
+        Self { data }
     }
 
     pub fn get_first(&self) -> Movement {

@@ -21,6 +21,40 @@ pub enum Move<const S: usize> {
     Move(Square<S>, Direction, StackMovement<S>), // Number of stones to take
 }
 
+pub struct CompressedMove<const S: usize> {
+    inner: u16,
+}
+
+impl<const S: usize> CompressedMove<S> {
+    pub fn compress(mv: Move<S>) -> CompressedMove<S> {
+        match mv {
+            Move::Place(role, square) => CompressedMove {
+                inner: square.into_inner() as u16 | (role as u16) << 6,
+            },
+            Move::Move(square, direction, stack_movement) => CompressedMove {
+                inner: square.into_inner() as u16
+                    | (direction as u16) << 6
+                    | (stack_movement.into_inner() as u16) << 8,
+            },
+        }
+    }
+
+    pub fn uncompress(self) -> Move<S> {
+        if self.inner >> 8 == 0 {
+            Move::Place(
+                Role::from_disc(self.inner as u8 >> 6),
+                Square::from_u8(self.inner as u8 & 63),
+            )
+        } else {
+            Move::Move(
+                Square::from_u8(self.inner as u8 & 63),
+                Direction::from_disc((self.inner as u8 >> 6) & 3),
+                StackMovement::from_u8((self.inner >> 8) as u8),
+            )
+        }
+    }
+}
+
 impl<const S: usize> Move<S> {
     pub fn origin_square(&self) -> Square<S> {
         match self {

@@ -2,11 +2,11 @@ use board_game_traits::{Color, Position as PositionTrait};
 use board_game_traits::{GameResult, GameResult::*};
 use pgn_traits::PgnPosition;
 
-use crate::position::Direction::*;
 use crate::position::Move;
 use crate::position::Piece::{BlackCap, BlackFlat, WhiteFlat, WhiteWall};
 use crate::position::Position;
 use crate::position::{squares_iterator, Piece, Role, Square, Stack};
+use crate::position::{CompressedMove, Direction::*};
 use crate::tests::do_moves_and_check_validity;
 use crate::{position as board_mod, search};
 
@@ -160,6 +160,33 @@ fn black_can_win_with_road_test() {
         moves.clear();
     }
     assert_eq!(position.game_result(), Some(GameResult::BlackWin));
+}
+
+#[test]
+fn big_8s_spread_test() {
+    let mut position = <Position<8>>::default();
+    do_moves_and_check_validity(
+        &mut position,
+        &[
+            "a1", "b1", "c1", "a2", "d1", "a3", "e1", "a4", "e1<", "a4-", "2d1<", "2a3-", "3c1<",
+            "3a2-", "4b1<", "b1",
+        ],
+    );
+    let mut moves = vec![];
+    position.generate_moves(&mut moves);
+    assert_eq!(moves.len(), 254 + 254 + (62 * 3));
+    for mv in moves.iter() {
+        assert_eq!(*mv, CompressedMove::compress(mv.clone()).uncompress());
+
+        if let Move::Move(_, _, stack_movement) = mv.clone() {
+            assert_ne!(stack_movement.into_inner(), 0)
+        }
+
+        let old_position = position.clone();
+        let reverse_move = position.do_move(mv.clone());
+        position.reverse_move(reverse_move);
+        assert_eq!(position, old_position);
+    }
 }
 
 #[test]

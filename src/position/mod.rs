@@ -25,7 +25,7 @@ pub use square::{squares_iterator, Square, SquareCacheEntry};
 
 pub use utils::AbstractBoard;
 
-pub use mv::{Move, ReverseMove};
+pub use mv::{CompressedMove, Move, ReverseMove};
 
 use crate::evaluation::parameters::{self, PolicyFeatures, ValueFeatures};
 use crate::evaluation::value_eval;
