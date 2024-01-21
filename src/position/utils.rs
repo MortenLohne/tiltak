@@ -23,6 +23,13 @@ pub struct Square<const S: usize> {
 
 impl<const S: usize> Square<S> {
     pub const fn from_u8(inner: u8) -> Self {
+        assert!((inner as usize) < S * S);
+        Square { inner }
+    }
+
+    /// # Safety `inner` must be a valid square for the board size, i.e. less than S * S
+    pub const unsafe fn from_u8_unchecked(inner: u8) -> Self {
+        debug_assert!((inner as usize) < S * S);
         Square { inner }
     }
 
@@ -40,7 +47,7 @@ impl<const S: usize> Square<S> {
     }
 
     pub const fn from_rank_file(rank: u8, file: u8) -> Self {
-        debug_assert!(rank < S as u8 && file < S as u8);
+        assert!(rank < S as u8 && file < S as u8);
         Square::from_u8(file * S as u8 + rank)
     }
 
@@ -179,7 +186,8 @@ impl<const S: usize> Square<S> {
 
 /// Iterates over all board squares.
 pub fn squares_iterator<const S: usize>() -> impl Iterator<Item = Square<S>> {
-    (0..(S * S)).map(|i| Square::from_u8(i as u8))
+    // Safety: `i` must be smaller than `S * S`, which is trivially true here
+    (0..(S * S)).map(|i| unsafe { Square::from_u8_unchecked(i as u8) })
 }
 
 #[derive(Clone, Copy, Debug, Default, Hash, PartialEq, Eq, PartialOrd, Ord)]
@@ -670,7 +678,7 @@ impl<T, const S: usize> Index<Square<S>> for AbstractBoard<T, S> {
     type Output = T;
     #[allow(clippy::needless_lifetimes)]
     fn index<'a>(&'a self, square: Square<S>) -> &'a Self::Output {
-        assert!((square.inner as usize) < S * S);
+        debug_assert!((square.inner as usize) < S * S);
         // Compared to the safe code, this is roughly a 10% speedup of the entire engine
         unsafe {
             (self.raw.as_ptr() as *const T)
@@ -684,7 +692,8 @@ impl<T, const S: usize> Index<Square<S>> for AbstractBoard<T, S> {
 impl<T, const S: usize> IndexMut<Square<S>> for AbstractBoard<T, S> {
     #[allow(clippy::needless_lifetimes)]
     fn index_mut<'a>(&'a mut self, square: Square<S>) -> &'a mut Self::Output {
-        assert!((square.inner as usize) < S * S);
+        debug_assert!((square.inner as usize) < S * S);
+        // Safety: A `Square<S>` is guaranteed to always be valid, i.e. less than `S * S`
         // Compared to the safe code, this is roughly a 10% speedup of the entire engine
         unsafe {
             (self.raw.as_mut_ptr() as *mut T)
