@@ -59,29 +59,23 @@ impl<const S: usize> Square<S> {
         }
     }
 
-    pub fn neighbours(self) -> impl Iterator<Item = Square<S>> {
-        (if self.rank() == 0 && self.file() == 0 {
-            [(S as i8), 1].iter()
-        } else if self.rank() == 0 && self.file() == S as u8 - 1 {
-            [-(S as i8), 1].iter()
-        } else if self.rank() == S as u8 - 1 && self.file() == 0 {
-            [(S as i8), -1].iter()
-        } else if self.rank() == S as u8 - 1 && self.file() == S as u8 - 1 {
-            [-(S as i8), -1].iter()
-        } else if self.rank() == 0 {
-            [-(S as i8), (S as i8), 1].iter()
-        } else if self.rank() == S as u8 - 1 {
-            [-1, -(S as i8), (S as i8)].iter()
-        } else if self.file() == 0 {
-            [-1, (S as i8), 1].iter()
-        } else if self.file() == S as u8 - 1 {
-            [-1, -(S as i8), 1].iter()
-        } else {
-            [-1, -(S as i8), (S as i8), 1].iter()
-        })
-        .cloned()
-        .map(move |sq| sq + self.inner as i8)
-        .map(|sq| Square::from_u8(sq as u8))
+    pub const fn neighbors_array(self) -> ConstNeighborArray<S> {
+        let mut neighbors = ConstNeighborArray::empty();
+
+        if let Some(north) = self.go_direction(North) {
+            neighbors = neighbors.push(north);
+        }
+        if let Some(west) = self.go_direction(West) {
+            neighbors = neighbors.push(west);
+        }
+        if let Some(east) = self.go_direction(East) {
+            neighbors = neighbors.push(east);
+        }
+        if let Some(south) = self.go_direction(South) {
+            neighbors = neighbors.push(south);
+        }
+
+        neighbors
     }
 
     pub fn directions(self) -> impl Iterator<Item = Direction> {
@@ -180,4 +174,70 @@ impl<const S: usize> fmt::Display for Square<S> {
 pub fn squares_iterator<const S: usize>() -> impl Iterator<Item = Square<S>> {
     // Safety: `i` must be smaller than `S * S`, which is trivially true here
     (0..(S * S)).map(|i| unsafe { Square::from_u8_unchecked(i as u8) })
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct ConstNeighborArray<const S: usize> {
+    len: u8,
+    array: [Square<S>; 4],
+}
+
+impl<const S: usize> ConstNeighborArray<S> {
+    pub const fn empty() -> Self {
+        Self {
+            len: 0,
+            array: [Square::from_u8(0); 4],
+        }
+    }
+
+    #[must_use]
+    pub const fn push(mut self, square: Square<S>) -> Self {
+        self.array[self.len as usize] = square;
+        self.len += 1;
+        self
+    }
+
+    pub fn downcast_size<const N: usize>(self) -> ConstNeighborArray<N> {
+        if S == N {
+            unsafe { mem::transmute(self) }
+        } else {
+            panic!(
+                "Tried to use {}s neighbor array as {}s neighbor array",
+                S, N
+            )
+        }
+    }
+}
+
+impl<const S: usize> IntoIterator for ConstNeighborArray<S> {
+    type Item = Square<S>;
+
+    type IntoIter = ConstNeighborArrayIter<S>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        ConstNeighborArrayIter {
+            len: self.len,
+            array: self.array,
+            position: 0,
+        }
+    }
+}
+
+pub struct ConstNeighborArrayIter<const S: usize> {
+    len: u8,
+    array: [Square<S>; 4],
+    position: u8,
+}
+
+impl<const S: usize> Iterator for ConstNeighborArrayIter<S> {
+    type Item = Square<S>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.position == self.len {
+            None
+        } else {
+            self.position += 1;
+            Some(self.array[self.position as usize - 1])
+        }
+    }
 }

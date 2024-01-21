@@ -1722,7 +1722,7 @@ fn connect_component<const S: usize>(
     id: u8,
 ) {
     components[square] = id;
-    for neighbour in square.neighbours() {
+    for neighbour in square.neighbors() {
         if road_pieces.get_square(neighbour) && components[neighbour] == 0 {
             connect_component(road_pieces, components, neighbour, id);
         }

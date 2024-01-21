@@ -14,6 +14,7 @@ use crate::position::utils::Direction::*;
 use crate::position::Piece::{BlackCap, BlackFlat, BlackWall, WhiteCap, WhiteFlat, WhiteWall};
 use crate::position::Role::{Cap, Flat, Wall};
 
+use super::square::ConstNeighborArray;
 use super::Square;
 
 #[derive(Clone, Copy, Debug, Default, Hash, PartialEq, Eq, PartialOrd, Ord)]
@@ -489,6 +490,55 @@ pub(crate) fn lookup_neighbor_table<const S: usize>(square: Square<S>) -> BitBoa
         7 => NEIGHBOR_TABLE_7S[square.downcast_size()],
         8 => NEIGHBOR_TABLE_8S[square.downcast_size()],
         _ => unimplemented!("Unsupported size {}", S),
+    }
+}
+
+pub(crate) const fn generate_neighbor_array_table<const S: usize>(
+) -> AbstractBoard<ConstNeighborArray<S>, S> {
+    let mut table = AbstractBoard::new_with_value(ConstNeighborArray::empty());
+    let mut rank = 0;
+    while rank < S {
+        let mut file = 0;
+        while file < S {
+            let square = Square::from_rank_file(rank as u8, file as u8);
+            table.raw[file][rank] = square.neighbors_array();
+            file += 1;
+        }
+        rank += 1;
+    }
+    table
+}
+
+const NEIGHBOR_ARRAY_TABLE_3S: AbstractBoard<ConstNeighborArray<3>, 3> =
+    generate_neighbor_array_table::<3>();
+const NEIGHBOR_ARRAY_TABLE_4S: AbstractBoard<ConstNeighborArray<4>, 4> =
+    generate_neighbor_array_table::<4>();
+const NEIGHBOR_ARRAY_TABLE_5S: AbstractBoard<ConstNeighborArray<5>, 5> =
+    generate_neighbor_array_table::<5>();
+const NEIGHBOR_ARRAY_TABLE_6S: AbstractBoard<ConstNeighborArray<6>, 6> =
+    generate_neighbor_array_table::<6>();
+const NEIGHBOR_ARRAY_TABLE_7S: AbstractBoard<ConstNeighborArray<7>, 7> =
+    generate_neighbor_array_table::<7>();
+const NEIGHBOR_ARRAY_TABLE_8S: AbstractBoard<ConstNeighborArray<8>, 8> =
+    generate_neighbor_array_table::<8>();
+
+pub(crate) fn lookup_neighbor_array_table<const S: usize>(
+    square: Square<S>,
+) -> ConstNeighborArray<S> {
+    match S {
+        3 => NEIGHBOR_ARRAY_TABLE_3S[square.downcast_size()].downcast_size(),
+        4 => NEIGHBOR_ARRAY_TABLE_4S[square.downcast_size()].downcast_size(),
+        5 => NEIGHBOR_ARRAY_TABLE_5S[square.downcast_size()].downcast_size(),
+        6 => NEIGHBOR_ARRAY_TABLE_6S[square.downcast_size()].downcast_size(),
+        7 => NEIGHBOR_ARRAY_TABLE_7S[square.downcast_size()].downcast_size(),
+        8 => NEIGHBOR_ARRAY_TABLE_8S[square.downcast_size()].downcast_size(),
+        _ => unimplemented!("Unsupported size {}", S),
+    }
+}
+
+impl<const S: usize> Square<S> {
+    pub fn neighbors(self) -> impl Iterator<Item = Square<S>> {
+        lookup_neighbor_array_table::<S>(self).into_iter()
     }
 }
 

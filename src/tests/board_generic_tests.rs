@@ -212,7 +212,7 @@ fn go_in_directions_6s_test() {
 
 fn go_in_directions_prop<const S: usize>() {
     for square in squares_iterator::<S>() {
-        assert_eq!(square.directions().count(), square.neighbours().count());
+        assert_eq!(square.directions().count(), square.neighbors().count());
         for direction in square.directions() {
             assert!(
                 square.go_direction(direction).is_some(),

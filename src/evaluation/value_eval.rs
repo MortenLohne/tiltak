@@ -249,7 +249,7 @@ pub fn static_eval_game_phase<const S: usize>(
             let controlling_player = top_stone.color();
 
             // Malus for them having stones next to our stack with flat stones on top
-            for neighbour in square.neighbours() {
+            for neighbour in square.neighbors() {
                 if let Some(neighbour_top_stone) = position[neighbour].top_stone() {
                     if top_stone.role() == Flat && neighbour_top_stone.color() != controlling_player
                     {
@@ -325,7 +325,7 @@ fn cap_activity<Us: ColorTr, Them: ColorTr, const S: usize>(
     let height_index = stack.height.min(3) as usize - 1;
 
     // Malus if our capstone's line towards the center is blocked
-    if square.neighbours().any(|neighbour| {
+    if square.neighbors().any(|neighbour| {
         lookup_square_symmetries::<S>(neighbour) > lookup_square_symmetries::<S>(square)
             && position[neighbour].top_stone().map(Piece::role) == Some(Cap)
     }) {
@@ -336,14 +336,14 @@ fn cap_activity<Us: ColorTr, Them: ColorTr, const S: usize>(
         .get(stack.height.overflowing_sub(2).0)
         .map(Them::piece_is_ours)
         == Some(true);
-    if square.neighbours().all(|neighbour| {
+    if square.neighbors().all(|neighbour| {
         matches!(
             position[neighbour].top_stone(),
             Some(WhiteCap) | Some(BlackCap) | None
         )
     }) {
         our_value_features.fully_isolated_cap[height_index] += 1.0
-    } else if square.neighbours().all(|neighbour| {
+    } else if square.neighbors().all(|neighbour| {
         if let Some(neighbour_top_stone) = position[neighbour].top_stone() {
             if neighbour_top_stone == Them::wall_piece() {
                 is_soft_cap

@@ -90,7 +90,7 @@ fn correct_number_of_directions_5s_test() {
 fn correct_number_of_neighbours_test() {
     assert_eq!(
         squares_iterator::<5>()
-            .flat_map(|square| square.neighbours())
+            .flat_map(|square| square.neighbors())
             .count(),
         4 * 2 + 12 * 3 + 9 * 4
     );
