@@ -687,7 +687,7 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usize>(
                         group_edge_connection = GroupEdgeConnection::default();
                     }
                     group_edge_connection =
-                        group_edge_connection.connect_square::<S>(destination_square);
+                        group_edge_connection | destination_square.group_edge_connection();
 
                     for group_id in neighbour_group_ids {
                         if !our_groups_joined.contains(&group_id) {
@@ -849,8 +849,7 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, const S: usize>(
                 } else {
                     // Check if reaching the critical square still wins, in case our
                     // stack spread lost some of our flats
-                    let mut edge_connection =
-                        GroupEdgeConnection::default().connect_square::<S>(critical_square);
+                    let mut edge_connection = critical_square.group_edge_connection();
                     for neighbour in critical_square.neighbors() {
                         if let Some(neighbour_piece) = position[neighbour].top_stone() {
                             if Us::piece_is_ours(neighbour_piece) {

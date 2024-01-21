@@ -14,7 +14,7 @@ use crate::position::utils::Direction::*;
 use crate::position::Piece::{BlackCap, BlackFlat, BlackWall, WhiteCap, WhiteFlat, WhiteWall};
 use crate::position::Role::{Cap, Flat, Wall};
 
-use super::{Square, SquareCacheEntry};
+use super::{GroupEdgeConnection, Square, SquareCacheEntry};
 
 #[derive(Clone, Copy, Debug, Default, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Komi {
@@ -535,6 +535,49 @@ pub(crate) fn lookup_neighbor_array_table<const S: usize>(
     }
 }
 
+pub(crate) const fn generate_group_connections_table<const S: usize>(
+) -> AbstractBoard<GroupEdgeConnection, S> {
+    let mut table = AbstractBoard::new_with_value(GroupEdgeConnection::empty());
+    let mut rank = 0;
+    while rank < S {
+        let mut file = 0;
+        while file < S {
+            let square: Square<S> = Square::from_rank_file(rank as u8, file as u8);
+            table.raw[file][rank] = GroupEdgeConnection::empty().connect_square_const(square);
+            file += 1;
+        }
+        rank += 1;
+    }
+    table
+}
+
+const GROUP_CONNECTION_TABLE_3S: AbstractBoard<GroupEdgeConnection, 3> =
+    generate_group_connections_table::<3>();
+const GROUP_CONNECTION_TABLE_4S: AbstractBoard<GroupEdgeConnection, 4> =
+    generate_group_connections_table::<4>();
+const GROUP_CONNECTION_TABLE_5S: AbstractBoard<GroupEdgeConnection, 5> =
+    generate_group_connections_table::<5>();
+const GROUP_CONNECTION_TABLE_6S: AbstractBoard<GroupEdgeConnection, 6> =
+    generate_group_connections_table::<6>();
+const GROUP_CONNECTION_TABLE_7S: AbstractBoard<GroupEdgeConnection, 7> =
+    generate_group_connections_table::<7>();
+const GROUP_CONNECTION_TABLE_8S: AbstractBoard<GroupEdgeConnection, 8> =
+    generate_group_connections_table::<8>();
+
+pub(crate) fn lookup_group_connections_table<const S: usize>(
+    square: Square<S>,
+) -> GroupEdgeConnection {
+    match S {
+        3 => GROUP_CONNECTION_TABLE_3S[square.downcast_size()],
+        4 => GROUP_CONNECTION_TABLE_4S[square.downcast_size()],
+        5 => GROUP_CONNECTION_TABLE_5S[square.downcast_size()],
+        6 => GROUP_CONNECTION_TABLE_6S[square.downcast_size()],
+        7 => GROUP_CONNECTION_TABLE_7S[square.downcast_size()],
+        8 => GROUP_CONNECTION_TABLE_8S[square.downcast_size()],
+        _ => unimplemented!("Unsupported size {}", S),
+    }
+}
+
 impl<const S: usize> Square<S> {
     pub fn neighbors(self) -> impl Iterator<Item = Square<S>> {
         lookup_neighbor_array_table::<S>(self)
@@ -554,6 +597,10 @@ impl<const S: usize> Square<S> {
 
     pub fn go_direction(self, direction: Direction) -> Option<Square<S>> {
         lookup_neighbor_array_table::<S>(self).go_direction(self, direction)
+    }
+
+    pub fn group_edge_connection(self) -> GroupEdgeConnection {
+        lookup_group_connections_table(self)
     }
 }
 

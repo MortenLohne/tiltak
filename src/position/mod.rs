@@ -142,7 +142,11 @@ pub struct GroupEdgeConnection {
 }
 
 impl GroupEdgeConnection {
-    pub fn connect_square<const S: usize>(self, square: Square<S>) -> Self {
+    pub const fn empty() -> Self {
+        Self { data: 0 }
+    }
+
+    pub const fn connect_square_const<const S: usize>(self, square: Square<S>) -> Self {
         let mut edge_connection = self;
         if square.rank() == S as u8 - 1 {
             edge_connection = edge_connection.connect_north();
@@ -168,7 +172,7 @@ impl GroupEdgeConnection {
         self.data & 0b1000 != 0
     }
 
-    pub fn connect_north(self) -> Self {
+    pub const fn connect_north(self) -> Self {
         GroupEdgeConnection {
             data: self.data | 0b1000,
         }
@@ -178,7 +182,7 @@ impl GroupEdgeConnection {
         self.data & 0b100 != 0
     }
 
-    pub fn connect_west(self) -> Self {
+    pub const fn connect_west(self) -> Self {
         GroupEdgeConnection {
             data: self.data | 0b100,
         }
@@ -188,7 +192,7 @@ impl GroupEdgeConnection {
         self.data & 0b10 != 0
     }
 
-    pub fn connect_east(self) -> Self {
+    pub const fn connect_east(self) -> Self {
         GroupEdgeConnection {
             data: self.data | 0b10,
         }
@@ -198,7 +202,7 @@ impl GroupEdgeConnection {
         self.data & 1 != 0
     }
 
-    pub fn connect_south(self) -> Self {
+    pub const fn connect_south(self) -> Self {
         GroupEdgeConnection {
             data: self.data | 1,
         }
@@ -631,7 +635,7 @@ impl<const S: usize> Position<S> {
         };
 
         let mut our_neighbors = neighbors_bitboard & our_road_stones;
-        let mut sum_of_connections = GroupEdgeConnection::default().connect_square::<S>(square);
+        let mut sum_of_connections = square.group_edge_connection();
         while let Some(neighbor_square) = our_neighbors.occupied_square() {
             sum_of_connections = sum_of_connections
                 | group_data.amount_in_group[group_data.groups[neighbor_square] as usize].1;
@@ -764,10 +768,9 @@ impl<const S: usize> Position<S> {
         for square in square::squares_iterator::<S>() {
             group_data.amount_in_group[group_data.groups[square] as usize].0 += 1;
             if self[square].top_stone().map(Piece::is_road_piece) == Some(true) {
-                group_data.amount_in_group[group_data.groups[square] as usize].1 = group_data
-                    .amount_in_group[group_data.groups[square] as usize]
-                    .1
-                    .connect_square::<S>(square);
+                group_data.amount_in_group[group_data.groups[square] as usize].1 =
+                    group_data.amount_in_group[group_data.groups[square] as usize].1
+                        | square.group_edge_connection();
             }
         }
 

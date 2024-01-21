@@ -242,7 +242,8 @@ fn group_connection_6s_test() {
 fn group_connection_generic_prop<const S: usize>() {
     let group_connection = GroupEdgeConnection::default();
 
-    let a1_connection = group_connection.connect_square::<S>(Square::parse_square("a1").unwrap());
+    let a1_connection =
+        group_connection.connect_square_const::<S>(Square::parse_square("a1").unwrap());
 
     assert!(!a1_connection.is_connected_south());
     assert!(!a1_connection.is_connected_east());
