@@ -17,15 +17,17 @@ use crate::position::Role::{Cap, Flat, Wall};
 /// A location on the board. Can be used to index a `Board`.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-pub struct Square(u8);
+pub struct Square {
+    inner: u8,
+}
 
 impl Square {
-    pub const fn from_u8(i: u8) -> Self {
-        Square(i)
+    pub const fn from_u8(inner: u8) -> Self {
+        Square { inner }
     }
 
     pub const fn into_inner(self) -> u8 {
-        self.0
+        self.inner
     }
 
     pub const fn corners<const S: usize>() -> [Self; 4] {
@@ -39,15 +41,15 @@ impl Square {
 
     pub const fn from_rank_file<const S: usize>(rank: u8, file: u8) -> Self {
         debug_assert!(rank < S as u8 && file < S as u8);
-        Square(file * S as u8 + rank)
+        Square::from_u8(file * S as u8 + rank)
     }
 
     pub const fn rank<const S: usize>(self) -> u8 {
-        self.0 % S as u8
+        self.inner % S as u8
     }
 
     pub const fn file<const S: usize>(self) -> u8 {
-        self.0 / S as u8
+        self.inner / S as u8
     }
 
     pub fn neighbours<const S: usize>(self) -> impl Iterator<Item = Square> {
@@ -71,8 +73,8 @@ impl Square {
             [-1, -(S as i8), (S as i8), 1].iter()
         })
         .cloned()
-        .map(move |sq| sq + self.0 as i8)
-        .map(|sq| Square(sq as u8))
+        .map(move |sq| sq + self.inner as i8)
+        .map(|sq| Square::from_u8(sq as u8))
     }
 
     pub fn directions<const S: usize>(self) -> impl Iterator<Item = Direction> {
@@ -173,7 +175,7 @@ impl Square {
 
 /// Iterates over all board squares.
 pub fn squares_iterator<const S: usize>() -> impl Iterator<Item = Square> {
-    (0..(S * S)).map(|i| Square(i as u8))
+    (0..(S * S)).map(|i| Square::from_u8(i as u8))
 }
 
 #[derive(Clone, Copy, Debug, Default, Hash, PartialEq, Eq, PartialOrd, Ord)]
@@ -664,11 +666,11 @@ impl<T, const S: usize> Index<Square> for AbstractBoard<T, S> {
     type Output = T;
     #[allow(clippy::needless_lifetimes)]
     fn index<'a>(&'a self, square: Square) -> &'a Self::Output {
-        assert!((square.0 as usize) < S * S);
+        assert!((square.inner as usize) < S * S);
         // Compared to the safe code, this is roughly a 10% speedup of the entire engine
         unsafe {
             (self.raw.as_ptr() as *const T)
-                .offset(square.0 as isize)
+                .offset(square.inner as isize)
                 .as_ref()
                 .unwrap_unchecked()
         }
@@ -678,11 +680,11 @@ impl<T, const S: usize> Index<Square> for AbstractBoard<T, S> {
 impl<T, const S: usize> IndexMut<Square> for AbstractBoard<T, S> {
     #[allow(clippy::needless_lifetimes)]
     fn index_mut<'a>(&'a mut self, square: Square) -> &'a mut Self::Output {
-        assert!((square.0 as usize) < S * S);
+        assert!((square.inner as usize) < S * S);
         // Compared to the safe code, this is roughly a 10% speedup of the entire engine
         unsafe {
             (self.raw.as_mut_ptr() as *mut T)
-                .offset(square.0 as isize)
+                .offset(square.inner as isize)
                 .as_mut()
                 .unwrap_unchecked()
         }
