@@ -108,7 +108,7 @@ fn play_random_games_prop<const S: usize>(num_games: usize) {
                             position,
                             old_position,
                             "Failed to restore board after {}\n{:?}",
-                            mv.to_string::<S>(),
+                            mv.to_string(),
                             temp_position
                         );
                         game_result == Some(WhiteWin) || game_result == Some(BlackWin)
@@ -119,7 +119,7 @@ fn play_random_games_prop<const S: usize>(num_games: usize) {
                         .iter()
                         .zip(moves)
                         .filter(|(features, _)| features.decline_win[0] == 0.0)
-                        .map(|(_, mv)| mv.to_string::<S>())
+                        .map(|(_, mv)| mv.to_string())
                         .collect::<Vec<_>>()
                 )
             }
@@ -214,13 +214,10 @@ fn go_in_directions_6s_test() {
 
 fn go_in_directions_prop<const S: usize>() {
     for square in squares_iterator::<S>() {
-        assert_eq!(
-            square.directions::<S>().count(),
-            square.neighbours::<S>().count()
-        );
-        for direction in square.directions::<S>() {
+        assert_eq!(square.directions().count(), square.neighbours().count());
+        for direction in square.directions() {
             assert!(
-                square.go_direction::<S>(direction).is_some(),
+                square.go_direction(direction).is_some(),
                 "Failed to go in direction {:?} from {:?}",
                 direction,
                 square
@@ -247,8 +244,7 @@ fn group_connection_6s_test() {
 fn group_connection_generic_prop<const S: usize>() {
     let group_connection = GroupEdgeConnection::default();
 
-    let a1_connection =
-        group_connection.connect_square::<S>(Square::parse_square::<S>("a1").unwrap());
+    let a1_connection = group_connection.connect_square::<S>(Square::parse_square("a1").unwrap());
 
     assert!(!a1_connection.is_connected_south());
     assert!(!a1_connection.is_connected_east());
@@ -273,9 +269,7 @@ fn bitboard_full_board_file_rank_6s_test() {
 
 fn bitboard_full_board_file_rank_prop<const S: usize>() {
     let mut position = <Position<S>>::start_position();
-    let move_strings: Vec<String> = squares_iterator::<S>()
-        .map(|sq| sq.to_string::<S>())
-        .collect();
+    let move_strings: Vec<String> = squares_iterator::<S>().map(|sq| sq.to_string()).collect();
     do_moves_and_check_validity(
         &mut position,
         &(move_strings.iter().map(AsRef::as_ref).collect::<Vec<_>>()),
@@ -333,9 +327,9 @@ fn square_rank_file_prop<const S: usize>() {
     let mut position = <Position<S>>::start_position();
     for rank_id in 0..S as u8 {
         for file_id in 0..S as u8 {
-            let square = Square::from_rank_file::<S>(rank_id, file_id);
-            assert_eq!(rank_id, square.rank::<S>());
-            assert_eq!(file_id, square.file::<S>());
+            let square = Square::from_rank_file(rank_id, file_id);
+            assert_eq!(rank_id, square.rank());
+            assert_eq!(file_id, square.file());
 
             let mv = Move::Place(Role::Flat, square);
             let reverse_move = position.do_move(mv);

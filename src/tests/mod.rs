@@ -112,7 +112,7 @@ impl TestPosition {
             policy_moves
                 .iter()
                 .take(n)
-                .map(|(mv, score)| format!("{}, {:.1}%", mv.to_string::<S>(), score * 100.0))
+                .map(|(mv, score)| format!("{}, {:.1}%", mv.to_string(), score * 100.0))
                 .collect::<Vec<_>>(),
         );
     }
@@ -141,7 +141,7 @@ impl TestPosition {
 fn check_candidate_moves<const S: usize>(
     position: &Position<S>,
     candidate_move_strings: &[&str],
-) -> Vec<Move> {
+) -> Vec<Move<S>> {
     let mut legal_moves = vec![];
     position.generate_moves(&mut legal_moves);
     candidate_move_strings
@@ -151,10 +151,10 @@ fn check_candidate_moves<const S: usize>(
             assert!(
                 legal_moves.contains(&mv),
                 "Candidate move {} was not among legal moves {:?} in position\n{:?}",
-                mv.to_string::<S>(),
+                mv.to_string(),
                 legal_moves
                     .iter()
-                    .map(|mv| mv.to_string::<S>())
+                    .map(|mv| mv.to_string())
                     .collect::<Vec<_>>(),
                 position
             );
@@ -172,10 +172,7 @@ fn do_moves_and_check_validity<const S: usize>(position: &mut Position<S>, move_
             moves.contains(&mv),
             "Move {} was not among legal moves: {:?}\n{:?}",
             position.move_to_san(&mv),
-            moves
-                .iter()
-                .map(|mv| mv.to_string::<S>())
-                .collect::<Vec<_>>(),
+            moves.iter().map(|mv| mv.to_string()).collect::<Vec<_>>(),
             position
         );
         position.do_move(mv);
@@ -186,7 +183,7 @@ fn do_moves_and_check_validity<const S: usize>(position: &mut Position<S>, move_
 fn moves_sorted_by_policy<const S: usize>(
     position: &Position<S>,
     eval_komi: Komi,
-) -> Vec<(Move, f32)> {
+) -> Vec<(Move<S>, f32)> {
     let mut simple_moves = vec![];
     let mut legal_moves = vec![];
     let group_data = position.group_data();

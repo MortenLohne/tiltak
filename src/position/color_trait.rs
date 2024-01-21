@@ -37,7 +37,7 @@ pub(crate) trait ColorTr {
 
     fn piece_is_ours(piece: Piece) -> bool;
 
-    fn is_critical_square<const S: usize>(group_data: &GroupData<S>, square: Square) -> bool;
+    fn is_critical_square<const S: usize>(group_data: &GroupData<S>, square: Square<S>) -> bool;
 
     fn critical_squares<const S: usize>(group_data: &GroupData<S>) -> BitBoard;
 }
@@ -97,7 +97,7 @@ impl ColorTr for WhiteTr {
         piece == WhiteFlat || piece == WhiteWall || piece == WhiteCap
     }
 
-    fn is_critical_square<const S: usize>(group_data: &GroupData<S>, square: Square) -> bool {
+    fn is_critical_square<const S: usize>(group_data: &GroupData<S>, square: Square<S>) -> bool {
         group_data.white_critical_squares.get_square(square)
     }
 
@@ -161,7 +161,7 @@ impl ColorTr for BlackTr {
         piece == BlackFlat || piece == BlackCap || piece == BlackWall
     }
 
-    fn is_critical_square<const S: usize>(group_data: &GroupData<S>, square: Square) -> bool {
+    fn is_critical_square<const S: usize>(group_data: &GroupData<S>, square: Square<S>) -> bool {
         group_data.black_critical_squares.get_square(square)
     }
 

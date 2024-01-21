@@ -36,7 +36,7 @@ pub struct MctsSetting<const S: usize> {
     policy_params: Option<Box<[f32]>>,
     search_params: Box<[Score]>,
     dirichlet: Option<f32>,
-    excluded_moves: Vec<Move>,
+    excluded_moves: Vec<Move<S>>,
     rollout_depth: u16,
     rollout_temperature: f64,
 }
@@ -56,12 +56,12 @@ impl<const S: usize> Default for MctsSetting<S> {
     }
 }
 
-impl<const N: usize> MctsSetting<N> {
+impl<const S: usize> MctsSetting<S> {
     /// Set a very liberal arena size, for searching a given amount of nodes
     pub fn arena_size_for_nodes(self, nodes: u32) -> Self {
         // For 6s, the toughest position I've found required 40 elements/node searched
         // This formula gives 108, which is hopefully plenty
-        self.arena_size((N * N) as u32 * 3 * nodes)
+        self.arena_size((S * S) as u32 * 3 * nodes)
     }
 
     pub fn mem_usage(self, mem_usage: usize) -> Self {
@@ -98,7 +98,7 @@ impl<const N: usize> MctsSetting<N> {
         self
     }
 
-    pub fn exclude_moves(mut self, excluded_moves: Vec<Move>) -> Self {
+    pub fn exclude_moves(mut self, excluded_moves: Vec<Move<S>>) -> Self {
         self.excluded_moves = excluded_moves;
         self
     }
@@ -137,11 +137,11 @@ pub const ARENA_ELEMENT_SIZE: usize = 24;
 /// Gives more fine-grained control of the search process compared to using the `mcts` function.
 // #[derive(Clone, PartialEq, Debug)]
 pub struct MonteCarloTree<const S: usize> {
-    edge: TreeEdge, // A virtual edge to the first node, with fake move and heuristic score
+    edge: TreeEdge<S>, // A virtual edge to the first node, with fake move and heuristic score
     position: Position<S>,
     temp_position: Position<S>,
     settings: MctsSetting<S>,
-    temp_vectors: TempVectors,
+    temp_vectors: TempVectors<S>,
     arena: Arena,
 }
 
@@ -159,7 +159,7 @@ impl<const S: usize> MonteCarloTree<S> {
             }
             Err(err) => panic!("{}", err),
         };
-        let mut temp_vectors = TempVectors::new::<S>();
+        let mut temp_vectors = TempVectors::new();
         let mut root_edge = TreeEdge {
             child: None,
             mv: Move::Place(Role::Flat, Square::default()),
@@ -180,7 +180,7 @@ impl<const S: usize> MonteCarloTree<S> {
         }
 
         if !settings.excluded_moves.is_empty() {
-            let mut filtered_edges: Vec<TreeEdge> = arena
+            let mut filtered_edges: Vec<TreeEdge<S>> = arena
                 .get_slice_mut(&mut arena.get_mut(root_edge.child.as_mut().unwrap()).children)
                 .iter_mut()
                 .filter(|edge| !settings.excluded_moves.contains(&edge.mv))
@@ -206,11 +206,11 @@ impl<const S: usize> MonteCarloTree<S> {
         }
     }
 
-    pub fn get_child(&self) -> &Tree {
+    pub fn get_child(&self) -> &Tree<S> {
         self.arena.get(self.edge.child.as_ref().unwrap())
     }
 
-    pub fn get_child_mut(&mut self) -> &mut Tree {
+    pub fn get_child_mut(&mut self) -> &mut Tree<S> {
         self.arena.get_mut(self.edge.child.as_mut().unwrap())
     }
 
@@ -240,7 +240,7 @@ impl<const S: usize> MonteCarloTree<S> {
             }
 
             let child = self.get_child();
-            let mut child_refs: Vec<&TreeEdge> =
+            let mut child_refs: Vec<&TreeEdge<S>> =
                 self.arena.get_slice(&child.children).iter().collect();
 
             child_refs.sort_by_key(|edge| edge.visits);
@@ -286,7 +286,7 @@ impl<const S: usize> MonteCarloTree<S> {
     #[must_use]
     pub fn select(&mut self) -> Option<f32> {
         self.temp_position.clone_from(&self.position);
-        self.edge.select::<S>(
+        self.edge.select(
             &mut self.temp_position,
             &self.settings,
             &mut self.temp_vectors,
@@ -296,7 +296,7 @@ impl<const S: usize> MonteCarloTree<S> {
 
     /// Returns the best move, and its score (as winning probability) from the perspective of the side to move
     /// Panics if no search iterations have been run
-    pub fn best_move(&self) -> (Move, f32) {
+    pub fn best_move(&self) -> (Move<S>, f32) {
         self.arena
             .get_slice(&self.get_child().children)
             .iter()
@@ -306,7 +306,7 @@ impl<const S: usize> MonteCarloTree<S> {
     }
 
     pub fn node_edge_sizes(&self, arena: &Arena) -> (usize, usize) {
-        pub fn edge_sizes(edge: &TreeEdge, arena: &Arena) -> (usize, usize) {
+        pub fn edge_sizes<const S: usize>(edge: &TreeEdge<S>, arena: &Arena) -> (usize, usize) {
             if let Some(child_index) = &edge.child {
                 let (child_nodes, child_edges) = node_sizes(arena.get(child_index), arena);
                 (child_nodes, child_edges + 1)
@@ -314,7 +314,7 @@ impl<const S: usize> MonteCarloTree<S> {
                 (0, 1)
             }
         }
-        pub fn node_sizes(node: &Tree, arena: &Arena) -> (usize, usize) {
+        pub fn node_sizes<const S: usize>(node: &Tree<S>, arena: &Arena) -> (usize, usize) {
             arena
                 .get_slice(&node.children)
                 .iter()
@@ -329,7 +329,7 @@ impl<const S: usize> MonteCarloTree<S> {
         edge_sizes(&self.edge, arena)
     }
 
-    fn children(&self) -> Vec<TreeEdge> {
+    fn children(&self) -> Vec<TreeEdge<S>> {
         self.arena
             .get_slice(&self.get_child().children)
             .iter()
@@ -337,14 +337,14 @@ impl<const S: usize> MonteCarloTree<S> {
             .collect()
     }
 
-    pub fn pv(&self) -> impl Iterator<Item = Move> + '_ {
+    pub fn pv(&self) -> impl Iterator<Item = Move<S>> + '_ {
         Pv::new(&self.edge, &self.arena)
     }
 
     /// Print human-readable information of the search's progress.
     pub fn print_info(&self) {
         let child = self.get_child();
-        let mut best_children: Vec<&TreeEdge> =
+        let mut best_children: Vec<&TreeEdge<S>> =
             self.arena.get_slice(&child.children).iter().collect();
 
         best_children.sort_by_key(|edge| edge.visits);
@@ -358,9 +358,9 @@ impl<const S: usize> MonteCarloTree<S> {
         best_children.iter().take(8).for_each(|edge| {
             println!(
                 "Move {}: {} visits, {:.2}% mean action value, {:.3}% static score, {:.3} exploration value, pv {}",
-                edge.mv.to_string::<S>(), edge.visits, edge.mean_action_value * 100.0, edge.heuristic_score * 100.0,
+                edge.mv.to_string(), edge.visits, edge.mean_action_value * 100.0, edge.heuristic_score * 100.0,
                 edge.exploration_value((self.visits() as Score).sqrt(), dynamic_cpuct),
-                Pv::new(edge, &self.arena).map(|mv| mv.to_string::<S>() + " ").collect::<String>()
+                Pv::new(edge, &self.arena).map(|mv| mv.to_string() + " ").collect::<String>()
             )
         });
     }
@@ -379,7 +379,7 @@ impl<const S: usize> MonteCarloTree<S> {
 }
 
 /// The simplest way to use the mcts module. Run Monte Carlo Tree Search for `nodes` nodes, returning the best move, and its estimated winning probability for the side to move.
-pub fn mcts<const S: usize>(position: Position<S>, nodes: u64) -> (Move, Score) {
+pub fn mcts<const S: usize>(position: Position<S>, nodes: u64) -> (Move<S>, Score) {
     let settings = MctsSetting::default().arena_size_for_nodes(nodes as u32);
     let mut tree = MonteCarloTree::with_settings(position, settings);
 
@@ -397,7 +397,7 @@ pub fn play_move_time<const S: usize>(
     board: Position<S>,
     max_time: time::Duration,
     settings: MctsSetting<S>,
-) -> (Move, Score) {
+) -> (Move<S>, Score) {
     let mut tree = MonteCarloTree::with_settings(board.clone(), settings);
     tree.search_for_time(max_time, |_| {});
     tree.best_move()
@@ -409,7 +409,7 @@ pub fn mcts_training<const S: usize>(
     position: Position<S>,
     time_control: &TimeControl,
     settings: MctsSetting<S>,
-) -> Vec<(Move, Score)> {
+) -> Vec<(Move<S>, Score)> {
     let mut tree = MonteCarloTree::with_settings(position, settings);
 
     match time_control {
@@ -440,11 +440,11 @@ pub fn cp_to_win_percentage(cp: f32) -> Score {
 }
 
 // Utility for testing
-pub fn edge_mem_usage() -> usize {
-    mem::size_of::<TreeEdge>()
+pub fn edge_mem_usage<const S: usize>() -> usize {
+    mem::size_of::<TreeEdge<S>>()
 }
 
 // Utility for testing
-pub fn node_mem_usage() -> usize {
-    mem::size_of::<Tree>()
+pub fn node_mem_usage<const S: usize>() -> usize {
+    mem::size_of::<Tree<S>>()
 }

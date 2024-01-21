@@ -110,5 +110,5 @@ fn parse_ptn_without_result2() {
 
 #[test]
 fn parse_bad_direction_test() {
-    assert!(Move::from_string::<6>("a1d").is_err())
+    assert!(<Move<6>>::from_string("a1d").is_err())
 }

@@ -14,13 +14,13 @@ use crate::{
 };
 
 #[derive(Debug, Clone)]
-struct Game {
+struct Game<const S: usize> {
     komi: Komi,
-    moves: Vec<Move>,
+    moves: Vec<Move<S>>,
 }
 
-impl Game {
-    fn analysis_positions(&self) -> Vec<AnalysisPosition> {
+impl<const S: usize> Game<S> {
+    fn analysis_positions(&self) -> Vec<AnalysisPosition<S>> {
         let mut position = Position::start_position_with_komi(self.komi);
         let mut result = vec![];
         'game_loop: for mv in self.moves.iter() {
@@ -60,12 +60,12 @@ impl Game {
 }
 
 #[derive(Debug, Clone)]
-struct AnalysisPosition {
-    position: Position<5>,
+struct AnalysisPosition<const S: usize> {
+    position: Position<S>,
     solution_result: Option<String>,
 }
 
-fn policy_finds_win(position: &Position<5>) -> Option<Move> {
+fn policy_finds_win(position: &Position<5>) -> Option<Move<5>> {
     let mut simple_moves = vec![];
     let mut moves = vec![];
     let mut fcd_per_move = vec![];
@@ -87,7 +87,7 @@ fn policy_finds_win(position: &Position<5>) -> Option<Move> {
         .map(|feature_set| parameters::PolicyFeatures::new::<5>(feature_set))
         .collect();
 
-    let simple_moves: Vec<Move> = moves.iter().map(|(mv, _)| mv.clone()).collect();
+    let simple_moves: Vec<Move<5>> = moves.iter().map(|(mv, _)| mv.clone()).collect();
 
     position.features_for_moves(
         &mut policy_feature_sets,
@@ -164,7 +164,7 @@ pub fn check_all_games() {
             "{}, {} komi, {}",
             wrongg.0.position.to_fen(),
             wrongg.0.position.komi(),
-            wrongg.1.to_string::<5>()
+            wrongg.1.to_string()
         );
     }
     println!(
@@ -182,7 +182,7 @@ pub fn check_all_games() {
     }
 }
 
-fn read_all_games() -> Vec<Game> {
+fn read_all_games() -> Vec<Game<5>> {
     let conn = Connection::open("puzzles.db").unwrap();
 
     let mut stmt = conn
@@ -204,7 +204,7 @@ fn read_all_games() -> Vec<Game> {
         let mut moves = vec![];
 
         for move_string in notation.split_whitespace() {
-            let mv = Move::from_string::<5>(move_string).unwrap();
+            let mv = Move::from_string(move_string).unwrap();
             let mut legal_moves = vec![];
             position.generate_moves(&mut legal_moves);
 

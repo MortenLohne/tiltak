@@ -80,7 +80,7 @@ fn flatten_stack_test() {
 fn correct_number_of_directions_5s_test() {
     assert_eq!(
         squares_iterator::<5>()
-            .flat_map(|square| square.directions::<5>())
+            .flat_map(|square| square.directions())
             .count(),
         4 * 2 + 12 * 3 + 9 * 4
     );
@@ -90,7 +90,7 @@ fn correct_number_of_directions_5s_test() {
 fn correct_number_of_neighbours_test() {
     assert_eq!(
         squares_iterator::<5>()
-            .flat_map(|square| square.neighbours::<5>())
+            .flat_map(|square| square.neighbours())
             .count(),
         4 * 2 + 12 * 3 + 9 * 4
     );
@@ -102,7 +102,7 @@ fn correct_number_of_legal_directions_test() {
         squares_iterator::<5>()
             .flat_map(|square| [North, South, East, West]
                 .iter()
-                .filter_map(move |&direction| square.go_direction::<5>(direction)))
+                .filter_map(move |&direction| square.go_direction(direction)))
             .count(),
         4 * 2 + 12 * 3 + 9 * 4
     );
@@ -303,7 +303,7 @@ fn games_ends_when_board_is_full_test() {
     let mut position = <Position<5>>::start_position();
     let move_strings: Vec<String> = squares_iterator::<5>()
         .skip(1)
-        .map(|sq| sq.to_string::<5>())
+        .map(|sq| sq.to_string())
         .collect();
     do_moves_and_check_validity(
         &mut position,
@@ -345,8 +345,8 @@ fn critical_square_test() {
 
     do_moves_and_check_validity(&mut position, &move_strings);
 
-    let e1 = Square::parse_square::<5>("e1").unwrap();
-    let a5 = Square::parse_square::<5>("a5").unwrap();
+    let e1 = Square::parse_square("e1").unwrap();
+    let a5 = Square::parse_square("a5").unwrap();
     let group_data = position.group_data();
     assert!(group_data.is_critical_square(e1, Color::White));
     assert!(!group_data.is_critical_square(e1, Color::Black));
@@ -376,7 +376,7 @@ fn move_iterator_test() {
     match mv {
         Move::Move(square, direction, stack_movement) => assert_eq!(
             board_mod::MoveIterator::<5>::new(square, direction, stack_movement)
-                .map(|sq| sq.to_string::<5>())
+                .map(|sq| sq.to_string())
                 .collect::<Vec<String>>(),
             vec!["e5", "e4"]
         ),

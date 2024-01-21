@@ -27,10 +27,10 @@ use crate::tune::gradient_descent::TrainingSample;
 use crate::tune::play_match::play_game;
 
 // The score, or probability of being played, for a given move
-type MoveScore = (Move, f32);
+type MoveScore<const S: usize> = (Move<S>, f32);
 
 // The probability of each possible move being played, through a whole game.
-type MoveScoresForGame = Vec<Vec<MoveScore>>;
+type MoveScoresForGame<const S: usize> = Vec<Vec<MoveScore<S>>>;
 
 pub fn train_from_scratch<const S: usize, const N: usize, const M: usize>(
     training_id: usize,
@@ -113,7 +113,7 @@ pub fn train_perpetually<const S: usize, const N: usize, const M: usize>(
     initial_value_params: &[f32; N],
     initial_policy_params: &[f32; M],
     mut all_games: Vec<Game<Position<S>>>,
-    mut all_move_scores: Vec<MoveScoresForGame>,
+    mut all_move_scores: Vec<MoveScoresForGame<S>>,
     mut batch_id: usize,
 ) -> Result<(), DynError> {
     const BATCH_SIZE: usize = 500;
@@ -188,9 +188,9 @@ pub fn train_perpetually<const S: usize, const N: usize, const M: usize>(
                 .map(|PtnMove { mv, .. }| mv)
                 .zip(move_scores)
             {
-                write!(writer, "{}: ", mv.to_string::<S>())?;
+                write!(writer, "{}: ", mv.to_string())?;
                 for (mv, score) in move_scores {
-                    write!(writer, "{} {}, ", mv.to_string::<S>(), score)?;
+                    write!(writer, "{} {}, ", mv.to_string(), score)?;
                 }
                 writeln!(writer)?;
             }
@@ -269,7 +269,7 @@ fn play_game_pair<const S: usize>(
     current_params_wins: &AtomicU64,
     last_params_wins: &AtomicU64,
     i: usize,
-) -> (Game<Position<S>>, MoveScoresForGame) {
+) -> (Game<Position<S>>, MoveScoresForGame<S>) {
     let settings = MctsSetting::default()
         .add_value_params(value_params.into())
         .add_policy_params(policy_params.into())
@@ -427,7 +427,7 @@ pub fn tune_value_from_file<const S: usize, const N: usize>(
 
 pub fn tune_value_and_policy<const S: usize, const N: usize, const M: usize>(
     games: &[Game<Position<S>>],
-    move_scoress: &[MoveScoresForGame],
+    move_scoress: &[MoveScoresForGame<S>],
     komi: Komi,
     initial_value_params: &[f32; N],
     initial_policy_params: &[f32; M],
@@ -489,7 +489,7 @@ pub fn tune_value_and_policy<const S: usize, const N: usize, const M: usize>(
                         .iter_mut()
                         .map(|feature_set| PolicyFeatures::new::<S>(feature_set))
                         .collect();
-                    let moves: Vec<Move> =
+                    let moves: Vec<Move<S>> =
                         move_scores.iter().map(|(mv, _score)| mv.clone()).collect();
 
                     position.features_for_moves(
@@ -572,7 +572,7 @@ pub fn games_and_move_scoress_from_file<const S: usize>(
     value_file_name: &str,
     policy_file_name: &str,
     komi: Komi,
-) -> Result<(Vec<Game<Position<S>>>, Vec<MoveScoresForGame>), DynError> {
+) -> Result<(Vec<Game<Position<S>>>, Vec<MoveScoresForGame<S>>), DynError> {
     let mut move_scoress = read_move_scores_from_file::<S>(policy_file_name)?;
     let mut games = read_games_from_file(value_file_name, komi)?;
 
@@ -605,15 +605,15 @@ pub fn games_and_move_scoress_from_file<const S: usize>(
                     .iter()
                     .any(|(scored_move, _score)| *mv == *scored_move),
                 "Played move {} in game {} not among move scores {:?}\nGame: {:?}\nBoard:\n{:?}",
-                mv.to_string::<S>(),
+                mv.to_string(),
                 i,
                 move_score
                     .iter()
-                    .map(|(mv, score)| format!("{}: {:.2}%", mv.to_string::<S>(), score * 100.0))
+                    .map(|(mv, score)| format!("{}: {:.2}%", mv.to_string(), score * 100.0))
                     .collect::<Vec<_>>(),
                 game.moves
                     .iter()
-                    .map(|PtnMove { mv, .. }| mv.to_string::<S>())
+                    .map(|PtnMove { mv, .. }| mv.to_string())
                     .collect::<Vec<_>>(),
                 position
             );
@@ -625,7 +625,7 @@ pub fn games_and_move_scoress_from_file<const S: usize>(
 
 pub fn read_move_scores_from_file<const S: usize>(
     file_name: &str,
-) -> Result<Vec<MoveScoresForGame>, DynError> {
+) -> Result<Vec<MoveScoresForGame<S>>, DynError> {
     let start_time = time::Instant::now();
 
     // Read entire file into memory. Because it's a single allocation, this allows the memory to be cleanly reclaimed later
@@ -634,7 +634,7 @@ pub fn read_move_scores_from_file<const S: usize>(
     // Games are separated by empty lines. Split here, to allow parallel parsing later
     let games: Vec<&str> = contents.split("\n\n").collect();
 
-    let mut move_scoress: Vec<MoveScoresForGame> = games
+    let mut move_scoress: Vec<MoveScoresForGame<S>> = games
         .into_par_iter()
         .map(|line_group| {
             line_group
@@ -649,7 +649,7 @@ pub fn read_move_scores_from_file<const S: usize>(
                             continue;
                         }
                         let mut words = move_score_string.split_whitespace();
-                        let mv = Move::from_string::<S>(words.next().unwrap()).unwrap();
+                        let mv = Move::from_string(words.next().unwrap()).unwrap();
                         let score = str::parse::<f32>(words.next().unwrap()).unwrap();
                         scores_for_this_move.push((mv, score));
                     }

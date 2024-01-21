@@ -61,10 +61,10 @@ impl BitBoard {
         }
     }
 
-    pub fn lines_for_square<const S: usize>(square: Square) -> [Self; 2] {
+    pub fn lines_for_square<const S: usize>(square: Square<S>) -> [Self; 2] {
         [
-            Self::full().rank::<S>(square.rank::<S>()),
-            Self::full().file::<S>(square.file::<S>()),
+            Self::full().rank::<S>(square.rank()),
+            Self::full().file::<S>(square.file()),
         ]
     }
 
@@ -91,7 +91,7 @@ impl BitBoard {
     }
 
     #[inline]
-    pub fn get_square(self, square: Square) -> bool {
+    pub fn get_square<const S: usize>(self, square: Square<S>) -> bool {
         debug_assert!(square.into_inner() < 64);
         self.board & (1 << square.into_inner()) != 0
     }
@@ -107,7 +107,7 @@ impl BitBoard {
     // Sets the square to true
     #[inline]
     #[must_use]
-    pub const fn set_square(self, square: Square) -> Self {
+    pub const fn set_square<const S: usize>(self, square: Square<S>) -> Self {
         debug_assert!(square.into_inner() < 64);
         BitBoard::from_u64(self.board | 1 << square.into_inner())
     }
@@ -157,54 +157,49 @@ impl BitBoard {
 
     // Get a bitboard with only the square's neighbors set
     // Note: The implementation is somewhat convoluted in order to work in const contexts.
-    pub const fn neighbors<const S: usize>(square: Square) -> BitBoard {
+    pub const fn neighbors<const S: usize>(square: Square<S>) -> BitBoard {
         let mut board = BitBoard::empty();
-        if let Some(north) = square.go_direction::<S>(Direction::North) {
+        if let Some(north) = square.go_direction(Direction::North) {
             board = board.set_square(north);
         }
-        if let Some(west) = square.go_direction::<S>(Direction::West) {
+        if let Some(west) = square.go_direction(Direction::West) {
             board = board.set_square(west);
         }
-        if let Some(east) = square.go_direction::<S>(Direction::East) {
+        if let Some(east) = square.go_direction(Direction::East) {
             board = board.set_square(east);
         }
-        if let Some(south) = square.go_direction::<S>(Direction::South) {
+        if let Some(south) = square.go_direction(Direction::South) {
             board = board.set_square(south);
         }
         board
     }
 
     #[inline]
-    pub fn occupied_square(self) -> Option<Square> {
+    pub fn occupied_square<const S: usize>(self) -> Option<Square<S>> {
         if self.is_empty() {
             None
         } else {
             Some(Square::from_u8(self.board.trailing_zeros() as u8))
         }
     }
-}
 
-impl IntoIterator for BitBoard {
-    type Item = Square;
-    type IntoIter = BitBoardIter;
-
-    fn into_iter(self) -> Self::IntoIter {
+    pub fn into_iter<const S: usize>(self) -> BitBoardIter<S> {
         BitBoardIter::new(self)
     }
 }
 
-pub struct BitBoardIter {
+pub struct BitBoardIter<const S: usize> {
     board: BitBoard,
 }
 
-impl BitBoardIter {
+impl<const S: usize> BitBoardIter<S> {
     fn new(board: BitBoard) -> Self {
         BitBoardIter { board }
     }
 }
 
-impl Iterator for BitBoardIter {
-    type Item = Square;
+impl<const S: usize> Iterator for BitBoardIter<S> {
+    type Item = Square<S>;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.board.is_empty() {

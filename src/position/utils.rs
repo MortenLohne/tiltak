@@ -2,7 +2,7 @@ use std::convert::TryFrom;
 use std::fmt::{self, Write};
 use std::ops::{Index, IndexMut};
 use std::str::FromStr;
-use std::{array, ops};
+use std::{array, mem, ops};
 
 use board_game_traits::{Color, GameResult};
 #[cfg(feature = "serde")]
@@ -17,11 +17,11 @@ use crate::position::Role::{Cap, Flat, Wall};
 /// A location on the board. Can be used to index a `Board`.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-pub struct Square {
+pub struct Square<const S: usize> {
     inner: u8,
 }
 
-impl Square {
+impl<const S: usize> Square<S> {
     pub const fn from_u8(inner: u8) -> Self {
         Square { inner }
     }
@@ -30,7 +30,7 @@ impl Square {
         self.inner
     }
 
-    pub const fn corners<const S: usize>() -> [Self; 4] {
+    pub const fn corners() -> [Self; 4] {
         [
             Self::from_u8(0),
             Self::from_u8(S as u8 - 1),
@@ -39,35 +39,43 @@ impl Square {
         ]
     }
 
-    pub const fn from_rank_file<const S: usize>(rank: u8, file: u8) -> Self {
+    pub const fn from_rank_file(rank: u8, file: u8) -> Self {
         debug_assert!(rank < S as u8 && file < S as u8);
         Square::from_u8(file * S as u8 + rank)
     }
 
-    pub const fn rank<const S: usize>(self) -> u8 {
+    pub const fn rank(self) -> u8 {
         self.inner % S as u8
     }
 
-    pub const fn file<const S: usize>(self) -> u8 {
+    pub const fn file(self) -> u8 {
         self.inner / S as u8
     }
 
-    pub fn neighbours<const S: usize>(self) -> impl Iterator<Item = Square> {
-        (if self.rank::<S>() == 0 && self.file::<S>() == 0 {
+    pub fn downcast_size<const N: usize>(self) -> Square<N> {
+        if S == N {
+            unsafe { mem::transmute(self) }
+        } else {
+            panic!("Tried to use {}s square as {}s square", S, N)
+        }
+    }
+
+    pub fn neighbours(self) -> impl Iterator<Item = Square<S>> {
+        (if self.rank() == 0 && self.file() == 0 {
             [(S as i8), 1].iter()
-        } else if self.rank::<S>() == 0 && self.file::<S>() == S as u8 - 1 {
+        } else if self.rank() == 0 && self.file() == S as u8 - 1 {
             [-(S as i8), 1].iter()
-        } else if self.rank::<S>() == S as u8 - 1 && self.file::<S>() == 0 {
+        } else if self.rank() == S as u8 - 1 && self.file() == 0 {
             [(S as i8), -1].iter()
-        } else if self.rank::<S>() == S as u8 - 1 && self.file::<S>() == S as u8 - 1 {
+        } else if self.rank() == S as u8 - 1 && self.file() == S as u8 - 1 {
             [-(S as i8), -1].iter()
-        } else if self.rank::<S>() == 0 {
+        } else if self.rank() == 0 {
             [-(S as i8), (S as i8), 1].iter()
-        } else if self.rank::<S>() == S as u8 - 1 {
+        } else if self.rank() == S as u8 - 1 {
             [-1, -(S as i8), (S as i8)].iter()
-        } else if self.file::<S>() == 0 {
+        } else if self.file() == 0 {
             [-1, (S as i8), 1].iter()
-        } else if self.file::<S>() == S as u8 - 1 {
+        } else if self.file() == S as u8 - 1 {
             [-1, -(S as i8), 1].iter()
         } else {
             [-1, -(S as i8), (S as i8), 1].iter()
@@ -77,22 +85,22 @@ impl Square {
         .map(|sq| Square::from_u8(sq as u8))
     }
 
-    pub fn directions<const S: usize>(self) -> impl Iterator<Item = Direction> {
-        (if self.rank::<S>() == 0 && self.file::<S>() == 0 {
+    pub fn directions(self) -> impl Iterator<Item = Direction> {
+        (if self.rank() == 0 && self.file() == 0 {
             [East, South].iter()
-        } else if self.rank::<S>() == 0 && self.file::<S>() == S as u8 - 1 {
+        } else if self.rank() == 0 && self.file() == S as u8 - 1 {
             [West, South].iter()
-        } else if self.rank::<S>() == S as u8 - 1 && self.file::<S>() == 0 {
+        } else if self.rank() == S as u8 - 1 && self.file() == 0 {
             [East, North].iter()
-        } else if self.rank::<S>() == S as u8 - 1 && self.file::<S>() == S as u8 - 1 {
+        } else if self.rank() == S as u8 - 1 && self.file() == S as u8 - 1 {
             [West, North].iter()
-        } else if self.rank::<S>() == 0 {
+        } else if self.rank() == 0 {
             [West, East, South].iter()
-        } else if self.rank::<S>() == S as u8 - 1 {
+        } else if self.rank() == S as u8 - 1 {
             [North, West, East].iter()
-        } else if self.file::<S>() == 0 {
+        } else if self.file() == 0 {
             [North, East, South].iter()
-        } else if self.file::<S>() == S as u8 - 1 {
+        } else if self.file() == S as u8 - 1 {
             [North, West, South].iter()
         } else {
             [North, West, East, South].iter()
@@ -100,21 +108,17 @@ impl Square {
         .cloned()
     }
 
-    pub const fn go_direction<const S: usize>(self, direction: Direction) -> Option<Self> {
-        self.jump_direction::<S>(direction, 1)
+    pub const fn go_direction(self, direction: Direction) -> Option<Self> {
+        self.jump_direction(direction, 1)
     }
 
-    pub const fn jump_direction<const S: usize>(
-        self,
-        direction: Direction,
-        len: u8,
-    ) -> Option<Self> {
-        let rank = self.rank::<S>();
-        let file = self.file::<S>();
+    pub const fn jump_direction(self, direction: Direction, len: u8) -> Option<Self> {
+        let rank = self.rank();
+        let file = self.file();
         match direction {
             North => {
                 if let Some(new_rank) = rank.checked_sub(len) {
-                    Some(Square::from_rank_file::<S>(new_rank, file))
+                    Some(Square::from_rank_file(new_rank, file))
                 } else {
                     None
                 }
@@ -123,27 +127,27 @@ impl Square {
                 if file < len {
                     None
                 } else {
-                    Some(Square::from_rank_file::<S>(rank, file - len))
+                    Some(Square::from_rank_file(rank, file - len))
                 }
             }
             East => {
                 if file >= S as u8 - len {
                     None
                 } else {
-                    Some(Square::from_rank_file::<S>(rank, file + len))
+                    Some(Square::from_rank_file(rank, file + len))
                 }
             }
             South => {
                 if rank + len >= S as u8 {
                     None
                 } else {
-                    Some(Square::from_rank_file::<S>(rank + len, file))
+                    Some(Square::from_rank_file(rank + len, file))
                 }
             }
         }
     }
 
-    pub fn parse_square<const S: usize>(input: &str) -> Result<Square, pgn_traits::Error> {
+    pub fn parse_square(input: &str) -> Result<Square<S>, pgn_traits::Error> {
         if input.len() != 2 {
             return Err(pgn_traits::Error::new_parse_error(format!(
                 "Couldn't parse square \"{}\"",
@@ -161,20 +165,20 @@ impl Square {
                 input, S
             )))
         } else {
-            Ok(Square::from_rank_file::<S>(rank, file))
+            Ok(Square::from_rank_file(rank, file))
         }
     }
 
-    pub fn to_string<const S: usize>(self) -> String {
+    pub fn to_string(self) -> String {
         let mut string = String::new();
-        write!(string, "{}", (self.file::<S>() + b'a') as char).unwrap();
-        write!(string, "{}", S as u8 - self.rank::<S>()).unwrap();
+        write!(string, "{}", (self.file() + b'a') as char).unwrap();
+        write!(string, "{}", S as u8 - self.rank()).unwrap();
         string
     }
 }
 
 /// Iterates over all board squares.
-pub fn squares_iterator<const S: usize>() -> impl Iterator<Item = Square> {
+pub fn squares_iterator<const S: usize>() -> impl Iterator<Item = Square<S>> {
     (0..(S * S)).map(|i| Square::from_u8(i as u8))
 }
 
@@ -508,24 +512,24 @@ impl Direction {
 /// One or more `Movement`s, storing how many pieces are dropped off at each step
 #[derive(Copy, Clone, Default, PartialEq, Eq, Debug)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-pub struct StackMovement {
+pub struct StackMovement<const S: usize> {
     // The first 4 bits is the number of squares moved
     // The remaining 28 bits are the number of pieces taken, 4 bits per number
     data: u8,
 }
 
-impl StackMovement {
+impl<const S: usize> StackMovement<S> {
     pub fn new() -> Self {
         StackMovement { data: 0 }
     }
 
-    pub fn get_first<const S: usize>(&self) -> Movement {
+    pub fn get_first(&self) -> Movement {
         Movement {
             pieces_to_take: 8 - self.data.leading_zeros() as u8,
         }
     }
 
-    pub fn push<const S: usize>(&mut self, movement: Movement, pieces_held: u8) {
+    pub fn push(&mut self, movement: Movement, pieces_held: u8) {
         debug_assert!(pieces_held > 0);
         debug_assert!(
             self.data == 0 || pieces_held > movement.pieces_to_take,
@@ -554,19 +558,19 @@ impl StackMovement {
         self.len() == 0
     }
 
-    pub fn from_movements<const S: usize, I: IntoIterator<Item = Movement>>(iter: I) -> Self {
+    pub fn from_movements<I: IntoIterator<Item = Movement>>(iter: I) -> Self {
         let mut pieces_held = S as u8;
         let mut result = StackMovement::new();
         for movement in iter {
             // println!("Holding {}, taking {}", pieces_held, movement.pieces_to_take);
-            result.push::<S>(movement, pieces_held);
+            result.push(movement, pieces_held);
             pieces_held = movement.pieces_to_take;
         }
         result
     }
 
     #[allow(clippy::should_implement_trait)]
-    pub fn into_iter<const S: usize>(self) -> impl Iterator<Item = Movement> {
+    pub fn into_iter(self) -> impl Iterator<Item = Movement> {
         StackMovementIterator { data: self.data }
     }
 }
@@ -626,7 +630,7 @@ pub(crate) const fn generate_neighbor_table<const S: usize>() -> AbstractBoard<B
     while rank < S {
         let mut file = 0;
         while file < S {
-            let square = Square::from_rank_file::<S>(rank as u8, file as u8);
+            let square = Square::from_rank_file(rank as u8, file as u8);
             table.raw[file][rank] = BitBoard::neighbors::<S>(square);
             file += 1;
         }
@@ -642,14 +646,14 @@ const NEIGHBOR_TABLE_6S: AbstractBoard<BitBoard, 6> = generate_neighbor_table::<
 const NEIGHBOR_TABLE_7S: AbstractBoard<BitBoard, 7> = generate_neighbor_table::<7>();
 const NEIGHBOR_TABLE_8S: AbstractBoard<BitBoard, 8> = generate_neighbor_table::<8>();
 
-pub(crate) fn lookup_neighbor_table<const S: usize>(square: Square) -> BitBoard {
+pub(crate) fn lookup_neighbor_table<const S: usize>(square: Square<S>) -> BitBoard {
     match S {
-        3 => NEIGHBOR_TABLE_3S[square],
-        4 => NEIGHBOR_TABLE_4S[square],
-        5 => NEIGHBOR_TABLE_5S[square],
-        6 => NEIGHBOR_TABLE_6S[square],
-        7 => NEIGHBOR_TABLE_7S[square],
-        8 => NEIGHBOR_TABLE_8S[square],
+        3 => NEIGHBOR_TABLE_3S[square.downcast_size()],
+        4 => NEIGHBOR_TABLE_4S[square.downcast_size()],
+        5 => NEIGHBOR_TABLE_5S[square.downcast_size()],
+        6 => NEIGHBOR_TABLE_6S[square.downcast_size()],
+        7 => NEIGHBOR_TABLE_7S[square.downcast_size()],
+        8 => NEIGHBOR_TABLE_8S[square.downcast_size()],
         _ => unimplemented!("Unsupported size {}", S),
     }
 }
@@ -662,10 +666,10 @@ impl<T: Default + Copy, const S: usize> Default for AbstractBoard<T, S> {
     }
 }
 
-impl<T, const S: usize> Index<Square> for AbstractBoard<T, S> {
+impl<T, const S: usize> Index<Square<S>> for AbstractBoard<T, S> {
     type Output = T;
     #[allow(clippy::needless_lifetimes)]
-    fn index<'a>(&'a self, square: Square) -> &'a Self::Output {
+    fn index<'a>(&'a self, square: Square<S>) -> &'a Self::Output {
         assert!((square.inner as usize) < S * S);
         // Compared to the safe code, this is roughly a 10% speedup of the entire engine
         unsafe {
@@ -677,9 +681,9 @@ impl<T, const S: usize> Index<Square> for AbstractBoard<T, S> {
     }
 }
 
-impl<T, const S: usize> IndexMut<Square> for AbstractBoard<T, S> {
+impl<T, const S: usize> IndexMut<Square<S>> for AbstractBoard<T, S> {
     #[allow(clippy::needless_lifetimes)]
-    fn index_mut<'a>(&'a mut self, square: Square) -> &'a mut Self::Output {
+    fn index_mut<'a>(&'a mut self, square: Square<S>) -> &'a mut Self::Output {
         assert!((square.inner as usize) < S * S);
         // Compared to the safe code, this is roughly a 10% speedup of the entire engine
         unsafe {

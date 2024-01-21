@@ -800,7 +800,7 @@ impl PlaytakSession {
                     // On the very first move, always place instantly in a random corner
                     if squares_iterator::<S>().all(|square| position[square].is_empty()) {
                         let mut rng = rand::thread_rng();
-                        let corner_placements: Vec<Move> = Square::corners::<S>().into_iter().map(|square| Move::Place(Role::Flat, square)).collect();
+                        let corner_placements: Vec<Move<S>> = Square::corners().into_iter().map(|square| Move::Place(Role::Flat, square)).collect();
 
                         (corner_placements.choose(&mut rng).unwrap().clone(), 0.0)
                     } else if let Some(fixed_nodes) = playtak_settings.fixed_nodes {
@@ -831,7 +831,7 @@ impl PlaytakSession {
                                 tps: None,
                                 moves: moves
                                     .iter()
-                                    .map(|PtnMove { mv, .. }: &PtnMove<Move>| mv.to_string::<S>())
+                                    .map(|PtnMove { mv, .. }: &PtnMove<Move<S>>| mv.to_string())
                                     .collect(),
                                 time_control: search::TimeControl::Time(our_time_left, game.increment),
                                 komi: position.komi().into(),
@@ -883,11 +883,8 @@ impl PlaytakSession {
                     comment: score.to_string(),
                 });
 
-                let output_string = format!(
-                    "Game#{} {}",
-                    game.game_no,
-                    best_move.to_string_playtak::<S>()
-                );
+                let output_string =
+                    format!("Game#{} {}", game.game_no, best_move.to_string_playtak());
                 self.send_line(&output_string)?;
 
                 // Say "Tak" whenever there is a threat to win
@@ -952,7 +949,7 @@ impl PlaytakSession {
                         match words[1] {
                             "P" | "M" => {
                                 let move_string = words[1..].join(" ");
-                                let move_played = Move::from_string_playtak::<S>(&move_string);
+                                let move_played = Move::from_string_playtak(&move_string);
                                 position.do_move(move_played.clone());
                                 moves.push(PtnMove {
                                     mv: move_played,
@@ -1013,7 +1010,7 @@ impl PlaytakSession {
 
         let mut move_list = vec![];
         for PtnMove { mv, .. } in moves {
-            move_list.push(mv.to_string::<S>());
+            move_list.push(mv.to_string());
         }
         info!("Move list: {}", move_list.join(" "));
 

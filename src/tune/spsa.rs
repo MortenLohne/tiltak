@@ -74,7 +74,7 @@ pub fn tune<const S: usize>(variables: &mut [Variable], book_path: Option<&str>)
 fn tuning_iteration<R: rand::Rng, const S: usize>(
     variables: &[Variable],
     rng: &mut R,
-    opening: &[Move],
+    opening: &[Move<S>],
 ) -> Vec<SpsaDirection> {
     #[allow(clippy::type_complexity)]
     let (player1_variables, player2_variables): (

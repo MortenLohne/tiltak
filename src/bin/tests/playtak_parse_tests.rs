@@ -14,7 +14,7 @@ fn parse_place_move_test() {
 
     for (playtak_move_string, san_move_string) in move_strings.iter() {
         assert_eq!(
-            Move::from_string_playtak::<5>(playtak_move_string).to_string::<5>(),
+            <Move<5>>::from_string_playtak(playtak_move_string).to_string(),
             *san_move_string
         );
     }
@@ -26,7 +26,7 @@ fn parse_move_move_test() {
 
     for (playtak_move_string, san_move_string) in move_strings.iter() {
         assert_eq!(
-            Move::from_string_playtak::<5>(playtak_move_string).to_string::<5>(),
+            <Move<5>>::from_string_playtak(playtak_move_string).to_string(),
             *san_move_string
         );
     }
@@ -44,7 +44,7 @@ fn write_place_move_5s_test() {
     for (playtak_move_string, san_move_string) in move_strings.iter() {
         let position = <Position<5>>::start_position();
         assert_eq!(
-            Move::to_string_playtak::<5>(&position.move_from_san(san_move_string).unwrap()),
+            Move::to_string_playtak(&position.move_from_san(san_move_string).unwrap()),
             *playtak_move_string
         );
     }
@@ -57,7 +57,7 @@ fn write_move_move_5s_test() {
     for (playtak_move_string, san_move_string) in move_strings.iter() {
         let position = <Position<5>>::start_position();
         assert_eq!(
-            Move::to_string_playtak::<5>(&position.move_from_san(san_move_string).unwrap()),
+            Move::to_string_playtak(&position.move_from_san(san_move_string).unwrap()),
             *playtak_move_string
         );
     }

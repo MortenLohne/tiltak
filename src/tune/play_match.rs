@@ -20,10 +20,10 @@ pub fn play_game<const S: usize>(
     white_settings: &MctsSetting<S>,
     black_settings: &MctsSetting<S>,
     komi: Komi,
-    opening: &[Move],
+    opening: &[Move<S>],
     temperature: f64,
     time_control: &TimeControl,
-) -> (Game<Position<S>>, Vec<Vec<(Move, Score)>>) {
+) -> (Game<Position<S>>, Vec<Vec<(Move<S>, Score)>>) {
     let mut position = Position::start_position_with_komi(komi);
     let mut game_moves = opening.to_vec();
     let mut move_scores = vec![vec![]; opening.len()];

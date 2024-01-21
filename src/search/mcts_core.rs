@@ -14,16 +14,16 @@ use super::{arena, Arena};
 
 /// A Monte Carlo Search Tree, containing every node that has been seen in search.
 #[derive(PartialEq, Debug)]
-pub struct Tree {
-    pub children: arena::SliceIndex<TreeEdge>,
+pub struct Tree<const S: usize> {
+    pub children: arena::SliceIndex<TreeEdge<S>>,
     pub total_action_value: f64,
     pub is_terminal: bool,
 }
 
 #[derive(PartialEq, Debug)]
-pub struct TreeEdge {
-    pub child: Option<arena::Index<Tree>>,
-    pub mv: Move,
+pub struct TreeEdge<const S: usize> {
+    pub child: Option<arena::Index<Tree<S>>>,
+    pub mv: Move<S>,
     pub mean_action_value: Score,
     pub visits: u64,
     pub heuristic_score: Score,
@@ -31,17 +31,17 @@ pub struct TreeEdge {
 
 /// Temporary vectors that are continually re-used during search to avoid unnecessary allocations
 #[derive(Debug)]
-pub struct TempVectors {
-    simple_moves: Vec<Move>,
-    moves: Vec<(Move, f32)>,
+pub struct TempVectors<const S: usize> {
+    simple_moves: Vec<Move<S>>,
+    moves: Vec<(Move<S>, f32)>,
     fcd_per_move: Vec<i8>,
     value_scores: Vec<Score>,
     policy_score_sets: Vec<Box<[Score]>>,
     policy_feature_sets: Option<Vec<PolicyFeatures<'static>>>,
 }
 
-impl TempVectors {
-    pub fn new<const S: usize>() -> Self {
+impl<const S: usize> TempVectors<S> {
+    pub fn new() -> Self {
         TempVectors {
             simple_moves: vec![],
             moves: vec![],
@@ -53,8 +53,8 @@ impl TempVectors {
     }
 }
 
-impl TreeEdge {
-    pub fn new(mv: Move, heuristic_score: Score, mean_action_value: Score) -> Self {
+impl<const S: usize> TreeEdge<S> {
+    pub fn new(mv: Move<S>, heuristic_score: Score, mean_action_value: Score) -> Self {
         TreeEdge {
             child: None,
             mv,
@@ -78,11 +78,11 @@ impl TreeEdge {
     ///
     /// Moves done on the board are not reversed.
     #[must_use]
-    pub fn select<const S: usize>(
+    pub fn select(
         &mut self,
         position: &mut Position<S>,
         settings: &MctsSetting<S>,
-        temp_vectors: &mut TempVectors,
+        temp_vectors: &mut TempVectors<S>,
         arena: &Arena,
     ) -> Option<Score> {
         if self.visits == 0 {
@@ -144,7 +144,7 @@ impl TreeEdge {
                 .unwrap();
 
             position.do_move(child_edge.mv.clone());
-            let result = 1.0 - child_edge.select::<S>(position, settings, temp_vectors, arena)?;
+            let result = 1.0 - child_edge.select(position, settings, temp_vectors, arena)?;
             self.visits += 1;
 
             node.total_action_value += result as f64;
@@ -157,11 +157,11 @@ impl TreeEdge {
     // Never inline, for profiling purposes
     #[inline(never)]
     #[must_use]
-    fn expand<const S: usize>(
+    fn expand(
         &mut self,
         position: &mut Position<S>,
         settings: &MctsSetting<S>,
-        temp_vectors: &mut TempVectors,
+        temp_vectors: &mut TempVectors<S>,
         arena: &Arena,
     ) -> Option<Score> {
         debug_assert!(self.child.is_none());
@@ -185,17 +185,17 @@ impl TreeEdge {
     }
 }
 
-impl Tree {
+impl<const S: usize> Tree<S> {
     /// Do not initialize children in the expansion phase, for better performance
     /// Never inline, for profiling purposes
     #[inline(never)]
     #[must_use]
-    fn init_children<const S: usize>(
+    fn init_children(
         &mut self,
         position: &Position<S>,
         group_data: &GroupData<S>,
         settings: &MctsSetting<S>,
-        temp_vectors: &mut TempVectors,
+        temp_vectors: &mut TempVectors<S>,
         arena: &Arena,
     ) -> Option<()> {
         position.generate_moves_with_params(
@@ -264,7 +264,7 @@ pub fn rollout<const S: usize>(
     position: &mut Position<S>,
     settings: &MctsSetting<S>,
     depth: u16,
-    temp_vectors: &mut TempVectors,
+    temp_vectors: &mut TempVectors<S>,
 ) -> (Score, bool) {
     let group_data = position.group_data();
 
@@ -346,13 +346,13 @@ impl GameResultForUs {
     }
 }
 
-pub struct Pv<'a> {
+pub struct Pv<'a, const S: usize> {
     arena: &'a Arena,
-    edge: Option<&'a TreeEdge>,
+    edge: Option<&'a TreeEdge<S>>,
 }
 
-impl<'a> Pv<'a> {
-    pub fn new(edge: &'a TreeEdge, arena: &'a Arena) -> Pv<'a> {
+impl<'a, const S: usize> Pv<'a, S> {
+    pub fn new(edge: &'a TreeEdge<S>, arena: &'a Arena) -> Pv<'a, S> {
         let mut pv = Pv {
             edge: Some(edge),
             arena,
@@ -363,8 +363,8 @@ impl<'a> Pv<'a> {
     }
 }
 
-impl<'a> Iterator for Pv<'a> {
-    type Item = Move;
+impl<'a, const S: usize> Iterator for Pv<'a, S> {
+    type Item = Move<S>;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.edge.map(|edge| {
@@ -387,7 +387,11 @@ impl<'a> Iterator for Pv<'a> {
 /// tending towards the highest-scoring moves, but with a random component
 /// If temperature is low (e.g. 0.1), it tends to choose the highest-scoring move
 /// If temperature is 1.0, it chooses a move proportional to its score
-pub fn best_move<R: Rng>(rng: &mut R, temperature: f64, move_scores: &[(Move, Score)]) -> Move {
+pub fn best_move<R: Rng, const S: usize>(
+    rng: &mut R,
+    temperature: f64,
+    move_scores: &[(Move<S>, Score)],
+) -> Move<S> {
     let mut move_probabilities = vec![];
     let mut cumulative_prob = 0.0;
 

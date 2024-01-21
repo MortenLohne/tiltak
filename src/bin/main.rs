@@ -188,7 +188,7 @@ fn main() {
                     Some(s) => println!("Game analysis at size {} not available", s),
                 }
             }
-            "mem_usage" => mem_usage(),
+            "mem_usage" => mem_usage::<6>(),
             "bench" => bench(),
             "bench_old" => bench_old(),
             "selfplay" => mcts_selfplay(time::Duration::from_secs(10)),
@@ -206,7 +206,7 @@ fn analyze_openings<const S: usize>(komi: Komi, nodes: u32) {
         .flat_map(|line| line.split(':').take(1))
         .par_bridge()
         .for_each(|line| {
-            let mut position = <Position<6>>::start_position_with_komi(komi);
+            let mut position = <Position<S>>::start_position_with_komi(komi);
             for word in line
                 .split_whitespace()
                 .take_while(|word| !word.contains(':'))
@@ -223,7 +223,7 @@ fn analyze_openings<const S: usize>(komi: Komi, nodes: u32) {
                     break;
                 };
             }
-            let pv: Vec<Move> = tree.pv().take(4).collect();
+            let pv: Vec<Move<S>> = tree.pv().take(4).collect();
             print!(
                 "{}: {:.4}, {:.1}s, ",
                 line.trim(),
@@ -243,7 +243,7 @@ fn generate_openings<const S: usize>(
     position: &mut Position<S>,
     positions: &mut HashSet<Position<S>>,
     depth: u8,
-) -> Vec<Vec<Move>> {
+) -> Vec<Vec<Move<S>>> {
     let mut moves = vec![];
     position.generate_moves(&mut moves);
     moves.retain(|mv| matches!(mv, Move::Place(Role::Flat, _)));
@@ -295,7 +295,7 @@ fn mcts_selfplay(max_time: time::Duration) {
         moves.push(best_move.clone());
         println!(
             "{:6}: {:.3}, {:.1}s",
-            best_move.to_string::<5>(),
+            best_move.to_string(),
             score,
             start_time.elapsed().as_secs_f32()
         );
@@ -340,7 +340,7 @@ fn mcts_vs_minmax(minmax_depth: u16, mcts_nodes: u64) {
                 let (best_move, score) = search::mcts::<5>(position.clone(), mcts_nodes);
                 position.do_move(best_move.clone());
                 moves.push(best_move.clone());
-                println!("{:6}: {:.3}", best_move.to_string::<5>(), score);
+                println!("{:6}: {:.3}", best_move.to_string(), score);
                 io::stdout().flush().unwrap();
             }
 
@@ -348,7 +348,7 @@ fn mcts_vs_minmax(minmax_depth: u16, mcts_nodes: u64) {
                 let (best_move, score) = minmax::minmax(&mut position, minmax_depth);
                 position.do_move(best_move.clone().unwrap());
                 moves.push(best_move.clone().unwrap());
-                print!("{:6}: {:.2}, ", best_move.unwrap().to_string::<5>(), score);
+                print!("{:6}: {:.2}, ", best_move.unwrap().to_string(), score);
                 io::stdout().flush().unwrap();
             }
         }
@@ -534,7 +534,7 @@ fn analyze_position<const S: usize>(position: &Position<S>) {
         .map(|feature_set| parameters::PolicyFeatures::new::<S>(feature_set))
         .collect();
 
-    let simple_moves: Vec<Move> = moves.iter().map(|(mv, _)| mv.clone()).collect();
+    let simple_moves: Vec<Move<S>> = moves.iter().map(|(mv, _)| mv.clone()).collect();
 
     position.features_for_moves(
         &mut policy_feature_sets,
@@ -545,7 +545,7 @@ fn analyze_position<const S: usize>(position: &Position<S>) {
 
     println!("Top 10 heuristic moves:");
     for ((mv, score), features) in moves.iter().zip(feature_sets).take(10) {
-        println!("{}: {:.3}%", mv.to_string::<S>(), score * 100.0);
+        println!("{}: {:.3}%", mv.to_string(), score * 100.0);
         for feature in features {
             print!("{:.1}, ", feature);
         }
@@ -582,7 +582,7 @@ fn analyze_position<const S: usize>(position: &Position<S>) {
             );
             tree.print_info();
             let (mv, value) = tree.best_move();
-            println!("Best move: ({}, {})", mv.to_string::<S>(), value);
+            println!("Best move: ({}, {})", mv.to_string(), value);
         }
     }
 }
@@ -625,30 +625,20 @@ fn analyze_game<const S: usize>(game: Game<Position<S>>) {
                 GameResult::Draw => "1/2-1/2",
             };
             if ply_number % 2 == 0 {
-                print!(
-                    "{}. {} {}",
-                    ply_number / 2,
-                    mv.to_string::<S>(),
-                    result_string
-                );
+                print!("{}. {} {}", ply_number / 2, mv.to_string(), result_string);
                 io::stdout().flush().unwrap();
             } else {
-                println!(
-                    "{}... {} {}",
-                    ply_number / 2,
-                    mv.to_string::<S>(),
-                    result_string
-                );
+                println!("{}... {} {}", ply_number / 2, mv.to_string(), result_string);
             }
         } else {
-            let (best_move, score) = search::mcts::<S>(position.clone(), 1_000_000);
+            let (best_move, score) = search::mcts(position.clone(), 1_000_000);
             if ply_number % 2 == 0 {
                 print!(
                     "{}. {} {{{:.2}%, best reply {}}} ",
                     ply_number / 2,
                     position.move_to_san(&mv),
                     (1.0 - score) * 100.0,
-                    best_move.to_string::<S>()
+                    best_move.to_string()
                 );
                 io::stdout().flush().unwrap();
             } else {
@@ -657,7 +647,7 @@ fn analyze_game<const S: usize>(game: Game<Position<S>>) {
                     ply_number / 2,
                     position.move_to_san(&mv),
                     (1.0 - score) * 100.0,
-                    best_move.to_string::<S>()
+                    best_move.to_string()
                 );
             }
         }
@@ -744,7 +734,7 @@ fn bench() {
 
     println!(
         "{}: {:.2}%, {:.2}s",
-        mv.to_string::<6>(),
+        mv.to_string(),
         score * 100.0,
         start_time.elapsed().as_secs_f32()
     );
@@ -792,16 +782,16 @@ fn bench_old() {
 }
 
 /// Print memory usage of various data types in the project, for debugging purposes
-fn mem_usage() {
+fn mem_usage<const S: usize>() {
     use std::mem;
     println!(
         "Tak board: {} bytes",
         mem::size_of::<position::Position<5>>()
     );
     println!("Tak board cell: {} bytes", mem::size_of::<Stack>());
-    println!("Tak move: {} bytes", mem::size_of::<Move>());
-    println!("MCTS edge 6s: {} bytes", search::edge_mem_usage());
-    println!("MCTS node 6s: {} bytes", search::node_mem_usage());
+    println!("Tak move: {} bytes", mem::size_of::<Move<S>>());
+    println!("MCTS edge 6s: {} bytes", search::edge_mem_usage::<S>());
+    println!("MCTS node 6s: {} bytes", search::node_mem_usage::<S>());
     println!(
         "Zobrist keys 5s: {} bytes",
         mem::size_of::<position::ZobristKeys<5>>()

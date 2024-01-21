@@ -108,11 +108,11 @@ pub(crate) const SQUARE_SYMMETRIES_4S: AbstractBoard<usize, 4> = generate_square
 pub(crate) const SQUARE_SYMMETRIES_5S: AbstractBoard<usize, 5> = generate_square_symmetries_table();
 pub(crate) const SQUARE_SYMMETRIES_6S: AbstractBoard<usize, 6> = generate_square_symmetries_table();
 
-pub(crate) fn lookup_square_symmetries<const S: usize>(square: Square) -> usize {
+pub(crate) fn lookup_square_symmetries<const S: usize>(square: Square<S>) -> usize {
     match S {
-        4 => SQUARE_SYMMETRIES_4S[square],
-        5 => SQUARE_SYMMETRIES_5S[square],
-        6 => SQUARE_SYMMETRIES_6S[square],
+        4 => SQUARE_SYMMETRIES_4S[square.downcast_size()],
+        5 => SQUARE_SYMMETRIES_5S[square.downcast_size()],
+        6 => SQUARE_SYMMETRIES_6S[square.downcast_size()],
         _ => unimplemented!("Unsupported size {}", S),
     }
 }
@@ -142,18 +142,18 @@ pub struct GroupEdgeConnection {
 }
 
 impl GroupEdgeConnection {
-    pub fn connect_square<const S: usize>(self, square: Square) -> Self {
+    pub fn connect_square<const S: usize>(self, square: Square<S>) -> Self {
         let mut edge_connection = self;
-        if square.rank::<S>() == S as u8 - 1 {
+        if square.rank() == S as u8 - 1 {
             edge_connection = edge_connection.connect_north();
         }
-        if square.rank::<S>() == 0 {
+        if square.rank() == 0 {
             edge_connection = edge_connection.connect_south();
         }
-        if square.file::<S>() == 0 {
+        if square.file() == 0 {
             edge_connection = edge_connection.connect_west();
         }
-        if square.file::<S>() == S as u8 - 1 {
+        if square.file() == S as u8 - 1 {
             edge_connection = edge_connection.connect_east();
         }
         edge_connection
@@ -275,14 +275,14 @@ impl<const S: usize> GroupData<S> {
             | self.black_blocking_pieces()
     }
 
-    pub fn is_critical_square(&self, square: Square, color: Color) -> bool {
+    pub fn is_critical_square(&self, square: Square<S>, color: Color) -> bool {
         match color {
             Color::White => WhiteTr::is_critical_square(self, square),
             Color::Black => BlackTr::is_critical_square(self, square),
         }
     }
 
-    pub fn critical_squares(&self, color: Color) -> impl Iterator<Item = Square> {
+    pub fn critical_squares(&self, color: Color) -> impl Iterator<Item = Square<S>> {
         match color {
             Color::White => self.white_critical_squares.into_iter(),
             Color::Black => self.black_critical_squares.into_iter(),
@@ -296,30 +296,30 @@ pub struct ZobristKeys<const S: usize> {
     to_move: [u64; 2],
 }
 
-pub fn zobrist_top_stones<const S: usize>(square: Square, piece: Piece) -> u64 {
+pub fn zobrist_top_stones<const S: usize>(square: Square<S>, piece: Piece) -> u64 {
     match S {
-        3 => ZOBRIST_KEYS_3S.top_stones[square][piece as u16 as usize],
-        4 => ZOBRIST_KEYS_4S.top_stones[square][piece as u16 as usize],
-        5 => ZOBRIST_KEYS_5S.top_stones[square][piece as u16 as usize],
-        6 => ZOBRIST_KEYS_6S.top_stones[square][piece as u16 as usize],
-        7 => ZOBRIST_KEYS_7S.top_stones[square][piece as u16 as usize],
-        8 => ZOBRIST_KEYS_8S.top_stones[square][piece as u16 as usize],
+        3 => ZOBRIST_KEYS_3S.top_stones[square.downcast_size()][piece as u16 as usize],
+        4 => ZOBRIST_KEYS_4S.top_stones[square.downcast_size()][piece as u16 as usize],
+        5 => ZOBRIST_KEYS_5S.top_stones[square.downcast_size()][piece as u16 as usize],
+        6 => ZOBRIST_KEYS_6S.top_stones[square.downcast_size()][piece as u16 as usize],
+        7 => ZOBRIST_KEYS_7S.top_stones[square.downcast_size()][piece as u16 as usize],
+        8 => ZOBRIST_KEYS_8S.top_stones[square.downcast_size()][piece as u16 as usize],
         _ => panic!("No zobrist keys for size {}. Size not supported.", S),
     }
 }
 
 pub fn zobrist_stones_in_stack<const S: usize>(
-    square: Square,
+    square: Square<S>,
     place_in_stack: usize,
     stack_slice: usize,
 ) -> u64 {
     match S {
-        3 => ZOBRIST_KEYS_3S.stones_in_stack[place_in_stack][square][stack_slice],
-        4 => ZOBRIST_KEYS_4S.stones_in_stack[place_in_stack][square][stack_slice],
-        5 => ZOBRIST_KEYS_5S.stones_in_stack[place_in_stack][square][stack_slice],
-        6 => ZOBRIST_KEYS_6S.stones_in_stack[place_in_stack][square][stack_slice],
-        7 => ZOBRIST_KEYS_7S.stones_in_stack[place_in_stack][square][stack_slice],
-        8 => ZOBRIST_KEYS_8S.stones_in_stack[place_in_stack][square][stack_slice],
+        3 => ZOBRIST_KEYS_3S.stones_in_stack[place_in_stack][square.downcast_size()][stack_slice],
+        4 => ZOBRIST_KEYS_4S.stones_in_stack[place_in_stack][square.downcast_size()][stack_slice],
+        5 => ZOBRIST_KEYS_5S.stones_in_stack[place_in_stack][square.downcast_size()][stack_slice],
+        6 => ZOBRIST_KEYS_6S.stones_in_stack[place_in_stack][square.downcast_size()][stack_slice],
+        7 => ZOBRIST_KEYS_7S.stones_in_stack[place_in_stack][square.downcast_size()][stack_slice],
+        8 => ZOBRIST_KEYS_8S.stones_in_stack[place_in_stack][square.downcast_size()][stack_slice],
         _ => panic!("No zobrist keys for size {}. Size not supported.", S),
     }
 }
@@ -394,7 +394,7 @@ pub struct Position<const S: usize> {
     white_caps_left: u8,
     black_caps_left: u8,
     half_moves_played: usize,
-    moves: Vec<Move>,
+    moves: Vec<Move<S>>,
     komi: Komi,
     hash: u64,              // Zobrist hash of current position
     hash_history: Vec<u64>, // Zobrist hashes of previous board states, up to the last irreversible move. Does not include the corrent position
@@ -462,16 +462,16 @@ impl<const S: usize> Hash for Position<S> {
     }
 }
 
-impl<const S: usize> Index<Square> for Position<S> {
+impl<const S: usize> Index<Square<S>> for Position<S> {
     type Output = Stack;
 
-    fn index(&self, square: Square) -> &Self::Output {
+    fn index(&self, square: Square<S>) -> &Self::Output {
         &self.cells[square]
     }
 }
 
-impl<const S: usize> IndexMut<Square> for Position<S> {
-    fn index_mut(&mut self, square: Square) -> &mut Self::Output {
+impl<const S: usize> IndexMut<Square<S>> for Position<S> {
+    fn index_mut(&mut self, square: Square<S>) -> &mut Self::Output {
         &mut self.cells[square]
     }
 }
@@ -488,7 +488,7 @@ impl<const S: usize> fmt::Debug for Position<S> {
             for print_row in 0..3 {
                 for x in 0..S {
                     for print_column in 0..3 {
-                        match self.cells[Square::from_rank_file::<S>(y as u8, x as u8)]
+                        match self.cells[Square::from_rank_file(y as u8, x as u8)]
                             .get(print_column * 3 + print_row)
                         {
                             None => write!(f, "[.]")?,
@@ -583,7 +583,7 @@ impl<const S: usize> Position<S> {
     }
 
     /// All the moves played in the game
-    pub fn moves(&self) -> &Vec<Move> {
+    pub fn moves(&self) -> &Vec<Move<S>> {
         &self.moves
     }
 
@@ -601,7 +601,7 @@ impl<const S: usize> Position<S> {
         hash
     }
 
-    pub(crate) fn zobrist_hash_for_square(&self, square: Square) -> u64 {
+    pub(crate) fn zobrist_hash_for_square(&self, square: Square<S>) -> u64 {
         let mut hash = 0;
         let stack = &self[square];
         if let Some(top_stone) = stack.top_stone {
@@ -621,7 +621,7 @@ impl<const S: usize> Position<S> {
     fn is_critical_square_from_scratch(
         &self,
         group_data: &GroupData<S>,
-        square: Square,
+        square: Square<S>,
         color: Color,
     ) -> bool {
         let neighbors_bitboard = utils::lookup_neighbor_table::<S>(square);
@@ -645,8 +645,8 @@ impl<const S: usize> Position<S> {
         let mut new_board = self.clone();
         for file in 0..S as u8 {
             for rank in 0..S as u8 {
-                new_board[Square::from_rank_file::<S>(rank, file)] =
-                    self[Square::from_rank_file::<S>(S as u8 - rank - 1, file)];
+                new_board[Square::from_rank_file(rank, file)] =
+                    self[Square::from_rank_file(S as u8 - rank - 1, file)];
             }
         }
         new_board
@@ -656,8 +656,8 @@ impl<const S: usize> Position<S> {
         let mut new_board = self.clone();
         for file in 0..S as u8 {
             for rank in 0..S as u8 {
-                new_board[Square::from_rank_file::<S>(rank, file)] =
-                    self[Square::from_rank_file::<S>(rank, S as u8 - file - 1)];
+                new_board[Square::from_rank_file(rank, file)] =
+                    self[Square::from_rank_file(rank, S as u8 - file - 1)];
             }
         }
         new_board
@@ -669,8 +669,8 @@ impl<const S: usize> Position<S> {
             for rank in 0..S as u8 {
                 let new_file = rank;
                 let new_rank = S as u8 - file - 1;
-                new_board[Square::from_rank_file::<S>(rank, file)] =
-                    self[Square::from_rank_file::<S>(new_rank, new_file)];
+                new_board[Square::from_rank_file(rank, file)] =
+                    self[Square::from_rank_file(new_rank, new_file)];
             }
         }
         new_board
@@ -787,11 +787,11 @@ impl<const S: usize> Position<S> {
     /// An iterator over the top stones left behind after a stack movement
     pub fn top_stones_left_behind_by_move<'a>(
         &'a self,
-        square: Square,
-        stack_movement: &'a StackMovement,
+        square: Square<S>,
+        stack_movement: &'a StackMovement<S>,
     ) -> impl Iterator<Item = Option<Piece>> + 'a {
         stack_movement
-            .into_iter::<S>()
+            .into_iter()
             .map(move |Movement { pieces_to_take }| {
                 let piece_index = self[square].len() - pieces_to_take;
                 if piece_index == 0 {
@@ -803,22 +803,22 @@ impl<const S: usize> Position<S> {
             .chain(std::iter::once(self[square].top_stone()))
     }
 
-    pub(crate) fn fcd_for_move(&self, mv: Move) -> i8 {
+    pub(crate) fn fcd_for_move(&self, mv: Move<S>) -> i8 {
         match mv {
             Move::Place(Role::Flat, _) if self.half_moves_played() > 1 => 1,
             Move::Place(Role::Flat, _) => -1,
             Move::Place(_, _) => 0,
             Move::Move(square, direction, stack_movement) => {
                 let mut destination_square =
-                    if stack_movement.get_first::<S>().pieces_to_take == self[square].len() {
-                        square.go_direction::<S>(direction).unwrap()
+                    if stack_movement.get_first().pieces_to_take == self[square].len() {
+                        square.go_direction(direction).unwrap()
                     } else {
                         square
                     };
 
                 let mut fcd = 0;
 
-                if self[square].len() == stack_movement.get_first::<S>().pieces_to_take {
+                if self[square].len() == stack_movement.get_first().pieces_to_take {
                     let top_stone = self[square].top_stone.unwrap();
                     if top_stone.role() == Flat {
                         fcd -= 1;
@@ -851,7 +851,7 @@ impl<const S: usize> Position<S> {
                     }
 
                     destination_square = destination_square
-                        .go_direction::<S>(direction)
+                        .go_direction(direction)
                         .unwrap_or(destination_square);
                 }
 
@@ -934,7 +934,7 @@ impl<const S: usize> Position<S> {
         &self,
         components: &AbstractBoard<u8, S>,
         highest_component_id: u8,
-    ) -> Option<Square> {
+    ) -> Option<Square<S>> {
         // If the side to move is already winning,
         // the last move was either a suicide, or a double win
         let mut suicide_win_square = None;
@@ -1103,8 +1103,8 @@ impl<const S: usize> Position<S> {
     pub fn generate_moves_with_probabilities(
         &self,
         group_data: &GroupData<S>,
-        simple_moves: &mut Vec<Move>,
-        moves: &mut Vec<(Move, search::Score)>,
+        simple_moves: &mut Vec<Move<S>>,
+        moves: &mut Vec<(Move<S>, search::Score)>,
         fcd_per_move: &mut Vec<i8>,
         features: &mut Vec<Box<[f32]>>,
         policy_params: &[f32],
@@ -1138,7 +1138,7 @@ impl<const S: usize> Position<S> {
                         *self,
                         old_position,
                         "Failed to restore old board after {:?} on\n{:?}",
-                        mv.to_string::<S>(),
+                        mv.to_string(),
                         old_position
                     );
                     num_moves
@@ -1172,8 +1172,8 @@ impl<const S: usize> Position<S> {
 }
 
 impl<const S: usize> PositionTrait for Position<S> {
-    type Move = Move;
-    type ReverseMove = ReverseMove;
+    type Move = Move<S>;
+    type ReverseMove = ReverseMove<S>;
     type Settings = Settings;
 
     fn start_position_with_settings(settings: &Self::Settings) -> Self {
@@ -1277,7 +1277,7 @@ impl<const S: usize> PositionTrait for Position<S> {
                 let mut pieces_left_behind = ArrayVec::new();
                 let mut flattens_stone = false;
 
-                let mut movement_iter = stack_movement.into_iter::<S>();
+                let mut movement_iter = stack_movement.into_iter();
                 let mut moving_pieces: ArrayVec<Piece, 8> = ArrayVec::new();
 
                 for _ in 0..movement_iter.next().unwrap().pieces_to_take {
@@ -1287,7 +1287,7 @@ impl<const S: usize> PositionTrait for Position<S> {
                 for Movement { pieces_to_take } in
                     movement_iter.chain(iter::once(Movement { pieces_to_take: 0 }))
                 {
-                    to = to.go_direction::<S>(direction).unwrap();
+                    to = to.go_direction(direction).unwrap();
 
                     if self[to].top_stone.map(Piece::role) == Some(Wall) {
                         flattens_stone = true;
@@ -1366,7 +1366,7 @@ impl<const S: usize> PositionTrait for Position<S> {
                 let mut to = from;
 
                 for piece_left_behind in pieces_left_behind.into_iter() {
-                    to = to.go_direction::<S>(direction).unwrap();
+                    to = to.go_direction(direction).unwrap();
                     let temp_pieces: ArrayVec<Piece, 8> = (0..piece_left_behind)
                         .map(|_| self[to].pop().unwrap())
                         .collect();
@@ -1405,14 +1405,14 @@ impl<const S: usize> PositionTrait for Position<S> {
 }
 
 pub(crate) struct MoveIterator<const S: usize> {
-    square: Square,
+    square: Square<S>,
     direction: Direction,
     squares_left: usize,
     _size: [(); S],
 }
 
 impl<const S: usize> MoveIterator<S> {
-    pub fn new(square: Square, direction: Direction, stack_movement: StackMovement) -> Self {
+    pub fn new(square: Square<S>, direction: Direction, stack_movement: StackMovement<S>) -> Self {
         MoveIterator {
             square,
             direction,
@@ -1423,7 +1423,7 @@ impl<const S: usize> MoveIterator<S> {
 }
 
 impl<const S: usize> Iterator for MoveIterator<S> {
-    type Item = Square;
+    type Item = Square<S>;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.squares_left == 0 {
@@ -1431,7 +1431,7 @@ impl<const S: usize> Iterator for MoveIterator<S> {
         } else {
             let next_square = self.square;
             if self.squares_left > 1 {
-                self.square = self.square.go_direction::<S>(self.direction).unwrap();
+                self.square = self.square.go_direction(self.direction).unwrap();
             }
             self.squares_left -= 1;
             Some(next_square)
@@ -1536,7 +1536,7 @@ impl<const S: usize> pgn_traits::PgnPosition for Position<S> {
             })?;
         let mut position = Position::start_position_with_settings(settings);
         for square in utils::squares_iterator::<S>() {
-            let (file, rank) = (square.file::<S>(), square.rank::<S>());
+            let (file, rank) = (square.file(), square.rank());
             let stack = rows[rank as usize][file as usize];
             for piece in stack.into_iter() {
                 match piece {
@@ -1654,7 +1654,7 @@ impl<const S: usize> pgn_traits::PgnPosition for Position<S> {
         let mut f = String::new();
         for rank in 0..S {
             for file in 0..S {
-                let square = Square::from_rank_file::<S>(rank as u8, file as u8);
+                let square = Square::from_rank_file(rank as u8, file as u8);
                 if self[square].is_empty() {
                     f.push('x')
                 } else {
@@ -1686,15 +1686,15 @@ impl<const S: usize> pgn_traits::PgnPosition for Position<S> {
     }
 
     fn move_from_san(&self, input: &str) -> Result<Self::Move, pgn_traits::Error> {
-        Self::Move::from_string::<S>(input)
+        Self::Move::from_string(input)
     }
 
     fn move_to_san(&self, mv: &Self::Move) -> String {
-        mv.to_string::<S>()
+        mv.to_string()
     }
 
     fn move_from_lan(&self, input: &str) -> Result<Self::Move, pgn_traits::Error> {
-        Self::Move::from_string::<S>(input)
+        Self::Move::from_string(input)
     }
 
     fn move_to_lan(&self, mv: &Self::Move) -> String {
@@ -1718,11 +1718,11 @@ pub(crate) fn connected_components_graph<const S: usize>(
 fn connect_component<const S: usize>(
     road_pieces: BitBoard,
     components: &mut AbstractBoard<u8, S>,
-    square: Square,
+    square: Square<S>,
     id: u8,
 ) {
     components[square] = id;
-    for neighbour in square.neighbours::<S>() {
+    for neighbour in square.neighbours() {
         if road_pieces.get_square(neighbour) && components[neighbour] == 0 {
             connect_component(road_pieces, components, neighbour, id);
         }

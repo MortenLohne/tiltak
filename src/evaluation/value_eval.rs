@@ -249,7 +249,7 @@ pub fn static_eval_game_phase<const S: usize>(
             let controlling_player = top_stone.color();
 
             // Malus for them having stones next to our stack with flat stones on top
-            for neighbour in square.neighbours::<S>() {
+            for neighbour in square.neighbours() {
                 if let Some(neighbour_top_stone) = position[neighbour].top_stone() {
                     if top_stone.role() == Flat && neighbour_top_stone.color() != controlling_player
                     {
@@ -318,14 +318,14 @@ pub fn static_eval_game_phase<const S: usize>(
 
 fn cap_activity<Us: ColorTr, Them: ColorTr, const S: usize>(
     position: &Position<S>,
-    square: Square,
+    square: Square<S>,
     our_value_features: &mut ValueFeatures,
 ) {
     let stack = position[square];
     let height_index = stack.height.min(3) as usize - 1;
 
     // Malus if our capstone's line towards the center is blocked
-    if square.neighbours::<S>().any(|neighbour| {
+    if square.neighbours().any(|neighbour| {
         lookup_square_symmetries::<S>(neighbour) > lookup_square_symmetries::<S>(square)
             && position[neighbour].top_stone().map(Piece::role) == Some(Cap)
     }) {
@@ -336,14 +336,14 @@ fn cap_activity<Us: ColorTr, Them: ColorTr, const S: usize>(
         .get(stack.height.overflowing_sub(2).0)
         .map(Them::piece_is_ours)
         == Some(true);
-    if square.neighbours::<S>().all(|neighbour| {
+    if square.neighbours().all(|neighbour| {
         matches!(
             position[neighbour].top_stone(),
             Some(WhiteCap) | Some(BlackCap) | None
         )
     }) {
         our_value_features.fully_isolated_cap[height_index] += 1.0
-    } else if square.neighbours::<S>().all(|neighbour| {
+    } else if square.neighbours().all(|neighbour| {
         if let Some(neighbour_top_stone) = position[neighbour].top_stone() {
             if neighbour_top_stone == Them::wall_piece() {
                 is_soft_cap
@@ -362,7 +362,7 @@ fn cap_activity<Us: ColorTr, Them: ColorTr, const S: usize>(
 fn critical_squares_eval<Us: ColorTr, Them: ColorTr, const S: usize>(
     position: &Position<S>,
     group_data: &GroupData<S>,
-    critical_square: Square,
+    critical_square: Square<S>,
     our_value_features: &mut ValueFeatures,
 ) {
     let top_stone = position[critical_square].top_stone;
@@ -379,8 +379,8 @@ fn critical_squares_eval<Us: ColorTr, Them: ColorTr, const S: usize>(
         our_value_features.critical_squares[3] += 1.0
     }
 
-    let rank = critical_square.rank::<S>();
-    let file = critical_square.file::<S>();
+    let rank = critical_square.rank();
+    let file = critical_square.file();
 
     let capstone_square_in_line = {
         let capstone_in_rank = BitBoard::full().rank::<S>(rank) & Us::caps(group_data);
@@ -394,10 +394,10 @@ fn critical_squares_eval<Us: ColorTr, Them: ColorTr, const S: usize>(
     // TODO: Don't give bonuses if walls/caps block the spread
     if let Some(capstone_square) = capstone_square_in_line {
         let distance =
-            file.abs_diff(capstone_square.file::<S>()) + rank.abs_diff(capstone_square.rank::<S>());
+            file.abs_diff(capstone_square.file()) + rank.abs_diff(capstone_square.rank());
         let cap_stack = position[capstone_square];
         let is_hard_cap = cap_stack
-            .get(cap_stack.len() - 2)
+            .get(cap_stack.len().saturating_sub(2))
             .is_some_and(Us::piece_is_ours);
         let num_high_supports = cap_stack
             .into_iter()
