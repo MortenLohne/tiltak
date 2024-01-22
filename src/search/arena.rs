@@ -11,7 +11,7 @@ use std::{
     sync::atomic::{AtomicU32, Ordering},
 };
 
-pub struct Arena<const S: usize = 24> {
+pub struct Arena<const S: usize = 16> {
     data: *mut u8,
     orig_pointer: *mut u8,
     layout: Layout,
@@ -214,6 +214,9 @@ impl<const S: usize> Arena<S> {
 
         if length == 0 {
             return Some(SliceIndex::default());
+        }
+        if length > u32::MAX as usize {
+            return None;
         }
 
         let index = self.get_index_for_element(Self::num_slots_required::<T>() * length as u32)?;
