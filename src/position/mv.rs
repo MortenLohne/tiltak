@@ -16,51 +16,65 @@ use super::Square;
 /// A legal move for a position.
 #[derive(Clone, PartialEq, Eq, Debug)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-pub enum Move<const S: usize> {
+pub enum ExpMove<const S: usize> {
     Place(Role, Square<S>),
     Move(Square<S>, Direction, StackMovement<S>), // Number of stones to take
 }
 
-pub struct CompressedMove<const S: usize> {
+/// A legal move for a position.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub struct Move<const S: usize> {
     inner: u16,
 }
 
-impl<const S: usize> CompressedMove<S> {
-    pub fn compress(mv: Move<S>) -> CompressedMove<S> {
+impl<const S: usize> Move<S> {
+    pub fn compress(mv: ExpMove<S>) -> Move<S> {
         match mv {
-            Move::Place(role, square) => CompressedMove {
-                inner: square.into_inner() as u16 | (role as u16) << 6,
-            },
-            Move::Move(square, direction, stack_movement) => CompressedMove {
-                inner: square.into_inner() as u16
-                    | (direction as u16) << 6
-                    | (stack_movement.into_inner() as u16) << 8,
-            },
+            ExpMove::Place(role, square) => Self::placement(role, square),
+            ExpMove::Move(square, direction, stack_movement) => {
+                Self::movement(square, direction, stack_movement)
+            }
         }
     }
 
-    pub fn uncompress(self) -> Move<S> {
+    pub fn placement(role: Role, square: Square<S>) -> Move<S> {
+        Move {
+            inner: square.into_inner() as u16 | (role as u16) << 6,
+        }
+    }
+
+    pub fn movement(
+        square: Square<S>,
+        direction: Direction,
+        stack_movement: StackMovement<S>,
+    ) -> Move<S> {
+        Move {
+            inner: square.into_inner() as u16
+                | (direction as u16) << 6
+                | (stack_movement.into_inner() as u16) << 8,
+        }
+    }
+
+    pub fn expand(self) -> ExpMove<S> {
         if self.inner >> 8 == 0 {
-            Move::Place(
-                Role::from_disc(self.inner as u8 >> 6),
-                Square::from_u8(self.inner as u8 & 63),
-            )
+            unsafe {
+                ExpMove::Place(
+                    Role::from_disc_unchecked(self.inner as u8 >> 6),
+                    Square::from_u8(self.inner as u8 & 63),
+                )
+            }
         } else {
-            Move::Move(
+            ExpMove::Move(
                 Square::from_u8(self.inner as u8 & 63),
                 Direction::from_disc((self.inner as u8 >> 6) & 3),
                 StackMovement::from_u8((self.inner >> 8) as u8),
             )
         }
     }
-}
 
-impl<const S: usize> Move<S> {
-    pub fn origin_square(&self) -> Square<S> {
-        match self {
-            Move::Place(_, square) => *square,
-            Move::Move(square, _, _) => *square,
-        }
+    pub fn origin_square(self) -> Square<S> {
+        Square::from_u8(self.inner as u8 & 63)
     }
 
     pub fn from_string(input: &str) -> Result<Self, pgn_traits::Error> {
@@ -80,7 +94,7 @@ impl<const S: usize> Move<S> {
         match first_char {
             'a'..='h' if input.len() == 2 => {
                 let square = Square::parse_square(input)?;
-                Ok(Move::Place(Flat, square))
+                Ok(Self::placement(Flat, square))
             }
             'a'..='h' if input.len() == 3 => {
                 let square = Square::parse_square(&input[0..2])?;
@@ -89,10 +103,12 @@ impl<const S: usize> Move<S> {
                 // Moves in the simplified move notation always move one piece
                 let mut movement = StackMovement::new();
                 movement.push(Movement { pieces_to_take: 1 }, 1);
-                Ok(Move::Move(square, direction, movement))
+                Ok(Self::movement(square, direction, movement))
             }
-            'C' if input.len() == 3 => Ok(Move::Place(Cap, Square::parse_square(&input[1..])?)),
-            'S' if input.len() == 3 => Ok(Move::Place(Wall, Square::parse_square(&input[1..])?)),
+            'C' if input.len() == 3 => Ok(Self::placement(Cap, Square::parse_square(&input[1..])?)),
+            'S' if input.len() == 3 => {
+                Ok(Self::placement(Wall, Square::parse_square(&input[1..])?))
+            }
             '1'..='8' if input.len() > 3 => {
                 let square = Square::parse_square(&input[1..3])?;
                 let direction = Direction::parse(input.chars().nth(3).unwrap())
@@ -139,7 +155,7 @@ impl<const S: usize> Move<S> {
                 // Finish the movement
                 movements.push(Movement { pieces_to_take: 0 }, pieces_held);
 
-                Ok(Move::Move(square, direction, movements))
+                Ok(Self::movement(square, direction, movements))
             }
             _ => Err(pgn_traits::Error::new(
                 pgn_traits::ErrorKind::ParseError,
@@ -153,50 +169,6 @@ impl<const S: usize> Move<S> {
         }
     }
 
-    pub fn to_string_playtak(&self) -> String {
-        match self {
-            Move::Place(role, square) => {
-                let role_string = match role {
-                    Role::Flat => "",
-                    Role::Wall => " W",
-                    Role::Cap => " C",
-                };
-                let square_string = square.to_string().to_uppercase();
-                format!("P {}{}", square_string, role_string)
-            }
-            Move::Move(start_square, direction, stack_movement) => {
-                let mut output = String::new();
-                let mut end_square = *start_square;
-                let mut pieces_held = stack_movement.get_first().pieces_to_take;
-                let pieces_to_leave: Vec<u8> = stack_movement
-                    .into_iter()
-                    .skip(1)
-                    .map(|Movement { pieces_to_take }| {
-                        end_square = end_square.go_direction(*direction).unwrap();
-                        let pieces_to_leave = pieces_held - pieces_to_take;
-                        pieces_held = pieces_to_take;
-                        pieces_to_leave
-                    })
-                    .collect();
-
-                end_square = end_square.go_direction(*direction).unwrap();
-
-                write!(
-                    output,
-                    "M {} {} ",
-                    start_square.to_string().to_uppercase(),
-                    end_square.to_string().to_uppercase()
-                )
-                .unwrap();
-                for num_to_leave in pieces_to_leave {
-                    write!(output, "{} ", num_to_leave).unwrap();
-                }
-                write!(output, "{}", pieces_held).unwrap();
-                output
-            }
-        }
-    }
-
     pub fn from_string_playtak(input: &str) -> Self {
         let words: Vec<&str> = input.split_whitespace().collect();
         if words[0] == "P" {
@@ -207,7 +179,7 @@ impl<const S: usize> Move<S> {
                 None => Role::Flat,
                 Some(s) => panic!("Unknown role {} for move {}", s, input),
             };
-            Move::Place(role, square)
+            Self::placement(role, square)
         } else if words[0] == "M" {
             let start_square = Square::parse_square(&words[1].to_lowercase()).unwrap();
             let end_square: Square<S> = Square::parse_square(&words[2].to_lowercase()).unwrap();
@@ -244,22 +216,86 @@ impl<const S: usize> Move<S> {
                 _ => panic!("Diagonal move string {}", input),
             };
 
-            Move::Move(start_square, direction, pieces_taken)
+            Self::movement(start_square, direction, pieces_taken)
         } else {
             unreachable!()
         }
+    }
+
+    pub fn to_string_playtak(self) -> String {
+        self.expand().to_string_playtak()
     }
 }
 
 impl<const S: usize> fmt::Display for Move<S> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.expand().fmt(f)
+    }
+}
+
+impl<const S: usize> ExpMove<S> {
+    pub fn origin_square(&self) -> Square<S> {
+        Move::compress(self.clone()).origin_square()
+    }
+
+    pub fn from_string(input: &str) -> Result<Self, pgn_traits::Error> {
+        Move::from_string(input).map(Move::expand)
+    }
+
+    pub fn to_string_playtak(&self) -> String {
         match self {
-            Move::Place(role, square) => match role {
+            ExpMove::Place(role, square) => {
+                let role_string = match role {
+                    Role::Flat => "",
+                    Role::Wall => " W",
+                    Role::Cap => " C",
+                };
+                let square_string = square.to_string().to_uppercase();
+                format!("P {}{}", square_string, role_string)
+            }
+            ExpMove::Move(start_square, direction, stack_movement) => {
+                let mut output = String::new();
+                let mut end_square = *start_square;
+                let mut pieces_held = stack_movement.get_first().pieces_to_take;
+                let pieces_to_leave: Vec<u8> = stack_movement
+                    .into_iter()
+                    .skip(1)
+                    .map(|Movement { pieces_to_take }| {
+                        end_square = end_square.go_direction(*direction).unwrap();
+                        let pieces_to_leave = pieces_held - pieces_to_take;
+                        pieces_held = pieces_to_take;
+                        pieces_to_leave
+                    })
+                    .collect();
+
+                end_square = end_square.go_direction(*direction).unwrap();
+
+                write!(
+                    output,
+                    "M {} {} ",
+                    start_square.to_string().to_uppercase(),
+                    end_square.to_string().to_uppercase()
+                )
+                .unwrap();
+                for num_to_leave in pieces_to_leave {
+                    write!(output, "{} ", num_to_leave).unwrap();
+                }
+                write!(output, "{}", pieces_held).unwrap();
+                output
+            }
+        }
+    }
+}
+
+impl<const S: usize> fmt::Display for ExpMove<S> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ExpMove::Place(role, square) => match role {
                 Cap => write!(f, "C{}", square),
                 Flat => write!(f, "{}", square),
                 Wall => write!(f, "S{}", square),
             },
-            Move::Move(square, direction, stack_movements) => {
+            ExpMove::Move(square, direction, stack_movements) => {
                 let mut pieces_held = stack_movements.get_first().pieces_to_take;
                 if pieces_held == 1 {
                     write!(f, "{}", square).unwrap();

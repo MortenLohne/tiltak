@@ -2,11 +2,11 @@ use board_game_traits::{Color, Position as PositionTrait};
 use board_game_traits::{GameResult, GameResult::*};
 use pgn_traits::PgnPosition;
 
-use crate::position::Move;
+use crate::position::Direction::*;
 use crate::position::Piece::{BlackCap, BlackFlat, WhiteFlat, WhiteWall};
 use crate::position::Position;
 use crate::position::{squares_iterator, Piece, Role, Square, Stack};
-use crate::position::{CompressedMove, Direction::*};
+use crate::position::{ExpMove, Move};
 use crate::tests::do_moves_and_check_validity;
 use crate::{position as board_mod, search};
 
@@ -115,7 +115,7 @@ fn stones_left_behind_by_stack_movement_test() {
     do_moves_and_check_validity(&mut position, &["d3", "c3", "c4", "1d3<", "1c4-", "Sc4"]);
 
     let mv = position.move_from_san("2c3<11").unwrap();
-    if let Move::Move(square, _direction, stack_movement) = mv {
+    if let ExpMove::Move(square, _direction, stack_movement) = mv.expand() {
         assert_eq!(
             position
                 .top_stones_left_behind_by_move(square, &stack_movement)
@@ -131,7 +131,7 @@ fn stones_left_behind_by_stack_movement_test() {
     }
 
     let mv = position.move_from_san("3c3<21").unwrap();
-    if let Move::Move(square, _direction, stack_movement) = mv {
+    if let ExpMove::Move(square, _direction, stack_movement) = mv.expand() {
         assert_eq!(
             position
                 .top_stones_left_behind_by_move(square, &stack_movement)
@@ -176,14 +176,14 @@ fn big_8s_spread_test() {
     position.generate_moves(&mut moves);
     assert_eq!(moves.len(), 254 + 254 + (62 * 3));
     for mv in moves.iter() {
-        assert_eq!(*mv, CompressedMove::compress(mv.clone()).uncompress());
+        assert_eq!(*mv, Move::compress(mv.expand()));
 
-        if let Move::Move(_, _, stack_movement) = mv.clone() {
+        if let ExpMove::Move(_, _, stack_movement) = mv.expand() {
             assert_ne!(stack_movement.into_inner(), 0)
         }
 
         let old_position = position.clone();
-        let reverse_move = position.do_move(mv.clone());
+        let reverse_move = position.do_move(*mv);
         position.reverse_move(reverse_move);
         assert_eq!(position, old_position);
     }
@@ -193,21 +193,21 @@ fn big_8s_spread_test() {
 fn game_win_test() {
     let mut position = <Position<5>>::default();
     for mv in [
-        Move::Place(Role::Flat, Square::from_u8(13)),
-        Move::Place(Role::Flat, Square::from_u8(12)),
-        Move::Place(Role::Flat, Square::from_u8(7)),
-        Move::Place(Role::Flat, Square::from_u8(14)),
-        Move::Place(Role::Flat, Square::from_u8(2)),
-        Move::Place(Role::Flat, Square::from_u8(11)),
-        Move::Place(Role::Flat, Square::from_u8(17)),
-        Move::Place(Role::Flat, Square::from_u8(10)),
+        Move::placement(Role::Flat, Square::from_u8(13)),
+        Move::placement(Role::Flat, Square::from_u8(12)),
+        Move::placement(Role::Flat, Square::from_u8(7)),
+        Move::placement(Role::Flat, Square::from_u8(14)),
+        Move::placement(Role::Flat, Square::from_u8(2)),
+        Move::placement(Role::Flat, Square::from_u8(11)),
+        Move::placement(Role::Flat, Square::from_u8(17)),
+        Move::placement(Role::Flat, Square::from_u8(10)),
     ]
     .iter()
     {
-        position.do_move(mv.clone());
+        position.do_move(*mv);
         assert!(position.game_result().is_none());
     }
-    position.do_move(Move::Place(Role::Flat, Square::from_u8(22)));
+    position.do_move(Move::placement(Role::Flat, Square::from_u8(22)));
     assert_eq!(position.game_result(), Some(GameResult::WhiteWin));
 }
 
@@ -215,21 +215,21 @@ fn game_win_test() {
 fn game_win_test2() {
     let mut position = <Position<5>>::default();
     for mv in [
-        Move::Place(Role::Flat, Square::from_u8(7)),
-        Move::Place(Role::Flat, Square::from_u8(12)),
-        Move::Place(Role::Flat, Square::from_u8(14)),
-        Move::Place(Role::Flat, Square::from_u8(2)),
-        Move::Place(Role::Flat, Square::from_u8(13)),
-        Move::Place(Role::Flat, Square::from_u8(17)),
-        Move::Place(Role::Flat, Square::from_u8(11)),
-        Move::Place(Role::Flat, Square::from_u8(22)),
+        Move::placement(Role::Flat, Square::from_u8(7)),
+        Move::placement(Role::Flat, Square::from_u8(12)),
+        Move::placement(Role::Flat, Square::from_u8(14)),
+        Move::placement(Role::Flat, Square::from_u8(2)),
+        Move::placement(Role::Flat, Square::from_u8(13)),
+        Move::placement(Role::Flat, Square::from_u8(17)),
+        Move::placement(Role::Flat, Square::from_u8(11)),
+        Move::placement(Role::Flat, Square::from_u8(22)),
     ]
     .iter()
     {
-        position.do_move(mv.clone());
+        position.do_move(*mv);
         assert!(position.game_result().is_none());
     }
-    position.do_move(Move::Place(Role::Flat, Square::from_u8(10)));
+    position.do_move(Move::placement(Role::Flat, Square::from_u8(10)));
     assert_eq!(position.game_result(), Some(GameResult::WhiteWin));
 }
 
@@ -278,14 +278,14 @@ fn suicide_into_points_loss_test() {
     let mut moves = vec![];
     position.generate_moves(&mut moves);
     for mv in moves.iter() {
-        let reverse_move = position.do_move(mv.clone());
-        match mv {
-            Move::Place(Role::Wall, _) => assert_eq!(
+        let reverse_move = position.do_move(*mv);
+        match mv.expand() {
+            ExpMove::Place(Role::Wall, _) => assert_eq!(
                 position.game_result(),
                 Some(GameResult::WhiteWin),
                 "Placing a wall is suicide"
             ),
-            Move::Place(Role::Flat, _) => assert_eq!(
+            ExpMove::Place(Role::Flat, _) => assert_eq!(
                 position.game_result(),
                 Some(GameResult::Draw),
                 "Placing a flatstone is a draw"
@@ -297,10 +297,10 @@ fn suicide_into_points_loss_test() {
 
     assert!(moves
         .iter()
-        .any(|mv| matches!(mv, Move::Place(Role::Wall, _))));
+        .any(|mv| matches!(mv.expand(), ExpMove::Place(Role::Wall, _))));
     assert!(moves
         .iter()
-        .any(|mv| matches!(mv, Move::Place(Role::Flat, _))));
+        .any(|mv| matches!(mv.expand(), ExpMove::Place(Role::Flat, _))));
 }
 
 #[test]
@@ -400,8 +400,8 @@ fn move_iterator_test() {
     let mut position = <Position<5>>::start_position();
     do_moves_and_check_validity(&mut position, &["a1", "e5"]);
     let mv = position.move_from_san("e5-").unwrap();
-    match mv {
-        Move::Move(square, direction, stack_movement) => assert_eq!(
+    match mv.expand() {
+        ExpMove::Move(square, direction, stack_movement) => assert_eq!(
             board_mod::MoveIterator::<5>::new(square, direction, stack_movement)
                 .map(|sq| sq.to_string())
                 .collect::<Vec<String>>(),

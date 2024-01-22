@@ -68,7 +68,7 @@ impl<const S: usize> TreeEdge<S> {
     pub fn shallow_clone(&self) -> Self {
         Self {
             child: None,
-            mv: self.mv.clone(),
+            mv: self.mv,
             mean_action_value: self.mean_action_value,
             visits: self.visits,
             heuristic_score: self.heuristic_score,
@@ -146,7 +146,7 @@ impl<const S: usize> TreeEdge<S> {
                 .get_mut(best_child_node_index)
                 .unwrap();
 
-            position.do_move(child_edge.mv.clone());
+            position.do_move(child_edge.mv);
             let result = 1.0 - child_edge.select(position, settings, temp_vectors, arena)?;
             self.visits += 1;
 
@@ -224,7 +224,7 @@ impl<const S: usize> Tree<S> {
 
         let child_edges = temp_vectors.moves.drain(..).map(|(mv, heuristic_score)| {
             TreeEdge::new(
-                mv.clone(),
+                mv,
                 f16::from_f32(heuristic_score.to_f32() * inv_sum),
                 settings.initial_mean_action_value(),
             )
@@ -376,7 +376,7 @@ impl<'a, const S: usize> Iterator for Pv<'a, S> {
 
     fn next(&mut self) -> Option<Self::Item> {
         self.edge.map(|edge| {
-            let mv = edge.mv.clone();
+            let mv = edge.mv;
             if let Some(child_index) = &edge.child {
                 let child = self.arena.get(child_index);
                 let best_edge = self
@@ -411,7 +411,7 @@ pub fn best_move<R: Rng, const S: usize>(
     let p = rng.gen_range(0.0..cumulative_prob);
     for (mv, cumulative_prob) in move_probabilities {
         if cumulative_prob > p {
-            return mv.clone();
+            return *mv;
         }
     }
     unreachable!()

@@ -113,7 +113,7 @@ fn main() {
                     .map(|opening| {
                         let mut position = <Position<6>>::start_position_with_komi(komi);
                         for mv in opening.iter() {
-                            position.do_move(mv.clone());
+                            position.do_move(*mv);
                         }
                         let result = (opening, search::mcts(position, 100_000));
                         let total = evaled.fetch_add(1, atomic::Ordering::Relaxed);
@@ -245,13 +245,15 @@ fn generate_openings<const S: usize>(
     positions: &mut HashSet<Position<S>>,
     depth: u8,
 ) -> Vec<Vec<Move<S>>> {
+    use tiltak::position::ExpMove;
+
     let mut moves = vec![];
     position.generate_moves(&mut moves);
-    moves.retain(|mv| matches!(mv, Move::Place(Role::Flat, _)));
+    moves.retain(|mv| matches!(mv.expand(), ExpMove::Place(Role::Flat, _)));
     moves
         .into_iter()
         .flat_map(|mv| {
-            let reverse_move = position.do_move(mv.clone());
+            let reverse_move = position.do_move(mv);
             let mut child_lines = if position
                 .symmetries()
                 .iter()
@@ -268,7 +270,7 @@ fn generate_openings<const S: usize>(
             };
             position.reverse_move(reverse_move);
             for child_line in child_lines.iter_mut() {
-                child_line.insert(0, mv.clone());
+                child_line.insert(0, mv);
             }
             child_lines
         })
@@ -292,8 +294,8 @@ fn mcts_selfplay(max_time: time::Duration) {
             Color::Black => black_elapsed += start_time.elapsed(),
         }
 
-        position.do_move(best_move.clone());
-        moves.push(best_move.clone());
+        position.do_move(best_move);
+        moves.push(best_move);
         println!(
             "{:6}: {:.3}, {:.1}s",
             best_move.to_string(),
@@ -339,16 +341,16 @@ fn mcts_vs_minmax(minmax_depth: u16, mcts_nodes: u64) {
         match position.side_to_move() {
             Color::Black => {
                 let (best_move, score) = search::mcts::<5>(position.clone(), mcts_nodes);
-                position.do_move(best_move.clone());
-                moves.push(best_move.clone());
+                position.do_move(best_move);
+                moves.push(best_move);
                 println!("{:6}: {:.3}", best_move.to_string(), score);
                 io::stdout().flush().unwrap();
             }
 
             Color::White => {
                 let (best_move, score) = minmax::minmax(&mut position, minmax_depth);
-                position.do_move(best_move.clone().unwrap());
-                moves.push(best_move.clone().unwrap());
+                position.do_move(best_move.unwrap());
+                moves.push(best_move.unwrap());
                 print!("{:6}: {:.2}, ", best_move.unwrap().to_string(), score);
                 io::stdout().flush().unwrap();
             }
@@ -542,7 +544,7 @@ fn analyze_position<const S: usize>(position: &Position<S>) {
         .map(|feature_set| parameters::PolicyFeatures::new::<S>(feature_set))
         .collect();
 
-    let simple_moves: Vec<Move<S>> = moves.iter().map(|(mv, _)| mv.clone()).collect();
+    let simple_moves: Vec<Move<S>> = moves.iter().map(|(mv, _)| *mv).collect();
 
     position.features_for_moves(
         &mut policy_feature_sets,
@@ -629,7 +631,7 @@ fn analyze_game<const S: usize>(game: Game<Position<S>>) {
     let mut position = game.start_position.clone();
     let mut ply_number = 2;
     for PtnMove { mv, .. } in game.moves {
-        position.do_move(mv.clone());
+        position.do_move(mv);
         if let Some(game_result) = position.game_result() {
             let result_string = match game_result {
                 GameResult::WhiteWin => "1-0",

@@ -1,4 +1,4 @@
-use crate::position::Move;
+use crate::position::ExpMove;
 use crate::position::Position;
 use crate::tests::do_moves_and_check_validity;
 use crate::tests::move_gen_generic_tests::perft_check_answers;
@@ -21,7 +21,7 @@ fn move_stack_test() {
         moves,
         moves
             .iter()
-            .filter(|mv| matches!(mv, Move::Move(_, _, _)))
+            .filter(|mv| matches!(mv.expand(), ExpMove::Move(_, _, _)))
             .collect::<Vec<_>>()
     );
 }

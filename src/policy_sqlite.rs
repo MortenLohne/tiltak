@@ -25,7 +25,7 @@ impl<const S: usize> Game<S> {
         let mut position = Position::start_position_with_komi(self.komi);
         let mut result = vec![];
         'game_loop: for mv in self.moves.iter() {
-            position.do_move(mv.clone());
+            position.do_move(*mv);
             if position.game_result().is_some() {
                 break;
             }
@@ -89,7 +89,7 @@ fn policy_finds_win(position: &Position<5>) -> Option<Move<5>> {
         .map(|feature_set| parameters::PolicyFeatures::new::<5>(feature_set))
         .collect();
 
-    let simple_moves: Vec<Move<5>> = moves.iter().map(|(mv, _)| mv.clone()).collect();
+    let simple_moves: Vec<Move<5>> = moves.iter().map(|(mv, _)| *mv).collect();
 
     position.features_for_moves(
         &mut policy_feature_sets,
@@ -106,7 +106,7 @@ fn policy_finds_win(position: &Position<5>) -> Option<Move<5>> {
             .iter()
             .zip(policy_feature_sets)
             .find(|(_, score)| score.decline_win[0] == f16::ZERO)
-            .map(|(mv, _)| mv.clone())
+            .map(|(mv, _)| *mv)
     } else {
         None
     }
@@ -213,7 +213,7 @@ fn read_all_games() -> Vec<Game<5>> {
             assert!(legal_moves.contains(&mv));
             assert!(position.game_result().is_none());
 
-            position.do_move(mv.clone());
+            position.do_move(mv);
             moves.push(mv);
         }
         Game { komi, moves }

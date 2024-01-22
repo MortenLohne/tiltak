@@ -7,6 +7,7 @@ use half::f16;
 use pgn_traits::PgnPosition;
 use rand::seq::SliceRandom;
 
+use crate::position::ExpMove;
 use crate::position::Komi;
 use crate::position::Move;
 use crate::position::Position;
@@ -29,7 +30,7 @@ pub fn play_game<const S: usize>(
     let mut game_moves = opening.to_vec();
     let mut move_scores = vec![vec![]; opening.len()];
     for mv in opening {
-        position.do_move(mv.clone());
+        position.do_move(*mv);
     }
     let mut rng = rand::thread_rng();
 
@@ -85,9 +86,9 @@ pub fn play_game<const S: usize>(
             let flat_moves = moves_scores
                 .iter()
                 .map(|(mv, _)| mv)
-                .filter(|mv| matches!(*mv, Move::Place(Role::Flat, _)))
+                .filter(|mv| matches!(mv.expand(), ExpMove::Place(Role::Flat, _)))
                 .collect::<Vec<_>>();
-            (*flat_moves.choose(&mut rng).unwrap()).clone()
+            **flat_moves.choose(&mut rng).unwrap()
         }
         // Turn off temperature in the middle-game, when all games are expected to be unique
         else if position.half_moves_played() < S * 2 - 2 {
@@ -95,7 +96,7 @@ pub fn play_game<const S: usize>(
         } else {
             search::best_move(&mut rand::thread_rng(), 0.1, &moves_scores[..])
         };
-        position.do_move(best_move.clone());
+        position.do_move(best_move);
         game_moves.push(best_move);
         move_scores.push(moves_scores);
     }

@@ -33,11 +33,11 @@ impl<const S: usize> Position<S> {
         match self[square].top_stone() {
             None => {
                 if Us::stones_left(self) > 0 {
-                    moves.extend(iter::once(Move::Place(Flat, square)));
-                    moves.extend(iter::once(Move::Place(Wall, square)));
+                    moves.extend(iter::once(Move::placement(Flat, square)));
+                    moves.extend(iter::once(Move::placement(Wall, square)));
                 }
                 if Us::caps_left(self) > 0 {
-                    moves.extend(iter::once(Move::Place(Cap, square)));
+                    moves.extend(iter::once(Move::placement(Cap, square)));
                 }
             }
             Some(piece) if Us::piece_is_ours(piece) => {
@@ -63,7 +63,7 @@ impl<const S: usize> Position<S> {
                         );
                     }
                     for movements in movements.into_iter().filter(|mv| !mv.is_empty()) {
-                        let mv = Move::Move(square, direction, movements);
+                        let mv = Move::movement(square, direction, movements);
                         moves.extend(iter::once(mv));
                     }
                 }

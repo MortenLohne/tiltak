@@ -800,9 +800,9 @@ impl PlaytakSession {
                     // On the very first move, always place instantly in a random corner
                     if squares_iterator::<S>().all(|square| position[square].is_empty()) {
                         let mut rng = rand::thread_rng();
-                        let corner_placements: Vec<Move<S>> = Square::corners().into_iter().map(|square| Move::Place(Role::Flat, square)).collect();
+                        let corner_placements: Vec<Move<S>> = Square::corners().into_iter().map(|square| Move::placement(Role::Flat, square)).collect();
 
-                        (corner_placements.choose(&mut rng).unwrap().clone(), 0.0)
+                        (*corner_placements.choose(&mut rng).unwrap(), 0.0)
                     } else if let Some(fixed_nodes) = playtak_settings.fixed_nodes {
                         let settings =
                             playtak_settings.to_mcts_setting()
@@ -876,9 +876,9 @@ impl PlaytakSession {
                         }
                     };
 
-                position.do_move(best_move.clone());
+                position.do_move(best_move);
                 moves.push(PtnMove {
-                    mv: best_move.clone(),
+                    mv: best_move,
                     annotations: vec![],
                     comment: score.to_string(),
                 });
@@ -950,7 +950,7 @@ impl PlaytakSession {
                             "P" | "M" => {
                                 let move_string = words[1..].join(" ");
                                 let move_played = Move::from_string_playtak(&move_string);
-                                position.do_move(move_played.clone());
+                                position.do_move(move_played);
                                 moves.push(PtnMove {
                                     mv: move_played,
                                     annotations: vec![],

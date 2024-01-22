@@ -120,6 +120,12 @@ impl Role {
         assert!(disc < 3);
         unsafe { mem::transmute::<u8, Self>(disc) }
     }
+
+    /// # Safety `disc` must be 0, 1 or 2
+    pub unsafe fn from_disc_unchecked(disc: u8) -> Self {
+        debug_assert!(disc < 3);
+        unsafe { mem::transmute::<u8, Self>(disc) }
+    }
 }
 
 /// One of the 6 game pieces in Tak. Each piece has one variant for each color.

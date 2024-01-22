@@ -1,6 +1,6 @@
 use std::convert::TryFrom;
 
-use crate::position::{Komi, Move, Position, Role};
+use crate::position::{ExpMove, Komi, Position, Role};
 use crate::tests::moves_sorted_by_policy;
 
 #[test]
@@ -11,7 +11,10 @@ fn place_to_win_no_komi() {
         Komi::try_from(0.5f64).unwrap()
     ).unwrap();
     let policy_moves = moves_sorted_by_policy(&position, Komi::from_half_komi(0).unwrap());
-    assert!(matches!(&policy_moves[0].0, Move::Place(Role::Flat, _)));
+    assert!(matches!(
+        &policy_moves[0].0.expand(),
+        ExpMove::Place(Role::Flat, _)
+    ));
 }
 
 #[test]
@@ -22,7 +25,10 @@ fn do_not_place_into_komi_loss() {
         Komi::try_from(1.5f64).unwrap()
     ).unwrap();
     let policy_moves = moves_sorted_by_policy(&position, Komi::from_half_komi(4).unwrap());
-    assert!(matches!(&policy_moves[0].0, Move::Move(_, _, _)));
+    assert!(matches!(
+        &policy_moves[0].0.expand(),
+        ExpMove::Move(_, _, _)
+    ));
 }
 
 #[test]
@@ -35,7 +41,7 @@ fn place_into_komi_win() {
     let policy_moves = moves_sorted_by_policy(&position, Komi::from_half_komi(4).unwrap());
     let (top_move, top_score) = &policy_moves[0];
     assert!(
-        matches!(top_move, Move::Place(Role::Flat, _)),
+        matches!(top_move.expand(), ExpMove::Place(Role::Flat, _)),
         "Got move {} with score {:.2}%, expected flat placement",
         top_move,
         top_score.to_f32() * 100.0
@@ -52,7 +58,7 @@ fn do_not_place_to_allow_win() {
     let policy_moves = moves_sorted_by_policy(&position, Komi::from_half_komi(0).unwrap());
     let (top_move, top_score) = &policy_moves[0];
     assert!(
-        matches!(top_move, Move::Move(_, _, _)),
+        matches!(top_move.expand(), ExpMove::Move(_, _, _)),
         "Got move {} with score {:.2}%, expected stack movement",
         top_move,
         top_score.to_f32() * 100.0
@@ -69,7 +75,7 @@ fn place_to_allow_komi_loss() {
     let policy_moves = moves_sorted_by_policy(&position, Komi::from_half_komi(4).unwrap());
     let (top_move, top_score) = &policy_moves[0];
     assert!(
-        matches!(top_move, Move::Place(Role::Flat, _)),
+        matches!(top_move.expand(), ExpMove::Place(Role::Flat, _)),
         "Got move {} with score {:.2}%, expected flat placement",
         top_move,
         top_score.to_f32() * 100.0

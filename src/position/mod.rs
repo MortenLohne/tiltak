@@ -25,7 +25,7 @@ pub use square::{squares_iterator, Square, SquareCacheEntry};
 
 pub use utils::AbstractBoard;
 
-pub use mv::{CompressedMove, Move, ReverseMove};
+pub use mv::{ExpMove, Move, ReverseMove};
 
 use crate::evaluation::parameters::{self, PolicyFeatures, ValueFeatures};
 use crate::evaluation::value_eval;
@@ -803,11 +803,11 @@ impl<const S: usize> Position<S> {
     }
 
     pub(crate) fn fcd_for_move(&self, mv: Move<S>) -> i8 {
-        match mv {
-            Move::Place(Role::Flat, _) if self.half_moves_played() > 1 => 1,
-            Move::Place(Role::Flat, _) => -1,
-            Move::Place(_, _) => 0,
-            Move::Move(square, direction, stack_movement) => {
+        match mv.expand() {
+            ExpMove::Place(Role::Flat, _) if self.half_moves_played() > 1 => 1,
+            ExpMove::Place(Role::Flat, _) => -1,
+            ExpMove::Place(_, _) => 0,
+            ExpMove::Move(square, direction, stack_movement) => {
                 let mut destination_square =
                     if stack_movement.get_first().pieces_to_take == self[square].len() {
                         square.go_direction(direction).unwrap()
@@ -1130,7 +1130,7 @@ impl<const S: usize> Position<S> {
                 .into_iter()
                 .map(|mv| {
                     let old_position = self.clone();
-                    let reverse_move = self.do_move(mv.clone());
+                    let reverse_move = self.do_move(mv);
                     let num_moves = self.perft(depth - 1);
                     self.reverse_move(reverse_move);
                     debug_assert_eq!(
@@ -1196,7 +1196,7 @@ impl<const S: usize> PositionTrait for Position<S> {
             0 | 1 => moves.extend(
                 square::squares_iterator::<S>()
                     .filter(|square| self[*square].is_empty())
-                    .map(|square| Move::Place(Flat, square)),
+                    .map(|square| Move::placement(Flat, square)),
             ),
             _ => match self.side_to_move() {
                 Color::White => self.generate_moves_colortr::<E, WhiteTr, BlackTr>(moves),
@@ -1206,20 +1206,20 @@ impl<const S: usize> PositionTrait for Position<S> {
     }
 
     fn move_is_legal(&self, mv: Self::Move) -> bool {
-        match (mv.clone(), self.side_to_move()) {
-            (Move::Place(Flat | Wall, square), Color::White) => {
+        match (mv.expand(), self.side_to_move()) {
+            (ExpMove::Place(Flat | Wall, square), Color::White) => {
                 self[square].is_empty() && self.white_reserves_left() > 0
             }
-            (Move::Place(Flat | Wall, square), Color::Black) => {
+            (ExpMove::Place(Flat | Wall, square), Color::Black) => {
                 self[square].is_empty() && self.black_reserves_left() > 0
             }
-            (Move::Place(Cap, square), Color::White) => {
+            (ExpMove::Place(Cap, square), Color::White) => {
                 self[square].is_empty() && self.white_caps_left() > 0
             }
-            (Move::Place(Cap, square), Color::Black) => {
+            (ExpMove::Place(Cap, square), Color::Black) => {
                 self[square].is_empty() && self.black_caps_left() > 0
             }
-            (Move::Move(square, _, _), Color::White) => {
+            (ExpMove::Move(square, _, _), Color::White) => {
                 let mut legal_moves = vec![];
                 self.generate_moves_for_square_colortr::<_, WhiteTr, BlackTr>(
                     &mut legal_moves,
@@ -1227,7 +1227,7 @@ impl<const S: usize> PositionTrait for Position<S> {
                 );
                 legal_moves.contains(&mv)
             }
-            (Move::Move(square, _, _), Color::Black) => {
+            (ExpMove::Move(square, _, _), Color::Black) => {
                 let mut legal_moves = vec![];
                 self.generate_moves_for_square_colortr::<_, BlackTr, WhiteTr>(
                     &mut legal_moves,
@@ -1240,8 +1240,8 @@ impl<const S: usize> PositionTrait for Position<S> {
 
     fn do_move(&mut self, mv: Self::Move) -> Self::ReverseMove {
         self.hash_history.push(self.hash);
-        let reverse_move = match mv {
-            Move::Place(role, to) => {
+        let reverse_move = match mv.expand() {
+            ExpMove::Place(role, to) => {
                 debug_assert!(self[to].is_empty());
                 // On the first move, the players place the opponent's color
                 let color_to_place = if self.half_moves_played() > 1 {
@@ -1266,7 +1266,7 @@ impl<const S: usize> PositionTrait for Position<S> {
 
                 ReverseMove::Place(to)
             }
-            Move::Move(square, direction, stack_movement) => {
+            ExpMove::Move(square, direction, stack_movement) => {
                 for sq in <MoveIterator<S>>::new(square, direction, stack_movement) {
                     self.hash ^= self.zobrist_hash_for_square(sq);
                 }

@@ -163,7 +163,7 @@ impl<const S: usize> MonteCarloTree<S> {
         let mut temp_vectors = TempVectors::default();
         let mut root_edge = TreeEdge {
             child: None,
-            mv: Move::Place(Role::Flat, Square::default()),
+            mv: Move::placement(Role::Flat, Square::default()),
             mean_action_value: 0.0,
             visits: 0,
             heuristic_score: f16::ZERO,
@@ -187,7 +187,7 @@ impl<const S: usize> MonteCarloTree<S> {
                 .filter(|edge| !settings.excluded_moves.contains(&edge.mv))
                 .map(|edge| TreeEdge {
                     child: edge.child.take(),
-                    mv: edge.mv.clone(),
+                    mv: edge.mv,
                     mean_action_value: edge.mean_action_value,
                     visits: edge.visits,
                     heuristic_score: edge.heuristic_score,
@@ -302,7 +302,7 @@ impl<const S: usize> MonteCarloTree<S> {
             .get_slice(&self.get_child().children)
             .iter()
             .max_by_key(|edge| edge.visits)
-            .map(|edge| (edge.mv.clone(), 1.0 - edge.mean_action_value))
+            .map(|edge| (edge.mv, 1.0 - edge.mean_action_value))
             .unwrap_or_else(|| panic!("Couldn't find best move"))
     }
 
@@ -433,7 +433,7 @@ pub fn mcts_training<const S: usize>(
         .iter()
         .map(|edge| {
             (
-                edge.mv.clone(),
+                edge.mv,
                 f16::from_f32(edge.visits as f32 / child_visits as f32),
             )
         })

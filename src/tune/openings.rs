@@ -27,7 +27,7 @@ pub fn openings_from_file<const S: usize>(path: &str) -> io::Result<Vec<Vec<Move
                     format!("Illegal move {}", mv_string),
                 ));
             }
-            position.do_move(mv.clone());
+            position.do_move(mv);
             moves.push(mv);
         }
         openings.push(moves);

@@ -16,7 +16,7 @@ pub fn write_and_read_ptn_test() {
         .moves()
         .iter()
         .map(|mv| PtnMove {
-            mv: mv.clone(),
+            mv: *mv,
             annotations: vec![],
             comment: "".to_string(),
         })

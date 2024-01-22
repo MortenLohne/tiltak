@@ -489,8 +489,7 @@ pub fn tune_value_and_policy<const S: usize, const N: usize, const M: usize>(
                         .iter_mut()
                         .map(|feature_set| PolicyFeatures::new::<S>(feature_set))
                         .collect();
-                    let moves: Vec<Move<S>> =
-                        move_scores.iter().map(|(mv, _score)| mv.clone()).collect();
+                    let moves: Vec<Move<S>> = move_scores.iter().map(|(mv, _score)| *mv).collect();
 
                     position.features_for_moves(
                         &mut policy_feature_sets,
@@ -499,7 +498,7 @@ pub fn tune_value_and_policy<const S: usize, const N: usize, const M: usize>(
                         &group_data,
                     );
 
-                    position.do_move(mv.clone());
+                    position.do_move(*mv);
 
                     move_scores
                         .iter()
@@ -617,7 +616,7 @@ pub fn games_and_move_scoress_from_file<const S: usize>(
                     .collect::<Vec<_>>(),
                 position
             );
-            position.do_move(mv.clone());
+            position.do_move(*mv);
         }
     }
     Ok((games, move_scoress))
@@ -696,7 +695,7 @@ pub fn positions_and_results_from_games<const S: usize>(
                     break;
                 }
                 output.push((position.clone(), game_result.unwrap_or(GameResult::Draw)));
-                position.do_move(mv.clone());
+                position.do_move(*mv);
                 // Deliberately skip the final position
             }
             output

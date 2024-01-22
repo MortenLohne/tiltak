@@ -5,7 +5,7 @@ use half::f16;
 use pgn_traits::PgnPosition;
 use rand::seq::SliceRandom;
 
-use crate::position::{squares_iterator, CompressedMove, Role, Square};
+use crate::position::{squares_iterator, Role, Square};
 use crate::position::{GroupData, Move};
 use crate::position::{GroupEdgeConnection, Position};
 use crate::tests::do_moves_and_check_validity;
@@ -85,7 +85,7 @@ fn play_random_games_prop<const S: usize>(num_games: usize) {
             position.generate_moves(&mut moves);
 
             for mv in moves.iter() {
-                assert_eq!(*mv, CompressedMove::compress(mv.clone()).uncompress());
+                assert_eq!(*mv, Move::compress(mv.expand()));
             }
 
             let mut feature_sets =
@@ -105,7 +105,7 @@ fn play_random_games_prop<const S: usize>(num_games: usize) {
                 assert!(
                     moves.iter().any(|mv| {
                         let old_position = position.clone();
-                        let reverse_move = position.do_move(mv.clone());
+                        let reverse_move = position.do_move(*mv);
                         let temp_position = position.clone();
                         let game_result = position.game_result();
                         position.reverse_move(reverse_move);
@@ -129,19 +129,18 @@ fn play_random_games_prop<const S: usize>(num_games: usize) {
 
             let mv = moves
                 .choose(&mut rng)
-                .unwrap_or_else(|| panic!("No legal moves on board\n{:?}", position))
-                .clone();
+                .unwrap_or_else(|| panic!("No legal moves on board\n{:?}", position));
             assert_eq!(
-                mv,
-                position.move_from_san(&position.move_to_san(&mv)).unwrap()
+                *mv,
+                position.move_from_san(&position.move_to_san(mv)).unwrap()
             );
 
             let white_flat_lead_before = group_data.white_flat_stones.count() as i8
                 - group_data.black_flat_stones.count() as i8;
 
-            let fcd = position.fcd_for_move(mv.clone());
+            let fcd = position.fcd_for_move(*mv);
 
-            position.do_move(mv.clone());
+            position.do_move(*mv);
 
             let new_group_data = position.group_data();
 
@@ -335,7 +334,7 @@ fn square_rank_file_prop<const S: usize>() {
             assert_eq!(rank_id, square.rank());
             assert_eq!(file_id, square.file());
 
-            let mv = Move::Place(Role::Flat, square);
+            let mv = Move::placement(Role::Flat, square);
             let reverse_move = position.do_move(mv);
 
             let group_data = position.group_data();
