@@ -4,6 +4,7 @@ use crate::evaluation::parameters;
 use arrayvec::ArrayVec;
 use board_game_traits::{Color, GameResult, Position as PositionTrait};
 use half::f16;
+use pgn_traits::PgnPosition;
 use rand_distr::num_traits::FromPrimitive;
 
 use crate::evaluation::parameters::PolicyFeatures;
@@ -74,7 +75,14 @@ impl<const S: usize> Position<S> {
                 .drain(..)
                 .zip(feature_sets)
                 .map(|(mv, features)| {
-                    let offset = inverse_sigmoid(1.0 / num_moves as f32);
+                    if num_moves < 2 {
+                        eprintln!(
+                            "Warning: Got {} legal moves for {}",
+                            num_moves,
+                            self.to_fen()
+                        );
+                    }
+                    let offset = inverse_sigmoid(1.0 / num_moves.max(2) as f32);
                     assert_eq!(features.len(), params_for_color.len());
 
                     const SIMD_WIDTH: usize = 8;
