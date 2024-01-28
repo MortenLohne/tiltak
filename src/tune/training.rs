@@ -118,7 +118,7 @@ pub fn train_perpetually<const S: usize, const N: usize, const M: usize>(
 ) -> Result<(), DynError> {
     const BATCH_SIZE: usize = 500;
     // Only train from the last n batches
-    const BATCHES_FOR_TRAINING: usize = 7;
+    const BATCHES_FOR_TRAINING: usize = 25;
 
     let mut last_value_params = *initial_value_params;
     let mut last_policy_params = *initial_policy_params;
@@ -285,7 +285,7 @@ fn play_game_pair<const S: usize>(
             komi,
             &[],
             1.0,
-            &TimeControl::FixedNodes(100_000),
+            &TimeControl::FixedNodes(50_000),
         );
         match game.0.game_result() {
             Some(GameResult::WhiteWin) => {
@@ -304,7 +304,7 @@ fn play_game_pair<const S: usize>(
             komi,
             &[],
             1.0,
-            &TimeControl::FixedNodes(100_000),
+            &TimeControl::FixedNodes(50_000),
         );
         match game.0.game_result() {
             Some(GameResult::BlackWin) => {
