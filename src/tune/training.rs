@@ -394,7 +394,7 @@ pub fn tune_value_from_file<const S: usize, const N: usize>(
             let result = match game_result {
                 GameResult::WhiteWin => f16::ONE,
                 GameResult::Draw => f16::ONE / (f16::ONE + f16::ONE),
-                GameResult::BlackWin => f16::ONE,
+                GameResult::BlackWin => f16::ZERO,
             };
             TrainingSample {
                 features,
@@ -446,7 +446,7 @@ pub fn tune_value_and_policy<const S: usize, const N: usize, const M: usize>(
             let result = match game_result {
                 GameResult::WhiteWin => f16::ONE,
                 GameResult::Draw => f16::ONE / (f16::ONE + f16::ONE),
-                GameResult::BlackWin => f16::ONE,
+                GameResult::BlackWin => f16::ZERO,
             };
             TrainingSample {
                 features,
