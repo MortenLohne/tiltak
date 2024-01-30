@@ -179,7 +179,7 @@ fn double_tak_threat_from_citadel_test() {
             "1,x3,2/1,1,112112C,x2/2,x2,212,11212/1,x2,2211112S,12221C/2,2S,2,2221,1 1 37",
         ),
         move_strings: &[],
-        komi: Komi::try_from(1.0).unwrap(),
+        komi: Komi::try_from(2.0).unwrap(),
     };
     test_position.plays_correct_move_long_prop::<5>(&["e2<"]);
 }
