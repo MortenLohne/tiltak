@@ -111,7 +111,7 @@ fn main() {
                     .into_par_iter()
                     .filter(|opening| opening.len() == depth as usize)
                     .map(|opening| {
-                        let mut position = <Position<6>>::start_position_with_komi(komi);
+                        let mut position = Position::start_position_with_komi(komi);
                         for mv in opening.iter() {
                             position.do_move(*mv);
                         }
@@ -132,7 +132,7 @@ fn main() {
                     score1.partial_cmp(score2).unwrap()
                 });
                 for (p, (mv, s)) in evaled_openings {
-                    let mut position = <Position<6>>::start_position_with_komi(komi);
+                    let mut position = Position::start_position_with_komi(komi);
                     for mv in p {
                         print!("{} ", position.move_to_san(&mv));
                         position.do_move(mv);
