@@ -866,7 +866,12 @@ impl PlaytakSession {
 
                             // For 6s, the toughest position I've found required 40 elements/node searched
                             // This formula gives 72, which is hopefully plenty
-                            let max_arena_size = max_nodes.saturating_mul((S * S) as u32 * 2);
+                            let max_arena_size = if playtak_settings.rollout_depth < 10 {
+                                max_nodes.saturating_mul((S * S) as u32 * 2)
+                            } else {
+                                // Give SlateBot a smaller tree size, because its nps is much lower
+                                max_nodes.saturating_mul(S as u32 * 2)
+                            };
 
                             let settings =
                                 playtak_settings.to_mcts_setting()
