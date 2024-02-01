@@ -41,8 +41,8 @@ Connect to the playtak.com server, and seek games as a bot. If no username/passw
 At the time of writing, three bots based on this project are running on Playtak. They are configured as follows:
 
 ```
-playtak -s 6 --tc 900+30 --target-move-time 25 --policy-noise high --seek-color black --allow-choosing-color -u Tiltak_Bot -p <password> -l tiltak.log
-playtak -s 6 --tc 600+20 --target-move-time 15 --komi 2 --rollout-depth 200 --rollout-noise low -u SlateBot -p <password> -l slate.log
+playtak -s 6 --tc 1200+30 --target-move-time 20 --policy-noise high --seek-color black --allow-choosing-color -u Tiltak_Bot -p <password> -l tiltak.log
+playtak -s 6 --tc 600+20 --target-move-time 10 --komi 2 --rollout-depth 200 --rollout-noise low  --allow-choosing-color -u SlateBot -p <password> -l slate.log
 playtak -s 5 --tc 900+30 --fixed-nodes 100 --policy-noise medium --rollout-depth 200 --rollout-noise low -u CobbleBot -p <password> -l cobble.log
 ```
 
