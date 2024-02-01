@@ -155,8 +155,29 @@ impl<const S: usize> MonteCarloTree<S> {
         let arena = match Arena::new(settings.arena_size) {
             Ok(arena) => arena,
             Err(ArenaError::AllocationFailed(num_bytes)) => {
-                eprintln!("Fatal error: failed to allocate {}MB memory for search tree. Try reducing the search time.", num_bytes / (1024 * 1024));
-                process::exit(1)
+                // The allocation may have failed because the system doesn't have enough memory
+                // Check the system's max memory, and try again
+
+                let mut sys = sysinfo::System::new_all();
+                sys.refresh_all();
+
+                if sys.total_memory() < num_bytes as u64 {
+                    // Note: The actual memory allocation is two slots larger, to ensure correct alignment
+                    let max_num_slots = (sys.total_memory() / 16).min(u32::MAX as u64) as u32 - 2;
+                    eprintln!("Warning: failed to allocate {}MB memory for the search tree. Trying again with {}MB.", num_bytes / (1024 * 1024), sys.total_memory() / (1024 * 1024));
+
+                    match <Arena<16>>::new(max_num_slots) {
+                        Ok(arena) => arena,
+                        Err(ArenaError::AllocationFailed(num_bytes)) => {
+                            eprintln!("Fatal error: failed to allocate {}MB memory for search tree. Try reducing the search time.", num_bytes / (1024 * 1024));
+                            process::exit(1)
+                        }
+                        Err(err) => panic!("{}", err),
+                    }
+                } else {
+                    eprintln!("Fatal error: failed to allocate {}MB memory for search tree. Try reducing the search time.", num_bytes / (1024 * 1024));
+                    process::exit(1)
+                }
             }
             Err(err) => panic!("{}", err),
         };
