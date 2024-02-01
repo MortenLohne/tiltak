@@ -78,6 +78,8 @@ impl<const S: usize> Move<S> {
     }
 
     pub fn from_string(input: &str) -> Result<Self, pgn_traits::Error> {
+        // Trim crush notation
+        let input = input.trim_end_matches('*');
         if input.len() < 2 {
             return Err(pgn_traits::Error::new(
                 pgn_traits::ErrorKind::ParseError,
