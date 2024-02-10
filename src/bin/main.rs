@@ -13,6 +13,8 @@ use pgn_traits::PgnPosition;
 #[cfg(feature = "constant-tuning")]
 use rayon::prelude::*;
 
+use tiltak::evaluation::parameters::Policy;
+use tiltak::evaluation::parameters::PolicyApplier;
 use tiltak::evaluation::{parameters, value_eval};
 use tiltak::minmax;
 #[cfg(feature = "sqlite")]
@@ -528,41 +530,16 @@ fn analyze_position<const S: usize>(position: &Position<S>) {
     let mut moves = vec![];
     let mut fcd_per_move = vec![];
 
-    position.generate_moves_with_probabilities(
+    position.generate_moves_with_probabilities::<Policy<S>>(
         &position.group_data(),
         &mut simple_moves,
         &mut moves,
         &mut fcd_per_move,
-        &mut vec![],
         <Position<S>>::policy_params(eval_komi),
-        &mut Some(vec![]),
+        &mut vec![],
     );
     moves.sort_by(|(_mv, score1), (_, score2)| score1.partial_cmp(score2).unwrap().reverse());
 
-    let mut feature_sets =
-        vec![vec![f16::ZERO; parameters::num_policy_features::<S>()]; moves.len()];
-    let mut policy_feature_sets: Vec<_> = feature_sets
-        .iter_mut()
-        .map(|feature_set| parameters::PolicyFeatures::new::<S>(feature_set))
-        .collect();
-
-    let simple_moves: Vec<Move<S>> = moves.iter().map(|(mv, _)| *mv).collect();
-
-    position.features_for_moves(
-        &mut policy_feature_sets,
-        &simple_moves,
-        &mut fcd_per_move,
-        &group_data,
-    );
-
-    println!("Top 10 heuristic moves:");
-    for ((mv, score), features) in moves.iter().zip(feature_sets).take(10) {
-        println!("{}: {:.3}%", mv, score.to_f32() * 100.0);
-        for feature in features {
-            print!("{:.1}, ", feature);
-        }
-        println!();
-    }
     let settings: MctsSetting<S> = search::MctsSetting::default()
         .arena_size(2_u32.pow(31))
         .exclude_moves(vec![]);

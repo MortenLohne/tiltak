@@ -27,7 +27,7 @@ pub use utils::AbstractBoard;
 
 pub use mv::{ExpMove, Move, ReverseMove};
 
-use crate::evaluation::parameters::{self, PolicyFeatures, ValueFeatures};
+use crate::evaluation::parameters::{self, PolicyApplier, ValueFeatures};
 use crate::evaluation::value_eval;
 use crate::position::color_trait::ColorTr;
 
@@ -1058,35 +1058,32 @@ impl<const S: usize> Position<S> {
     }
 
     #[allow(clippy::too_many_arguments)]
-    pub fn generate_moves_with_params(
+    pub fn generate_moves_with_params<P: PolicyApplier>(
         &self,
-        params: &[f32],
+        params: &'static [f32],
         group_data: &GroupData<S>,
         simple_moves: &mut Vec<<Self as PositionTrait>::Move>,
         moves: &mut Vec<(<Self as PositionTrait>::Move, f16)>,
         fcd_per_move: &mut Vec<i8>,
-        features: &mut Vec<Box<[f16]>>,
-        policy_feature_sets: &mut Option<Vec<PolicyFeatures<'static>>>,
+        policy_feature_sets: &mut Vec<P>,
     ) {
         debug_assert!(simple_moves.is_empty());
         self.generate_moves(simple_moves);
         match self.side_to_move() {
-            Color::White => self.generate_moves_with_probabilities_colortr::<WhiteTr, BlackTr>(
+            Color::White => self.generate_moves_with_probabilities_colortr::<WhiteTr, BlackTr, P>(
                 params,
                 group_data,
                 simple_moves,
                 fcd_per_move,
                 moves,
-                features,
                 policy_feature_sets,
             ),
-            Color::Black => self.generate_moves_with_probabilities_colortr::<BlackTr, WhiteTr>(
+            Color::Black => self.generate_moves_with_probabilities_colortr::<BlackTr, WhiteTr, P>(
                 params,
                 group_data,
                 simple_moves,
                 fcd_per_move,
                 moves,
-                features,
                 policy_feature_sets,
             ),
         }
@@ -1099,15 +1096,14 @@ impl<const S: usize> Position<S> {
     /// * `simple_moves` - An empty vector to temporarily store moves without probabilities. The vector will be emptied before the function returns, and only serves to re-use allocated memory.
     /// * `moves` A vector to place the moves and associated probabilities.
     #[allow(clippy::too_many_arguments)]
-    pub fn generate_moves_with_probabilities(
+    pub fn generate_moves_with_probabilities<P: PolicyApplier>(
         &self,
         group_data: &GroupData<S>,
         simple_moves: &mut Vec<Move<S>>,
         moves: &mut Vec<(Move<S>, f16)>,
         fcd_per_move: &mut Vec<i8>,
-        features: &mut Vec<Box<[f16]>>,
-        policy_params: &[f32],
-        policy_feature_sets: &mut Option<Vec<PolicyFeatures<'static>>>,
+        policy_params: &'static [f32],
+        policy_feature_sets: &mut Vec<P>,
     ) {
         self.generate_moves_with_params(
             policy_params,
@@ -1115,7 +1111,6 @@ impl<const S: usize> Position<S> {
             simple_moves,
             moves,
             fcd_per_move,
-            features,
             policy_feature_sets,
         )
     }

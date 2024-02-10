@@ -5,7 +5,7 @@ use half::f16;
 use rand::distributions::Distribution;
 use rand::Rng;
 
-use crate::evaluation::parameters::{self, PolicyFeatures};
+use crate::evaluation::parameters::{self, Policy};
 use crate::position::Move;
 /// This module contains the core of the MCTS search algorithm
 use crate::position::{GroupData, Position};
@@ -36,8 +36,7 @@ pub struct TempVectors<const S: usize> {
     moves: Vec<(Move<S>, f16)>,
     fcd_per_move: Vec<i8>,
     value_scores: Vec<f16>,
-    policy_score_sets: Vec<Box<[f16]>>,
-    policy_feature_sets: Option<Vec<PolicyFeatures<'static>>>,
+    policy_feature_sets: Vec<Policy<S>>,
 }
 
 impl<const S: usize> Default for TempVectors<S> {
@@ -47,8 +46,7 @@ impl<const S: usize> Default for TempVectors<S> {
             moves: vec![],
             fcd_per_move: vec![],
             value_scores: vec![f16::ZERO; parameters::num_value_features::<S>()],
-            policy_score_sets: vec![],
-            policy_feature_sets: Some(vec![]),
+            policy_feature_sets: vec![],
         }
     }
 }
@@ -220,7 +218,6 @@ impl<const S: usize> Tree<S> {
             &mut temp_vectors.simple_moves,
             &mut temp_vectors.moves,
             &mut temp_vectors.fcd_per_move,
-            &mut temp_vectors.policy_score_sets,
             &mut temp_vectors.policy_feature_sets,
         );
         // let mut children_vec = arena.add_from_iter(length, source) Vec::with_capacity(temp_vectors.moves.len());
@@ -315,7 +312,6 @@ pub fn rollout<const S: usize>(
             &mut temp_vectors.simple_moves,
             &mut temp_vectors.moves,
             &mut temp_vectors.fcd_per_move,
-            &mut temp_vectors.policy_score_sets,
             match settings.policy_params.as_ref() {
                 Some(params) => params,
                 None => <Position<S>>::policy_params(position.komi()),

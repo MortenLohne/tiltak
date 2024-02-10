@@ -1,6 +1,11 @@
+use std::{array, mem};
+
 use half::f16;
 
-use crate::position::{num_line_symmetries, num_square_symmetries, Komi};
+use crate::{
+    evaluation::policy_eval::{inverse_sigmoid, sigmoid},
+    position::{num_line_symmetries, num_square_symmetries, Komi},
+};
 
 pub const NUM_VALUE_FEATURES_4S: usize = 264;
 pub const NUM_POLICY_FEATURES_4S: usize = 176;
@@ -11,21 +16,21 @@ pub const NUM_POLICY_FEATURES_5S: usize = 200;
 pub const NUM_VALUE_FEATURES_6S: usize = 368;
 pub const NUM_POLICY_FEATURES_6S: usize = 208;
 
-fn value_padding<const S: usize>() -> usize {
+const fn value_padding<const S: usize>() -> usize {
     match S {
         4 => 2,
         5 => 2,
         6 => 6,
-        _ => panic!("Unsupported size {}", S),
+        _ => unimplemented!(),
     }
 }
 
-fn policy_padding<const S: usize>() -> usize {
+const fn policy_padding<const S: usize>() -> usize {
     match S {
         4 => 7,
         5 => 3,
         6 => 1,
-        _ => panic!("Unsupported size {}", S),
+        _ => unimplemented!(),
     }
 }
 
@@ -336,7 +341,334 @@ impl<'a> PolicyFeatures<'a> {
     }
 }
 
-pub fn num_value_features<const S: usize>() -> usize {
+#[derive(Clone, Copy)]
+pub struct IndexPair {
+    start: usize,
+    length: usize,
+}
+
+impl IndexPair {
+    pub const fn next(start: usize, length: usize) -> (Self, usize) {
+        (Self { start, length }, start + length)
+    }
+
+    pub fn as_slice<'a, T>(&self, slice: &'a [T]) -> &'a [T] {
+        &slice[self.start..self.start + self.length]
+    }
+
+    pub fn as_mut_slice<'a, T>(&self, slice: &'a mut [T]) -> &'a mut [T] {
+        &mut slice[self.start..self.start + self.length]
+    }
+}
+
+pub struct PolicyIndexes<const S: usize> {
+    pub flat_psqt_white: IndexPair,
+    pub flat_psqt_black: IndexPair,
+    pub wall_psqt_white: IndexPair,
+    pub wall_psqt_black: IndexPair,
+    pub cap_psqt_white: IndexPair,
+    pub cap_psqt_black: IndexPair,
+    pub move_role_bonus_white: IndexPair,
+    pub move_role_bonus_black: IndexPair,
+    pub decline_win: IndexPair,
+    pub place_to_win: IndexPair,
+    pub place_to_draw: IndexPair,
+    pub place_to_loss: IndexPair,
+    pub place_to_allow_opponent_to_end: IndexPair,
+    pub two_flats_left: IndexPair,
+    pub three_flats_left: IndexPair,
+    pub our_road_stones_in_line: IndexPair,
+    pub their_road_stones_in_line: IndexPair,
+    pub extend_single_group_base: IndexPair,
+    pub extend_single_group_linear: IndexPair,
+    pub extend_single_group_to_new_line_base: IndexPair,
+    pub extend_single_group_to_new_line_linear: IndexPair,
+    pub merge_two_groups_base: IndexPair,
+    pub merge_two_groups_linear: IndexPair,
+    pub block_merger_base: IndexPair,
+    pub block_merger_linear: IndexPair,
+    pub place_our_critical_square: IndexPair,
+    pub place_their_critical_square: IndexPair,
+    pub ignore_their_critical_square: IndexPair,
+    pub next_to_our_last_stone: IndexPair,
+    pub next_to_their_last_stone: IndexPair,
+    pub diagonal_to_our_last_stone: IndexPair,
+    pub diagonal_to_their_last_stone: IndexPair,
+    pub attack_strong_flats: IndexPair,
+    pub blocking_stone_blocks_extensions_of_two_flats: IndexPair,
+    pub attack_strong_stack_with_wall: IndexPair,
+    pub attack_strong_stack_with_cap: IndexPair,
+    pub attack_last_movement: IndexPair,
+    pub place_last_movement: IndexPair,
+    pub simple_movement: IndexPair,
+    pub simple_capture: IndexPair,
+    pub simple_self_capture: IndexPair,
+    pub pure_spread: IndexPair,
+    pub fcd_highest_board: IndexPair,
+    pub fcd_highest_stack: IndexPair,
+    pub fcd_other: IndexPair,
+    pub stack_captured_by_movement: IndexPair,
+    pub stack_capture_in_strong_line: IndexPair,
+    pub stack_capture_in_strong_line_cap: IndexPair,
+    pub move_cap_onto_strong_line: IndexPair,
+    pub move_cap_onto_strong_line_with_critical_square: IndexPair,
+    pub recapture_stack_pure: IndexPair,
+    pub recapture_stack_impure: IndexPair,
+    pub move_last_placement: IndexPair,
+    pub continue_spread: IndexPair,
+    pub move_onto_critical_square: IndexPair,
+    pub spread_that_connects_groups_to_win: IndexPair,
+    pub padding: IndexPair,
+}
+
+pub const POLICY_INDEXES_4S: PolicyIndexes<4> = PolicyIndexes::new();
+pub const POLICY_INDEXES_5S: PolicyIndexes<5> = PolicyIndexes::new();
+pub const POLICY_INDEXES_6S: PolicyIndexes<6> = PolicyIndexes::new();
+
+impl<const S: usize> PolicyIndexes<S> {
+    pub const fn downcast_size<const N: usize>(self) -> PolicyIndexes<N> {
+        if S == N {
+            unsafe { mem::transmute(self) }
+        } else {
+            panic!()
+        }
+    }
+}
+
+pub const fn policy_indexes<const S: usize>() -> PolicyIndexes<S> {
+    match S {
+        4 => POLICY_INDEXES_4S.downcast_size(),
+        5 => POLICY_INDEXES_5S.downcast_size(),
+        6 => POLICY_INDEXES_6S.downcast_size(),
+        _ => panic!(),
+    }
+}
+
+impl<const S: usize> PolicyIndexes<S> {
+    pub const fn new() -> Self {
+        let i = 0;
+        let (flat_psqt_white, i) = IndexPair::next(i, num_square_symmetries::<S>());
+        let (flat_psqt_black, i) = IndexPair::next(i, num_square_symmetries::<S>());
+        let (wall_psqt_white, i) = IndexPair::next(i, num_square_symmetries::<S>());
+        let (wall_psqt_black, i) = IndexPair::next(i, num_square_symmetries::<S>());
+        let (cap_psqt_white, i) = IndexPair::next(i, num_square_symmetries::<S>());
+        let (cap_psqt_black, i) = IndexPair::next(i, num_square_symmetries::<S>());
+        let (move_role_bonus_white, i) = IndexPair::next(i, 3);
+        let (move_role_bonus_black, i) = IndexPair::next(i, 3);
+        let (decline_win, i) = IndexPair::next(i, 1);
+        let (place_to_win, i) = IndexPair::next(i, 1);
+        let (place_to_draw, i) = IndexPair::next(i, 1);
+        let (place_to_loss, i) = IndexPair::next(i, 1);
+        let (place_to_allow_opponent_to_end, i) = IndexPair::next(i, 3);
+        let (two_flats_left, i) = IndexPair::next(i, 2);
+        let (three_flats_left, i) = IndexPair::next(i, 2);
+        let (our_road_stones_in_line, i) = IndexPair::next(i, S * 3);
+        let (their_road_stones_in_line, i) = IndexPair::next(i, S * 3);
+        let (extend_single_group_to_new_line_base, i) = IndexPair::next(i, 3);
+        let (extend_single_group_to_new_line_linear, i) = IndexPair::next(i, 3);
+        let (extend_single_group_base, i) = IndexPair::next(i, 3);
+        let (extend_single_group_linear, i) = IndexPair::next(i, 3);
+        let (merge_two_groups_base, i) = IndexPair::next(i, 3);
+        let (merge_two_groups_linear, i) = IndexPair::next(i, 3);
+        let (block_merger_base, i) = IndexPair::next(i, 3);
+        let (block_merger_linear, i) = IndexPair::next(i, 3);
+        let (place_our_critical_square, i) = IndexPair::next(i, 1);
+        let (place_their_critical_square, i) = IndexPair::next(i, 4);
+        let (ignore_their_critical_square, i) = IndexPair::next(i, 2);
+        let (next_to_our_last_stone, i) = IndexPair::next(i, 1);
+        let (next_to_their_last_stone, i) = IndexPair::next(i, 1);
+        let (diagonal_to_our_last_stone, i) = IndexPair::next(i, 1);
+        let (diagonal_to_their_last_stone, i) = IndexPair::next(i, 1);
+        let (attack_strong_flats, i) = IndexPair::next(i, 1);
+        let (blocking_stone_blocks_extensions_of_two_flats, i) = IndexPair::next(i, 1);
+        let (attack_strong_stack_with_wall, i) = IndexPair::next(i, 6);
+        let (attack_strong_stack_with_cap, i) = IndexPair::next(i, 6);
+        let (attack_last_movement, i) = IndexPair::next(i, 4);
+        let (place_last_movement, i) = IndexPair::next(i, 3);
+        let (simple_movement, i) = IndexPair::next(i, 3);
+        let (simple_capture, i) = IndexPair::next(i, 4);
+        let (simple_self_capture, i) = IndexPair::next(i, 4);
+        let (pure_spread, i) = IndexPair::next(i, 2);
+        let (fcd_highest_board, i) = IndexPair::next(i, 6);
+        let (fcd_highest_stack, i) = IndexPair::next(i, 6);
+        let (fcd_other, i) = IndexPair::next(i, 8);
+        let (stack_captured_by_movement, i) = IndexPair::next(i, 1);
+        let (stack_capture_in_strong_line, i) = IndexPair::next(i, S - 3);
+        let (stack_capture_in_strong_line_cap, i) = IndexPair::next(i, S - 3);
+        let (move_cap_onto_strong_line, i) = IndexPair::next(i, S - 3);
+        let (move_cap_onto_strong_line_with_critical_square, i) = IndexPair::next(i, S - 3);
+        let (recapture_stack_pure, i) = IndexPair::next(i, 3);
+        let (recapture_stack_impure, i) = IndexPair::next(i, 3);
+        let (move_last_placement, i) = IndexPair::next(i, 3);
+        let (continue_spread, i) = IndexPair::next(i, 3);
+        let (move_onto_critical_square, i) = IndexPair::next(i, 3);
+        let (spread_that_connects_groups_to_win, i) = IndexPair::next(i, 1);
+        let (padding, i) = IndexPair::next(i, policy_padding::<S>());
+
+        assert!(i == num_policy_features::<S>());
+
+        PolicyIndexes {
+            flat_psqt_white,
+            flat_psqt_black,
+            wall_psqt_white,
+            wall_psqt_black,
+            cap_psqt_white,
+            cap_psqt_black,
+            move_role_bonus_white,
+            move_role_bonus_black,
+            decline_win,
+            place_to_win,
+            place_to_draw,
+            place_to_loss,
+            place_to_allow_opponent_to_end,
+            two_flats_left,
+            three_flats_left,
+            our_road_stones_in_line,
+            their_road_stones_in_line,
+            extend_single_group_base,
+            extend_single_group_linear,
+            extend_single_group_to_new_line_base,
+            extend_single_group_to_new_line_linear,
+            merge_two_groups_base,
+            merge_two_groups_linear,
+            block_merger_base,
+            block_merger_linear,
+            place_our_critical_square,
+            place_their_critical_square,
+            ignore_their_critical_square,
+            next_to_our_last_stone,
+            next_to_their_last_stone,
+            diagonal_to_our_last_stone,
+            diagonal_to_their_last_stone,
+            attack_strong_flats,
+            blocking_stone_blocks_extensions_of_two_flats,
+            attack_strong_stack_with_wall,
+            attack_strong_stack_with_cap,
+            attack_last_movement,
+            place_last_movement,
+            simple_movement,
+            simple_capture,
+            simple_self_capture,
+            pure_spread,
+            fcd_highest_board,
+            fcd_highest_stack,
+            fcd_other,
+            stack_captured_by_movement,
+            stack_capture_in_strong_line,
+            stack_capture_in_strong_line_cap,
+            move_cap_onto_strong_line,
+            move_cap_onto_strong_line_with_critical_square,
+            recapture_stack_pure,
+            recapture_stack_impure,
+            move_last_placement,
+            continue_spread,
+            move_onto_critical_square,
+            spread_that_connects_groups_to_win,
+            padding,
+        }
+    }
+}
+
+pub trait PolicyApplier {
+    fn new(parameters: &'static [f32]) -> Self;
+    fn eval(&mut self, index_pair: IndexPair, index: usize, val: f16);
+    fn set_immediate_win(&mut self);
+    fn has_immediate_win(&self) -> bool;
+    fn finish(&mut self, num_moves: usize) -> f16;
+}
+
+#[derive(Debug)]
+pub struct Policy<const S: usize> {
+    features: Vec<f16>,
+    parameters: &'static [f32],
+    has_immediate_win: bool,
+}
+
+impl<const S: usize> PolicyApplier for Policy<S> {
+    fn new(parameters: &'static [f32]) -> Self {
+        Policy {
+            features: vec![f16::ZERO; num_policy_features::<S>()],
+            parameters,
+            has_immediate_win: false,
+        }
+    }
+    fn eval(&mut self, index_pair: IndexPair, index: usize, val: f16) {
+        index_pair.as_mut_slice(&mut self.features)[index] += val
+    }
+
+    fn set_immediate_win(&mut self) {
+        self.has_immediate_win = true
+    }
+
+    fn has_immediate_win(&self) -> bool {
+        self.has_immediate_win
+    }
+
+    fn finish(&mut self, num_moves: usize) -> f16 {
+        if num_moves < 2 {
+            eprintln!("Warning: Got {} legal moves", num_moves,);
+        }
+        let offset = inverse_sigmoid(1.0 / num_moves.max(2) as f32);
+
+        const SIMD_WIDTH: usize = 8;
+        assert_eq!(self.features.len() % SIMD_WIDTH, 0);
+        assert_eq!(self.features.len(), self.parameters.len());
+
+        let partial_sums: [f32; SIMD_WIDTH] = self
+            .features
+            .chunks_exact(SIMD_WIDTH)
+            .zip(self.parameters.chunks_exact(SIMD_WIDTH))
+            .fold([0.0; SIMD_WIDTH], |acc, (c, p)| {
+                array::from_fn(|i| acc[i] + c[i].to_f32() * p[i])
+            });
+
+        let total_value = partial_sums.iter().sum::<f32>() + offset;
+
+        self.features.fill(f16::ZERO);
+        self.has_immediate_win = false;
+
+        f16::from_f32(sigmoid(total_value))
+    }
+}
+
+pub struct IncrementalPolicy<const S: usize> {
+    val: f32,
+    parameters: &'static [f32],
+    has_immediate_win: bool,
+}
+
+impl<const S: usize> PolicyApplier for IncrementalPolicy<S> {
+    fn new(parameters: &'static [f32]) -> Self {
+        IncrementalPolicy {
+            val: 0.0,
+            parameters,
+            has_immediate_win: false,
+        }
+    }
+    fn eval(&mut self, index_pair: IndexPair, index: usize, val: f16) {
+        self.val += index_pair.as_slice(self.parameters)[index] * val.to_f32()
+    }
+
+    fn set_immediate_win(&mut self) {
+        self.has_immediate_win = true
+    }
+
+    fn has_immediate_win(&self) -> bool {
+        self.has_immediate_win
+    }
+
+    fn finish(&mut self, num_moves: usize) -> f16 {
+        if num_moves < 2 {
+            eprintln!("Warning: Got {} legal moves", num_moves,);
+        }
+        let offset = inverse_sigmoid(1.0 / num_moves.max(2) as f32);
+        let total_value = self.val + offset;
+
+        f16::from_f32(sigmoid(total_value))
+    }
+}
+
+pub const fn num_value_features<const S: usize>() -> usize {
     match S {
         4 => NUM_VALUE_FEATURES_4S,
         5 => NUM_VALUE_FEATURES_5S,
@@ -345,7 +677,7 @@ pub fn num_value_features<const S: usize>() -> usize {
     }
 }
 
-pub fn num_policy_features<const S: usize>() -> usize {
+pub const fn num_policy_features<const S: usize>() -> usize {
     match S {
         4 => NUM_POLICY_FEATURES_4S,
         5 => NUM_POLICY_FEATURES_5S,

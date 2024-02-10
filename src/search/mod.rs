@@ -33,8 +33,8 @@ pub enum TimeControl {
 #[derive(Clone, PartialEq, Debug)]
 pub struct MctsSetting<const S: usize> {
     arena_size: u32,
-    value_params: Option<Box<[f32]>>,
-    policy_params: Option<Box<[f32]>>,
+    value_params: Option<&'static [f32]>,
+    policy_params: Option<&'static [f32]>,
     search_params: Box<[Score]>,
     dirichlet: Option<f32>,
     excluded_moves: Vec<Move<S>>,
@@ -79,12 +79,12 @@ impl<const S: usize> MctsSetting<S> {
         self
     }
 
-    pub fn add_value_params(mut self, value_params: Box<[f32]>) -> Self {
+    pub fn add_value_params(mut self, value_params: &'static [f32]) -> Self {
         self.value_params = Some(value_params);
         self
     }
 
-    pub fn add_policy_params(mut self, policy_params: Box<[f32]>) -> Self {
+    pub fn add_policy_params(mut self, policy_params: &'static [f32]) -> Self {
         self.policy_params = Some(policy_params);
         self
     }
