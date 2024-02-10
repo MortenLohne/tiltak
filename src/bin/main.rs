@@ -1,8 +1,6 @@
 #[cfg(feature = "constant-tuning")]
 use std::collections::HashSet;
-use std::convert::TryFrom;
 use std::io::{Read, Write};
-#[cfg(feature = "constant-tuning")]
 use std::str::FromStr;
 #[cfg(feature = "constant-tuning")]
 use std::sync::atomic::{self, AtomicU64};
@@ -54,6 +52,10 @@ fn main() {
         if words.is_empty() {
             continue;
         }
+        let komi = words
+            .get(2)
+            .map(|komi_str| Komi::from_str(komi_str).unwrap())
+            .unwrap_or_default();
         match words[0] {
             "play" => {
                 let position = Position::default();
@@ -65,22 +67,22 @@ fn main() {
                 }
             }
             "analyze" => match words.get(1) {
-                Some(&"4") => analyze_position_from_ptn::<4>(),
-                Some(&"5") => analyze_position_from_ptn::<5>(),
-                Some(&"6") => analyze_position_from_ptn::<6>(),
-                Some(&"7") => analyze_position_from_ptn::<7>(),
-                Some(&"8") => analyze_position_from_ptn::<8>(),
+                Some(&"4") => analyze_position_from_ptn::<4>(komi),
+                Some(&"5") => analyze_position_from_ptn::<5>(komi),
+                Some(&"6") => analyze_position_from_ptn::<6>(komi),
+                Some(&"7") => analyze_position_from_ptn::<7>(komi),
+                Some(&"8") => analyze_position_from_ptn::<8>(komi),
                 Some(s) => println!("Unsupported size {}", s),
-                None => analyze_position_from_ptn::<5>(),
+                None => analyze_position_from_ptn::<5>(komi),
             },
             "tps" => match words.get(1) {
-                Some(&"4") => analyze_position_from_tps::<4>(),
-                Some(&"5") => analyze_position_from_tps::<5>(),
-                Some(&"6") => analyze_position_from_tps::<6>(),
-                Some(&"7") => analyze_position_from_tps::<7>(),
-                Some(&"8") => analyze_position_from_tps::<8>(),
+                Some(&"4") => analyze_position_from_tps::<4>(komi),
+                Some(&"5") => analyze_position_from_tps::<5>(komi),
+                Some(&"6") => analyze_position_from_tps::<6>(komi),
+                Some(&"7") => analyze_position_from_tps::<7>(komi),
+                Some(&"8") => analyze_position_from_tps::<8>(komi),
                 Some(s) => println!("Unsupported size {}", s),
-                None => analyze_position_from_tps::<5>(),
+                None => analyze_position_from_tps::<5>(komi),
             },
             "perft" => match words.get(1) {
                 Some(&"3") => perft_from_tps::<3>(),
@@ -95,7 +97,6 @@ fn main() {
             #[cfg(feature = "constant-tuning")]
             "openings" => {
                 let depth = 4;
-                let komi = Komi::from_str("2.0").unwrap();
                 let mut positions = HashSet::new();
                 let openings = generate_openings::<6>(
                     &mut Position::start_position_with_komi(komi),
@@ -147,18 +148,18 @@ fn main() {
             #[cfg(feature = "sqlite")]
             "test_policy" => policy_sqlite::check_all_games(),
             "value_features" => match words.get(1) {
-                Some(&"4") => print_value_features::<4>(Komi::from_half_komi(4).unwrap()), // TODO: Bad default komi
-                Some(&"5") => print_value_features::<5>(Komi::from_half_komi(4).unwrap()),
-                Some(&"6") => print_value_features::<6>(Komi::from_half_komi(4).unwrap()),
+                Some(&"4") => print_value_features::<4>(komi), // TODO: Bad default komi
+                Some(&"5") => print_value_features::<5>(komi),
+                Some(&"6") => print_value_features::<6>(komi),
                 Some(s) => println!("Unsupported size {}", s),
-                None => print_value_features::<5>(Komi::from_half_komi(4).unwrap()),
+                None => print_value_features::<5>(komi),
             },
             "policy_features" => match words.get(1) {
-                Some(&"4") => print_policy_features::<4>(Komi::from_half_komi(4).unwrap()), // TODO: Bad default komi
-                Some(&"5") => print_policy_features::<5>(Komi::from_half_komi(4).unwrap()),
-                Some(&"6") => print_policy_features::<6>(Komi::from_half_komi(4).unwrap()),
+                Some(&"4") => print_policy_features::<4>(komi), // TODO: Bad default komi
+                Some(&"5") => print_policy_features::<5>(komi),
+                Some(&"6") => print_policy_features::<6>(komi),
                 Some(s) => println!("Unsupported size {}", s),
-                None => print_policy_features::<5>(Komi::from_half_komi(4).unwrap()),
+                None => print_policy_features::<5>(komi),
             },
             "game" => {
                 println!("Enter move list or a full PTN, then press enter followed by CTRL+D");
@@ -417,7 +418,7 @@ fn print_policy_features<const S: usize>(komi: Komi) {
     }
 }
 
-fn analyze_position_from_ptn<const S: usize>() {
+fn analyze_position_from_ptn<const S: usize>(komi: Komi) {
     println!("Enter move list or a full PTN, then press enter followed by CTRL+D");
 
     let mut input = String::new();
@@ -429,6 +430,7 @@ fn analyze_position_from_ptn<const S: usize>() {
     }
 
     let mut position: Position<S> = games[0].start_position.clone();
+    position.set_komi(komi);
 
     for PtnMove { mv, .. } in games[0].moves.clone() {
         position.do_move(mv);
@@ -436,11 +438,11 @@ fn analyze_position_from_ptn<const S: usize>() {
     analyze_position(&position)
 }
 
-fn analyze_position_from_tps<const S: usize>() {
+fn analyze_position_from_tps<const S: usize>(komi: Komi) {
     println!("Enter TPS");
     let mut input = String::new();
     io::stdin().read_line(&mut input).unwrap();
-    let position = <Position<S>>::from_fen_with_komi(&input, Komi::try_from(2.0).unwrap()).unwrap();
+    let position = <Position<S>>::from_fen_with_komi(&input, komi).unwrap();
     analyze_position(&position)
 }
 
@@ -563,9 +565,7 @@ fn analyze_position<const S: usize>(position: &Position<S>) {
     }
     let settings: MctsSetting<S> = search::MctsSetting::default()
         .arena_size(2_u32.pow(31))
-        .exclude_moves(vec![])
-        .add_value_params(<Position<S>>::value_params_2komi().into())
-        .add_policy_params(<Position<S>>::policy_params_2komi().into());
+        .exclude_moves(vec![]);
     let start_time = time::Instant::now();
 
     let mut tree = search::MonteCarloTree::with_settings(position.clone(), settings);
