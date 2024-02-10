@@ -80,8 +80,8 @@ fn main() {
                         >(
                             i,
                             komi,
-                            parameters::value_features_4s(komi),
-                            parameters::policy_features_4s(komi),
+                            *parameters::value_features_4s(komi),
+                            *parameters::policy_features_4s(komi),
                             vec![],
                             vec![],
                             0,
@@ -94,8 +94,8 @@ fn main() {
                         >(
                             i,
                             komi,
-                            parameters::value_features_5s(komi),
-                            parameters::policy_features_5s(komi),
+                            *parameters::value_features_5s(komi),
+                            *parameters::policy_features_5s(komi),
                             vec![],
                             vec![],
                             0,
@@ -108,8 +108,8 @@ fn main() {
                         >(
                             i,
                             komi,
-                            parameters::value_features_6s(komi),
-                            parameters::policy_features_6s(komi),
+                            *parameters::value_features_6s(komi),
+                            *parameters::policy_features_6s(komi),
                             vec![],
                             vec![],
                             0,

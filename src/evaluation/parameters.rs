@@ -577,9 +577,9 @@ pub trait PolicyApplier {
     fn finish(&mut self, num_moves: usize) -> f16;
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Policy<const S: usize> {
-    features: Vec<f16>,
+    pub features: Vec<f16>,
     parameters: &'static [f32],
     has_immediate_win: bool,
 }
@@ -631,6 +631,7 @@ impl<const S: usize> PolicyApplier for Policy<S> {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct IncrementalPolicy<const S: usize> {
     val: f32,
     parameters: &'static [f32],
@@ -663,6 +664,9 @@ impl<const S: usize> PolicyApplier for IncrementalPolicy<S> {
         }
         let offset = inverse_sigmoid(1.0 / num_moves.max(2) as f32);
         let total_value = self.val + offset;
+
+        self.val = 0.0;
+        self.has_immediate_win = false;
 
         f16::from_f32(sigmoid(total_value))
     }

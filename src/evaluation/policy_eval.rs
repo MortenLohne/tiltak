@@ -1,10 +1,6 @@
-use std::array;
-
-use crate::evaluation::parameters;
 use arrayvec::ArrayVec;
 use board_game_traits::{Color, GameResult, Position as PositionTrait};
 use half::f16;
-use pgn_traits::PgnPosition;
 use rand_distr::num_traits::FromPrimitive;
 
 use crate::position::bitboard::BitBoard;
@@ -133,7 +129,7 @@ impl<const S: usize> Position<S> {
         }
         if immediate_win_exists {
             for policy in policies.iter_mut().take(moves.len()) {
-                if policy.has_immediate_win() {
+                if !policy.has_immediate_win() {
                     policy.eval(indexes.decline_win, 0, f16::ONE)
                 }
             }

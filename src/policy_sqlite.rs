@@ -4,13 +4,12 @@ use std::{
 };
 
 use board_game_traits::{Color, GameResult, Position as BoardTrait};
-use half::f16;
 use pgn_traits::PgnPosition;
 use rayon::prelude::*;
 use rusqlite::Connection;
 
 use crate::{
-    evaluation::parameters,
+    evaluation::parameters::{IncrementalPolicy, PolicyApplier},
     position::{Komi, Move, Position},
 };
 
@@ -71,41 +70,37 @@ fn policy_finds_win(position: &Position<5>) -> Option<Move<5>> {
     let mut moves = vec![];
     let mut fcd_per_move = vec![];
 
-    position.generate_moves_with_probabilities(
+    position.generate_moves_with_probabilities::<IncrementalPolicy<5>>(
         &position.group_data(),
         &mut simple_moves,
         &mut moves,
         &mut fcd_per_move,
-        &mut vec![],
         <Position<5>>::policy_params(position.komi()),
-        &mut Some(vec![]),
+        &mut vec![],
     );
 
-    let mut feature_sets =
-        vec![vec![f16::ZERO; parameters::num_policy_features::<5>()]; moves.len()];
+    let parameters = <Position<5>>::policy_params(position.komi());
 
-    let mut policy_feature_sets: Vec<_> = feature_sets
-        .iter_mut()
-        .map(|feature_set| parameters::PolicyFeatures::new::<5>(feature_set))
-        .collect();
+    let mut policies: Vec<IncrementalPolicy<5>> =
+        vec![IncrementalPolicy::new(parameters); moves.len()];
 
     let simple_moves: Vec<Move<5>> = moves.iter().map(|(mv, _)| *mv).collect();
 
     position.features_for_moves(
-        &mut policy_feature_sets,
+        &mut policies,
         &simple_moves,
         &mut fcd_per_move,
         &position.group_data(),
     );
     if simple_moves
         .iter()
-        .zip(policy_feature_sets.iter())
-        .any(|(_, score)| score.decline_win[0] != f16::ZERO)
+        .zip(policies.iter())
+        .any(|(_, score)| score.has_immediate_win())
     {
         simple_moves
             .iter()
-            .zip(policy_feature_sets)
-            .find(|(_, score)| score.decline_win[0] == f16::ZERO)
+            .zip(policies)
+            .find(|(_, score)| score.has_immediate_win())
             .map(|(mv, _)| *mv)
     } else {
         None

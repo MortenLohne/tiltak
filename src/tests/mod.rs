@@ -11,7 +11,7 @@ mod ptn_tests;
 mod tactics_tests_5s;
 mod tactics_tests_6s;
 
-use crate::evaluation::parameters::{self, PolicyFeatures};
+use crate::evaluation::parameters::{IncrementalPolicy, PolicyApplier};
 use crate::position::{Komi, Move, Position};
 use crate::search;
 use board_game_traits::Position as PositionTrait;
@@ -125,18 +125,14 @@ impl TestPosition {
         let mut moves = vec![];
         position.generate_moves(&mut moves);
 
-        let mut feature_sets =
-            vec![vec![f16::ZERO; parameters::num_policy_features::<S>()]; moves.len()];
-        let mut policy_feature_sets: Vec<PolicyFeatures> = feature_sets
-            .iter_mut()
-            .map(|feature_set| PolicyFeatures::new::<S>(feature_set))
-            .collect();
+        let parameters = <Position<S>>::policy_params(position.komi());
 
-        position.features_for_moves(&mut policy_feature_sets, &moves, &mut vec![], &group_data);
+        let mut policies: Vec<IncrementalPolicy<S>> =
+            vec![IncrementalPolicy::new(parameters); moves.len()];
 
-        policy_feature_sets
-            .iter()
-            .any(|features| features.decline_win[0] != f16::ZERO)
+        position.features_for_moves(&mut policies, &moves, &mut vec![], &group_data);
+
+        policies.iter().any(|policy| policy.has_immediate_win())
     }
 }
 
@@ -191,14 +187,13 @@ fn moves_sorted_by_policy<const S: usize>(
     let group_data = position.group_data();
 
     let policy_params = <Position<S>>::policy_params(eval_komi);
-    position.generate_moves_with_params(
+    position.generate_moves_with_params::<IncrementalPolicy<S>>(
         policy_params,
         &group_data,
         &mut simple_moves,
         &mut legal_moves,
         &mut vec![],
         &mut vec![],
-        &mut Some(vec![]),
     );
     legal_moves.sort_by(|(_, score1), (_, score2)| score1.partial_cmp(score2).unwrap().reverse());
     legal_moves

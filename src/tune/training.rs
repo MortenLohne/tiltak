@@ -7,7 +7,8 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::time;
 use std::{error, fs, io};
 
-use crate::evaluation::parameters::PolicyFeatures;
+use crate::evaluation::parameters::Policy;
+use crate::evaluation::parameters::PolicyApplier;
 use crate::position::Komi;
 use crate::search::TimeControl;
 use board_game_traits::GameResult;
@@ -45,8 +46,8 @@ pub fn train_from_scratch<const S: usize, const N: usize, const M: usize>(
     train_perpetually::<S, N, M>(
         training_id,
         komi,
-        &initial_value_params,
-        &initial_policy_params,
+        initial_value_params,
+        initial_policy_params,
         vec![],
         vec![],
         0,
@@ -99,8 +100,8 @@ pub fn continue_training<const S: usize, const N: usize, const M: usize>(
     train_perpetually::<S, N, M>(
         training_id,
         komi,
-        &<[f32; N]>::try_from(value_params).unwrap(),
-        &<[f32; M]>::try_from(policy_params).unwrap(),
+        <[f32; N]>::try_from(value_params).unwrap(),
+        <[f32; M]>::try_from(policy_params).unwrap(),
         games,
         move_scores,
         batch_id,
@@ -110,8 +111,8 @@ pub fn continue_training<const S: usize, const N: usize, const M: usize>(
 pub fn train_perpetually<const S: usize, const N: usize, const M: usize>(
     training_id: usize,
     komi: Komi,
-    initial_value_params: &[f32; N],
-    initial_policy_params: &[f32; M],
+    initial_value_params: [f32; N],
+    initial_policy_params: [f32; M],
     mut all_games: Vec<Game<Position<S>>>,
     mut all_move_scores: Vec<MoveScoresForGame<S>>,
     mut batch_id: usize,
@@ -120,11 +121,11 @@ pub fn train_perpetually<const S: usize, const N: usize, const M: usize>(
     // Only train from the last n batches
     const BATCHES_FOR_TRAINING: usize = 25;
 
-    let mut last_value_params = *initial_value_params;
-    let mut last_policy_params = *initial_policy_params;
+    let mut last_value_params: &'static [f32; N] = Box::leak(Box::new(initial_value_params));
+    let mut last_policy_params: &'static [f32; M] = Box::leak(Box::new(initial_policy_params));
 
-    let mut value_params = *initial_value_params;
-    let mut policy_params = *initial_policy_params;
+    let mut value_params: &'static [f32; N] = last_value_params;
+    let mut policy_params: &'static [f32; M] = last_policy_params;
 
     let start_time = time::Instant::now();
     let mut playing_time = time::Duration::default();
@@ -140,10 +141,10 @@ pub fn train_perpetually<const S: usize, const N: usize, const M: usize>(
             .map(|i| {
                 play_game_pair::<S>(
                     komi,
-                    &last_value_params,
-                    &last_policy_params,
-                    &value_params,
-                    &policy_params,
+                    last_value_params,
+                    last_policy_params,
+                    value_params,
+                    policy_params,
                     &current_params_wins,
                     &last_params_wins,
                     i,
@@ -237,15 +238,15 @@ pub fn train_perpetually<const S: usize, const N: usize, const M: usize>(
             &games_in_training_batch,
             &move_scores_in_training_batch,
             komi,
-            &value_params,
-            &policy_params,
+            value_params,
+            policy_params,
         )?;
 
         last_value_params = value_params;
         last_policy_params = policy_params;
 
-        value_params = new_value_params;
-        policy_params = new_policy_params;
+        value_params = Box::leak(Box::new(new_value_params));
+        policy_params = Box::leak(Box::new(new_policy_params));
 
         tuning_time += value_tuning_start_time.elapsed();
 
@@ -262,21 +263,21 @@ pub fn train_perpetually<const S: usize, const N: usize, const M: usize>(
 #[allow(clippy::too_many_arguments)]
 fn play_game_pair<const S: usize>(
     komi: Komi,
-    last_value_params: &[f32],
-    last_policy_params: &[f32],
-    value_params: &[f32],
-    policy_params: &[f32],
+    last_value_params: &'static [f32],
+    last_policy_params: &'static [f32],
+    value_params: &'static [f32],
+    policy_params: &'static [f32],
     current_params_wins: &AtomicU64,
     last_params_wins: &AtomicU64,
     i: usize,
 ) -> (Game<Position<S>>, MoveScoresForGame<S>) {
     let settings = MctsSetting::default()
-        .add_value_params(value_params.into())
-        .add_policy_params(policy_params.into())
+        .add_value_params(value_params)
+        .add_policy_params(policy_params)
         .add_dirichlet(0.2);
     let last_settings = MctsSetting::default()
-        .add_value_params(last_value_params.into())
-        .add_policy_params(last_policy_params.into())
+        .add_value_params(last_value_params)
+        .add_policy_params(last_policy_params)
         .add_dirichlet(0.2);
     if i % 2 == 0 {
         let game = play_game::<S>(
@@ -484,15 +485,11 @@ pub fn tune_value_and_policy<const S: usize, const N: usize, const M: usize>(
                 .flat_map(move |(mv, move_scores)| {
                     let group_data = position.group_data();
 
-                    let mut feature_sets = vec![[f16::ZERO; M]; move_scores.len()];
-                    let mut policy_feature_sets: Vec<PolicyFeatures> = feature_sets
-                        .iter_mut()
-                        .map(|feature_set| PolicyFeatures::new::<S>(feature_set))
-                        .collect();
+                    let mut policies: Vec<Policy<S>> = vec![Policy::new(&[]); move_scores.len()];
                     let moves: Vec<Move<S>> = move_scores.iter().map(|(mv, _score)| *mv).collect();
 
                     position.features_for_moves(
-                        &mut policy_feature_sets,
+                        &mut policies,
                         &moves,
                         &mut Vec::with_capacity(moves.len()),
                         &group_data,
@@ -502,7 +499,11 @@ pub fn tune_value_and_policy<const S: usize, const N: usize, const M: usize>(
 
                     move_scores
                         .iter()
-                        .zip(feature_sets)
+                        .zip(
+                            policies
+                                .into_iter()
+                                .map(|pol| pol.features.try_into().unwrap()),
+                        )
                         .map(|((_, result), features)| {
                             let offset = inverse_sigmoid(1.0 / move_scores.len().max(2) as f32);
                             {

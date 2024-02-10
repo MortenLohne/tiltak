@@ -70,8 +70,8 @@ pub fn handle_aws_event_generic<const S: usize>(e: Event, _c: Context) -> Result
     .add_rollout_depth(e.rollout_depth)
     .add_rollout_temperature(e.rollout_temperature)
     .mem_usage(2_usize.pow(30))
-    .add_value_params(<Position<S>>::value_params(eval_komi).into())
-    .add_policy_params(<Position<S>>::policy_params(eval_komi).into());
+    .add_value_params(<Position<S>>::value_params(eval_komi))
+    .add_policy_params(<Position<S>>::policy_params(eval_komi));
 
     let start_time = Instant::now();
 

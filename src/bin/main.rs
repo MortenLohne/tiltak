@@ -13,8 +13,7 @@ use pgn_traits::PgnPosition;
 #[cfg(feature = "constant-tuning")]
 use rayon::prelude::*;
 
-use tiltak::evaluation::parameters::Policy;
-use tiltak::evaluation::parameters::PolicyApplier;
+use tiltak::evaluation::parameters::IncrementalPolicy;
 use tiltak::evaluation::{parameters, value_eval};
 use tiltak::minmax;
 #[cfg(feature = "sqlite")]
@@ -530,7 +529,7 @@ fn analyze_position<const S: usize>(position: &Position<S>) {
     let mut moves = vec![];
     let mut fcd_per_move = vec![];
 
-    position.generate_moves_with_probabilities::<Policy<S>>(
+    position.generate_moves_with_probabilities::<IncrementalPolicy<S>>(
         &position.group_data(),
         &mut simple_moves,
         &mut moves,
