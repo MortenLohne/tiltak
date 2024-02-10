@@ -155,13 +155,6 @@ fn main() {
                 Some(s) => println!("Unsupported size {}", s),
                 None => print_value_features::<5>(komi),
             },
-            "policy_features" => match words.get(1) {
-                Some(&"4") => print_policy_features::<4>(komi), // TODO: Bad default komi
-                Some(&"5") => print_policy_features::<5>(komi),
-                Some(&"6") => print_policy_features::<6>(komi),
-                Some(s) => println!("Unsupported size {}", s),
-                None => print_policy_features::<5>(komi),
-            },
             "game" => {
                 println!("Enter move list or a full PTN, then press enter followed by CTRL+D");
                 let mut input = String::new();
@@ -400,22 +393,6 @@ fn print_value_features<const S: usize>(komi: Komi) {
     for line in black_value_features_string.split("],") {
         let (name, values) = line.split_once(": ").unwrap();
         println!("{:40}: {}],", name, values);
-    }
-}
-
-fn print_policy_features<const S: usize>(komi: Komi) {
-    let mut params: Vec<f16> = <Position<S>>::policy_params(komi)
-        .iter()
-        .map(|p| f16::from_f32(*p))
-        .collect();
-
-    let policy_features = parameters::PolicyFeatures::new::<S>(&mut params);
-    let policy_features_string = format!("{:?}", policy_features);
-
-    println!("White features:");
-    for line in policy_features_string.split("],") {
-        let (name, values) = line.split_once(": ").unwrap();
-        println!("{:48}: {}],", name, values);
     }
 }
 
