@@ -11,6 +11,7 @@ use crate::evaluation::parameters::Policy;
 use crate::evaluation::parameters::PolicyApplier;
 use crate::evaluation::parameters::Value;
 use crate::evaluation::parameters::ValueApplier;
+use crate::evaluation::policy_eval::policy_offset;
 use crate::position::Komi;
 use crate::search::TimeControl;
 use board_game_traits::GameResult;
@@ -19,7 +20,6 @@ use half::f16;
 use rand::prelude::*;
 use rayon::prelude::*;
 
-use crate::evaluation::policy_eval::inverse_sigmoid;
 use crate::position::Move;
 use crate::position::Position;
 use crate::ptn::Game;
@@ -527,7 +527,7 @@ pub fn tune_value_and_policy<const S: usize, const N: usize, const M: usize>(
                                 .map(|pol| pol.features.try_into().unwrap()),
                         )
                         .map(|((_, result), features)| {
-                            let offset = inverse_sigmoid(1.0 / move_scores.len().max(2) as f32);
+                            let offset = policy_offset(move_scores.len());
                             {
                                 TrainingSample {
                                     features,

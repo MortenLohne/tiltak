@@ -1,3 +1,5 @@
+use std::{array, sync};
+
 use arrayvec::ArrayVec;
 use board_game_traits::{Color, GameResult, Position as PositionTrait};
 use half::f16;
@@ -16,11 +18,31 @@ use super::parameters::{policy_indexes, PolicyApplier};
 
 const POLICY_BASELINE: f32 = 0.05;
 
+static POLICY_OFFSET: sync::OnceLock<[f32; 512]> = sync::OnceLock::new();
+
+/// Memoize policy offset for low move numbers, to avoid expensive floating-point operations
+/// Gives a roughly 10% speedup
+pub fn policy_offset(num_moves: usize) -> f32 {
+    if !(1..512).contains(&num_moves) {
+        inverse_sigmoid(1.0 / num_moves as f32)
+    } else {
+        POLICY_OFFSET.get_or_init(|| {
+            array::from_fn(|i| {
+                if i < 2 {
+                    inverse_sigmoid(0.5)
+                } else {
+                    inverse_sigmoid(1.0 / i as f32)
+                }
+            })
+        })[num_moves]
+    }
+}
+
 pub fn sigmoid(x: f32) -> f32 {
     1.0 / (1.0 + f32::exp(-x))
 }
 
-pub fn inverse_sigmoid(x: f32) -> f32 {
+fn inverse_sigmoid(x: f32) -> f32 {
     assert!(x > 0.0 && x < 1.0, "Tried to inverse sigmoid {}", x);
     f32::ln(x / (1.0 - x))
 }

@@ -3,9 +3,11 @@ use std::{array, mem};
 use half::f16;
 
 use crate::{
-    evaluation::policy_eval::{inverse_sigmoid, sigmoid},
+    evaluation::policy_eval::sigmoid,
     position::{num_line_symmetries, num_square_symmetries, Komi},
 };
+
+use super::policy_eval::policy_offset;
 
 pub const NUM_VALUE_FEATURES_4S: usize = 264;
 pub const NUM_POLICY_FEATURES_4S: usize = 176;
@@ -614,7 +616,7 @@ impl<const S: usize> PolicyApplier for Policy<S> {
         if num_moves < 2 {
             eprintln!("Warning: Got {} legal moves", num_moves,);
         }
-        let offset = inverse_sigmoid(1.0 / num_moves.max(2) as f32);
+        let offset = policy_offset(num_moves);
 
         const SIMD_WIDTH: usize = 8;
         assert_eq!(self.features.len() % SIMD_WIDTH, 0);
@@ -668,7 +670,7 @@ impl<const S: usize> PolicyApplier for IncrementalPolicy<S> {
         if num_moves < 2 {
             eprintln!("Warning: Got {} legal moves", num_moves,);
         }
-        let offset = inverse_sigmoid(1.0 / num_moves.max(2) as f32);
+        let offset = policy_offset(num_moves);
         let total_value = self.val + offset;
 
         self.val = 0.0;
