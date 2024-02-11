@@ -27,9 +27,7 @@ pub use utils::AbstractBoard;
 
 pub use mv::{ExpMove, Move, ReverseMove};
 
-use crate::evaluation::parameters::{
-    self, IncrementalValue, PolicyApplier, Value, ValueApplier, ValueFeatures,
-};
+use crate::evaluation::parameters::{self, IncrementalValue, PolicyApplier, ValueApplier};
 use crate::evaluation::value_eval;
 use crate::position::color_trait::ColorTr;
 

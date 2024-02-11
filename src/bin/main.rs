@@ -13,8 +13,8 @@ use pgn_traits::PgnPosition;
 #[cfg(feature = "constant-tuning")]
 use rayon::prelude::*;
 
+use tiltak::evaluation::parameters;
 use tiltak::evaluation::parameters::IncrementalPolicy;
-use tiltak::evaluation::{parameters, value_eval};
 use tiltak::minmax;
 #[cfg(feature = "sqlite")]
 use tiltak::policy_sqlite;

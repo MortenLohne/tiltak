@@ -3,7 +3,7 @@ use board_game_traits::{Color, Position as EvalPosition};
 use half::f16;
 use rand_distr::num_traits::FromPrimitive;
 
-use crate::evaluation::parameters::{value_indexes, ValueFeatures};
+use crate::evaluation::parameters::value_indexes;
 use crate::position::bitboard::BitBoard;
 use crate::position::color_trait::{BlackTr, ColorTr, WhiteTr};
 use crate::position::{

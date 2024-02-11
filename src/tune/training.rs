@@ -9,6 +9,8 @@ use std::{error, fs, io};
 
 use crate::evaluation::parameters::Policy;
 use crate::evaluation::parameters::PolicyApplier;
+use crate::evaluation::parameters::Value;
+use crate::evaluation::parameters::ValueApplier;
 use crate::position::Komi;
 use crate::search::TimeControl;
 use board_game_traits::GameResult;
@@ -390,8 +392,18 @@ pub fn tune_value_from_file<const S: usize, const N: usize>(
         .par_iter()
         .zip(results)
         .map(|(position, game_result)| {
-            let mut features = [f16::ZERO; N];
-            position.static_eval_features(&mut features);
+            let mut white_features: Value<S> = Value::new(&[]);
+            let mut black_features: Value<S> = Value::new(&[]);
+            position.static_eval_features(&mut white_features, &mut black_features);
+
+            let features = white_features
+                .features
+                .into_iter()
+                .chain(black_features.features)
+                .collect::<Vec<_>>()
+                .try_into()
+                .unwrap();
+
             let result = match game_result {
                 GameResult::WhiteWin => f16::ONE,
                 GameResult::Draw => f16::ONE / (f16::ONE + f16::ONE),
@@ -442,8 +454,18 @@ pub fn tune_value_and_policy<const S: usize, const N: usize, const M: usize>(
         .par_iter()
         .zip(results)
         .map(|(position, game_result)| {
-            let mut features = [f16::ZERO; N];
-            position.static_eval_features(&mut features);
+            let mut white_features: Value<S> = Value::new(&[]);
+            let mut black_features: Value<S> = Value::new(&[]);
+            position.static_eval_features(&mut white_features, &mut black_features);
+
+            let features = white_features
+                .features
+                .into_iter()
+                .chain(black_features.features)
+                .collect::<Vec<_>>()
+                .try_into()
+                .unwrap();
+
             let result = match game_result {
                 GameResult::WhiteWin => f16::ONE,
                 GameResult::Draw => f16::ONE / (f16::ONE + f16::ONE),
