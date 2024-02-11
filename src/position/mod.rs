@@ -27,7 +27,9 @@ pub use utils::AbstractBoard;
 
 pub use mv::{ExpMove, Move, ReverseMove};
 
-use crate::evaluation::parameters::{self, PolicyApplier, ValueFeatures};
+use crate::evaluation::parameters::{
+    self, IncrementalValue, PolicyApplier, Value, ValueApplier, ValueFeatures,
+};
 use crate::evaluation::value_eval;
 use crate::position::color_trait::ColorTr;
 
@@ -961,31 +963,18 @@ impl<const S: usize> Position<S> {
     pub(crate) fn static_eval_with_params_and_data(
         &self,
         group_data: &GroupData<S>,
-        params: &[f32],
-        features: &mut [f16],
+        params: &'static [f32],
     ) -> f32 {
-        let (white_features, black_features) = features.split_at_mut(features.len() / 2);
-        let mut white_value_features = ValueFeatures::new::<S>(white_features);
-        let mut black_value_features = ValueFeatures::new::<S>(black_features);
+        let (white_params, black_params) = params.split_at(params.len() / 2);
+        let mut white_value_features: IncrementalValue<S> = IncrementalValue::new(white_params);
+        let mut black_value_features: IncrementalValue<S> = IncrementalValue::new(black_params);
         value_eval::static_eval_game_phase(
             self,
             group_data,
             &mut white_value_features,
             &mut black_value_features,
         );
-        let eval = white_features
-            .iter()
-            .chain(black_features.iter())
-            .zip(params)
-            .map(|(a, b)| a.to_f32() * b)
-            .sum::<f32>();
-
-        for c in features.iter_mut() {
-            *c = f16::ZERO;
-        }
-
-        features.fill(f16::ZERO);
-        eval
+        white_value_features.finish() + black_value_features.finish()
     }
 
     pub fn value_params(komi: Komi) -> &'static [f32] {
@@ -1040,21 +1029,12 @@ impl<const S: usize> Position<S> {
         }
     }
 
-    pub fn static_eval_features(&self, features: &mut [f16]) {
+    pub fn static_eval_features<V: ValueApplier>(&self, white_value: &mut V, black_value: &mut V) {
         debug_assert!(self.game_result().is_none());
 
         let group_data = self.group_data();
 
-        let (white_features, black_features) = features.split_at_mut(features.len() / 2);
-        let mut white_value_features = ValueFeatures::new::<S>(white_features);
-        let mut black_value_features = ValueFeatures::new::<S>(black_features);
-
-        value_eval::static_eval_game_phase(
-            self,
-            &group_data,
-            &mut white_value_features,
-            &mut black_value_features,
-        );
+        value_eval::static_eval_game_phase(self, &group_data, white_value, black_value);
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -1437,13 +1417,13 @@ impl<const S: usize> EvalPositionTrait for Position<S> {
     fn static_eval(&self) -> f32 {
         let params = Self::value_params(self.komi());
 
-        let mut features: Vec<f16> = vec![f16::ZERO; params.len()];
-        self.static_eval_features(&mut features);
-        features
-            .iter()
-            .zip(params)
-            .map(|(a, b)| a.to_f32() * b)
-            .sum()
+        let (white_params, black_params) = params.split_at(params.len() / 2);
+        let mut white_value: IncrementalValue<S> = IncrementalValue::new(white_params);
+        let mut black_value: IncrementalValue<S> = IncrementalValue::new(black_params);
+
+        self.static_eval_features(&mut white_value, &mut black_value);
+
+        white_value.finish() + black_value.finish()
     }
 }
 

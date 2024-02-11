@@ -6,8 +6,8 @@ use std::str::FromStr;
 use std::sync::atomic::{self, AtomicU64};
 use std::{io, time};
 
-use board_game_traits::Position as PositionTrait;
 use board_game_traits::{Color, GameResult};
+use board_game_traits::{EvalPosition, Position as PositionTrait};
 use half::f16;
 use pgn_traits::PgnPosition;
 #[cfg(feature = "constant-tuning")]
@@ -435,72 +435,72 @@ fn analyze_position<const S: usize>(position: &Position<S>) {
 
     assert_eq!(position.game_result(), None, "Cannot analyze finished game");
 
-    let group_data = position.group_data();
+    // let group_data = position.group_data();
 
-    let mut coefficients = vec![f16::ZERO; parameters::num_value_features::<S>()];
-    let coefficients_mid_index = coefficients.len() / 2;
+    // let mut coefficients = vec![f16::ZERO; parameters::num_value_features::<S>()];
+    // let coefficients_mid_index = coefficients.len() / 2;
 
-    let (white_coefficients, black_coefficients) =
-        coefficients.split_at_mut(coefficients_mid_index);
+    // let (white_coefficients, black_coefficients) =
+    //     coefficients.split_at_mut(coefficients_mid_index);
 
-    {
-        let mut white_value_features = parameters::ValueFeatures::new::<S>(white_coefficients);
-        let mut black_value_features = parameters::ValueFeatures::new::<S>(black_coefficients);
-        value_eval::static_eval_game_phase::<S>(
-            position,
-            &group_data,
-            &mut white_value_features,
-            &mut black_value_features,
-        );
-    }
-    for (feature, param) in white_coefficients.iter_mut().zip(
-        <Position<S>>::value_params(eval_komi)
-            .iter()
-            .take(coefficients_mid_index),
-    ) {
-        *feature *= f16::from_f32(*param);
-    }
+    // {
+    //     let mut white_value_features = parameters::ValueFeatures::new::<S>(white_coefficients);
+    //     let mut black_value_features = parameters::ValueFeatures::new::<S>(black_coefficients);
+    //     value_eval::static_eval_game_phase::<S>(
+    //         position,
+    //         &group_data,
+    //         &mut white_value_features,
+    //         &mut black_value_features,
+    //     );
+    // }
+    // for (feature, param) in white_coefficients.iter_mut().zip(
+    //     <Position<S>>::value_params(eval_komi)
+    //         .iter()
+    //         .take(coefficients_mid_index),
+    // ) {
+    //     *feature *= f16::from_f32(*param);
+    // }
 
-    for (feature, param) in black_coefficients.iter_mut().zip(
-        <Position<S>>::value_params(eval_komi)
-            .iter()
-            .skip(coefficients_mid_index),
-    ) {
-        *feature *= f16::from_f32(*param);
-    }
+    // for (feature, param) in black_coefficients.iter_mut().zip(
+    //     <Position<S>>::value_params(eval_komi)
+    //         .iter()
+    //         .skip(coefficients_mid_index),
+    // ) {
+    //     *feature *= f16::from_f32(*param);
+    // }
 
-    let mut mixed_coefficients: Vec<f16> = white_coefficients
-        .iter()
-        .zip(black_coefficients.iter())
-        .map(|(white, black)| *white - *black)
-        .collect();
+    // let mut mixed_coefficients: Vec<f16> = white_coefficients
+    //     .iter()
+    //     .zip(black_coefficients.iter())
+    //     .map(|(white, black)| *white - *black)
+    //     .collect();
 
-    let white_value_features = parameters::ValueFeatures::new::<S>(white_coefficients);
-    let white_value_features_string = format!("{:?}", white_value_features);
+    // let white_value_features = parameters::ValueFeatures::new::<S>(white_coefficients);
+    // let white_value_features_string = format!("{:?}", white_value_features);
 
-    let black_value_features = parameters::ValueFeatures::new::<S>(black_coefficients);
-    let black_value_features_string = format!("{:?}", black_value_features);
+    // let black_value_features = parameters::ValueFeatures::new::<S>(black_coefficients);
+    // let black_value_features_string = format!("{:?}", black_value_features);
 
-    let mixed_value_features = parameters::ValueFeatures::new::<S>(&mut mixed_coefficients);
-    let mixed_value_features_string = format!("{:?}", mixed_value_features);
+    // let mixed_value_features = parameters::ValueFeatures::new::<S>(&mut mixed_coefficients);
+    // let mixed_value_features_string = format!("{:?}", mixed_value_features);
 
-    println!("White features:");
-    for line in white_value_features_string.split("],") {
-        let (name, values) = line.split_once(": ").unwrap();
-        println!("{:32}: {}],", name, values);
-    }
-    println!();
-    println!("Black features:");
-    for line in black_value_features_string.split("],") {
-        let (name, values) = line.split_once(": ").unwrap();
-        println!("{:32}: {}],", name, values);
-    }
-    println!();
-    println!("Mixed features:");
-    for line in mixed_value_features_string.split("],") {
-        let (name, values) = line.split_once(": ").unwrap();
-        println!("{:32}: {}],", name, values);
-    }
+    // println!("White features:");
+    // for line in white_value_features_string.split("],") {
+    //     let (name, values) = line.split_once(": ").unwrap();
+    //     println!("{:32}: {}],", name, values);
+    // }
+    // println!();
+    // println!("Black features:");
+    // for line in black_value_features_string.split("],") {
+    //     let (name, values) = line.split_once(": ").unwrap();
+    //     println!("{:32}: {}],", name, values);
+    // }
+    // println!();
+    // println!("Mixed features:");
+    // for line in mixed_value_features_string.split("],") {
+    //     let (name, values) = line.split_once(": ").unwrap();
+    //     println!("{:32}: {}],", name, values);
+    // }
 
     let mut simple_moves = vec![];
     let mut moves = vec![];
@@ -528,16 +528,8 @@ fn analyze_position<const S: usize>(position: &Position<S>) {
             break;
         };
         if i % 100_000 == 0 {
-            let params = <Position<S>>::value_params(eval_komi);
-
-            let mut features: Vec<f16> = vec![f16::ZERO; params.len()];
-            position.static_eval_features(&mut features);
-            let static_eval: f32 = features
-                .iter()
-                .zip(params)
-                .map(|(a, b)| a.to_f32() * b)
-                .sum::<f32>()
-                * position.side_to_move().multiplier() as f32;
+            let static_eval: f32 =
+                position.static_eval() * position.side_to_move().multiplier() as f32;
             println!(
                 "{} visits, eval: {:.2}%, Wilem-style eval: {:+.2}, static eval: {:.4}, static winning probability: {:.2}%, {:.2}s",
                 tree.visits(),

@@ -5,7 +5,7 @@ use half::f16;
 use rand::distributions::Distribution;
 use rand::Rng;
 
-use crate::evaluation::parameters::{self, IncrementalPolicy};
+use crate::evaluation::parameters::IncrementalPolicy;
 use crate::position::Move;
 /// This module contains the core of the MCTS search algorithm
 use crate::position::{GroupData, Position};
@@ -35,7 +35,6 @@ pub struct TempVectors<const S: usize> {
     simple_moves: Vec<Move<S>>,
     moves: Vec<(Move<S>, f16)>,
     fcd_per_move: Vec<i8>,
-    value_scores: Vec<f16>,
     policy_feature_sets: Vec<IncrementalPolicy<S>>,
 }
 
@@ -45,7 +44,6 @@ impl<const S: usize> Default for TempVectors<S> {
             simple_moves: vec![],
             moves: vec![],
             fcd_per_move: vec![],
-            value_scores: vec![f16::ZERO; parameters::num_value_features::<S>()],
             policy_feature_sets: vec![],
         }
     }
@@ -300,7 +298,6 @@ pub fn rollout<const S: usize>(
                 Some(params) => params,
                 None => <Position<S>>::value_params(position.komi()),
             },
-            &mut temp_vectors.value_scores,
         ));
         match position.side_to_move() {
             Color::White => (static_eval, false),

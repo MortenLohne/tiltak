@@ -165,6 +165,138 @@ impl IndexPair {
     }
 }
 
+pub struct ValueIndexes<const S: usize> {
+    pub first_ply: IndexPair,
+    pub second_ply: IndexPair,
+    pub flat_psqt: IndexPair,
+    pub wall_psqt: IndexPair,
+    pub cap_psqt: IndexPair,
+    pub supports_psqt: IndexPair,
+    pub captives_psqt: IndexPair,
+    pub shallow_supports_per_piece: IndexPair,
+    pub deep_supports_per_piece: IndexPair,
+    pub shallow_captives_per_piece: IndexPair,
+    pub deep_captives_per_piece: IndexPair,
+    pub us_to_move_opening_flatstone_lead: IndexPair,
+    pub them_to_move_opening_flatstone_lead: IndexPair,
+    pub us_to_move_middlegame_flatstone_lead: IndexPair,
+    pub them_to_move_middlegame_flatstone_lead: IndexPair,
+    pub us_to_move_endgame_flatstone_lead: IndexPair,
+    pub them_to_move_endgame_flatstone_lead: IndexPair,
+    pub i_number_of_groups: IndexPair,
+    pub critical_squares: IndexPair,
+    pub critical_square_cap_attack: IndexPair,
+    pub flat_next_to_our_stack: IndexPair,
+    pub wall_next_to_our_stack: IndexPair,
+    pub cap_next_to_our_stack: IndexPair,
+    pub num_lines_occupied: IndexPair,
+    pub line_control_empty: IndexPair,
+    pub line_control_their_blocking_piece: IndexPair,
+    pub line_control_other: IndexPair,
+    pub sidelined_cap: IndexPair,
+    pub fully_isolated_cap: IndexPair,
+    pub semi_isolated_cap: IndexPair,
+    pub padding: IndexPair,
+}
+
+impl<const S: usize> ValueIndexes<S> {
+    pub const fn new() -> Self {
+        let i = 0;
+
+        let (first_ply, i) = IndexPair::next(i, 1);
+        let (second_ply, i) = IndexPair::next(i, num_square_symmetries::<S>());
+        let (flat_psqt, i) = IndexPair::next(i, num_square_symmetries::<S>());
+        let (wall_psqt, i) = IndexPair::next(i, num_square_symmetries::<S>());
+        let (cap_psqt, i) = IndexPair::next(i, num_square_symmetries::<S>());
+        let (supports_psqt, i) = IndexPair::next(i, num_square_symmetries::<S>());
+        let (captives_psqt, i) = IndexPair::next(i, num_square_symmetries::<S>());
+        let (shallow_supports_per_piece, i) = IndexPair::next(i, 4);
+        let (deep_supports_per_piece, i) = IndexPair::next(i, 4);
+        let (shallow_captives_per_piece, i) = IndexPair::next(i, 4);
+        let (deep_captives_per_piece, i) = IndexPair::next(i, 4);
+        let (us_to_move_opening_flatstone_lead, i) = IndexPair::next(i, 7);
+        let (them_to_move_opening_flatstone_lead, i) = IndexPair::next(i, 7);
+        let (us_to_move_middlegame_flatstone_lead, i) = IndexPair::next(i, 7);
+        let (them_to_move_middlegame_flatstone_lead, i) = IndexPair::next(i, 7);
+        let (us_to_move_endgame_flatstone_lead, i) = IndexPair::next(i, 7);
+        let (them_to_move_endgame_flatstone_lead, i) = IndexPair::next(i, 7);
+        let (i_number_of_groups, i) = IndexPair::next(i, 3);
+        let (critical_squares, i) = IndexPair::next(i, 4);
+        let (critical_square_cap_attack, i) = IndexPair::next(i, 6);
+        let (flat_next_to_our_stack, i) = IndexPair::next(i, 1);
+        let (wall_next_to_our_stack, i) = IndexPair::next(i, 1);
+        let (cap_next_to_our_stack, i) = IndexPair::next(i, 1);
+        let (num_lines_occupied, i) = IndexPair::next(i, S + 1);
+        let (line_control_empty, i) = IndexPair::next(i, S * num_line_symmetries::<S>());
+        let (line_control_their_blocking_piece, i) =
+            IndexPair::next(i, S * num_line_symmetries::<S>());
+        let (line_control_other, i) = IndexPair::next(i, S * num_line_symmetries::<S>());
+        let (sidelined_cap, i) = IndexPair::next(i, 3);
+        let (fully_isolated_cap, i) = IndexPair::next(i, 3);
+        let (semi_isolated_cap, i) = IndexPair::next(i, 3);
+        let (padding, i) = IndexPair::next(i, value_padding::<S>() / 2);
+
+        assert!(i == num_value_features::<S>() / 2);
+
+        ValueIndexes {
+            first_ply,
+            second_ply,
+            flat_psqt,
+            wall_psqt,
+            cap_psqt,
+            supports_psqt,
+            captives_psqt,
+            shallow_supports_per_piece,
+            deep_supports_per_piece,
+            shallow_captives_per_piece,
+            deep_captives_per_piece,
+            us_to_move_opening_flatstone_lead,
+            them_to_move_opening_flatstone_lead,
+            us_to_move_middlegame_flatstone_lead,
+            them_to_move_middlegame_flatstone_lead,
+            us_to_move_endgame_flatstone_lead,
+            them_to_move_endgame_flatstone_lead,
+            i_number_of_groups,
+            critical_squares,
+            critical_square_cap_attack,
+            flat_next_to_our_stack,
+            wall_next_to_our_stack,
+            cap_next_to_our_stack,
+            num_lines_occupied,
+            line_control_empty,
+            line_control_their_blocking_piece,
+            line_control_other,
+            sidelined_cap,
+            fully_isolated_cap,
+            semi_isolated_cap,
+            padding,
+        }
+    }
+}
+
+pub const VALUE_INDEXES_4S: ValueIndexes<4> = ValueIndexes::new();
+pub const VALUE_INDEXES_5S: ValueIndexes<5> = ValueIndexes::new();
+pub const VALUE_INDEXES_6S: ValueIndexes<6> = ValueIndexes::new();
+
+impl<const S: usize> ValueIndexes<S> {
+    pub const fn downcast_size<const N: usize>(self) -> ValueIndexes<N> {
+        if S == N {
+            unsafe { mem::transmute(self) }
+        } else {
+            panic!()
+        }
+    }
+}
+
+pub const fn value_indexes<const S: usize>() -> ValueIndexes<S> {
+    match S {
+        4 => VALUE_INDEXES_4S.downcast_size(),
+        5 => VALUE_INDEXES_5S.downcast_size(),
+        6 => VALUE_INDEXES_6S.downcast_size(),
+        _ => panic!(),
+    }
+}
+
 pub struct PolicyIndexes<const S: usize> {
     pub flat_psqt_white: IndexPair,
     pub flat_psqt_black: IndexPair,
@@ -370,6 +502,76 @@ impl<const S: usize> PolicyIndexes<S> {
             spread_that_connects_groups_to_win,
             padding,
         }
+    }
+}
+
+pub trait ValueApplier {
+    fn new(parameters: &'static [f32]) -> Self;
+    fn eval(&mut self, index_pair: IndexPair, index: usize, val: f16);
+    fn finish(&mut self) -> f32;
+}
+
+#[derive(Debug, Clone)]
+pub struct Value<const S: usize> {
+    pub features: Vec<f16>,
+    parameters: &'static [f32],
+}
+
+impl<const S: usize> ValueApplier for Value<S> {
+    fn new(parameters: &'static [f32]) -> Self {
+        Value {
+            features: vec![f16::ZERO; num_value_features::<S>()],
+            parameters,
+        }
+    }
+    fn eval(&mut self, index_pair: IndexPair, index: usize, val: f16) {
+        index_pair.as_mut_slice(&mut self.features)[index] += val
+    }
+
+    fn finish(&mut self) -> f32 {
+        const SIMD_WIDTH: usize = 8;
+        assert_eq!(self.features.len() % SIMD_WIDTH, 0);
+        assert_eq!(self.features.len(), self.parameters.len());
+
+        let partial_sums: [f32; SIMD_WIDTH] = self
+            .features
+            .chunks_exact(SIMD_WIDTH)
+            .zip(self.parameters.chunks_exact(SIMD_WIDTH))
+            .fold([0.0; SIMD_WIDTH], |acc, (c, p)| {
+                array::from_fn(|i| acc[i] + c[i].to_f32() * p[i])
+            });
+
+        let total_value = partial_sums.iter().sum::<f32>();
+
+        self.features.fill(f16::ZERO);
+
+        total_value
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct IncrementalValue<const S: usize> {
+    val: f32,
+    parameters: &'static [f32],
+}
+
+impl<const S: usize> ValueApplier for IncrementalValue<S> {
+    fn new(parameters: &'static [f32]) -> Self {
+        IncrementalValue {
+            val: 0.0,
+            parameters,
+        }
+    }
+    fn eval(&mut self, index_pair: IndexPair, index: usize, val: f16) {
+        self.val += index_pair.as_slice(self.parameters)[index] * val.to_f32()
+    }
+
+    fn finish(&mut self) -> f32 {
+        let total_value = self.val;
+
+        self.val = 0.0;
+
+        total_value
     }
 }
 
