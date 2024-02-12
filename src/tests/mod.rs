@@ -65,11 +65,12 @@ impl TestPosition {
 
         assert!(
             candidate_moves.contains(&best_move),
-            "{} didn't play one of the correct moves {:?}, {} {:.1}% played instead in position:\n{:?}",
+            "{} didn't play one of the correct moves {:?}, {} {:.1}% played instead in position:\n{}\n{:?}",
             position.side_to_move(),
             correct_moves,
             position.move_to_san(&best_move),
             score * 100.0,
+            position.to_fen(),
             position
         );
     }
