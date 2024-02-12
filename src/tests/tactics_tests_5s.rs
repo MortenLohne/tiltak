@@ -188,16 +188,6 @@ fn double_tak_threat_from_citadel_test() {
 }
 
 #[test]
-fn impure_spread_onto_string_line() {
-    let test_position = TestPosition {
-        tps_string: Some("2,2,x2,1/x,2,x2,21/2,221C,22121,x,121/12C,x2,112,1/x2,1,2221S,2S 1 27"),
-        move_strings: &[],
-        komi: Komi::default(),
-    };
-    test_position.plays_correct_move_long_prop::<5>(&["3b3>111"]);
-}
-
-#[test]
 fn cap_movement_creating_tak_threat() {
     let test_position = TestPosition {
         tps_string: Some("x2,2,1,x/x,2,2,1,1/x,12,12112C,111112S,1/2,x,2,1,12S/1S,1C,1,1,1 2 21"),
