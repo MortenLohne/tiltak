@@ -16,12 +16,15 @@ fn avoid_loss_in_two() {
 #[test]
 // c3< wins if not stopped
 fn avoid_loss_in_three2() {
+    // x,2,x3/x,2,2,x2/x,1,2,1,1/x,12C,21C,1,x/x,1,2,x2 1 9
     let test_position = TestPosition::from_move_strings(&[
         "b5", "e3", "Cc3", "Cb3", "b2", "b4", "b1", "c2", "d3", "c4", "d2", "c1", "c3-", "b3-",
         "b3", "c3",
     ]);
 
-    test_position.plays_correct_move_long_prop::<5>(&["a3", "2c2+"]);
+    test_position.plays_correct_move_long_prop::<5>(&[
+        "a1", "Sa1", "a2", "Sa2", "a3", "Sa3", "Sa4", "Sa5", "Sc5", "2c2+", "2c2-", "b3+",
+    ]);
 }
 
 #[test]
@@ -222,7 +225,7 @@ fn place_cap_in_strong_line_for_tinue() {
         move_strings: &[],
         komi: Komi::default(),
     };
-    test_position.plays_correct_move_long_prop::<5>(&["Ca2"]);
+    test_position.plays_correct_move_long_prop::<5>(&["Ca1", "Ca2"]);
 }
 
 #[test]
@@ -255,7 +258,7 @@ fn cap_throw_with_tinue() {
         move_strings: &[],
         komi: Komi::default(),
     };
-    test_position.plays_correct_move_long_prop::<5>(&["4c5-112", "3c5-111", "4c5-211"]);
+    test_position.plays_correct_move_long_prop::<5>(&["4c5-112", "3c5-111", "4c5-211", "4c5-121"]);
 }
 
 #[test]
