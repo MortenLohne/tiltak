@@ -13,7 +13,6 @@ use pgn_traits::PgnPosition;
 #[cfg(feature = "constant-tuning")]
 use rayon::prelude::*;
 
-use tiltak::evaluation::parameters;
 use tiltak::evaluation::parameters::IncrementalPolicy;
 use tiltak::minmax;
 #[cfg(feature = "sqlite")]
@@ -148,13 +147,6 @@ fn main() {
             "analyze_openings" => analyze_openings::<6>(Komi::default(), 500_000),
             #[cfg(feature = "sqlite")]
             "test_policy" => policy_sqlite::check_all_games(),
-            "value_features" => match words.get(1) {
-                Some(&"4") => print_value_features::<4>(komi), // TODO: Bad default komi
-                Some(&"5") => print_value_features::<5>(komi),
-                Some(&"6") => print_value_features::<6>(komi),
-                Some(s) => println!("Unsupported size {}", s),
-                None => print_value_features::<5>(komi),
-            },
             "game" => {
                 println!("Enter move list or a full PTN, then press enter followed by CTRL+D");
                 let mut input = String::new();
@@ -369,33 +361,6 @@ fn mcts_vs_minmax(minmax_depth: u16, mcts_nodes: u64) {
     println!("\n{:?}\nResult: {:?}", position, position.game_result());
 }
 
-fn print_value_features<const S: usize>(komi: Komi) {
-    let mut params: Vec<f16> = <Position<S>>::value_params(komi)
-        .iter()
-        .map(|p| f16::from_f32(*p))
-        .collect();
-    let num: usize = params.len() / 2;
-    let (white_coefficients, black_coefficients) = params.split_at_mut(num);
-
-    let white_value_features = parameters::ValueFeatures::new::<S>(white_coefficients);
-    let white_value_features_string = format!("{:?}", white_value_features);
-
-    let black_value_features = parameters::ValueFeatures::new::<S>(black_coefficients);
-    let black_value_features_string = format!("{:?}", black_value_features);
-
-    println!("White features:");
-    for line in white_value_features_string.split("],") {
-        let (name, values) = line.split_once(": ").unwrap();
-        println!("{:40}: {}],", name, values);
-    }
-    println!();
-    println!("Black features:");
-    for line in black_value_features_string.split("],") {
-        let (name, values) = line.split_once(": ").unwrap();
-        println!("{:40}: {}],", name, values);
-    }
-}
-
 fn analyze_position_from_ptn<const S: usize>(komi: Komi) {
     println!("Enter move list or a full PTN, then press enter followed by CTRL+D");
 
@@ -434,73 +399,6 @@ fn analyze_position<const S: usize>(position: &Position<S>) {
     let eval_komi = position.komi();
 
     assert_eq!(position.game_result(), None, "Cannot analyze finished game");
-
-    // let group_data = position.group_data();
-
-    // let mut coefficients = vec![f16::ZERO; parameters::num_value_features::<S>()];
-    // let coefficients_mid_index = coefficients.len() / 2;
-
-    // let (white_coefficients, black_coefficients) =
-    //     coefficients.split_at_mut(coefficients_mid_index);
-
-    // {
-    //     let mut white_value_features = parameters::ValueFeatures::new::<S>(white_coefficients);
-    //     let mut black_value_features = parameters::ValueFeatures::new::<S>(black_coefficients);
-    //     value_eval::static_eval_game_phase::<S>(
-    //         position,
-    //         &group_data,
-    //         &mut white_value_features,
-    //         &mut black_value_features,
-    //     );
-    // }
-    // for (feature, param) in white_coefficients.iter_mut().zip(
-    //     <Position<S>>::value_params(eval_komi)
-    //         .iter()
-    //         .take(coefficients_mid_index),
-    // ) {
-    //     *feature *= f16::from_f32(*param);
-    // }
-
-    // for (feature, param) in black_coefficients.iter_mut().zip(
-    //     <Position<S>>::value_params(eval_komi)
-    //         .iter()
-    //         .skip(coefficients_mid_index),
-    // ) {
-    //     *feature *= f16::from_f32(*param);
-    // }
-
-    // let mut mixed_coefficients: Vec<f16> = white_coefficients
-    //     .iter()
-    //     .zip(black_coefficients.iter())
-    //     .map(|(white, black)| *white - *black)
-    //     .collect();
-
-    // let white_value_features = parameters::ValueFeatures::new::<S>(white_coefficients);
-    // let white_value_features_string = format!("{:?}", white_value_features);
-
-    // let black_value_features = parameters::ValueFeatures::new::<S>(black_coefficients);
-    // let black_value_features_string = format!("{:?}", black_value_features);
-
-    // let mixed_value_features = parameters::ValueFeatures::new::<S>(&mut mixed_coefficients);
-    // let mixed_value_features_string = format!("{:?}", mixed_value_features);
-
-    // println!("White features:");
-    // for line in white_value_features_string.split("],") {
-    //     let (name, values) = line.split_once(": ").unwrap();
-    //     println!("{:32}: {}],", name, values);
-    // }
-    // println!();
-    // println!("Black features:");
-    // for line in black_value_features_string.split("],") {
-    //     let (name, values) = line.split_once(": ").unwrap();
-    //     println!("{:32}: {}],", name, values);
-    // }
-    // println!();
-    // println!("Mixed features:");
-    // for line in mixed_value_features_string.split("],") {
-    //     let (name, values) = line.split_once(": ").unwrap();
-    //     println!("{:32}: {}],", name, values);
-    // }
 
     let mut simple_moves = vec![];
     let mut moves = vec![];
