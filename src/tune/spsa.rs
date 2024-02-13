@@ -26,9 +26,9 @@ enum SpsaDirection {
 }
 
 /// Tune the variables indefinitely
-pub fn tune<const S: usize>(variables: &mut [Variable], book_path: Option<&str>) {
+pub fn tune<const S: usize>(variables: &mut [Variable], book_path: Option<&str>, komi: Komi) {
     let openings = if let Some(path) = book_path {
-        openings_from_file::<S>(path).unwrap()
+        openings_from_file::<S>(path, komi).unwrap()
     } else {
         vec![vec![]]
     };

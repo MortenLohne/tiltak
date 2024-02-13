@@ -1,5 +1,5 @@
 use std::path::Path;
-use std::str::FromStr;
+use std::process::exit;
 
 use clap::{Arg, Command};
 
@@ -21,9 +21,16 @@ fn main() {
                 .long("size")
                 .help("Board size")
                 .num_args(1)
-                .default_value("5")
-                .value_parser(clap::value_parser!(u64).range(4..=6)),
-        )
+                .value_parser(clap::value_parser!(u64).range(4..=6)))
+        .arg(
+            Arg::new("komi")
+                .global(true)
+                .long("komi")
+                .num_args(1)
+                .allow_hyphen_values(true)
+                .value_parser(|input: &str| {
+                    input.parse::<Komi>()
+                }))
         .subcommand(Command::new("selfplay")
             .about("Tune value and policy constants by playing against itself. Will write the games to text files in the working directory."))
         .subcommand(Command::new("selfplay-from-scratch")
@@ -64,8 +71,16 @@ fn main() {
             )).arg_required_else_help(true);
 
     let matches = app.get_matches();
-    let size: usize = *matches.get_one::<u64>("size").unwrap() as usize;
-    let komi = Komi::from_str("2.0").unwrap();
+    // Required global options doesn't work properly in Clap,
+    // so manually check that they are present
+    let Some(size) = matches.get_one::<u64>("size") else {
+        eprintln!("Error: --size is required");
+        exit(1)
+    };
+    let Some(komi) = matches.get_one::<Komi>("komi") else {
+        eprintln!("Error: --komi is required");
+        exit(1)
+    };
 
     match matches.subcommand() {
         Some(("selfplay", _)) => {
@@ -79,9 +94,9 @@ fn main() {
                             NUM_POLICY_FEATURES_4S,
                         >(
                             i,
-                            komi,
-                            *parameters::value_features_4s(komi),
-                            *parameters::policy_features_4s(komi),
+                            *komi,
+                            *parameters::value_features_4s(*komi),
+                            *parameters::policy_features_4s(*komi),
                             vec![],
                             vec![],
                             0,
@@ -93,9 +108,9 @@ fn main() {
                             NUM_POLICY_FEATURES_5S,
                         >(
                             i,
-                            komi,
-                            *parameters::value_features_5s(komi),
-                            *parameters::policy_features_5s(komi),
+                            *komi,
+                            *parameters::value_features_5s(*komi),
+                            *parameters::policy_features_5s(*komi),
                             vec![],
                             vec![],
                             0,
@@ -107,9 +122,9 @@ fn main() {
                             NUM_POLICY_FEATURES_6S,
                         >(
                             i,
-                            komi,
-                            *parameters::value_features_6s(komi),
-                            *parameters::policy_features_6s(komi),
+                            *komi,
+                            *parameters::value_features_6s(*komi),
+                            *parameters::policy_features_6s(*komi),
                             vec![],
                             vec![],
                             0,
@@ -132,19 +147,19 @@ fn main() {
                             4,
                             NUM_VALUE_FEATURES_4S,
                             NUM_POLICY_FEATURES_4S,
-                        >(i, komi)
+                        >(i, *komi)
                         .unwrap(),
                         5 => training::train_from_scratch::<
                             5,
                             NUM_VALUE_FEATURES_5S,
                             NUM_POLICY_FEATURES_5S,
-                        >(i, komi)
+                        >(i, *komi)
                         .unwrap(),
                         6 => training::train_from_scratch::<
                             6,
                             NUM_VALUE_FEATURES_6S,
                             NUM_POLICY_FEATURES_6S,
-                        >(i, komi)
+                        >(i, *komi)
                         .unwrap(),
                         _ => panic!("Size {} not supported.", size),
                     }
@@ -160,21 +175,21 @@ fn main() {
                 4 => {
                     training::continue_training::<4, NUM_VALUE_FEATURES_4S, NUM_POLICY_FEATURES_4S>(
                         training_id,
-                        komi,
+                        *komi,
                     )
                     .unwrap()
                 }
                 5 => {
                     training::continue_training::<5, NUM_VALUE_FEATURES_5S, NUM_POLICY_FEATURES_5S>(
                         training_id,
-                        komi,
+                        *komi,
                     )
                     .unwrap()
                 }
                 6 => {
                     training::continue_training::<6, NUM_VALUE_FEATURES_6S, NUM_POLICY_FEATURES_6S>(
                         training_id,
-                        komi,
+                        *komi,
                     )
                     .unwrap()
                 }
@@ -185,21 +200,24 @@ fn main() {
             let file_name = arg.get_one::<String>("file-name").unwrap();
             match size {
                 4 => {
-                    let value_params =
-                        training::tune_value_from_file::<4, NUM_VALUE_FEATURES_4S>(file_name, komi)
-                            .unwrap();
+                    let value_params = training::tune_value_from_file::<4, NUM_VALUE_FEATURES_4S>(
+                        file_name, *komi,
+                    )
+                    .unwrap();
                     println!("{:?}", value_params);
                 }
                 5 => {
-                    let value_params =
-                        training::tune_value_from_file::<5, NUM_VALUE_FEATURES_5S>(file_name, komi)
-                            .unwrap();
+                    let value_params = training::tune_value_from_file::<5, NUM_VALUE_FEATURES_5S>(
+                        file_name, *komi,
+                    )
+                    .unwrap();
                     println!("{:?}", value_params);
                 }
                 6 => {
-                    let value_params =
-                        training::tune_value_from_file::<6, NUM_VALUE_FEATURES_6S>(file_name, komi)
-                            .unwrap();
+                    let value_params = training::tune_value_from_file::<6, NUM_VALUE_FEATURES_6S>(
+                        file_name, *komi,
+                    )
+                    .unwrap();
                     println!("{:?}", value_params);
                 }
                 _ => panic!("Size {} not supported.", size),
@@ -215,7 +233,7 @@ fn main() {
                             4,
                             NUM_VALUE_FEATURES_4S,
                             NUM_POLICY_FEATURES_4S,
-                        >(value_file_name, policy_file_name, komi)
+                        >(value_file_name, policy_file_name, *komi)
                         .unwrap();
                     println!("Value: {:?}", value_params);
                     println!("Policy: {:?}", policy_params);
@@ -226,7 +244,7 @@ fn main() {
                             5,
                             NUM_VALUE_FEATURES_5S,
                             NUM_POLICY_FEATURES_5S,
-                        >(value_file_name, policy_file_name, komi)
+                        >(value_file_name, policy_file_name, *komi)
                         .unwrap();
                     println!("Value: {:?}", value_params);
                     println!("Policy: {:?}", policy_params);
@@ -237,7 +255,7 @@ fn main() {
                             6,
                             NUM_VALUE_FEATURES_6S,
                             NUM_POLICY_FEATURES_6S,
-                        >(value_file_name, policy_file_name, komi)
+                        >(value_file_name, policy_file_name, *komi)
                         .unwrap();
                     println!("Value: {:?}", value_params);
                     println!("Policy: {:?}", policy_params);
@@ -267,14 +285,17 @@ fn main() {
                 4 => spsa::tune::<4>(
                     &mut variables,
                     arg.get_one::<String>("book").map(|s| s.as_ref()),
+                    *komi,
                 ),
                 5 => spsa::tune::<5>(
                     &mut variables,
                     arg.get_one::<String>("book").map(|s| s.as_ref()),
+                    *komi,
                 ),
                 6 => spsa::tune::<6>(
                     &mut variables,
                     arg.get_one::<String>("book").map(|s| s.as_ref()),
+                    *komi,
                 ),
                 _ => panic!("Size {} not supported.", size),
             }
