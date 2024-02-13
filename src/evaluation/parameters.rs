@@ -411,7 +411,7 @@ pub struct Value<const S: usize> {
 impl<const S: usize> ValueApplier for Value<S> {
     fn new(parameters: &'static [f32]) -> Self {
         Value {
-            features: vec![f16::ZERO; num_value_features::<S>()],
+            features: vec![f16::ZERO; num_value_features::<S>() / 2],
             parameters,
         }
     }
