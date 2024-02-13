@@ -35,8 +35,15 @@ type MoveScore<const S: usize> = (Move<S>, f16);
 // The probability of each possible move being played, through a whole game.
 type MoveScoresForGame<const S: usize> = Vec<Vec<MoveScore<S>>>;
 
+pub struct TrainingOptions {
+    pub training_id: usize,
+    pub batch_size: usize,
+    pub num_games_for_tuning: usize,
+    pub nodes_per_game: usize,
+}
+
 pub fn train_from_scratch<const S: usize, const N: usize, const M: usize>(
-    training_id: usize,
+    options: TrainingOptions,
     komi: Komi,
 ) -> Result<(), DynError> {
     let mut rng = rand::rngs::StdRng::from_seed([0; 32]);
@@ -46,7 +53,7 @@ pub fn train_from_scratch<const S: usize, const N: usize, const M: usize>(
     let initial_policy_params: [f32; M] = array_from_fn(|| rng.gen_range(-0.01..0.01));
 
     train_perpetually::<S, N, M>(
-        training_id,
+        options,
         komi,
         initial_value_params,
         initial_policy_params,
@@ -57,7 +64,7 @@ pub fn train_from_scratch<const S: usize, const N: usize, const M: usize>(
 }
 
 pub fn continue_training<const S: usize, const N: usize, const M: usize>(
-    training_id: usize,
+    options: TrainingOptions,
     komi: Komi,
 ) -> Result<(), DynError> {
     let mut games = vec![];
@@ -65,7 +72,7 @@ pub fn continue_training<const S: usize, const N: usize, const M: usize>(
     let mut batch_id = 0;
     loop {
         match read_games_from_file::<S>(
-            &format!("games{}_{}s_batch{}.ptn", training_id, S, batch_id),
+            &format!("games{}_{}s_batch{}.ptn", options.training_id, S, batch_id),
             komi,
         ) {
             Ok(mut game_batch) => {
@@ -82,7 +89,7 @@ pub fn continue_training<const S: usize, const N: usize, const M: usize>(
         }
         let mut move_scores_batch = read_move_scores_from_file::<S>(&format!(
             "move_scores{}_{}s_batch{}.ptn",
-            training_id, S, batch_id
+            options.training_id, S, batch_id
         ))?;
         move_scores.append(&mut move_scores_batch);
         batch_id += 1;
@@ -100,7 +107,7 @@ pub fn continue_training<const S: usize, const N: usize, const M: usize>(
     let policy_params = <Position<S>>::policy_params(komi);
 
     train_perpetually::<S, N, M>(
-        training_id,
+        options,
         komi,
         <[f32; N]>::try_from(value_params).unwrap(),
         <[f32; M]>::try_from(policy_params).unwrap(),
@@ -111,7 +118,7 @@ pub fn continue_training<const S: usize, const N: usize, const M: usize>(
 }
 
 pub fn train_perpetually<const S: usize, const N: usize, const M: usize>(
-    training_id: usize,
+    options: TrainingOptions,
     komi: Komi,
     initial_value_params: [f32; N],
     initial_policy_params: [f32; M],
@@ -119,10 +126,6 @@ pub fn train_perpetually<const S: usize, const N: usize, const M: usize>(
     mut all_move_scores: Vec<MoveScoresForGame<S>>,
     mut batch_id: usize,
 ) -> Result<(), DynError> {
-    const BATCH_SIZE: usize = 500;
-    // Only train from the last n batches
-    const BATCHES_FOR_TRAINING: usize = 25;
-
     let mut last_value_params: &'static [f32; N] = Box::leak(Box::new(initial_value_params));
     let mut last_policy_params: &'static [f32; M] = Box::leak(Box::new(initial_policy_params));
 
@@ -138,7 +141,7 @@ pub fn train_perpetually<const S: usize, const N: usize, const M: usize>(
         let last_params_wins: AtomicU64 = AtomicU64::new(0);
 
         let playing_start_time = time::Instant::now();
-        let (games, move_scores): (Vec<_>, Vec<_>) = (0..BATCH_SIZE)
+        let (games, move_scores): (Vec<_>, Vec<_>) = (0..options.batch_size)
             .into_par_iter()
             .map(|i| {
                 play_game_pair::<S>(
@@ -158,7 +161,7 @@ pub fn train_perpetually<const S: usize, const N: usize, const M: usize>(
         all_move_scores.extend_from_slice(&move_scores[..]);
         all_games.extend_from_slice(&games[..]);
 
-        let file_name = format!("games{}_{}s_batch{}.ptn", training_id, S, batch_id);
+        let file_name = format!("games{}_{}s_batch{}.ptn", options.training_id, S, batch_id);
 
         let outfile = fs::OpenOptions::new()
             .create(true)
@@ -177,7 +180,7 @@ pub fn train_perpetually<const S: usize, const N: usize, const M: usize>(
             .append(true)
             .open(format!(
                 "move_scores{}_{}s_batch{}.ptn",
-                training_id, S, batch_id
+                options.training_id, S, batch_id
             ))
             .unwrap();
         writer.flush()?;
@@ -205,7 +208,7 @@ pub fn train_perpetually<const S: usize, const N: usize, const M: usize>(
 
         let wins = current_params_wins.into_inner();
         let losses = last_params_wins.into_inner();
-        let draws = BATCH_SIZE as u64 - wins - losses;
+        let draws = options.batch_size as u64 - wins - losses;
 
         println!("Finished playing batch of {} games. {} games played in total. {} white wins, {} draws, {} black wins, {} aborted. New vs old parameters was +{}-{}={}.",
             games.len(), all_games.len(), game_stats.white_wins, game_stats.draws, game_stats.black_wins, game_stats.aborted, wins, losses, draws
@@ -218,20 +221,14 @@ pub fn train_perpetually<const S: usize, const N: usize, const M: usize>(
             .iter()
             .cloned()
             .rev()
-            .take(usize::min(
-                max_training_games,
-                BATCH_SIZE * BATCHES_FOR_TRAINING,
-            ))
+            .take(usize::min(max_training_games, options.num_games_for_tuning))
             .collect::<Vec<_>>();
 
         let move_scores_in_training_batch = all_move_scores
             .iter()
             .cloned()
             .rev()
-            .take(usize::min(
-                max_training_games,
-                BATCH_SIZE * BATCHES_FOR_TRAINING,
-            ))
+            .take(usize::min(max_training_games, options.num_games_for_tuning))
             .collect::<Vec<_>>();
 
         let value_tuning_start_time = time::Instant::now();

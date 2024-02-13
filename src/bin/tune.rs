@@ -8,6 +8,7 @@ use tiltak::evaluation::parameters::{
     NUM_VALUE_FEATURES_4S, NUM_VALUE_FEATURES_5S, NUM_VALUE_FEATURES_6S,
 };
 use tiltak::position::Komi;
+use tiltak::tune::training::TrainingOptions;
 use tiltak::tune::{spsa, training};
 
 fn main() {
@@ -32,11 +33,53 @@ fn main() {
                     input.parse::<Komi>()
                 }))
         .subcommand(Command::new("selfplay")
-            .about("Tune value and policy constants by playing against itself. Will write the games to text files in the working directory."))
+            .about("Tune value and policy constants by playing against itself. Will write the games to text files in the working directory.")
+            .arg(
+                Arg::new("nodes")
+                    .long("nodes")
+                    .help("Number of MCTS nodes per selfplay game.")
+                    .default_value("50000")
+                    .num_args(1)
+                    .value_parser(clap::value_parser!(u64)))
+            .arg(
+                Arg::new("batch-size")
+                    .long("batch-size")
+                    .help("Number of games per training batch. Eval parameters are re-tuned after each batch.")
+                    .default_value("1000")
+                    .num_args(1)
+                    .value_parser(clap::value_parser!(u64))))
         .subcommand(Command::new("selfplay-from-scratch")
-            .about("Tune value and policy constants from randomly initialized values by playing against itself. Will write the games to text files in the working directory."))
+            .about("Tune value and policy constants from randomly initialized values by playing against itself. Will write the games to text files in the working directory.")
+            .arg(
+                Arg::new("nodes")
+                    .long("nodes")
+                    .help("Number of MCTS nodes per selfplay game.")
+                    .default_value("50000")
+                    .num_args(1)
+                    .value_parser(clap::value_parser!(u64)))
+            .arg(
+                Arg::new("batch-size")
+                    .long("batch-size")
+                    .help("Number of games per training batch. Eval parameters are re-tuned after each batch.")
+                    .default_value("1000")
+                    .num_args(1)
+                    .value_parser(clap::value_parser!(u64))))
         .subcommand(Command::new("continue-selfplay")
             .about("Continue selfplay training")
+            .arg(
+                Arg::new("nodes")
+                    .long("nodes")
+                    .help("Number of MCTS nodes per selfplay game.")
+                    .default_value("50000")
+                    .num_args(1)
+                    .value_parser(clap::value_parser!(u64)))
+            .arg(
+                Arg::new("batch-size")
+                    .long("batch-size")
+                    .help("Number of games per training batch. Eval parameters are re-tuned after each batch.")
+                    .default_value("1000")
+                    .num_args(1)
+                    .value_parser(clap::value_parser!(u64)))
             .arg(Arg::new("training-id")
                 .long("training-id")
                 .num_args(1)
@@ -82,18 +125,32 @@ fn main() {
         exit(1)
     };
 
+    let num_games_for_tuning = match size {
+        4 => 20_000,
+        5 => 15_000,
+        _ => 12_000,
+    };
+
     match matches.subcommand() {
-        Some(("selfplay", _)) => {
-            for i in 0.. {
-                let file_name = format!("games{}_s{}_batch0.ptn", i, size);
+        Some(("selfplay", arg)) => {
+            for training_id in 0.. {
+                let file_name = format!("games{}_s{}_batch0.ptn", training_id, size);
                 if !Path::new(&file_name).exists() {
+                    let batch_size = *arg.get_one::<u64>("batch-size").unwrap() as usize;
+                    let nodes_per_game = *arg.get_one::<u64>("nodes").unwrap() as usize;
+                    let options = TrainingOptions {
+                        training_id,
+                        batch_size,
+                        num_games_for_tuning,
+                        nodes_per_game,
+                    };
                     match size {
                         4 => training::train_perpetually::<
                             4,
                             NUM_VALUE_FEATURES_4S,
                             NUM_POLICY_FEATURES_4S,
                         >(
-                            i,
+                            options,
                             *komi,
                             *parameters::value_features_4s(*komi),
                             *parameters::policy_features_4s(*komi),
@@ -107,7 +164,7 @@ fn main() {
                             NUM_VALUE_FEATURES_5S,
                             NUM_POLICY_FEATURES_5S,
                         >(
-                            i,
+                            options,
                             *komi,
                             *parameters::value_features_5s(*komi),
                             *parameters::policy_features_5s(*komi),
@@ -121,7 +178,7 @@ fn main() {
                             NUM_VALUE_FEATURES_6S,
                             NUM_POLICY_FEATURES_6S,
                         >(
-                            i,
+                            options,
                             *komi,
                             *parameters::value_features_6s(*komi),
                             *parameters::policy_features_6s(*komi),
@@ -138,28 +195,36 @@ fn main() {
                 }
             }
         }
-        Some(("selfplay-from-scratch", _)) => {
-            for i in 0.. {
-                let file_name = format!("games{}_{}s_batch0.ptn", i, size);
+        Some(("selfplay-from-scratch", arg)) => {
+            for training_id in 0.. {
+                let file_name = format!("games{}_{}s_batch0.ptn", training_id, size);
                 if !Path::new(&file_name).exists() {
+                    let batch_size = *arg.get_one::<u64>("batch-size").unwrap() as usize;
+                    let nodes_per_game = *arg.get_one::<u64>("nodes").unwrap() as usize;
+                    let options = TrainingOptions {
+                        training_id,
+                        batch_size,
+                        num_games_for_tuning,
+                        nodes_per_game,
+                    };
                     match size {
                         4 => training::train_from_scratch::<
                             4,
                             NUM_VALUE_FEATURES_4S,
                             NUM_POLICY_FEATURES_4S,
-                        >(i, *komi)
+                        >(options, *komi)
                         .unwrap(),
                         5 => training::train_from_scratch::<
                             5,
                             NUM_VALUE_FEATURES_5S,
                             NUM_POLICY_FEATURES_5S,
-                        >(i, *komi)
+                        >(options, *komi)
                         .unwrap(),
                         6 => training::train_from_scratch::<
                             6,
                             NUM_VALUE_FEATURES_6S,
                             NUM_POLICY_FEATURES_6S,
-                        >(i, *komi)
+                        >(options, *komi)
                         .unwrap(),
                         _ => panic!("Size {} not supported.", size),
                     }
@@ -170,26 +235,31 @@ fn main() {
             }
         }
         Some(("continue-selfplay", arg)) => {
-            let training_id: usize = *arg.get_one::<u64>("training-id").unwrap() as usize;
+            let training_id = *arg.get_one::<u64>("training-id").unwrap() as usize;
+            let batch_size = *arg.get_one::<u64>("batch-size").unwrap() as usize;
+            let nodes_per_game = *arg.get_one::<u64>("nodes").unwrap() as usize;
+            let options = TrainingOptions {
+                training_id,
+                batch_size,
+                num_games_for_tuning,
+                nodes_per_game,
+            };
             match size {
                 4 => {
                     training::continue_training::<4, NUM_VALUE_FEATURES_4S, NUM_POLICY_FEATURES_4S>(
-                        training_id,
-                        *komi,
+                        options, *komi,
                     )
                     .unwrap()
                 }
                 5 => {
                     training::continue_training::<5, NUM_VALUE_FEATURES_5S, NUM_POLICY_FEATURES_5S>(
-                        training_id,
-                        *komi,
+                        options, *komi,
                     )
                     .unwrap()
                 }
                 6 => {
                     training::continue_training::<6, NUM_VALUE_FEATURES_6S, NUM_POLICY_FEATURES_6S>(
-                        training_id,
-                        *komi,
+                        options, *komi,
                     )
                     .unwrap()
                 }
