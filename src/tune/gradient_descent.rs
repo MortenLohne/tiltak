@@ -74,7 +74,7 @@ pub fn gradient_descent<R: rand::Rng, const N: usize>(
 
             let error = average_error(samples, &parameter_set);
 
-            if i % 50 == 0 {
+            if i % 100 == 0 {
                 println!(
                     "\n{:04} iterations in {:.1}s: Error {:.8}, eta={:.4}, {} ({}) iterations since (large) improvement, {:.8} error ratio, {} minibatches\n",
                     i,
@@ -87,7 +87,7 @@ pub fn gradient_descent<R: rand::Rng, const N: usize>(
                     num_minibatches
                 );
                 if i % 1000 == 0 {
-                    println!("New parameters: {:?}", parameter_set);
+                    trace!("New parameters: {:?}", parameter_set);
                 }
             } else {
                 trace!(
