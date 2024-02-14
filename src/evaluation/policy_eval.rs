@@ -23,15 +23,16 @@ static POLICY_OFFSET: sync::OnceLock<[f32; 512]> = sync::OnceLock::new();
 /// Memoize policy offset for low move numbers, to avoid expensive floating-point operations
 /// Gives a roughly 10% speedup
 pub fn policy_offset(num_moves: usize) -> f32 {
-    if !(1..512).contains(&num_moves) {
-        inverse_sigmoid(1.0 / num_moves as f32)
+    if num_moves >= 512 {
+        inverse_sigmoid(1.0 / (num_moves + 1) as f32)
     } else {
         POLICY_OFFSET.get_or_init(|| {
             array::from_fn(|i| {
-                if i < 2 {
-                    inverse_sigmoid(0.5)
+                if i == 0 {
+                    // This is a dummy value, having 0 legal moves is impossible
+                    0.0
                 } else {
-                    inverse_sigmoid(1.0 / i as f32)
+                    inverse_sigmoid(1.0 / (i + 1) as f32)
                 }
             })
         })[num_moves]
