@@ -404,22 +404,30 @@ impl<'a, const S: usize> Iterator for Pv<'a, S> {
 /// If temperature is 1.0, it chooses a move proportional to its score
 pub fn best_move<R: Rng, const S: usize>(
     rng: &mut R,
-    temperature: f64,
+    temperature: Option<f64>,
     move_scores: &[(Move<S>, f16)],
 ) -> Move<S> {
-    let mut move_probabilities = vec![];
-    let mut cumulative_prob = 0.0;
+    if let Some(temperature) = temperature {
+        let mut move_probabilities = vec![];
+        let mut cumulative_prob = 0.0;
 
-    for (mv, individual_prob) in move_scores.iter() {
-        cumulative_prob += (individual_prob.to_f64()).powf(1.0 / temperature);
-        move_probabilities.push((mv, cumulative_prob));
-    }
-
-    let p = rng.gen_range(0.0..cumulative_prob);
-    for (mv, cumulative_prob) in move_probabilities {
-        if cumulative_prob > p {
-            return *mv;
+        for (mv, individual_prob) in move_scores.iter() {
+            cumulative_prob += (individual_prob.to_f64()).powf(1.0 / temperature);
+            move_probabilities.push((mv, cumulative_prob));
         }
+
+        let p = rng.gen_range(0.0..cumulative_prob);
+        for (mv, cumulative_prob) in move_probabilities {
+            if cumulative_prob > p {
+                return *mv;
+            }
+        }
+        unreachable!()
+    } else {
+        return move_scores
+            .iter()
+            .max_by(|(_, score1), (_, score2)| score1.total_cmp(score2))
+            .unwrap()
+            .0;
     }
-    unreachable!()
 }

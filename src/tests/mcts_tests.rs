@@ -178,7 +178,8 @@ fn best_move_temperature_test() {
     let mut b1_selected = 0;
 
     for _ in 0..1000 {
-        let move_string_selected = search::best_move::<_, 5>(&mut rng, 1.0, &moves).to_string();
+        let move_string_selected =
+            search::best_move::<_, 5>(&mut rng, Some(1.0), &moves).to_string();
         if move_string_selected == "a1" {
             top_move_selected += 1;
         } else if move_string_selected == "b1" {

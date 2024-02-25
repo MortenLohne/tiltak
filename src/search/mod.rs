@@ -39,7 +39,7 @@ pub struct MctsSetting<const S: usize> {
     dirichlet: Option<f32>,
     excluded_moves: Vec<Move<S>>,
     rollout_depth: u16,
-    rollout_temperature: f64,
+    rollout_temperature: Option<f64>,
 }
 
 impl<const S: usize> Default for MctsSetting<S> {
@@ -52,7 +52,7 @@ impl<const S: usize> Default for MctsSetting<S> {
             dirichlet: None,
             excluded_moves: vec![],
             rollout_depth: 0,
-            rollout_temperature: 0.25,
+            rollout_temperature: None,
         }
     }
 }
@@ -113,7 +113,7 @@ impl<const S: usize> MctsSetting<S> {
     /// The degree of randomness when picking moves in MCTS rollouts
     /// A value of 1.0 is highly random, values around 0.2 give low randomness
     pub fn add_rollout_temperature(mut self, temperature: f64) -> Self {
-        self.rollout_temperature = temperature;
+        self.rollout_temperature = Some(temperature);
         self
     }
 
