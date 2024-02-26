@@ -212,9 +212,7 @@ fn get_movement_in_history<const S: usize>(
             ExpMove::Place(_, _) => None,
             ExpMove::Move(origin, direction, stack_movement) => Some(MovementSynopsis {
                 origin,
-                destination: origin
-                    .jump_direction(direction, stack_movement.len() as u8)
-                    .unwrap(),
+                destination: origin.jump_valid_direction(direction, stack_movement.len() as u8),
             }),
         })
 }

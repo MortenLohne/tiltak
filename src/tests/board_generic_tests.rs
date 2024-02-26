@@ -371,6 +371,14 @@ fn go_in_directions_prop<const S: usize>() {
                 "Failed to go in direction {:?} from {:?}",
                 direction,
                 square
+            );
+            assert_eq!(
+                Some(square.jump_valid_direction(direction, 1)),
+                square.go_direction(direction),
+                "Got {} when going {:?} from {}",
+                square.jump_valid_direction(direction, 1),
+                direction,
+                square
             )
         }
     }

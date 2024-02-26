@@ -133,6 +133,16 @@ impl<const S: usize> Square<S> {
         }
     }
 
+    /// Do a known valid jump. If the jump is not valid, the function either returns an arbitrary square, or panics
+    pub const fn jump_valid_direction(self, direction: Direction, len: u8) -> Self {
+        match direction {
+            North => Square::from_u8(self.inner - len),
+            West => Square::from_u8(self.inner - len * S as u8),
+            East => Square::from_u8(self.inner + len * S as u8),
+            South => Square::from_u8(self.inner + len),
+        }
+    }
+
     pub fn parse_square(input: &str) -> Result<Square<S>, pgn_traits::Error> {
         if input.len() != 2 {
             return Err(pgn_traits::Error::new_parse_error(format!(
