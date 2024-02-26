@@ -89,12 +89,10 @@ pub fn play_game<const S: usize>(
                 .filter(|mv| matches!(mv.expand(), ExpMove::Place(Role::Flat, _)))
                 .collect::<Vec<_>>();
             **flat_moves.choose(&mut rng).unwrap()
-        }
-        // Turn off temperature in the middle-game, when all games are expected to be unique
-        else if position.half_moves_played() < S * 2 - 2 {
-            search::best_move(&mut rand::thread_rng(), temperature, &moves_scores[..])
         } else {
-            search::best_move(&mut rand::thread_rng(), 0.1, &moves_scores[..])
+            // Turn off temperature after the opening (after `2 * (S - 1)` ply), when all games are expected to be unique
+            let temperature = (position.half_moves_played() < 2 * (S - 1)).then_some(temperature);
+            search::best_move(&mut rand::thread_rng(), temperature, &moves_scores[..])
         };
         position.do_move(best_move);
         game_moves.push(best_move);
