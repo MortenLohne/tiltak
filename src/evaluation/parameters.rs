@@ -469,6 +469,9 @@ impl<const S: usize> ValueApplier for IncrementalValue<S> {
 pub trait PolicyApplier {
     fn new(parameters: &'static [f32]) -> Self;
     fn eval(&mut self, index_pair: IndexPair, index: usize, val: f16);
+    fn eval_one(&mut self, index_pair: IndexPair, index: usize) {
+        self.eval(index_pair, index, f16::ONE)
+    }
     fn set_immediate_win(&mut self);
     fn has_immediate_win(&self) -> bool;
     fn finish(&mut self, num_moves: usize) -> f16;
@@ -545,6 +548,10 @@ impl<const S: usize> PolicyApplier for IncrementalPolicy<S> {
     }
     fn eval(&mut self, index_pair: IndexPair, index: usize, val: f16) {
         self.val += index_pair.as_slice(self.parameters)[index] * val.to_f32()
+    }
+
+    fn eval_one(&mut self, index_pair: IndexPair, index: usize) {
+        self.val += index_pair.as_slice(self.parameters)[index]
     }
 
     fn set_immediate_win(&mut self) {
