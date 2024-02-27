@@ -408,7 +408,7 @@ pub fn best_move<R: Rng, const S: usize>(
     move_scores: &[(Move<S>, f16)],
 ) -> Move<S> {
     if let Some(temperature) = temperature {
-        let mut move_probabilities = vec![];
+        let mut move_probabilities = Vec::with_capacity(move_scores.len());
         let mut cumulative_prob = 0.0;
 
         for (mv, individual_prob) in move_scores.iter() {
