@@ -798,7 +798,7 @@ impl PlaytakSession {
             if position.side_to_move() == game.our_color && !restoring_previous_session {
                 let (best_move, score) =
                     // On the very first move, always place instantly in a random corner
-                    if squares_iterator::<S>().all(|square| position[square].is_empty()) {
+                    if squares_iterator::<S>().all(|square| position.stack_heights()[square] == 0) {
                         let mut rng = rand::thread_rng();
                         let corner_placements: Vec<Move<S>> = Square::corners().into_iter().map(|square| Move::placement(Role::Flat, square)).collect();
 

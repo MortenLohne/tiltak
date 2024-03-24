@@ -2,7 +2,6 @@
 
 use std::fmt::Write;
 use std::hash::{Hash, Hasher};
-use std::ops::{Index, IndexMut};
 use std::{array, fmt, ops};
 use std::{iter, mem};
 
@@ -391,7 +390,9 @@ impl DetailedGameResult {
 
 /// Complete representation of a Tak position
 pub struct Position<const S: usize> {
-    cells: AbstractBoard<Stack, S>,
+    stacks: AbstractBoard<BitBoard, S>,
+    stack_heights: AbstractBoard<u8, S>,
+    top_stones: AbstractBoard<Option<Piece>, S>,
     to_move: Color,
     white_stones_left: u8,
     black_stones_left: u8,
@@ -407,7 +408,9 @@ pub struct Position<const S: usize> {
 impl<const S: usize> Clone for Position<S> {
     fn clone(&self) -> Self {
         Self {
-            cells: self.cells.clone(),
+            stacks: self.stacks.clone(),
+            stack_heights: self.stack_heights.clone(),
+            top_stones: self.top_stones.clone(),
             to_move: self.to_move,
             white_stones_left: self.white_stones_left,
             black_stones_left: self.black_stones_left,
@@ -421,7 +424,9 @@ impl<const S: usize> Clone for Position<S> {
         }
     }
     fn clone_from(&mut self, source: &Self) {
-        self.cells = source.cells.clone();
+        self.stacks = source.stacks.clone();
+        self.stack_heights = source.stack_heights.clone();
+        self.top_stones = source.top_stones.clone();
         self.to_move = source.to_move;
         self.white_stones_left = source.white_stones_left;
         self.black_stones_left = source.black_stones_left;
@@ -440,7 +445,9 @@ impl<const S: usize> Clone for Position<S> {
 
 impl<const S: usize> PartialEq for Position<S> {
     fn eq(&self, other: &Self) -> bool {
-        self.cells == other.cells
+        self.stacks == other.stacks
+            && self.stack_heights == other.stack_heights
+            && self.top_stones == other.top_stones
             && self.to_move == other.to_move
             && self.white_stones_left == other.white_stones_left
             && self.black_stones_left == other.black_stones_left
@@ -455,7 +462,9 @@ impl<const S: usize> Eq for Position<S> {}
 
 impl<const S: usize> Hash for Position<S> {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.cells.hash(state);
+        self.stacks.hash(state);
+        self.stack_heights.hash(state);
+        self.top_stones.hash(state);
         self.to_move.hash(state);
         self.white_stones_left.hash(state);
         self.black_stones_left.hash(state);
@@ -463,20 +472,6 @@ impl<const S: usize> Hash for Position<S> {
         self.black_caps_left.hash(state);
         self.half_moves_played.hash(state);
         self.komi.hash(state);
-    }
-}
-
-impl<const S: usize> Index<Square<S>> for Position<S> {
-    type Output = Stack;
-
-    fn index(&self, square: Square<S>) -> &Self::Output {
-        &self.cells[square]
-    }
-}
-
-impl<const S: usize> IndexMut<Square<S>> for Position<S> {
-    fn index_mut(&mut self, square: Square<S>) -> &mut Self::Output {
-        &mut self.cells[square]
     }
 }
 
@@ -492,7 +487,8 @@ impl<const S: usize> fmt::Debug for Position<S> {
             for print_row in 0..3 {
                 for x in 0..S {
                     for print_column in 0..3 {
-                        match self.cells[Square::from_rank_file(y as u8, x as u8)]
+                        match self
+                            .get_stack(Square::from_rank_file(y as u8, x as u8))
                             .get(print_column * 3 + print_row)
                         {
                             None => write!(f, "[.]")?,
@@ -532,7 +528,9 @@ impl<const S: usize> fmt::Debug for Position<S> {
 impl<const S: usize> Position<S> {
     pub fn start_position_with_komi(komi: Komi) -> Self {
         Position {
-            cells: Default::default(),
+            stacks: Default::default(),
+            stack_heights: Default::default(),
+            top_stones: Default::default(),
             to_move: Color::White,
             white_stones_left: starting_stones(S),
             black_stones_left: starting_stones(S),
@@ -550,6 +548,31 @@ impl<const S: usize> Position<S> {
         let mut position = Self::from_fen(fen)?;
         position.komi = komi;
         Ok(position)
+    }
+
+    pub fn get_stack(&self, square: Square<S>) -> Stack {
+        let bitboard = self.stacks[square];
+        let top_stone = self.top_stones[square];
+        let height = self.stack_heights[square];
+        Stack {
+            top_stone,
+            bitboard,
+            height,
+        }
+    }
+
+    pub fn set_stack(&mut self, square: Square<S>, stack: Stack) {
+        self.stacks[square] = stack.bitboard;
+        self.stack_heights[square] = stack.height;
+        self.top_stones[square] = stack.top_stone;
+    }
+
+    pub fn top_stones(&self) -> &AbstractBoard<Option<Piece>, S> {
+        &self.top_stones
+    }
+
+    pub fn stack_heights(&self) -> &AbstractBoard<u8, S> {
+        &self.stack_heights
     }
 
     pub fn white_reserves_left(&self) -> u8 {
@@ -607,15 +630,14 @@ impl<const S: usize> Position<S> {
 
     pub(crate) fn zobrist_hash_for_square(&self, square: Square<S>) -> u64 {
         let mut hash = 0;
-        let stack = &self[square];
-        if let Some(top_stone) = stack.top_stone {
+        if let Some(top_stone) = self.top_stones[square] {
             hash ^= zobrist_top_stones::<S>(square, top_stone);
             // Only enter this loop if stack.len() is 2 or more
-            for i in 0..(stack.len() as usize + 6) / 8 {
+            for i in 0..(self.stack_heights[square] as usize + 6) / 8 {
                 hash ^= zobrist_stones_in_stack::<S>(
                     square,
                     i,
-                    stack.bitboard.board as usize >> (i * 8) & 255,
+                    self.stacks[square].board as usize >> (i * 8) & 255,
                 )
             }
         }
@@ -645,8 +667,12 @@ impl<const S: usize> Position<S> {
         let mut new_board = self.clone();
         for file in 0..S as u8 {
             for rank in 0..S as u8 {
-                new_board[Square::from_rank_file(rank, file)] =
-                    self[Square::from_rank_file(S as u8 - rank - 1, file)];
+                new_board.stacks[Square::from_rank_file(rank, file)] =
+                    self.stacks[Square::from_rank_file(S as u8 - rank - 1, file)];
+                new_board.stack_heights[Square::from_rank_file(rank, file)] =
+                    self.stack_heights[Square::from_rank_file(S as u8 - rank - 1, file)];
+                new_board.top_stones[Square::from_rank_file(rank, file)] =
+                    self.top_stones[Square::from_rank_file(S as u8 - rank - 1, file)];
             }
         }
         new_board
@@ -656,8 +682,12 @@ impl<const S: usize> Position<S> {
         let mut new_board = self.clone();
         for file in 0..S as u8 {
             for rank in 0..S as u8 {
-                new_board[Square::from_rank_file(rank, file)] =
-                    self[Square::from_rank_file(rank, S as u8 - file - 1)];
+                new_board.stacks[Square::from_rank_file(rank, file)] =
+                    self.stacks[Square::from_rank_file(rank, S as u8 - file - 1)];
+                new_board.stack_heights[Square::from_rank_file(rank, file)] =
+                    self.stack_heights[Square::from_rank_file(rank, S as u8 - file - 1)];
+                new_board.top_stones[Square::from_rank_file(rank, file)] =
+                    self.top_stones[Square::from_rank_file(rank, S as u8 - file - 1)];
             }
         }
         new_board
@@ -669,8 +699,12 @@ impl<const S: usize> Position<S> {
             for rank in 0..S as u8 {
                 let new_file = rank;
                 let new_rank = S as u8 - file - 1;
-                new_board[Square::from_rank_file(rank, file)] =
-                    self[Square::from_rank_file(new_rank, new_file)];
+                new_board.stacks[Square::from_rank_file(rank, file)] =
+                    self.stacks[Square::from_rank_file(new_rank, new_file)];
+                new_board.stack_heights[Square::from_rank_file(rank, file)] =
+                    self.stack_heights[Square::from_rank_file(new_rank, new_file)];
+                new_board.top_stones[Square::from_rank_file(rank, file)] =
+                    self.top_stones[Square::from_rank_file(new_rank, new_file)];
             }
         }
         new_board
@@ -679,10 +713,13 @@ impl<const S: usize> Position<S> {
     pub fn flip_colors(&self) -> Position<S> {
         let mut new_board = self.clone();
         for square in square::squares_iterator::<S>() {
-            new_board[square] = Stack::default();
-            for piece in self[square] {
-                new_board[square].push(piece.flip_color());
+            let mut new_stack = Stack::default();
+            for piece in self.get_stack(square) {
+                new_stack.push(piece.flip_color());
             }
+            new_board.stacks[square] = new_stack.bitboard;
+            new_board.stack_heights[square] = new_stack.height;
+            new_board.top_stones[square] = new_stack.top_stone;
         }
         mem::swap(
             &mut new_board.white_stones_left,
@@ -720,7 +757,7 @@ impl<const S: usize> Position<S> {
 
     fn count_all_pieces(&self) -> u8 {
         squares_iterator::<S>()
-            .map(|square| self[square].len())
+            .map(|square| self.stack_heights[square])
             .sum()
     }
 
@@ -729,7 +766,7 @@ impl<const S: usize> Position<S> {
         let mut group_data = GroupData::default();
 
         for square in square::squares_iterator::<S>() {
-            match self[square].top_stone() {
+            match self.top_stones[square] {
                 Some(WhiteFlat) => {
                     group_data.white_flat_stones = group_data.white_flat_stones.set_square(square)
                 }
@@ -763,7 +800,7 @@ impl<const S: usize> Position<S> {
 
         for square in square::squares_iterator::<S>() {
             group_data.amount_in_group[group_data.groups[square] as usize].0 += 1;
-            if self[square].top_stone().is_some_and(Piece::is_road_piece) {
+            if self.top_stones[square].is_some_and(Piece::is_road_piece) {
                 group_data.amount_in_group[group_data.groups[square] as usize].1 =
                     group_data.amount_in_group[group_data.groups[square] as usize].1
                         | square.group_edge_connection();
@@ -792,14 +829,14 @@ impl<const S: usize> Position<S> {
         stack_movement
             .into_iter()
             .map(move |Movement { pieces_to_take }| {
-                let piece_index = self[square].len() - pieces_to_take;
+                let piece_index = self.stack_heights[square] - pieces_to_take;
                 if piece_index == 0 {
                     None
                 } else {
-                    Some(self[square].get(piece_index - 1).unwrap())
+                    Some(self.get_stack(square).get(piece_index - 1).unwrap())
                 }
             })
-            .chain(std::iter::once(self[square].top_stone()))
+            .chain(std::iter::once(self.top_stones[square]))
     }
 
     pub(crate) fn fcd_for_move(&self, mv: Move<S>) -> i8 {
@@ -809,7 +846,7 @@ impl<const S: usize> Position<S> {
             ExpMove::Place(_, _) => 0,
             ExpMove::Move(square, direction, stack_movement) => {
                 let mut destination_square =
-                    if stack_movement.get_first().pieces_to_take == self[square].len() {
+                    if stack_movement.get_first().pieces_to_take == self.stack_heights[square] {
                         square.go_direction(direction).unwrap()
                     } else {
                         square
@@ -817,8 +854,8 @@ impl<const S: usize> Position<S> {
 
                 let mut fcd = 0;
 
-                if self[square].len() == stack_movement.get_first().pieces_to_take {
-                    let top_stone = self[square].top_stone.unwrap();
+                if self.stack_heights[square] == stack_movement.get_first().pieces_to_take {
+                    let top_stone = self.top_stones[square].unwrap();
                     if top_stone.role() == Flat {
                         fcd -= 1;
                     }
@@ -829,9 +866,7 @@ impl<const S: usize> Position<S> {
                     .top_stones_left_behind_by_move(square, &stack_movement)
                     .flatten()
                 {
-                    let destination_stack = &self[destination_square];
-
-                    if let Some(captured_piece) = destination_stack.top_stone() {
+                    if let Some(captured_piece) = self.top_stones[destination_square] {
                         if captured_piece.role() == Flat {
                             if captured_piece.color() == self.side_to_move() {
                                 fcd -= 1;
@@ -893,8 +928,8 @@ impl<const S: usize> Position<S> {
                 .unwrap_or(S * S + 1) as u8;
 
             if let Some(square) = self.is_win_by_road(&group_data.groups, highest_component_id) {
-                debug_assert!(self[square].top_stone().unwrap().is_road_piece());
-                return if self[square].top_stone().unwrap().color() == Color::White {
+                debug_assert!(self.top_stones[square].unwrap().is_road_piece());
+                return if self.top_stones[square].unwrap().color() == Color::White {
                     Some(DetailedGameResult::WhiteRoadWin)
                 } else {
                     Some(DetailedGameResult::BlackRoadWin)
@@ -948,7 +983,7 @@ impl<const S: usize> Position<S> {
                 let square = square::squares_iterator::<S>()
                     .find(|&sq| components[sq] == id)
                     .unwrap();
-                if self[square].top_stone.unwrap().color() == self.side_to_move() {
+                if self.top_stones[square].unwrap().color() == self.side_to_move() {
                     suicide_win_square = Some(square)
                 } else {
                     return Some(square);
@@ -1168,7 +1203,7 @@ impl<const S: usize> PositionTrait for Position<S> {
         match self.half_moves_played() {
             0 | 1 => moves.extend(
                 square::squares_iterator::<S>()
-                    .filter(|square| self[*square].is_empty())
+                    .filter(|square| self.stack_heights[*square] == 0)
                     .map(|square| Move::placement(Flat, square)),
             ),
             _ => match self.side_to_move() {
@@ -1181,16 +1216,16 @@ impl<const S: usize> PositionTrait for Position<S> {
     fn move_is_legal(&self, mv: Self::Move) -> bool {
         match (mv.expand(), self.side_to_move()) {
             (ExpMove::Place(Flat | Wall, square), Color::White) => {
-                self[square].is_empty() && self.white_reserves_left() > 0
+                self.stack_heights[square] == 0 && self.white_reserves_left() > 0
             }
             (ExpMove::Place(Flat | Wall, square), Color::Black) => {
-                self[square].is_empty() && self.black_reserves_left() > 0
+                self.stack_heights[square] == 0 && self.black_reserves_left() > 0
             }
             (ExpMove::Place(Cap, square), Color::White) => {
-                self[square].is_empty() && self.white_caps_left() > 0
+                self.stack_heights[square] == 0 && self.white_caps_left() > 0
             }
             (ExpMove::Place(Cap, square), Color::Black) => {
-                self[square].is_empty() && self.black_caps_left() > 0
+                self.stack_heights[square] == 0 && self.black_caps_left() > 0
             }
             (ExpMove::Move(square, _, _), Color::White) => {
                 let mut legal_moves = vec![];
@@ -1215,7 +1250,7 @@ impl<const S: usize> PositionTrait for Position<S> {
         self.hash_history.push(self.hash);
         let reverse_move = match mv.expand() {
             ExpMove::Place(role, to) => {
-                debug_assert!(self[to].is_empty());
+                debug_assert!(self.stack_heights[to] == 0);
                 // On the first move, the players place the opponent's color
                 let color_to_place = if self.half_moves_played() > 1 {
                     self.side_to_move()
@@ -1223,7 +1258,9 @@ impl<const S: usize> PositionTrait for Position<S> {
                     !self.side_to_move()
                 };
                 let piece = Piece::from_role_color(role, color_to_place);
-                self[to].push(piece);
+                let mut to_stack = self.get_stack(to);
+                to_stack.push(piece);
+                self.set_stack(to, to_stack);
 
                 match (color_to_place, role) {
                     (Color::White, Flat) => self.white_stones_left -= 1,
@@ -1252,24 +1289,28 @@ impl<const S: usize> PositionTrait for Position<S> {
                 let mut movement_iter = stack_movement.into_iter();
                 let mut moving_pieces: ArrayVec<Piece, 8> = ArrayVec::new();
 
+                let mut stack = self.get_stack(square);
                 for _ in 0..movement_iter.next().unwrap().pieces_to_take {
-                    moving_pieces.push(self[square].pop().unwrap());
+                    moving_pieces.push(stack.pop().unwrap());
                 }
+                self.set_stack(square, stack);
 
                 for Movement { pieces_to_take } in
                     movement_iter.chain(iter::once(Movement { pieces_to_take: 0 }))
                 {
                     to = to.go_direction(direction).unwrap();
 
-                    if self[to].top_stone.map(Piece::role) == Some(Wall) {
+                    if self.top_stones[to].map(Piece::role) == Some(Wall) {
                         flattens_stone = true;
                     }
 
                     pieces_left_behind.push(moving_pieces.len() as u8 - pieces_to_take);
 
+                    let mut to_stack = self.get_stack(to);
                     while moving_pieces.len() as u8 > pieces_to_take {
-                        self[to].push(moving_pieces.pop().unwrap());
+                        to_stack.push(moving_pieces.pop().unwrap());
                     }
+                    self.set_stack(to, to_stack);
                 }
 
                 for sq in <MoveIterator<S>>::new(square, direction, stack_movement) {
@@ -1310,7 +1351,9 @@ impl<const S: usize> PositionTrait for Position<S> {
     fn reverse_move(&mut self, reverse_move: Self::ReverseMove) {
         match reverse_move {
             ReverseMove::Place(square) => {
-                let piece = self[square].pop().unwrap();
+                let mut stack = self.get_stack(square);
+                let piece = stack.pop().unwrap();
+                self.set_stack(square, stack);
 
                 self.hash ^= zobrist_top_stones::<S>(square, piece);
 
@@ -1339,20 +1382,24 @@ impl<const S: usize> PositionTrait for Position<S> {
 
                 for piece_left_behind in pieces_left_behind.into_iter() {
                     to = to.go_direction(direction).unwrap();
+                    let mut to_stack = self.get_stack(to);
                     let temp_pieces: ArrayVec<Piece, 8> = (0..piece_left_behind)
-                        .map(|_| self[to].pop().unwrap())
+                        .map(|_| to_stack.pop().unwrap())
                         .collect();
+                    self.set_stack(to, to_stack);
 
+                    let mut from_stack = self.get_stack(from);
                     for piece in temp_pieces.into_iter().rev() {
-                        self[from].push(piece);
+                        from_stack.push(piece);
                     }
+                    self.set_stack(from, from_stack);
                 }
 
                 if flattens_wall {
-                    debug_assert_eq!(self[to].top_stone().map(Piece::role), Some(Flat));
-                    match self[to].top_stone().unwrap().color() {
-                        Color::White => self[to].replace_top(WhiteWall),
-                        Color::Black => self[to].replace_top(BlackWall),
+                    debug_assert_eq!(self.top_stones[to].map(Piece::role), Some(Flat));
+                    match self.top_stones[to].unwrap().color() {
+                        Color::White => self.top_stones[to].replace(WhiteWall),
+                        Color::Black => self.top_stones[to].replace(BlackWall),
                     };
                 };
 
@@ -1522,7 +1569,7 @@ impl<const S: usize> pgn_traits::PgnPosition for Position<S> {
                     BlackCap => position.black_caps_left -= 1,
                 }
             }
-            position[square] = stack;
+            position.set_stack(square, stack);
         }
 
         match fen_words[1] {
@@ -1631,10 +1678,10 @@ impl<const S: usize> pgn_traits::PgnPosition for Position<S> {
         for rank in 0..S {
             for file in 0..S {
                 let square = Square::from_rank_file(rank as u8, file as u8);
-                if self[square].is_empty() {
+                if self.stack_heights[square] == 0 {
                     f.push('x')
                 } else {
-                    for piece in self[square].into_iter() {
+                    for piece in self.get_stack(square).into_iter() {
                         match piece {
                             WhiteFlat => f.push('1'),
                             BlackFlat => f.push('2'),

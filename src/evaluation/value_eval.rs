@@ -26,7 +26,7 @@ pub fn static_eval_game_phase<const S: usize, V: ValueApplier>(
         return;
     } else if all_pieces.count() == 1 {
         for square in squares_iterator::<S>() {
-            if position[square].top_stone().is_some() {
+            if position.top_stones()[square].is_some() {
                 white_value.eval(
                     indexes.second_ply,
                     lookup_square_symmetries::<S>(square),
@@ -42,8 +42,8 @@ pub fn static_eval_game_phase<const S: usize, V: ValueApplier>(
     let mut black_flat_count = 0;
 
     for square in squares_iterator::<S>() {
-        let stack = &position[square];
-        if let Some(piece) = position[square].top_stone() {
+        let stack = position.get_stack(square);
+        if let Some(piece) = position.top_stones()[square] {
             match piece {
                 WhiteFlat => {
                     white_value.eval(
@@ -197,7 +197,7 @@ pub fn static_eval_game_phase<const S: usize, V: ValueApplier>(
         let group_id = group_data.groups[square] as usize;
         if !seen_groups[group_id] {
             seen_groups[group_id] = true;
-            match position[square].top_stone().unwrap().color() {
+            match position.top_stones()[square].unwrap().color() {
                 Color::White => num_white_groups += 1,
                 Color::Black => num_black_groups += 1,
             }
@@ -360,7 +360,7 @@ pub fn static_eval_game_phase<const S: usize, V: ValueApplier>(
     }
 
     squares_iterator::<S>()
-        .map(|sq| (sq, &position[sq]))
+        .map(|sq| (sq, position.get_stack(sq)))
         .filter(|(_, stack)| stack.len() > 1)
         .for_each(|(square, stack)| {
             let top_stone = stack.top_stone().unwrap();
@@ -368,7 +368,7 @@ pub fn static_eval_game_phase<const S: usize, V: ValueApplier>(
 
             // Malus for them having stones next to our stack with flat stones on top
             for neighbour in square.neighbors() {
-                if let Some(neighbour_top_stone) = position[neighbour].top_stone() {
+                if let Some(neighbour_top_stone) = position.top_stones()[neighbour] {
                     if top_stone.role() == Flat && neighbour_top_stone.color() != controlling_player
                     {
                         match (neighbour_top_stone.role(), top_stone.color()) {
@@ -469,13 +469,13 @@ fn cap_activity<Us: ColorTr, Them: ColorTr, V: ValueApplier, const S: usize>(
 ) {
     let indexes = value_indexes::<S>();
 
-    let stack = position[square];
+    let stack = position.get_stack(square);
     let height_index = stack.height.min(3) as usize - 1;
 
     // Malus if our capstone's line towards the center is blocked
     if square.neighbors().any(|neighbour| {
         lookup_square_symmetries::<S>(neighbour) > lookup_square_symmetries::<S>(square)
-            && position[neighbour].top_stone().map(Piece::role) == Some(Cap)
+            && position.top_stones()[neighbour].map(Piece::role) == Some(Cap)
     }) {
         our_value.eval(indexes.sidelined_cap, height_index, f16::ONE)
     }
@@ -486,13 +486,13 @@ fn cap_activity<Us: ColorTr, Them: ColorTr, V: ValueApplier, const S: usize>(
         == Some(true);
     if square.neighbors().all(|neighbour| {
         matches!(
-            position[neighbour].top_stone(),
+            position.top_stones()[neighbour],
             Some(WhiteCap) | Some(BlackCap) | None
         )
     }) {
         our_value.eval(indexes.fully_isolated_cap, height_index, f16::ONE)
     } else if square.neighbors().all(|neighbour| {
-        if let Some(neighbour_top_stone) = position[neighbour].top_stone() {
+        if let Some(neighbour_top_stone) = position.top_stones()[neighbour] {
             if neighbour_top_stone == Them::wall_piece() {
                 is_soft_cap
             } else {
@@ -515,7 +515,7 @@ fn critical_squares_eval<Us: ColorTr, Them: ColorTr, V: ValueApplier, const S: u
 ) {
     let indexes = value_indexes::<S>();
 
-    let top_stone = position[critical_square].top_stone;
+    let top_stone = position.top_stones()[critical_square];
     let top_stone_role = top_stone.map(Piece::role);
     if top_stone.is_none() {
         our_value.eval(indexes.critical_squares, 0, f16::ONE);
@@ -545,7 +545,7 @@ fn critical_squares_eval<Us: ColorTr, Them: ColorTr, V: ValueApplier, const S: u
     if let Some(capstone_square) = capstone_square_in_line {
         let distance =
             file.abs_diff(capstone_square.file()) + rank.abs_diff(capstone_square.rank());
-        let cap_stack = position[capstone_square];
+        let cap_stack = position.get_stack(capstone_square);
         let is_hard_cap = cap_stack
             .get(cap_stack.len().saturating_sub(2))
             .is_some_and(Us::piece_is_ours);

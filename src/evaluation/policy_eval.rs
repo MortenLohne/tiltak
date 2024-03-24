@@ -323,9 +323,12 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, P: PolicyApplier, const
             // If square is next to a group
             let mut our_unique_neighbour_groups: ArrayVec<(Square<S>, u8), 4> = ArrayVec::new();
             let mut their_unique_neighbour_groups: ArrayVec<(Square<S>, u8), 4> = ArrayVec::new();
-            for neighbour in square.neighbors().filter(|sq| !position[*sq].is_empty()) {
+            for neighbour in square
+                .neighbors()
+                .filter(|sq| position.stack_heights()[*sq] != 0)
+            {
                 let neighbour_group_id = group_data.groups[neighbour];
-                if Us::piece_is_ours(position[neighbour].top_stone().unwrap()) {
+                if Us::piece_is_ours(position.top_stones()[neighbour].unwrap()) {
                     if our_unique_neighbour_groups
                         .iter()
                         .all(|(_sq, id)| *id != neighbour_group_id)
@@ -438,7 +441,7 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, P: PolicyApplier, const
 
                 // Bonus for attacking a flatstone in a rank/file where we are strong
                 for neighbour in square.neighbors() {
-                    if position[neighbour].top_stone() == Some(Them::flat_piece()) {
+                    if position.top_stones()[neighbour] == Some(Them::flat_piece()) {
                         let our_road_stones = Us::road_stones(group_data)
                             .rank::<S>(neighbour.rank())
                             .count()
@@ -479,23 +482,22 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, P: PolicyApplier, const
             if role == Wall || role == Cap {
                 for (direction, neighbour) in square.direction_neighbors() {
                     // If square blocks an extension of two flats
-                    if position[neighbour]
-                        .top_stone()
+                    if position.top_stones()[neighbour]
                         .map(Them::is_road_stone)
                         .unwrap_or_default()
                         && neighbour
                             .go_direction(direction)
-                            .and_then(|sq| position[sq].top_stone())
+                            .and_then(|sq| position.top_stones()[sq])
                             .map(Them::is_road_stone)
                             .unwrap_or_default()
                     {
                         policy.eval_one(indexes.blocking_stone_blocks_extensions_of_two_flats, 0);
                     }
 
-                    if position[neighbour].len() > 2
-                        && Them::piece_is_ours(position[neighbour].top_stone().unwrap())
+                    if position.stack_heights()[neighbour] > 2
+                        && Them::piece_is_ours(position.top_stones()[neighbour].unwrap())
                     {
-                        let stack = position[neighbour];
+                        let stack = position.get_stack(neighbour);
                         let top_stone = stack.top_stone().unwrap();
                         let mut captives: u8 = 0;
                         let mut reserves: u8 = 0;
@@ -562,7 +564,7 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, P: PolicyApplier, const
         }
 
         ExpMove::Move(square, direction, stack_movement) => {
-            let role_id = match position[square].top_stone().unwrap().role() {
+            let role_id = match position.top_stones()[square].unwrap().role() {
                 Flat => 0,
                 Wall => 1,
                 Cap => 2,
@@ -574,9 +576,10 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, P: PolicyApplier, const
 
             if stack_movement.len() == 1
                 && stack_movement.get_first().pieces_to_take == 1
-                && position[square].len() == 1
+                && position.stack_heights()[square] == 1
             {
-                if let Some(piece) = position[square.go_direction(direction).unwrap()].top_stone() {
+                if let Some(piece) = position.top_stones()[square.go_direction(direction).unwrap()]
+                {
                     match (piece.role(), piece.color() == Us::color()) {
                         (Flat, true) => policy.eval_one(indexes.simple_self_capture, role_id),
                         (Flat, false) => policy.eval_one(indexes.simple_capture, role_id),
@@ -590,7 +593,7 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, P: PolicyApplier, const
             }
 
             let mut destination_square =
-                if stack_movement.get_first().pieces_to_take == position[square].len() {
+                if stack_movement.get_first().pieces_to_take == position.stack_heights()[square] {
                     square.go_direction(direction).unwrap()
                 } else {
                     square
@@ -598,7 +601,7 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, P: PolicyApplier, const
 
             // Bonus for moving the piece we placed on our last turn
             if let Some((role, last_square)) = our_last_placement(position) {
-                if square == last_square && !position[destination_square].is_empty() {
+                if square == last_square && position.stack_heights()[destination_square] != 0 {
                     policy.eval_one(indexes.move_last_placement, role.disc());
                 }
             }
@@ -625,9 +628,9 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, P: PolicyApplier, const
             let mut num_squares_covered = group_data.all_pieces().count();
 
             // Special case for when we spread the whole stack
-            if position[square].len() == stack_movement.get_first().pieces_to_take {
+            if position.stack_heights()[square] == stack_movement.get_first().pieces_to_take {
                 num_squares_covered -= 1;
-                let top_stone: Piece = position[square].top_stone.unwrap();
+                let top_stone: Piece = position.top_stones()[square].unwrap();
                 if top_stone.is_road_piece() {
                     our_squares_affected.push(square);
 
@@ -642,8 +645,6 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, P: PolicyApplier, const
                 .top_stones_left_behind_by_move(square, &stack_movement)
                 .flatten()
             {
-                let destination_stack = &position[destination_square];
-
                 if Us::piece_is_ours(piece) {
                     if Us::is_critical_square(group_data, destination_square)
                         && piece.is_road_piece()
@@ -680,7 +681,7 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, P: PolicyApplier, const
                         {
                             continue;
                         }
-                        if let Some(neighbour_piece) = position[neighbour].top_stone() {
+                        if let Some(neighbour_piece) = position.top_stones()[neighbour] {
                             if Us::piece_is_ours(neighbour_piece) && neighbour_piece.is_road_piece()
                             {
                                 neighbour_group_ids.push(group_data.groups[neighbour]);
@@ -738,22 +739,25 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, P: PolicyApplier, const
                     }
                 }
 
-                if let Some(destination_top_stone) = destination_stack.top_stone() {
+                let destination_top_stone = position.top_stones()[destination_square];
+
+                if let Some(destination_top_stone) = destination_top_stone {
                     // When a stack gets captured, give a linear bonus or malus depending on
                     // whether it's captured by us or them
+                    let destination_stack_height = position.stack_heights()[destination_square];
                     if piece.color() != destination_top_stone.color() {
                         if Us::piece_is_ours(piece) {
                             policy.eval_i8(
                                 indexes.stack_captured_by_movement,
                                 0,
-                                destination_stack.len() as i8,
+                                destination_stack_height as i8,
                             );
                             their_pieces_captured += 1;
                         } else {
                             policy.eval_i8(
                                 indexes.stack_captured_by_movement,
                                 0,
-                                -(destination_stack.len() as i8),
+                                -(destination_stack_height as i8),
                             );
                             our_squares_affected.push(destination_square);
 
@@ -781,13 +785,13 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, P: PolicyApplier, const
                                 policy.eval_i8(
                                     indexes.stack_capture_in_strong_line_cap,
                                     our_road_stones - 3,
-                                    color_factor * destination_stack.len() as i8,
+                                    color_factor * destination_stack_height as i8,
                                 );
                             } else {
                                 policy.eval_i8(
                                     indexes.stack_capture_in_strong_line,
                                     our_road_stones - 3,
-                                    color_factor * destination_stack.len() as i8,
+                                    color_factor * destination_stack_height as i8,
                                 );
                             }
                         }
@@ -880,7 +884,7 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, P: PolicyApplier, const
                     // stack spread lost some of our flats
                     let mut edge_connection = critical_square.group_edge_connection();
                     for neighbour in critical_square.neighbors() {
-                        if let Some(neighbour_piece) = position[neighbour].top_stone() {
+                        if let Some(neighbour_piece) = position.top_stones()[neighbour] {
                             if Us::piece_is_ours(neighbour_piece) {
                                 let group_id = group_data.groups[neighbour];
                                 if our_groups_affected.iter().all(|g| *g != group_id) {
@@ -910,7 +914,7 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, P: PolicyApplier, const
                             })
                             .count()
                             > 1
-                        && position[critical_square].top_stone().map(Piece::role) != Some(Wall)
+                        && position.top_stones()[critical_square].map(Piece::role) != Some(Wall)
                     {
                         policy.eval_one(indexes.move_onto_critical_square, 1);
                         policy.set_immediate_win();
@@ -1014,23 +1018,18 @@ fn spread_damages_our_group<const S: usize, Us: ColorTr>(
             let flank_square = square.go_direction(orthogonal).unwrap();
             let opposite_flank = square.go_direction(orthogonal.reverse());
 
-            position[flank_square]
-                .top_stone()
-                .is_some_and(Us::is_road_stone)
-                && position[flank_square.go_direction(direction).unwrap()]
-                    .top_stone()
+            position.top_stones()[flank_square].is_some_and(Us::is_road_stone)
+                && position.top_stones()[flank_square.go_direction(direction).unwrap()]
                     .is_some_and(Us::is_road_stone)
                 && (opposite_flank.is_none() // This is probably not fully correct, it assumes the connection to the edge will be restored because the next piece dropped is ours
                 || behind_square.is_none() // Ditto
-                || !position[opposite_flank.unwrap()]
-                    .top_stone()
+                || !position.top_stones()[opposite_flank.unwrap()]
                     .is_some_and(Us::is_road_stone))
                 && (behind_square.is_none()
-                    || !position[behind_square.unwrap()]
-                        .top_stone()
+                    || !position.top_stones()[behind_square.unwrap()]
                         .is_some_and(Us::is_road_stone)
-                    || position[behind_square.unwrap().go_direction(orthogonal).unwrap()]
-                        .top_stone()
-                        .is_some_and(Us::is_road_stone))
+                    || position.top_stones()
+                        [behind_square.unwrap().go_direction(orthogonal).unwrap()]
+                    .is_some_and(Us::is_road_stone))
         })
 }

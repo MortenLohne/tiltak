@@ -30,7 +30,7 @@ impl<const S: usize> Position<S> {
         moves: &mut E,
         square: Square<S>,
     ) {
-        match self[square].top_stone() {
+        match self.top_stones()[square] {
             None => {
                 if Us::stones_left(self) > 0 {
                     moves.extend(iter::once(Move::placement(Flat, square)));
@@ -48,7 +48,7 @@ impl<const S: usize> Position<S> {
                             direction,
                             square,
                             square,
-                            self[square].len(),
+                            self.stack_heights()[square],
                             StackMovement::new(),
                             &mut movements,
                         );
@@ -57,7 +57,7 @@ impl<const S: usize> Position<S> {
                             direction,
                             square,
                             square,
-                            self[square].len(),
+                            self.stack_heights()[square],
                             StackMovement::new(),
                             &mut movements,
                         );
@@ -92,7 +92,7 @@ impl<const S: usize> Position<S> {
             } else {
                 (pieces_carried - 1).min(S as u8)
             };
-            let neighbour_piece = self[neighbour].top_stone();
+            let neighbour_piece = self.top_stones()[neighbour];
             if neighbour_piece.map(Piece::role) == Some(Cap) {
                 return;
             }
@@ -133,7 +133,7 @@ impl<const S: usize> Position<S> {
         movements: &mut ArrayVec<StackMovement<S>, 255>, // 2^max_size - 1
     ) {
         if let Some(neighbour) = square.go_direction(direction) {
-            let neighbour_piece = self[neighbour].top_stone();
+            let neighbour_piece = self.top_stones()[neighbour];
             if neighbour_piece.is_some_and(|piece| piece.role() != Flat) {
                 return;
             }

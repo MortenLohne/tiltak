@@ -415,7 +415,7 @@ fn analyze_position<const S: usize>(position: &Position<S>) {
     moves.sort_by(|(_mv, score1), (_, score2)| score1.partial_cmp(score2).unwrap().reverse());
 
     let settings: MctsSetting<S> = search::MctsSetting::default()
-        .arena_size(2_u32.pow(31))
+        .arena_size(2_u32.pow(30) * 3)
         .exclude_moves(vec![]);
     let start_time = time::Instant::now();
 

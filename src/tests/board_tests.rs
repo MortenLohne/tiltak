@@ -14,11 +14,11 @@ use crate::{position as board_mod, search};
 fn default_board_test() {
     let position = <Position<5>>::default();
     for square in squares_iterator::<5>() {
-        assert!(position[square].is_empty());
+        assert!(position.get_stack(square).is_empty());
     }
     let position = <Position<6>>::default();
     for square in squares_iterator::<6>() {
-        assert!(position[square].is_empty());
+        assert!(position.get_stack(square).is_empty());
     }
 }
 
@@ -26,43 +26,45 @@ fn default_board_test() {
 fn get_set_test() {
     let pieces = [WhiteFlat, BlackFlat, BlackFlat, WhiteWall];
     let mut position = <Position<5>>::default();
+
+    let mut stack = position.get_stack(Square::from_u8(12));
     for &piece in pieces.iter() {
-        position[Square::from_u8(12)].push(piece);
+        stack.push(piece);
     }
-    assert_eq!(position[Square::from_u8(12)].len(), 4);
-    assert_eq!(position[Square::from_u8(12)].top_stone(), Some(WhiteWall));
+    position.set_stack(Square::from_u8(12), stack);
+
+    assert_eq!(position.get_stack(Square::from_u8(12)).len(), 4);
+    assert_eq!(
+        position.get_stack(Square::from_u8(12)).top_stone(),
+        Some(WhiteWall)
+    );
 
     for (i, &piece) in pieces.iter().enumerate() {
         assert_eq!(
             Some(piece),
-            position[Square::from_u8(12)].get(i as u8),
+            position.get_stack(Square::from_u8(12)).get(i as u8),
             "{:?}",
-            position[Square::from_u8(12)]
+            position.get_stack(Square::from_u8(12))
         );
     }
 
+    let mut stack = position.get_stack(Square::from_u8(12));
     for &piece in pieces.iter().rev() {
-        assert_eq!(
-            Some(piece),
-            position[Square::from_u8(12)].pop(),
-            "{:?}",
-            position
-        );
+        assert_eq!(Some(piece), stack.pop(), "{:?}", position);
     }
+    position.set_stack(Square::from_u8(12), stack);
 
-    assert!(position[Square::from_u8(12)].is_empty());
+    assert!(position.get_stack(Square::from_u8(12)).is_empty());
 
+    let mut stack = position.get_stack(Square::from_u8(12));
     for &piece in pieces.iter() {
-        position[Square::from_u8(12)].push(piece);
+        stack.push(piece);
     }
+    position.set_stack(Square::from_u8(12), stack);
 
+    let mut stack = position.get_stack(Square::from_u8(12));
     for &piece in pieces.iter() {
-        assert_eq!(
-            piece,
-            position[Square::from_u8(12)].remove(0),
-            "{:?}",
-            position[Square::from_u8(12)]
-        );
+        assert_eq!(piece, stack.remove(0), "{:?}", stack);
     }
 }
 
