@@ -73,6 +73,10 @@ impl<const S: usize> Move<S> {
         }
     }
 
+    pub fn is_placement(self) -> bool {
+        self.inner >> 8 == 0
+    }
+
     pub fn origin_square(self) -> Square<S> {
         Square::from_u8(self.inner as u8 & 63)
     }

@@ -4,7 +4,7 @@ use std::io::{Read, Write};
 use std::str::FromStr;
 #[cfg(feature = "constant-tuning")]
 use std::sync::atomic::{self, AtomicU64};
-use std::{io, time};
+use std::{fs, io, time};
 
 use board_game_traits::{Color, GameResult};
 use board_game_traits::{EvalPosition, Position as PositionTrait};
@@ -14,7 +14,6 @@ use pgn_traits::PgnPosition;
 use rayon::prelude::*;
 
 use tiltak::evaluation::parameters::IncrementalPolicy;
-use tiltak::minmax;
 #[cfg(feature = "sqlite")]
 use tiltak::policy_sqlite;
 use tiltak::position::Role;
@@ -24,6 +23,7 @@ use tiltak::position::{
 use tiltak::position::{Position, Stack};
 use tiltak::ptn::{Game, PtnMove};
 use tiltak::search::MctsSetting;
+use tiltak::{minmax, ptn};
 use tiltak::{position, search};
 
 #[cfg(test)]
@@ -181,9 +181,115 @@ fn main() {
             "bench" => bench::<6>(),
             "bench_old" => bench_old(),
             "selfplay" => mcts_selfplay(time::Duration::from_secs(10)),
+            "process_ptn" => process_ptn::<6>("games_6s_2komi_all.ptn"),
             s => println!("Unknown option \"{}\"", s),
         }
     }
+}
+
+fn process_ptn<const S: usize>(path: &str) {
+    let ptn_contents = fs::read_to_string(path).unwrap();
+    let games = ptn::ptn_parser::parse_ptn::<Position<S>>(&ptn_contents).unwrap();
+    println!("Processing {} games", games.len());
+
+    #[derive(Default, Clone, Copy, Debug)]
+    struct MoveStats {
+        flat_placements: u64,
+        wall_placements: u64,
+        cap_placements: u64,
+        movements: u64,
+        legal_placements: u64,
+        legal_movements: u64,
+        legal_moves_from_stack: u64,
+    }
+
+    impl MoveStats {
+        fn total_played(&self) -> u64 {
+            self.flat_placements + self.wall_placements + self.cap_placements + self.movements
+        }
+
+        fn total_legal(&self) -> u64 {
+            self.legal_placements + self.legal_movements
+        }
+    }
+
+    let mut per_move_stats = [MoveStats::default(); 400];
+
+    for game in games {
+        let mut position = game.start_position;
+        for (i, mv) in game.moves.into_iter().enumerate() {
+            let mut moves = vec![];
+            position.generate_moves(&mut moves);
+            let num_legal_placements = moves.iter().filter(|mv| mv.is_placement()).count();
+            per_move_stats[i].legal_placements += num_legal_placements as u64;
+            per_move_stats[i].legal_movements += moves.len() as u64 - num_legal_placements as u64;
+            match mv.mv.expand() {
+                position::ExpMove::Place(Role::Flat, _) => per_move_stats[i].flat_placements += 1,
+                position::ExpMove::Place(Role::Wall, _) => per_move_stats[i].wall_placements += 1,
+                position::ExpMove::Place(Role::Cap, _) => per_move_stats[i].cap_placements += 1,
+                position::ExpMove::Move(_, _, _) => per_move_stats[i].movements += 1,
+            }
+            if !mv.mv.is_placement() {
+                let origin_square = mv.mv.origin_square();
+                let moves_in_stack = moves
+                    .iter()
+                    .filter(|mv| mv.origin_square() == origin_square)
+                    .count();
+                per_move_stats[i].legal_moves_from_stack += moves_in_stack as u64;
+            }
+            position.do_move(mv.mv);
+        }
+    }
+
+    let total_stats = per_move_stats
+        .iter()
+        .cloned()
+        .reduce(|a, b| MoveStats {
+            flat_placements: a.flat_placements + b.flat_placements,
+            wall_placements: a.wall_placements + b.wall_placements,
+            cap_placements: a.cap_placements + b.cap_placements,
+            movements: a.movements + b.movements,
+            legal_placements: a.legal_placements + b.legal_placements,
+            legal_movements: a.legal_movements + b.legal_movements,
+            legal_moves_from_stack: a.legal_moves_from_stack + b.legal_moves_from_stack,
+        })
+        .unwrap();
+
+    for (i, stats) in per_move_stats.iter().take(150).enumerate() {
+        let total = stats.total_played();
+        let placements = stats.total_played() - stats.movements;
+        let average_placement_likelihood = placements as f32 / stats.legal_placements as f32;
+        let average_movement_likelihood = stats.movements as f32 / stats.legal_movements as f32;
+        let color = if i % 2 == 0 {
+            Color::White
+        } else {
+            Color::Black
+        };
+        println!("{}'s move {}:", color, i / 2 + 1);
+        println!("{:.1}% placements, {:.1}% movements, {:.1}% placements among legal moves, ({:.2}%, {:.2}%) chance for each (placement, movement), {:.2} moves in the played stack, {:.1} legal moves per position",
+            (100 * placements) as f32 / total as f32,
+            (100 * stats.movements) as f32 / total as f32,
+            (100 * stats.legal_placements) as f32 / stats.total_legal() as f32,
+            (100 * placements) as f32 / stats.legal_placements as f32,
+            (100 * stats.movements) as f32 / stats.legal_movements as f32,
+            stats.legal_moves_from_stack as f32 / stats.movements as f32,
+            stats.total_legal() as f32 / total as f32
+        );
+        println!(
+            "{:.2}% placement likelihood, {:.2}% movement likelihood, {:.2} ratio, {} total games",
+            100.0 * average_placement_likelihood,
+            100.0 * average_movement_likelihood,
+            average_placement_likelihood / average_movement_likelihood,
+            total
+        );
+    }
+    let total_played = total_stats.total_played();
+    println!(
+        "Total stats: {:.1}% placement, {:.1}% movements, {} total games",
+        (100 * (total_played - total_stats.movements)) as f32 / total_played as f32,
+        (100 * total_stats.movements) as f32 / total_played as f32,
+        total_played
+    )
 }
 
 #[cfg(feature = "constant-tuning")]
