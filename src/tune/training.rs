@@ -516,6 +516,11 @@ pub fn tune_value_and_policy<const S: usize, const N: usize, const M: usize>(
 
                     position.do_move(*mv);
 
+                    let num_placements = move_scores
+                        .iter()
+                        .filter(|(mv, _)| mv.is_placement())
+                        .count();
+
                     move_scores
                         .iter()
                         .zip(
@@ -523,8 +528,12 @@ pub fn tune_value_and_policy<const S: usize, const N: usize, const M: usize>(
                                 .into_iter()
                                 .map(|pol| pol.features.try_into().unwrap()),
                         )
-                        .map(|((_, result), features)| {
-                            let offset = policy_offset(move_scores.len());
+                        .map(move |((mv, result), features)| {
+                            let offset = policy_offset(
+                                mv.is_placement(),
+                                num_placements,
+                                move_scores.len() - num_placements,
+                            );
                             {
                                 TrainingSample {
                                     features,

@@ -23,9 +23,17 @@ static POLICY_OFFSET: sync::OnceLock<[f32; 512]> = sync::OnceLock::new();
 
 /// Memoize policy offset for low move numbers, to avoid expensive floating-point operations
 /// Gives a roughly 10% speedup
-pub fn policy_offset(num_moves: usize) -> f32 {
-    if num_moves >= 512 {
-        inverse_sigmoid(1.0 / (num_moves + 1) as f32)
+pub fn policy_offset(is_placement: bool, num_placements: usize, num_movements: usize) -> f32 {
+    let effective_move_count = if is_placement {
+        // Give a 60% weight to placements
+        num_placements + num_movements
+    } else {
+        // 60% to movements
+        num_movements + num_placements
+    };
+    assert!(effective_move_count > 0);
+    if effective_move_count >= 512 {
+        inverse_sigmoid(1.0 / (effective_move_count + 1) as f32)
     } else {
         POLICY_OFFSET.get_or_init(|| {
             array::from_fn(|i| {
@@ -36,7 +44,7 @@ pub fn policy_offset(num_moves: usize) -> f32 {
                     inverse_sigmoid(1.0 / (i + 1) as f32)
                 }
             })
-        })[num_moves]
+        })[effective_move_count]
     }
 }
 
@@ -65,6 +73,8 @@ impl<const S: usize> Position<S> {
         policy_feature_sets: &mut Vec<P>,
     ) {
         let num_moves = simple_moves.len();
+        let num_placements = simple_moves.iter().filter(|mv| mv.is_placement()).count();
+        let num_movements = num_moves - num_placements;
 
         while policy_feature_sets.len() < num_moves {
             policy_feature_sets.push(P::new(params_for_color));
@@ -77,7 +87,7 @@ impl<const S: usize> Position<S> {
                 .drain(..)
                 .zip(policy_feature_sets)
                 .map(|(mv, features)| {
-                    let eval = features.finish(num_moves);
+                    let eval = features.finish(mv.is_placement(), num_placements, num_movements);
 
                     (mv, eval)
                 }),

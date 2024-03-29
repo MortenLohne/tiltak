@@ -480,7 +480,7 @@ pub trait PolicyApplier {
     }
     fn set_immediate_win(&mut self);
     fn has_immediate_win(&self) -> bool;
-    fn finish(&mut self, num_moves: usize) -> f16;
+    fn finish(&mut self, is_placement: bool, num_placements: usize, num_movements: usize) -> f16;
 }
 
 #[derive(Debug, Clone)]
@@ -510,11 +510,14 @@ impl<const S: usize> PolicyApplier for Policy<S> {
         self.has_immediate_win
     }
 
-    fn finish(&mut self, num_moves: usize) -> f16 {
-        if num_moves < 2 {
-            eprintln!("Warning: Got {} legal moves", num_moves,);
+    fn finish(&mut self, is_placement: bool, num_placements: usize, num_movements: usize) -> f16 {
+        if num_placements + num_movements < 2 {
+            eprintln!(
+                "Warning: Got {} legal moves",
+                num_placements + num_movements,
+            );
         }
-        let offset = policy_offset(num_moves);
+        let offset = policy_offset(is_placement, num_placements, num_movements);
 
         const SIMD_WIDTH: usize = 8;
         assert_eq!(self.features.len() % SIMD_WIDTH, 0);
@@ -572,11 +575,14 @@ impl<const S: usize> PolicyApplier for IncrementalPolicy<S> {
         self.has_immediate_win
     }
 
-    fn finish(&mut self, num_moves: usize) -> f16 {
-        if num_moves < 2 {
-            eprintln!("Warning: Got {} legal moves", num_moves,);
+    fn finish(&mut self, is_placement: bool, num_placements: usize, num_movements: usize) -> f16 {
+        if num_placements + num_movements < 2 {
+            eprintln!(
+                "Warning: Got {} legal moves",
+                num_placements + num_movements
+            );
         }
-        let offset = policy_offset(num_moves);
+        let offset = policy_offset(is_placement, num_placements, num_movements);
         let total_value = self.val + offset;
 
         self.val = 0.0;
