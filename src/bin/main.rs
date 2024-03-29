@@ -17,9 +17,10 @@ use tiltak::evaluation::parameters::IncrementalPolicy;
 use tiltak::minmax;
 #[cfg(feature = "sqlite")]
 use tiltak::policy_sqlite;
-#[cfg(feature = "constant-tuning")]
 use tiltak::position::Role;
-use tiltak::position::{AbstractBoard, Direction, Komi, Move, Square, SquareCacheEntry};
+use tiltak::position::{
+    squares_iterator, AbstractBoard, Direction, Komi, Move, Square, SquareCacheEntry,
+};
 use tiltak::position::{Position, Stack};
 use tiltak::ptn::{Game, PtnMove};
 use tiltak::search::MctsSetting;
@@ -177,7 +178,7 @@ fn main() {
                 }
             }
             "mem_usage" => mem_usage::<6>(),
-            "bench" => bench(),
+            "bench" => bench::<6>(),
             "bench_old" => bench_old(),
             "selfplay" => mcts_selfplay(time::Duration::from_secs(10)),
             s => println!("Unknown option \"{}\"", s),
@@ -564,12 +565,19 @@ fn play_human(mut position: Position<5>) {
     }
 }
 
-fn bench() {
+fn bench<const S: usize>() {
     println!("Starting benchmark");
     const NODES: u32 = 5_000_000;
     let start_time = time::Instant::now();
 
-    let position = <Position<6>>::default();
+    let mut position = <Position<S>>::default();
+
+    // Start the benchmark from opposite corners opening
+    let corner = squares_iterator().next().unwrap();
+    let opposite_corner = squares_iterator().last().unwrap();
+    position.do_move(Move::placement(Role::Flat, corner));
+    position.do_move(Move::placement(Role::Flat, opposite_corner));
+
     let settings = search::MctsSetting::default().arena_size_for_nodes(NODES);
     let mut tree = search::MonteCarloTree::with_settings(position, settings);
     let mut last_iteration_start_time = time::Instant::now();
