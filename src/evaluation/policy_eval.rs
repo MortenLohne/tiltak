@@ -7,7 +7,9 @@ use half::f16;
 use crate::position::bitboard::BitBoard;
 use crate::position::color_trait::{BlackTr, ColorTr, WhiteTr};
 use crate::position::Role::{Cap, Flat, Wall};
-use crate::position::{lookup_square_symmetries, GroupData, Piece, Position, Role};
+use crate::position::{
+    lookup_square_symmetries, GroupData, MovementSynopsis, Piece, Position, Role,
+};
 use crate::position::{squares_iterator, Move};
 use crate::position::{AbstractBoard, Direction};
 use crate::position::{Direction::*, ExpMove};
@@ -168,11 +170,6 @@ impl<const S: usize> Position<S> {
     }
 }
 
-struct MovementSynopsis<const S: usize> {
-    origin: Square<S>,
-    destination: Square<S>,
-}
-
 fn our_last_placement<const S: usize>(position: &Position<S>) -> Option<(Role, Square<S>)> {
     position
         .moves()
@@ -190,30 +187,6 @@ fn their_last_placement<const S: usize>(position: &Position<S>) -> Option<(Role,
         .and_then(|mv| match mv.expand() {
             ExpMove::Place(role, square) => Some((role, square)),
             ExpMove::Move(_, _, _) => None,
-        })
-}
-
-fn our_last_movement<const S: usize>(position: &Position<S>) -> Option<MovementSynopsis<S>> {
-    get_movement_in_history(position, 2)
-}
-
-fn their_last_movement<const S: usize>(position: &Position<S>) -> Option<MovementSynopsis<S>> {
-    get_movement_in_history(position, 1)
-}
-
-fn get_movement_in_history<const S: usize>(
-    position: &Position<S>,
-    i: usize,
-) -> Option<MovementSynopsis<S>> {
-    position
-        .moves()
-        .get(position.moves().len().overflowing_sub(i).0)
-        .and_then(|mv| match mv.expand() {
-            ExpMove::Place(_, _) => None,
-            ExpMove::Move(origin, direction, stack_movement) => Some(MovementSynopsis {
-                origin,
-                destination: origin.jump_valid_direction(direction, stack_movement.len() as u8),
-            }),
         })
 }
 
@@ -540,7 +513,7 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, P: PolicyApplier, const
                         if let Some(MovementSynopsis {
                             origin: _,
                             destination,
-                        }) = their_last_movement(position)
+                        }) = group_data.last_movement()
                         {
                             if neighbour == destination {
                                 policy.eval_i8(indexes.attack_last_movement, 0, captives as i8);
@@ -555,7 +528,7 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, P: PolicyApplier, const
             if let Some(MovementSynopsis {
                 origin,
                 destination: _,
-            }) = their_last_movement(position)
+            }) = group_data.last_movement()
             {
                 if square == origin {
                     policy.eval_one(indexes.place_last_movement, role_id);
@@ -657,7 +630,7 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, P: PolicyApplier, const
                     if let Some(MovementSynopsis {
                         origin: _,
                         destination: last_capture,
-                    }) = their_last_movement(position)
+                    }) = group_data.last_movement()
                     {
                         if destination_square == last_capture {
                             stack_recaptured_with = Some(piece.role());
@@ -834,7 +807,7 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, P: PolicyApplier, const
             if let Some(MovementSynopsis {
                 origin: _,
                 destination,
-            }) = our_last_movement(position)
+            }) = group_data.second_to_last_movement()
             {
                 if destination == square {
                     policy.eval_one(indexes.continue_spread, role_id);

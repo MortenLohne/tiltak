@@ -217,7 +217,38 @@ impl ops::BitOr for GroupEdgeConnection {
         }
     }
 }
-#[derive(Clone, PartialEq, Eq, Debug)]
+
+#[derive(Clone, Copy, Debug)]
+pub struct MovementSynopsis<const S: usize> {
+    pub origin: Square<S>,
+    pub destination: Square<S>,
+}
+
+fn our_last_movement<const S: usize>(position: &Position<S>) -> Option<MovementSynopsis<S>> {
+    get_movement_in_history(position, 2)
+}
+
+fn their_last_movement<const S: usize>(position: &Position<S>) -> Option<MovementSynopsis<S>> {
+    get_movement_in_history(position, 1)
+}
+
+fn get_movement_in_history<const S: usize>(
+    position: &Position<S>,
+    i: usize,
+) -> Option<MovementSynopsis<S>> {
+    position
+        .moves()
+        .get(position.moves().len().overflowing_sub(i).0)
+        .and_then(|mv| match mv.expand() {
+            ExpMove::Place(_, _) => None,
+            ExpMove::Move(origin, direction, stack_movement) => Some(MovementSynopsis {
+                origin,
+                destination: origin.jump_valid_direction(direction, stack_movement.len() as u8),
+            }),
+        })
+}
+
+#[derive(Clone, Debug)]
 pub struct GroupData<const S: usize> {
     pub(crate) groups: AbstractBoard<u8, S>,
     pub(crate) amount_in_group: ArrayVec<(u8, GroupEdgeConnection), 65>, // Size is max_size^2 + 1
@@ -229,6 +260,8 @@ pub struct GroupData<const S: usize> {
     pub(crate) black_caps: BitBoard,
     pub(crate) white_walls: BitBoard,
     pub(crate) black_walls: BitBoard,
+    pub(crate) last_movement: Option<MovementSynopsis<S>>,
+    pub(crate) second_to_last_movement: Option<MovementSynopsis<S>>,
 }
 
 impl<const S: usize> Default for GroupData<S> {
@@ -244,6 +277,8 @@ impl<const S: usize> Default for GroupData<S> {
             black_caps: Default::default(),
             white_walls: Default::default(),
             black_walls: Default::default(),
+            last_movement: Default::default(),
+            second_to_last_movement: Default::default(),
         };
         for _ in 0..S * S + 1 {
             group_data
@@ -290,6 +325,14 @@ impl<const S: usize> GroupData<S> {
             Color::White => self.white_critical_squares.into_iter(),
             Color::Black => self.black_critical_squares.into_iter(),
         }
+    }
+
+    pub fn last_movement(&self) -> Option<MovementSynopsis<S>> {
+        self.last_movement
+    }
+
+    pub fn second_to_last_movement(&self) -> Option<MovementSynopsis<S>> {
+        self.second_to_last_movement
     }
 }
 #[derive(PartialEq, Eq, Debug)]
@@ -763,7 +806,11 @@ impl<const S: usize> Position<S> {
 
     #[inline(never)]
     pub fn group_data(&self) -> GroupData<S> {
-        let mut group_data = GroupData::default();
+        let mut group_data = GroupData {
+            last_movement: their_last_movement(self),
+            second_to_last_movement: our_last_movement(self),
+            ..Default::default()
+        };
 
         for square in square::squares_iterator::<S>() {
             match self.top_stones[square] {
