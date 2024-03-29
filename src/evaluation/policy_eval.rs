@@ -26,10 +26,10 @@ static POLICY_OFFSET: sync::OnceLock<[f32; 512]> = sync::OnceLock::new();
 pub fn policy_offset(is_placement: bool, num_placements: usize, num_movements: usize) -> f32 {
     let effective_move_count = if is_placement {
         // Give a 60% weight to placements
-        num_placements + num_movements
+        2 * num_placements
     } else {
         // 60% to movements
-        num_movements + num_placements
+        2 * num_movements
     };
     assert!(effective_move_count > 0);
     if effective_move_count >= 512 {
