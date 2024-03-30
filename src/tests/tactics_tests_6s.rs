@@ -1,3 +1,5 @@
+use crate::position::Komi;
+
 use super::TestPosition;
 
 #[test]
@@ -251,4 +253,18 @@ fn double_tak_threat_tinue() {
     // Alion's Puzzle #6
     let test_position = TestPosition::from_tps("x,1,x4/x,12S,x,2,x2/x,12,212S,x,2C,x/12,2111211C,1S,112,11112,x/2221,x,2,1,2,1S/2222221,x,2,2,2,2 1 44");
     test_position.plays_correct_move_long_prop::<6>(&["6b3-"]);
+}
+
+#[test]
+fn setup_cap_transposition() {
+    // Not actually tinue, but the threat of 63... 4f5- is devastating, and wins shortly
+    let test_position = TestPosition::from_tps_with_komi("x3,1S,x2/x,2,11,x2,11122212C/x,211222221C,1,211,1212,2/2,112,x,1121111112S,x,121/x,21S,x,112,x2/2,x5 2 62", Komi::from_half_komi(4).unwrap());
+    test_position.plays_correct_move_long_prop::<6>(&["f6"]);
+}
+
+#[test]
+fn capture_stack_for_gaelet() {
+    // Other moves allow white to draw immediately
+    let test_position = TestPosition::from_tps_with_komi("2,2,1,1,x,2/2,2,x2,1,2/1,2S,x,2,1,x/x,11121S,x,112S,21112221,2/22221S,11,1112S,1,2S,2112221C/x,1212121S,1,2C,x2 2 57", Komi::from_half_komi(4).unwrap());
+    test_position.plays_correct_move_long_prop::<6>(&["f3<", "e2+"]);
 }

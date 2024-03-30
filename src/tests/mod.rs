@@ -27,9 +27,14 @@ pub struct TestPosition {
 
 impl TestPosition {
     pub fn from_tps(tps: &'static str) -> Self {
+        Self::from_tps_with_komi(tps, Komi::default())
+    }
+
+    pub fn from_tps_with_komi(tps: &'static str, komi: Komi) -> Self {
         Self {
             tps_string: Some(tps),
-            ..Default::default()
+            komi,
+            move_strings: &[],
         }
     }
 
