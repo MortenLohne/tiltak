@@ -1,5 +1,5 @@
 use arrayvec::ArrayVec;
-use board_game_traits::{Color, GameResult, Position as EvalPosition};
+use board_game_traits::{Color, Position as EvalPosition};
 use half::f16;
 use rand_distr::num_traits::FromPrimitive;
 
@@ -359,62 +359,22 @@ pub fn static_eval_game_phase<const S: usize, V: ValueApplier>(
         );
     }
 
-    // Bonuses for having flat win imminently available
-
-    if position.side_to_move() == Color::White {
-        if position.white_reserves_left() == 1
-            && position
-                .komi()
-                .game_result_with_flatcounts(white_flat_count + 1, black_flat_count)
-                == GameResult::WhiteWin
-        {
-            white_value.eval(indexes.flat_win_this_ply, 0, f16::ONE)
-        }
-
-        if position.black_reserves_left() == 1 {
-            // Extra bonus is black wins despite a +2 fcd move from white
-            if position
-                .komi()
-                .game_result_with_flatcounts(white_flat_count + 1, black_flat_count)
-                == GameResult::BlackWin
-            {
-                black_value.eval(indexes.flat_win_next_ply, 1, f16::ONE)
-            } else if position
-                .komi()
-                .game_result_with_flatcounts(white_flat_count, black_flat_count)
-                == GameResult::BlackWin
-            {
-                black_value.eval(indexes.flat_win_next_ply, 0, f16::ONE)
-            }
-        }
-    }
-
-    if position.side_to_move() == Color::Black {
-        if position.black_reserves_left() == 1
-            && position
-                .komi()
-                .game_result_with_flatcounts(white_flat_count, black_flat_count + 1)
-                == GameResult::BlackWin
-        {
-            black_value.eval(indexes.flat_win_this_ply, 0, f16::ONE)
-        }
-
-        if position.white_reserves_left() == 1 {
-            // Extra bonus is white wins despite a +2 fcd move from black
-            if position
-                .komi()
-                .game_result_with_flatcounts(white_flat_count, black_flat_count + 1)
-                == GameResult::WhiteWin
-            {
-                white_value.eval(indexes.flat_win_next_ply, 1, f16::ONE)
-            } else if position
-                .komi()
-                .game_result_with_flatcounts(white_flat_count, black_flat_count)
-                == GameResult::WhiteWin
-            {
-                white_value.eval(indexes.flat_win_next_ply, 0, f16::ONE)
-            }
-        }
+    // Bonuses for having flat win immediately available
+    match position.side_to_move() {
+        Color::White => flat_win::<WhiteTr, BlackTr, V, S>(
+            position,
+            white_flat_count,
+            black_flat_count,
+            white_value,
+            black_value,
+        ),
+        Color::Black => flat_win::<BlackTr, WhiteTr, V, S>(
+            position,
+            white_flat_count,
+            black_flat_count,
+            black_value,
+            white_value,
+        ),
     }
 
     squares_iterator::<S>()
@@ -518,6 +478,46 @@ pub fn static_eval_game_phase<const S: usize, V: ValueApplier>(
         num_files_occupied_black,
         f16::ONE,
     );
+}
+
+fn flat_win<Us: ColorTr, Them: ColorTr, V: ValueApplier, const S: usize>(
+    position: &Position<S>,
+    white_flat_count: i8,
+    black_flat_count: i8,
+    our_value: &mut V,
+    their_value: &mut V,
+) {
+    let indexes = value_indexes::<S>();
+
+    let white_flats_after_move = white_flat_count + (Us::color() == Color::White) as i8;
+    let black_flats_after_move = black_flat_count + (Us::color() == Color::Black) as i8;
+    // Bonus if we have an immediate flat win
+    if Us::stones_left(position) == 1
+        && position
+            .komi()
+            .game_result_with_flatcounts(white_flats_after_move, black_flats_after_move)
+            == Us::win()
+    {
+        our_value.eval(indexes.flat_win_this_ply, 0, f16::ONE)
+    }
+
+    // Malus if they're threatening a flat win on the next ply
+    if Them::stones_left(position) == 1 {
+        // Extra bonus if they win despite a +2 fcd move from us
+        if position
+            .komi()
+            .game_result_with_flatcounts(white_flats_after_move, black_flats_after_move)
+            == Them::win()
+        {
+            their_value.eval(indexes.flat_win_next_ply, 1, f16::ONE)
+        } else if position
+            .komi()
+            .game_result_with_flatcounts(white_flat_count, black_flat_count)
+            == Them::win()
+        {
+            their_value.eval(indexes.flat_win_next_ply, 0, f16::ONE)
+        }
+    }
 }
 
 fn cap_activity<Us: ColorTr, Them: ColorTr, V: ValueApplier, const S: usize>(
