@@ -36,7 +36,7 @@ const fn policy_padding<const S: usize>() -> usize {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 pub struct IndexPair {
     start: usize,
     length: usize,
@@ -56,6 +56,7 @@ impl IndexPair {
     }
 }
 
+#[derive(Debug)]
 pub struct ValueIndexes<const S: usize> {
     pub first_ply: IndexPair,
     pub second_ply: IndexPair,
@@ -194,6 +195,7 @@ pub const fn value_indexes<const S: usize>() -> ValueIndexes<S> {
     }
 }
 
+#[derive(Debug)]
 pub struct PolicyIndexes<const S: usize> {
     pub flat_psqt_white: IndexPair,
     pub flat_psqt_black: IndexPair,

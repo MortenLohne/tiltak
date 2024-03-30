@@ -13,7 +13,7 @@ use pgn_traits::PgnPosition;
 #[cfg(feature = "constant-tuning")]
 use rayon::prelude::*;
 
-use tiltak::evaluation::parameters::IncrementalPolicy;
+use tiltak::evaluation::parameters::{self, IncrementalPolicy, PolicyIndexes, ValueIndexes};
 #[cfg(feature = "sqlite")]
 use tiltak::policy_sqlite;
 use tiltak::position::Role;
@@ -182,8 +182,103 @@ fn main() {
             "bench_old" => bench_old(),
             "selfplay" => mcts_selfplay(time::Duration::from_secs(10)),
             "process_ptn" => process_ptn::<6>("games_6s_2komi_all.ptn"),
+            "value_params" => {
+                if words.len() < 3 {
+                    println!("Error: format is 'value_params <size> <komi>'");
+                    continue;
+                }
+                let komi = Komi::from_str(words[2]).unwrap();
+                match words[1] {
+                    "4" => value_params::<4>(komi),
+                    "5" => value_params::<5>(komi),
+                    "6" => value_params::<6>(komi),
+                    s => panic!("Unsupported size {}", s),
+                }
+            }
+            "policy_params" => {
+                if words.len() < 3 {
+                    println!("Error: format is 'policy_params <size> <komi>'");
+                    continue;
+                }
+                let komi = Komi::from_str(words[2]).unwrap();
+                match words[1] {
+                    "4" => policy_params::<4>(komi),
+                    "5" => policy_params::<5>(komi),
+                    "6" => policy_params::<6>(komi),
+                    s => panic!("Unsupported size {}", s),
+                }
+            }
             s => println!("Unknown option \"{}\"", s),
         }
+    }
+}
+
+fn value_params<const S: usize>(komi: Komi) {
+    let indexes: ValueIndexes<S> = parameters::value_indexes();
+    let indexes_string = format!("{:?}", indexes);
+
+    let params = match S {
+        4 => parameters::value_features_4s(komi).as_slice(),
+        5 => parameters::value_features_5s(komi).as_slice(),
+        6 => parameters::value_features_6s(komi).as_slice(),
+        _ => panic!("Unsupported size {}", S),
+    };
+    let black_start_index = params.len() / 2;
+
+    println!("\nValue features:\n");
+
+    for part in indexes_string
+        .strip_prefix("ValueIndexes { ")
+        .unwrap()
+        .split("},")
+    {
+        let words: Vec<&str> = part.split_whitespace().collect();
+        let name = words[0].strip_suffix(':').unwrap_or_default();
+        let start: usize = words[4]
+            .strip_suffix(',')
+            .unwrap()
+            .parse()
+            .unwrap_or_default();
+        let length: usize = words[6].parse().unwrap_or_default();
+
+        println!("{} (white): {:?}", name, &params[start..(start + length)]);
+        println!(
+            "{} (black): {:?}",
+            name,
+            &params[(start + black_start_index)..(start + black_start_index + length)]
+        );
+        println!();
+    }
+}
+
+fn policy_params<const S: usize>(komi: Komi) {
+    let indexes: PolicyIndexes<S> = parameters::policy_indexes();
+    let indexes_string = format!("{:?}", indexes);
+
+    let params = match S {
+        4 => parameters::policy_features_4s(komi).as_slice(),
+        5 => parameters::policy_features_5s(komi).as_slice(),
+        6 => parameters::policy_features_6s(komi).as_slice(),
+        _ => panic!("Unsupported size {}", S),
+    };
+
+    println!("\nPolicy features:\n");
+
+    for part in indexes_string
+        .strip_prefix("PolicyIndexes { ")
+        .unwrap()
+        .split("},")
+    {
+        let words: Vec<&str> = part.split_whitespace().collect();
+        let name = words[0].strip_suffix(':').unwrap_or_default();
+        let start: usize = words[4]
+            .strip_suffix(',')
+            .unwrap()
+            .parse()
+            .unwrap_or_default();
+        let length: usize = words[6].parse().unwrap_or_default();
+
+        println!("{}: {:?}", name, &params[start..(start + length)]);
     }
 }
 
