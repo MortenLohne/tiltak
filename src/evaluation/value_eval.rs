@@ -489,33 +489,73 @@ fn flat_win<Us: ColorTr, Them: ColorTr, V: ValueApplier, const S: usize>(
 ) {
     let indexes = value_indexes::<S>();
 
-    let white_flats_after_move = white_flat_count + (Us::color() == Color::White) as i8;
-    let black_flats_after_move = black_flat_count + (Us::color() == Color::Black) as i8;
-    // Bonus if we have an immediate flat win
-    if Us::stones_left(position) == 1
-        && position
-            .komi()
-            .game_result_with_flatcounts(white_flats_after_move, black_flats_after_move)
-            == Us::win()
-    {
-        our_value.eval(indexes.flat_win_this_ply, 0, f16::ONE)
+    let white_flats_needed_for_win =
+        1 + (black_flat_count + position.komi().half_komi() / 2) - white_flat_count;
+    let black_flats_needed_for_win =
+        1 + white_flat_count - (black_flat_count + position.komi().half_komi() / 2);
+
+    let (our_flats_needed_for_win, their_flats_needed_for_win) = match Us::color() {
+        Color::White => (white_flats_needed_for_win, black_flats_needed_for_win),
+        Color::Black => (black_flats_needed_for_win, white_flats_needed_for_win),
+    };
+
+    if Us::stones_left(position) == 1 {
+        if our_flats_needed_for_win <= 1 {
+            // Bonus if we have an immediate flat win
+            our_value.eval(indexes.flat_win_this_ply, 0, f16::ONE)
+        } else if Them::stones_left(position) > 2 {
+            // General malus for having 1 reserve left, but being behind on flats
+            // Exclude the case where they're also close to flatting out,
+            // since it's covered by other features below
+            our_value.eval(
+                indexes.one_reserve_left_us,
+                our_flats_needed_for_win.min(5) as usize - 2,
+                f16::ONE,
+            )
+        }
+    }
+
+    // Bonus if we have a flat lead, and two reserves left
+    if Us::stones_left(position) == 2 {
+        if our_flats_needed_for_win <= 0 {
+            // Opponent must play a +3 fcd move next move, to stop gaelet
+            our_value.eval(indexes.flat_win_two_ply, 1, f16::ONE)
+        } else if our_flats_needed_for_win <= 1 {
+            // A +2 fcd response is required
+            our_value.eval(indexes.flat_win_two_ply, 0, f16::ONE)
+        }
     }
 
     // Malus if they're threatening a flat win on the next ply
     if Them::stones_left(position) == 1 {
         // Extra bonus if they win despite a +2 fcd move from us
-        if position
-            .komi()
-            .game_result_with_flatcounts(white_flats_after_move, black_flats_after_move)
-            == Them::win()
-        {
+        if their_flats_needed_for_win < 0 {
             their_value.eval(indexes.flat_win_next_ply, 1, f16::ONE)
-        } else if position
-            .komi()
-            .game_result_with_flatcounts(white_flat_count, black_flat_count)
-            == Them::win()
-        {
+        } else if their_flats_needed_for_win < 1 {
             their_value.eval(indexes.flat_win_next_ply, 0, f16::ONE)
+        } else if Us::stones_left(position) > 2 {
+            // General malus for having 1 reserve left, but being behind on flats
+            // Exclude the case where we are also close to flatting out,
+            // since it's covered by other features above our_value.eval(
+            their_value.eval(
+                indexes.one_reserve_left_them,
+                their_flats_needed_for_win.min(4) as usize - 1,
+                f16::ONE,
+            )
+        }
+    }
+
+    // Malus if they're threatening a flat win on their next move
+    if Them::stones_left(position) == 2 {
+        if their_flats_needed_for_win < -1 {
+            // Extra bonus if they win despite +4 total fcd moves from us
+            their_value.eval(indexes.flat_win_three_ply, 2, f16::ONE)
+        } else if their_flats_needed_for_win < 0 {
+            // despite +3 fcd on our moves
+            their_value.eval(indexes.flat_win_three_ply, 1, f16::ONE)
+        } else if their_flats_needed_for_win < 1 {
+            // despite +2 fcd is needed
+            their_value.eval(indexes.flat_win_three_ply, 0, f16::ONE)
         }
     }
 }
