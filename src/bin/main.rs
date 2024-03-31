@@ -145,7 +145,7 @@ fn main() {
                 return;
             }
             #[cfg(feature = "constant-tuning")]
-            "analyze_openings" => analyze_openings::<6>(Komi::default(), 500_000),
+            "analyze_openings" => analyze_openings::<6>(komi, 500_000),
             #[cfg(feature = "sqlite")]
             "test_policy" => policy_sqlite::check_all_games(),
             "game" => {
@@ -391,6 +391,43 @@ fn process_ptn<const S: usize>(path: &str) {
 fn analyze_openings<const S: usize>(komi: Komi, nodes: u32) {
     let mut input = String::new();
     io::stdin().read_to_string(&mut input).unwrap();
+
+    let openings: Vec<(Position<S>, Vec<&str>)> = input
+        .lines()
+        .map(|line| {
+            let mut position = <Position<S>>::start_position_with_komi(komi);
+            let words: Vec<&str> = line
+                .split_whitespace()
+                .take_while(|word| !word.contains(':'))
+                .collect();
+            for word in words.iter() {
+                let mv = position.move_from_san(word).unwrap();
+                position.do_move(mv);
+            }
+            (position, words)
+        })
+        .collect();
+
+    eprintln!("Read {} openings. Check for duplicates...", openings.len());
+
+    let mut unique_openings: Vec<(String, Vec<&str>)> = vec![];
+
+    for (position, opening_moves) in openings {
+        if position
+            .symmetries_with_swapped_colors()
+            .into_iter()
+            .all(|rotation| {
+                unique_openings
+                    .iter()
+                    .all(|(unique_tps, _)| *unique_tps != rotation.to_fen())
+            })
+        {
+            unique_openings.push((position.to_fen(), opening_moves));
+        }
+    }
+
+    eprintln!("Got {} truly unique openings", unique_openings.len());
+
     input
         .lines()
         .flat_map(|line| line.split(':').take(1))
