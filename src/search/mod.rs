@@ -48,7 +48,7 @@ impl<const S: usize> Default for MctsSetting<S> {
             arena_size: 2_u32.pow(29), // Default to 12GB max
             value_params: None,
             policy_params: None,
-            search_params: vec![1.43, 2800.0, 0.61].into_boxed_slice(),
+            search_params: vec![1.50, 2200.0, 0.61].into_boxed_slice(),
             dirichlet: None,
             excluded_moves: vec![],
             rollout_depth: 0,
