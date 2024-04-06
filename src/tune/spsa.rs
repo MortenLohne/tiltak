@@ -38,8 +38,12 @@ pub fn tune<const S: usize>(variables: &mut [Variable], book_path: Option<&str>,
         let cloned_variables = (*mutex_variables.lock().unwrap()).to_vec();
         let mut rng = rand::rngs::StdRng::from_entropy();
 
-        let result =
-            tuning_iteration::<_, S>(&cloned_variables, &mut rng, &openings[i % openings.len()]);
+        let result = tuning_iteration::<_, S>(
+            &cloned_variables,
+            &mut rng,
+            komi,
+            &openings[i % openings.len()],
+        );
         {
             let mut mut_variables = mutex_variables.lock().unwrap();
             for (variable, result) in (*mut_variables).iter_mut().zip(&result) {
@@ -74,6 +78,7 @@ pub fn tune<const S: usize>(variables: &mut [Variable], book_path: Option<&str>,
 fn tuning_iteration<R: rand::Rng, const S: usize>(
     variables: &[Variable],
     rng: &mut R,
+    komi: Komi,
     opening: &[Move<S>],
 ) -> Vec<SpsaDirection> {
     #[allow(clippy::type_complexity)]
@@ -99,10 +104,10 @@ fn tuning_iteration<R: rand::Rng, const S: usize>(
     let (game, _) = play_game::<S>(
         &player1_settings,
         &player2_settings,
-        Komi::default(),
+        komi,
         opening,
         0.2,
-        &TimeControl::Time(Duration::from_secs(20), Duration::from_millis(200)),
+        &TimeControl::Time(Duration::from_secs(60), Duration::from_millis(600)),
     );
     match game.game_result() {
         Some(GameResult::WhiteWin) => player1_variables.iter().map(|(a, _)| *a).collect(),
