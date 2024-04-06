@@ -17,7 +17,8 @@ use super::{arena, Arena};
 #[derive(PartialEq, Debug)]
 pub struct Tree<const S: usize> {
     pub total_action_value: f64,
-    pub children: Option<arena::SliceIndex<TreeEdge<S>>>, // This is only `None` if the node is confirmed to be a terminal node. Uninitialized nodes will have `Some(SliceIndex::default())`
+    pub is_terminal: bool,
+    pub children: arena::SliceIndex<TreeEdge<S>>, // This is only `None` if the node is confirmed to be a terminal node. Uninitialized nodes will have `Some(SliceIndex::default())`
 }
 
 #[derive(PartialEq, Debug)]
@@ -96,7 +97,7 @@ impl<const S: usize> TreeEdge<S> {
             debug_assert_eq!(
                 self.visits,
                 arena
-                    .get_slice(node.children.as_ref().unwrap())
+                    .get_slice(&node.children)
                     .iter()
                     .map(|edge| edge.visits)
                     .sum::<u32>()
@@ -119,7 +120,7 @@ impl<const S: usize> TreeEdge<S> {
                 );
 
             assert_ne!(
-                arena.get_slice(node.children.as_ref().unwrap()).len(),
+                arena.get_slice(&node.children).len(),
                 0,
                 "No legal moves in position\n{:?}",
                 position
@@ -128,11 +129,7 @@ impl<const S: usize> TreeEdge<S> {
             let mut best_exploration_value = 0.0;
             let mut best_child_node_index = 0;
 
-            for (i, edge) in arena
-                .get_slice(node.children.as_ref().unwrap())
-                .iter()
-                .enumerate()
-            {
+            for (i, edge) in arena.get_slice(&node.children).iter().enumerate() {
                 let child_exploration_value = edge.exploration_value(visits_sqrt, dynamic_cpuct);
                 if child_exploration_value >= best_exploration_value {
                     best_child_node_index = i;
@@ -141,7 +138,7 @@ impl<const S: usize> TreeEdge<S> {
             }
 
             let child_edge = arena
-                .get_slice_mut(node.children.as_mut().unwrap())
+                .get_slice_mut(&mut node.children)
                 .get_mut(best_child_node_index)
                 .unwrap();
 
@@ -176,9 +173,7 @@ impl<const S: usize> TreeEdge<S> {
         self.visits = 1;
         child.total_action_value = eval as f64;
         self.mean_action_value = eval;
-        if is_terminal {
-            child.children = None
-        };
+        child.is_terminal = is_terminal;
         Some(eval)
     }
 
@@ -192,7 +187,7 @@ impl<const S: usize> TreeEdge<S> {
 
 impl<const S: usize> Tree<S> {
     fn is_terminal(&self) -> bool {
-        self.children.is_none()
+        self.is_terminal
     }
 
     /// Do not initialize children in the expansion phase, for better performance
@@ -234,13 +229,14 @@ impl<const S: usize> Tree<S> {
             )
         });
 
-        self.children = Some(arena.add_slice(child_edges)?);
+        self.children = arena.add_slice(child_edges)?;
         Some(())
     }
 
     fn new_node() -> Self {
         Tree {
-            children: Some(arena::SliceIndex::default()),
+            children: arena::SliceIndex::default(),
+            is_terminal: false,
             total_action_value: 0.0,
         }
     }
@@ -251,14 +247,12 @@ impl<const S: usize> Tree<S> {
     /// Values above 1 are less noisy, and tend towards uniform outputs
     pub fn apply_dirichlet(&mut self, arena: &Arena, epsilon: f32, alpha: f32) {
         let mut rng = rand::thread_rng();
-        let dirichlet = rand_distr::Dirichlet::new_with_size(
-            alpha,
-            arena.get_slice(self.children.as_ref().unwrap()).len(),
-        )
-        .unwrap();
+        let dirichlet =
+            rand_distr::Dirichlet::new_with_size(alpha, arena.get_slice(&self.children).len())
+                .unwrap();
         let noise_vec = dirichlet.sample(&mut rng);
         for (child_prior, eta) in arena
-            .get_slice_mut(self.children.as_mut().unwrap())
+            .get_slice_mut(&mut self.children)
             .iter_mut()
             .map(|child| &mut child.heuristic_score)
             .zip(noise_vec)
@@ -382,16 +376,13 @@ impl<'a, const S: usize> Iterator for Pv<'a, S> {
             let mv = edge.mv;
             if let Some(child_index) = &edge.child {
                 let child = self.arena.get(child_index);
-                if let Some(children) = child.children.as_ref() {
-                    let best_edge = self
-                        .arena
-                        .get_slice(children)
-                        .iter()
-                        .max_by_key(|edge| edge.visits);
-                    self.edge = best_edge;
-                } else {
-                    self.edge = None;
-                }
+
+                let best_edge = self
+                    .arena
+                    .get_slice(&child.children)
+                    .iter()
+                    .max_by_key(|edge| edge.visits);
+                self.edge = best_edge;
             }
             mv
         })

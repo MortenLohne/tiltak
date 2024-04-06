@@ -5,8 +5,8 @@
 use half::f16;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
-use std::process;
 use std::{mem, time};
+use std::{process, sync};
 
 use crate::position::Move;
 use crate::position::Position;
@@ -203,13 +203,7 @@ impl<const S: usize> MonteCarloTree<S> {
 
         if !settings.excluded_moves.is_empty() {
             let mut filtered_edges: Vec<TreeEdge<S>> = arena
-                .get_slice_mut(
-                    arena
-                        .get_mut(root_edge.child.as_mut().unwrap())
-                        .children
-                        .as_mut()
-                        .unwrap(),
-                )
+                .get_slice_mut(&mut arena.get_mut(root_edge.child.as_mut().unwrap()).children)
                 .iter_mut()
                 .filter(|edge| !settings.excluded_moves.contains(&edge.mv))
                 .map(|edge| TreeEdge {
@@ -221,7 +215,7 @@ impl<const S: usize> MonteCarloTree<S> {
                 })
                 .collect();
             arena.get_mut(root_edge.child.as_mut().unwrap()).children =
-                Some(arena.add_slice(&mut filtered_edges.drain(..)).unwrap());
+                arena.add_slice(&mut filtered_edges.drain(..)).unwrap();
         }
 
         MonteCarloTree {
@@ -268,11 +262,8 @@ impl<const S: usize> MonteCarloTree<S> {
             }
 
             let child = self.get_child();
-            let mut child_refs: Vec<&TreeEdge<S>> = self
-                .arena
-                .get_slice(child.children.as_ref().unwrap())
-                .iter()
-                .collect();
+            let mut child_refs: Vec<&TreeEdge<S>> =
+                self.arena.get_slice(&child.children).iter().collect();
 
             child_refs.sort_by_key(|edge| edge.visits);
             child_refs.reverse();
@@ -329,7 +320,7 @@ impl<const S: usize> MonteCarloTree<S> {
     /// Panics if no search iterations have been run
     pub fn best_move(&self) -> (Move<S>, f32) {
         self.arena
-            .get_slice(self.get_child().children.as_ref().unwrap())
+            .get_slice(&self.get_child().children)
             .iter()
             .max_by_key(|edge| edge.visits)
             .map(|edge| (edge.mv, 1.0 - edge.mean_action_value))
@@ -347,7 +338,7 @@ impl<const S: usize> MonteCarloTree<S> {
         }
         pub fn node_sizes<const S: usize>(node: &Tree<S>, arena: &Arena) -> (usize, usize) {
             arena
-                .get_slice(node.children.as_ref().unwrap())
+                .get_slice(&node.children)
                 .iter()
                 .map(|edge| edge_sizes(edge, arena))
                 .fold(
@@ -362,7 +353,7 @@ impl<const S: usize> MonteCarloTree<S> {
 
     fn children(&self) -> Vec<TreeEdge<S>> {
         self.arena
-            .get_slice(self.get_child().children.as_ref().unwrap())
+            .get_slice(&self.get_child().children)
             .iter()
             .map(|edge| edge.shallow_clone())
             .collect()
@@ -375,11 +366,8 @@ impl<const S: usize> MonteCarloTree<S> {
     /// Print human-readable information of the search's progress.
     pub fn print_info(&self) {
         let child = self.get_child();
-        let mut best_children: Vec<&TreeEdge<S>> = self
-            .arena
-            .get_slice(child.children.as_ref().unwrap())
-            .iter()
-            .collect();
+        let mut best_children: Vec<&TreeEdge<S>> =
+            self.arena.get_slice(&child.children).iter().collect();
 
         best_children.sort_by_key(|edge| edge.visits);
         best_children.reverse();
@@ -388,6 +376,15 @@ impl<const S: usize> MonteCarloTree<S> {
                 (1.0 + self.visits() as Score + self.settings.c_puct_base())
                     / self.settings.c_puct_base(),
             );
+
+        use sync::atomic::Ordering::*;
+        println!(
+            "Arena stats: {}MiB allocated, {}MiB structs, {}MiB slices, {}MiB wasted",
+            self.arena.stats.bytes_allocated.load(SeqCst) / (1024 * 1024),
+            self.arena.stats.bytes_structs.load(SeqCst) / (1024 * 1024),
+            self.arena.stats.bytes_slices.load(SeqCst) / (1024 * 1024),
+            self.arena.stats.padding_bytes.load(SeqCst) / (1024 * 1024),
+        );
 
         best_children.iter().take(8).for_each(|edge| {
             println!(

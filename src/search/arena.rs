@@ -1,6 +1,5 @@
 use std::{
-    alloc,
-    alloc::Layout,
+    alloc::{self, Layout},
     any,
     error::Error,
     fmt::{self, Display},
@@ -8,7 +7,7 @@ use std::{
     mem,
     num::NonZeroU32,
     slice,
-    sync::atomic::{AtomicU32, Ordering},
+    sync::atomic::{AtomicU32, AtomicUsize, Ordering},
 };
 
 pub struct Arena<const S: usize = 16> {
@@ -17,6 +16,15 @@ pub struct Arena<const S: usize = 16> {
     layout: Layout,
     next_index: AtomicU32,
     max_index: u32,
+    pub stats: ArenaStats,
+}
+
+#[derive(Debug, Default)]
+pub struct ArenaStats {
+    pub bytes_allocated: AtomicUsize,
+    pub bytes_structs: AtomicUsize,
+    pub bytes_slices: AtomicUsize,
+    pub padding_bytes: AtomicUsize,
 }
 
 impl<const S: usize> fmt::Debug for Arena<S> {
@@ -131,6 +139,7 @@ impl<const S: usize> Arena<S> {
             layout,
             next_index: AtomicU32::new(1),
             max_index: num_slots + 1,
+            stats: ArenaStats::default(),
         })
     }
 
@@ -201,6 +210,17 @@ impl<const S: usize> Arena<S> {
             *ptr = value;
         }
 
+        let bytes_required = Self::num_slots_required::<T>() as usize * S;
+        self.stats
+            .bytes_allocated
+            .fetch_add(bytes_required, Ordering::Relaxed);
+        self.stats
+            .padding_bytes
+            .fetch_add(bytes_required - mem::size_of::<T>(), Ordering::Relaxed);
+        self.stats
+            .bytes_structs
+            .fetch_add(bytes_required, Ordering::Relaxed);
+
         Some(Index::new(NonZeroU32::new(index).unwrap()))
     }
 
@@ -231,6 +251,18 @@ impl<const S: usize> Arena<S> {
         }
 
         assert!(source.next().is_none());
+
+        let bytes_required = Self::num_slots_required::<T>() as usize * length * S;
+        self.stats
+            .bytes_allocated
+            .fetch_add(bytes_required, Ordering::Relaxed);
+        self.stats.padding_bytes.fetch_add(
+            bytes_required - mem::size_of::<T>() * length,
+            Ordering::Relaxed,
+        );
+        self.stats
+            .bytes_slices
+            .fetch_add(bytes_required, Ordering::Relaxed);
 
         Some(SliceIndex::new(
             NonZeroU32::new(index).unwrap(),
