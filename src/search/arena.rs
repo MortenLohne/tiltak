@@ -239,7 +239,14 @@ impl<const S: usize> Arena<S> {
             return None;
         }
 
-        let index = self.get_index_for_element(Self::num_slots_required::<T>() * length as u32)?;
+        // Ensure that the elements can be safely stored continuously
+        // We could probably make the reverse case work, but it's not necessary atm
+        assert_eq!(mem::size_of::<T>() % mem::align_of::<T>(), 0);
+
+        let bytes_required = mem::size_of::<T>() * length;
+        let slots_required = bytes_required.div_ceil(S);
+
+        let index = self.get_index_for_element(slots_required.try_into().unwrap())?;
 
         let mut ptr = unsafe { self.ptr_to_index(index) as *mut T };
 
