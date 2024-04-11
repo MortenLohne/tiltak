@@ -7,8 +7,11 @@ use crate::evaluation::parameters::value_indexes;
 use crate::position::bitboard::BitBoard;
 use crate::position::color_trait::{BlackTr, ColorTr, WhiteTr};
 use crate::position::{
-    line_symmetries, lookup_square_symmetries, squares_iterator, GroupData, Piece, Piece::*,
-    Position, Role::*, Square,
+    line_symmetries, lookup_square_symmetries, squares_iterator, AbstractBoard, GroupData,
+    Piece::{self, *},
+    Position,
+    Role::*,
+    Square,
 };
 
 use super::parameters::ValueApplier;
@@ -41,142 +44,137 @@ pub fn static_eval_game_phase<const S: usize, V: ValueApplier>(
     let mut white_flat_count = 0;
     let mut black_flat_count = 0;
 
-    for square in squares_iterator::<S>() {
+    #[derive(Default, Clone, Copy, Debug)]
+    struct StackData {
+        shallow_supports: u8,
+        deep_supports: u8,
+        shallow_captives: u8,
+        deep_captives: u8,
+    }
+
+    let mut stack_data: AbstractBoard<StackData, S> = AbstractBoard::default();
+
+    for (square, top_stone) in
+        squares_iterator::<S>().filter_map(|sq| position.top_stones()[sq].map(|piece| (sq, piece)))
+    {
+        let mut data = StackData::default();
         let stack = position.get_stack(square);
-        if let Some(piece) = position.top_stones()[square] {
-            match piece {
-                WhiteFlat => {
-                    white_value.eval(
-                        indexes.flat_psqt,
-                        lookup_square_symmetries::<S>(square),
-                        f16::ONE,
-                    );
-                    white_flat_count += 1;
-                }
-                BlackFlat => {
-                    black_value.eval(
-                        indexes.flat_psqt,
-                        lookup_square_symmetries::<S>(square),
-                        f16::ONE,
-                    );
-                    black_flat_count += 1;
-                }
-                WhiteWall => white_value.eval(
-                    indexes.wall_psqt,
-                    lookup_square_symmetries::<S>(square),
-                    f16::ONE,
-                ),
-                BlackWall => black_value.eval(
-                    indexes.wall_psqt,
-                    lookup_square_symmetries::<S>(square),
-                    f16::ONE,
-                ),
-                WhiteCap => {
-                    white_value.eval(
-                        indexes.cap_psqt,
-                        lookup_square_symmetries::<S>(square),
-                        f16::ONE,
-                    );
-                    cap_activity::<WhiteTr, BlackTr, V, S>(position, square, white_value);
-                }
-                BlackCap => {
-                    black_value.eval(
-                        indexes.cap_psqt,
-                        lookup_square_symmetries::<S>(square),
-                        f16::ONE,
-                    );
-                    cap_activity::<BlackTr, WhiteTr, V, S>(position, square, black_value);
-                }
-            }
-            if stack.height > 1 {
-                let controlling_player = piece.color();
-                for (stack_index, stack_piece) in stack
-                    .into_iter()
-                    .enumerate()
-                    .take(stack.height as usize - 1)
-                {
-                    // Position in the stack. Top stone is 1
-                    let depth = stack.height as usize - stack_index;
-                    let is_support = stack_piece.color() == controlling_player;
-                    let top_role_index = match piece.role() {
-                        Flat => 0,
-                        Wall => 1,
-                        Cap if stack.get(stack.height - 2).unwrap().color()
-                            == controlling_player =>
-                        {
-                            2
-                        }
-                        Cap => 3,
-                    };
-                    // Separate non-psqt bonus based on the role of the top stone,
-                    // and whether the stack piece is below the carry limit in the stack
-                    match (is_support, depth > S + 1, controlling_player) {
-                        (true, true, Color::White) => white_value.eval(
-                            indexes.deep_supports_per_piece,
-                            top_role_index,
-                            f16::ONE,
-                        ),
-                        (true, true, Color::Black) => black_value.eval(
-                            indexes.deep_supports_per_piece,
-                            top_role_index,
-                            f16::ONE,
-                        ),
-                        (true, false, Color::White) => white_value.eval(
-                            indexes.shallow_supports_per_piece,
-                            top_role_index,
-                            f16::ONE,
-                        ),
-                        (true, false, Color::Black) => black_value.eval(
-                            indexes.shallow_supports_per_piece,
-                            top_role_index,
-                            f16::ONE,
-                        ),
-                        (false, true, Color::White) => white_value.eval(
-                            indexes.deep_captives_per_piece,
-                            top_role_index,
-                            f16::ONE,
-                        ),
-                        (false, true, Color::Black) => black_value.eval(
-                            indexes.deep_captives_per_piece,
-                            top_role_index,
-                            f16::ONE,
-                        ),
-                        (false, false, Color::White) => white_value.eval(
-                            indexes.shallow_captives_per_piece,
-                            top_role_index,
-                            f16::ONE,
-                        ),
-                        (false, false, Color::Black) => black_value.eval(
-                            indexes.shallow_captives_per_piece,
-                            top_role_index,
-                            f16::ONE,
-                        ),
-                    }
-                    match (is_support, controlling_player) {
-                        (true, Color::White) => white_value.eval(
-                            indexes.supports_psqt,
-                            lookup_square_symmetries::<S>(square),
-                            f16::ONE,
-                        ),
-                        (true, Color::Black) => black_value.eval(
-                            indexes.supports_psqt,
-                            lookup_square_symmetries::<S>(square),
-                            f16::ONE,
-                        ),
-                        (false, Color::White) => white_value.eval(
-                            indexes.captives_psqt,
-                            lookup_square_symmetries::<S>(square),
-                            -f16::ONE,
-                        ),
-                        (false, Color::Black) => black_value.eval(
-                            indexes.captives_psqt,
-                            lookup_square_symmetries::<S>(square),
-                            -f16::ONE,
-                        ),
-                    }
-                }
+        let controlling_player = top_stone.color();
+        for (stack_index, stack_piece) in stack
+            .into_iter()
+            .enumerate()
+            .take(stack.height as usize - 1)
+        // Skip last element, so that we don't count top stone as a support
+        {
+            // Position in the stack. Top stone is 1
+            let depth = stack.height as usize - stack_index;
+
+            match (stack_piece.color() == controlling_player, depth > S + 1) {
+                (true, true) => data.deep_supports += 1,
+                (true, false) => data.shallow_supports += 1,
+                (false, true) => data.deep_captives += 1,
+                (false, false) => data.shallow_captives += 1,
             }
         }
+        stack_data[square] = data;
+    }
+
+    for (square, piece) in
+        squares_iterator::<S>().filter_map(|sq| position.top_stones()[sq].map(|piece| (sq, piece)))
+    {
+        let stack = position.get_stack(square);
+        match piece {
+            WhiteFlat => {
+                white_value.eval(
+                    indexes.flat_psqt,
+                    lookup_square_symmetries::<S>(square),
+                    f16::ONE,
+                );
+                white_flat_count += 1;
+            }
+            BlackFlat => {
+                black_value.eval(
+                    indexes.flat_psqt,
+                    lookup_square_symmetries::<S>(square),
+                    f16::ONE,
+                );
+                black_flat_count += 1;
+            }
+            WhiteWall => white_value.eval(
+                indexes.wall_psqt,
+                lookup_square_symmetries::<S>(square),
+                f16::ONE,
+            ),
+            BlackWall => black_value.eval(
+                indexes.wall_psqt,
+                lookup_square_symmetries::<S>(square),
+                f16::ONE,
+            ),
+            WhiteCap => {
+                white_value.eval(
+                    indexes.cap_psqt,
+                    lookup_square_symmetries::<S>(square),
+                    f16::ONE,
+                );
+                cap_activity::<WhiteTr, BlackTr, V, S>(position, square, white_value);
+            }
+            BlackCap => {
+                black_value.eval(
+                    indexes.cap_psqt,
+                    lookup_square_symmetries::<S>(square),
+                    f16::ONE,
+                );
+                cap_activity::<BlackTr, WhiteTr, V, S>(position, square, black_value);
+            }
+        }
+        if stack.height < 2 {
+            continue;
+        }
+        let controlling_player = piece.color();
+
+        let top_role_index = match piece.role() {
+            Flat => 0,
+            Wall => 1,
+            Cap if stack.get(stack.height - 2).unwrap().color() == controlling_player => 2,
+            Cap => 3,
+        };
+        let data = stack_data[square];
+        let value_for_stack = match controlling_player {
+            Color::White => &mut *white_value,
+            Color::Black => &mut *black_value,
+        };
+
+        value_for_stack.eval(
+            indexes.deep_supports_per_piece,
+            top_role_index,
+            data.deep_supports.into(),
+        );
+        value_for_stack.eval(
+            indexes.shallow_supports_per_piece,
+            top_role_index,
+            data.shallow_supports.into(),
+        );
+        value_for_stack.eval(
+            indexes.deep_captives_per_piece,
+            top_role_index,
+            data.deep_captives.into(),
+        );
+        value_for_stack.eval(
+            indexes.shallow_captives_per_piece,
+            top_role_index,
+            data.shallow_captives.into(),
+        );
+
+        value_for_stack.eval(
+            indexes.supports_psqt,
+            lookup_square_symmetries::<S>(square),
+            (data.deep_supports + data.shallow_supports).into(),
+        );
+        value_for_stack.eval(
+            indexes.captives_psqt,
+            lookup_square_symmetries::<S>(square),
+            (-(data.deep_captives as i8) - data.shallow_captives as i8).into(),
+        );
     }
 
     // Give the side to move a bonus/malus depending on flatstone lead
