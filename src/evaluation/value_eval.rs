@@ -132,6 +132,35 @@ pub fn static_eval_game_phase<const S: usize, V: ValueApplier>(
         }
         let controlling_player = piece.color();
 
+        // Count the number of squares that can be reached by a spread
+        let mut num_reachable_squares = 0;
+        for direction in square.directions() {
+            let mut steps_in_direction = 0;
+            let mut dest_square = square;
+            while let Some(sq) = dest_square.go_direction(direction) {
+                steps_in_direction += 1;
+                if steps_in_direction > stack.height {
+                    break;
+                }
+                dest_square = sq;
+
+                let dest_role = position.top_stones()[dest_square].map(Piece::role);
+                if dest_role == Some(Cap) {
+                    break;
+                }
+                if dest_role == Some(Wall) {
+                    // A wall square can be reached by squashing, but that still ends the spread
+                    if piece.role() == Cap {
+                        num_reachable_squares += 1;
+                    }
+                    break;
+                }
+                num_reachable_squares += 1;
+            }
+        }
+        // Arbitrarily divide value by 8, because the tuner might act weird on large values
+        let reachable_squares_weight = num_reachable_squares as f32 / 8.0;
+
         let top_role_index = match piece.role() {
             Flat => 0,
             Wall => 1,
@@ -155,6 +184,11 @@ pub fn static_eval_game_phase<const S: usize, V: ValueApplier>(
             data.shallow_supports.into(),
         );
         value_for_stack.eval(
+            indexes.shallow_supports_per_piece_mobility,
+            top_role_index,
+            f16::from_f32(data.shallow_supports as f32 * reachable_squares_weight),
+        );
+        value_for_stack.eval(
             indexes.deep_captives_per_piece,
             top_role_index,
             data.deep_captives.into(),
@@ -163,6 +197,11 @@ pub fn static_eval_game_phase<const S: usize, V: ValueApplier>(
             indexes.shallow_captives_per_piece,
             top_role_index,
             data.shallow_captives.into(),
+        );
+        value_for_stack.eval(
+            indexes.shallow_captives_per_piece_mobility,
+            top_role_index,
+            f16::from_f32(data.shallow_captives as f32 * reachable_squares_weight),
         );
 
         value_for_stack.eval(
