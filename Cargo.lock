@@ -1399,7 +1399,6 @@ dependencies = [
  "libc",
  "ntapi",
  "once_cell",
- "rayon",
  "windows",
 ]
 
@@ -1458,8 +1457,8 @@ dependencies = [
  "fern",
  "half",
  "lambda_runtime",
- "lazy_static",
  "log",
+ "num-traits",
  "pgn-traits",
  "rand",
  "rand_distr",

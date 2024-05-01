@@ -29,9 +29,6 @@ use tiltak::{position, search};
 #[cfg(test)]
 mod tests;
 
-pub mod playtak;
-pub mod tei;
-
 fn main() {
     println!("play: Play against the engine through the command line");
     println!("aimatch: Watch the engine play against a very simple minmax implementation");

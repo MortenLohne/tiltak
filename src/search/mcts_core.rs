@@ -2,8 +2,8 @@ use std::ops;
 
 use board_game_traits::{Color, GameResult, Position as PositionTrait};
 use half::f16;
-use rand::distributions::Distribution;
 use rand::Rng;
+use rand_distr::Distribution;
 
 use crate::evaluation::parameters::IncrementalPolicy;
 use crate::position::Move;
@@ -311,8 +311,8 @@ pub fn rollout<const S: usize>(
         );
 
         let mut rng = rand::thread_rng();
-
         let best_move = best_move(&mut rng, settings.rollout_temperature, &temp_vectors.moves);
+
         position.do_move(best_move);
 
         temp_vectors.moves.clear();

@@ -19,18 +19,30 @@ aws-lambda-client = ["serde", "serde_json", "arrayvec/serde", "rusoto_core", "ru
 sqlite = ["rusqlite", "rayon"]
 
 [[bin]]
-name = "bootstrap"
-required-features = ["aws-lambda-runtime"]
+name = "main"
+required-features = []
+
+[[bin]]
+name = "tei"
+required-features = []
+
+[[bin]]
+name = "playtak"
+required-features = ["clap", "fern", "bufstream"]
 
 [[bin]]
 name = "tune"
-required-features = ["constant-tuning"]
+required-features = ["constant-tuning", "clap"]
+
+[[bin]]
+name = "bootstrap"
+required-features = ["aws-lambda-runtime"]
 
 [dependencies]
 board-game-traits = "0.4.0"
 pgn-traits = "0.5.0"
 arrayvec = "0.7"
-rand = "0.8"
+rand = {version = "0.8", features = ["small_rng"] }
 rayon = { version = "1.5", optional = true }
 serde = { version = "1.0", optional = true, features = ["derive"] }
 serde_json = { version = "1", optional = true }
@@ -41,11 +53,11 @@ tokio = { version = "1.7", optional = true }
 lambda_runtime = { version = "0.4", optional = true }
 rand_distr = "0.4"
 log = "0.4"
-fern = "0.6"
+fern = { version = "0.6", optional = true }
 chrono = "0.4"
-bufstream = "0.1"
-clap = { version = "4.4", features = ["env"] }
-lazy_static = "1.4"
+bufstream = { version = "0.1", optional = true }
+clap = { version = "4.4", features = ["env"], optional = true }
 rusqlite = { version = "0.29.0", optional = true, features = ["bundled", "chrono"] }
 half = { version = "2.3.1", features = ["num-traits"] }
-sysinfo = "0.30.5"
+sysinfo = { version = "0.30.5", default-features = false }
+num-traits = "0.2.18"

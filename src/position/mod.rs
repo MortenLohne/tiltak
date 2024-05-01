@@ -2,6 +2,7 @@
 
 use std::fmt::Write;
 use std::hash::{Hash, Hasher};
+use std::sync::OnceLock;
 use std::{array, fmt, ops};
 use std::{iter, mem};
 
@@ -9,7 +10,6 @@ use arrayvec::ArrayVec;
 use board_game_traits::{Color, GameResult};
 use board_game_traits::{EvalPosition as EvalPositionTrait, Position as PositionTrait};
 use half::f16;
-use lazy_static::lazy_static;
 use pgn_traits::PgnPosition;
 use rand::{Rng, SeedableRng};
 #[cfg(feature = "serde")]
@@ -36,14 +36,12 @@ mod mv;
 mod square;
 mod utils;
 
-lazy_static! {
-    pub(crate) static ref ZOBRIST_KEYS_3S: Box<ZobristKeys<3>> = ZobristKeys::new();
-    pub(crate) static ref ZOBRIST_KEYS_4S: Box<ZobristKeys<4>> = ZobristKeys::new();
-    pub(crate) static ref ZOBRIST_KEYS_5S: Box<ZobristKeys<5>> = ZobristKeys::new();
-    pub(crate) static ref ZOBRIST_KEYS_6S: Box<ZobristKeys<6>> = ZobristKeys::new();
-    pub(crate) static ref ZOBRIST_KEYS_7S: Box<ZobristKeys<7>> = ZobristKeys::new();
-    pub(crate) static ref ZOBRIST_KEYS_8S: Box<ZobristKeys<8>> = ZobristKeys::new();
-}
+pub(crate) static ZOBRIST_KEYS_3S: OnceLock<Box<ZobristKeys<3>>> = OnceLock::new();
+pub(crate) static ZOBRIST_KEYS_4S: OnceLock<Box<ZobristKeys<4>>> = OnceLock::new();
+pub(crate) static ZOBRIST_KEYS_5S: OnceLock<Box<ZobristKeys<5>>> = OnceLock::new();
+pub(crate) static ZOBRIST_KEYS_6S: OnceLock<Box<ZobristKeys<6>>> = OnceLock::new();
+pub(crate) static ZOBRIST_KEYS_7S: OnceLock<Box<ZobristKeys<7>>> = OnceLock::new();
+pub(crate) static ZOBRIST_KEYS_8S: OnceLock<Box<ZobristKeys<8>>> = OnceLock::new();
 
 pub const MAX_BOARD_SIZE: usize = 8;
 
@@ -344,12 +342,30 @@ pub struct ZobristKeys<const S: usize> {
 
 pub fn zobrist_top_stones<const S: usize>(square: Square<S>, piece: Piece) -> u64 {
     match S {
-        3 => ZOBRIST_KEYS_3S.top_stones[square.downcast_size()][piece as u16 as usize],
-        4 => ZOBRIST_KEYS_4S.top_stones[square.downcast_size()][piece as u16 as usize],
-        5 => ZOBRIST_KEYS_5S.top_stones[square.downcast_size()][piece as u16 as usize],
-        6 => ZOBRIST_KEYS_6S.top_stones[square.downcast_size()][piece as u16 as usize],
-        7 => ZOBRIST_KEYS_7S.top_stones[square.downcast_size()][piece as u16 as usize],
-        8 => ZOBRIST_KEYS_8S.top_stones[square.downcast_size()][piece as u16 as usize],
+        3 => {
+            ZOBRIST_KEYS_3S.get_or_init(ZobristKeys::new).top_stones[square.downcast_size()]
+                [piece as u16 as usize]
+        }
+        4 => {
+            ZOBRIST_KEYS_4S.get_or_init(ZobristKeys::new).top_stones[square.downcast_size()]
+                [piece as u16 as usize]
+        }
+        5 => {
+            ZOBRIST_KEYS_5S.get_or_init(ZobristKeys::new).top_stones[square.downcast_size()]
+                [piece as u16 as usize]
+        }
+        6 => {
+            ZOBRIST_KEYS_6S.get_or_init(ZobristKeys::new).top_stones[square.downcast_size()]
+                [piece as u16 as usize]
+        }
+        7 => {
+            ZOBRIST_KEYS_7S.get_or_init(ZobristKeys::new).top_stones[square.downcast_size()]
+                [piece as u16 as usize]
+        }
+        8 => {
+            ZOBRIST_KEYS_8S.get_or_init(ZobristKeys::new).top_stones[square.downcast_size()]
+                [piece as u16 as usize]
+        }
         _ => panic!("No zobrist keys for size {}. Size not supported.", S),
     }
 }
@@ -360,31 +376,55 @@ pub fn zobrist_stones_in_stack<const S: usize>(
     stack_slice: usize,
 ) -> u64 {
     match S {
-        3 => ZOBRIST_KEYS_3S.stones_in_stack[place_in_stack][square.downcast_size()][stack_slice],
-        4 => ZOBRIST_KEYS_4S.stones_in_stack[place_in_stack][square.downcast_size()][stack_slice],
-        5 => ZOBRIST_KEYS_5S.stones_in_stack[place_in_stack][square.downcast_size()][stack_slice],
-        6 => ZOBRIST_KEYS_6S.stones_in_stack[place_in_stack][square.downcast_size()][stack_slice],
-        7 => ZOBRIST_KEYS_7S.stones_in_stack[place_in_stack][square.downcast_size()][stack_slice],
-        8 => ZOBRIST_KEYS_8S.stones_in_stack[place_in_stack][square.downcast_size()][stack_slice],
+        3 => {
+            ZOBRIST_KEYS_3S
+                .get_or_init(ZobristKeys::new)
+                .stones_in_stack[place_in_stack][square.downcast_size()][stack_slice]
+        }
+        4 => {
+            ZOBRIST_KEYS_4S
+                .get_or_init(ZobristKeys::new)
+                .stones_in_stack[place_in_stack][square.downcast_size()][stack_slice]
+        }
+        5 => {
+            ZOBRIST_KEYS_5S
+                .get_or_init(ZobristKeys::new)
+                .stones_in_stack[place_in_stack][square.downcast_size()][stack_slice]
+        }
+        6 => {
+            ZOBRIST_KEYS_6S
+                .get_or_init(ZobristKeys::new)
+                .stones_in_stack[place_in_stack][square.downcast_size()][stack_slice]
+        }
+        7 => {
+            ZOBRIST_KEYS_7S
+                .get_or_init(ZobristKeys::new)
+                .stones_in_stack[place_in_stack][square.downcast_size()][stack_slice]
+        }
+        8 => {
+            ZOBRIST_KEYS_8S
+                .get_or_init(ZobristKeys::new)
+                .stones_in_stack[place_in_stack][square.downcast_size()][stack_slice]
+        }
         _ => panic!("No zobrist keys for size {}. Size not supported.", S),
     }
 }
 
 pub fn zobrist_to_move<const S: usize>(color: Color) -> u64 {
     match S {
-        3 => ZOBRIST_KEYS_3S.to_move[color.disc()],
-        4 => ZOBRIST_KEYS_4S.to_move[color.disc()],
-        5 => ZOBRIST_KEYS_5S.to_move[color.disc()],
-        6 => ZOBRIST_KEYS_6S.to_move[color.disc()],
-        7 => ZOBRIST_KEYS_7S.to_move[color.disc()],
-        8 => ZOBRIST_KEYS_8S.to_move[color.disc()],
+        3 => ZOBRIST_KEYS_3S.get_or_init(ZobristKeys::new).to_move[color.disc()],
+        4 => ZOBRIST_KEYS_4S.get_or_init(ZobristKeys::new).to_move[color.disc()],
+        5 => ZOBRIST_KEYS_5S.get_or_init(ZobristKeys::new).to_move[color.disc()],
+        6 => ZOBRIST_KEYS_6S.get_or_init(ZobristKeys::new).to_move[color.disc()],
+        7 => ZOBRIST_KEYS_7S.get_or_init(ZobristKeys::new).to_move[color.disc()],
+        8 => ZOBRIST_KEYS_8S.get_or_init(ZobristKeys::new).to_move[color.disc()],
         _ => panic!("No zobrist keys for size {}. Size not supported.", S),
     }
 }
 
 impl<const S: usize> ZobristKeys<S> {
     pub(crate) fn new() -> Box<Self> {
-        let mut rng = rand::rngs::StdRng::from_seed([0; 32]);
+        let mut rng = rand::rngs::SmallRng::from_seed([0; 32]);
 
         Box::new(ZobristKeys {
             top_stones: AbstractBoard::new_from_fn(|| array::from_fn(|_| rng.gen())),
