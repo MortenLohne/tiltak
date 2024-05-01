@@ -3,8 +3,6 @@ use std::io::{BufRead, Result, Write};
 use std::net::TcpStream;
 use std::str::FromStr;
 use std::time::Duration;
-#[cfg(feature = "aws-lambda-client")]
-use std::time::Instant;
 use std::{io, net, thread};
 
 use board_game_traits::{Color, GameResult, Position as PositionTrait};
@@ -17,8 +15,6 @@ use pgn_traits::PgnPosition;
 
 use rand::seq::SliceRandom;
 use rand::Rng;
-#[cfg(feature = "aws-lambda-client")]
-use tiltak::aws;
 use tiltak::position;
 use tiltak::position::{squares_iterator, Move, Role, Square};
 use tiltak::position::{Komi, Position};
@@ -59,7 +55,7 @@ impl PlaytakSettings {
 }
 
 pub fn main() -> Result<()> {
-    let mut app = Command::new("Tiltak playtak client")
+    let app = Command::new("Tiltak playtak client")
         .version("0.1")
         .author("Morten Lohne")
         .arg(
@@ -198,20 +194,6 @@ pub fn main() -> Result<()> {
             .default_value("10000")
             .value_parser(clap::value_parser!(u16)));
 
-    if cfg!(feature = "aws-lambda-client") {
-        app = app.arg(
-            Arg::new("aws-function-name")
-                .long("aws-function-name")
-                .env("AWS_FUNCTION_NAME")
-                .value_name("tiltak")
-                .required(true)
-                .conflicts_with("fixedNodes")
-                .help(
-                    "Run the engine on AWS instead of locally. Requires aws cli installed locally.",
-                )
-                .num_args(1),
-        );
-    }
     let matches = app.get_matches();
 
     let log_dispatcher = fern::Dispatch::new().format(|out, message, record| {
@@ -312,14 +294,6 @@ pub fn main() -> Result<()> {
     };
 
     loop {
-        #[cfg(feature = "aws-lambda-client")]
-        let connection_result =
-            if let Some(aws_function_name) = matches.get_one::<String>("aws-function-name") {
-                PlaytakSession::with_aws(&playtak_url, aws_function_name.to_string())
-            } else {
-                PlaytakSession::new(&playtak_url)
-            };
-        #[cfg(not(feature = "aws-lambda-client"))]
         let connection_result = PlaytakSession::new(&playtak_url);
 
         let mut session = match connection_result {
@@ -478,8 +452,6 @@ impl<'a> ChatCommand<'a> {
 
 struct PlaytakSession {
     username: Option<String>,
-    #[cfg(feature = "aws-lambda-client")]
-    aws_function_name: Option<String>,
     connection: BufStream<TcpStream>,
     // The server requires regular pings, to not kick the user
     // This thread does nothing but provide those pings
@@ -532,18 +504,9 @@ impl PlaytakSession {
         }));
         Ok(PlaytakSession {
             username: None,
-            #[cfg(feature = "aws-lambda-client")]
-            aws_function_name: None,
             connection,
             ping_thread,
         })
-    }
-
-    #[cfg(feature = "aws-lambda-client")]
-    fn with_aws(playtak_url: &str, aws_function_name: String) -> Result<Self> {
-        let mut session = Self::new(playtak_url)?;
-        session.aws_function_name = Some(aws_function_name);
-        Ok(session)
     }
 
     /// Login with the provided name, username and password
@@ -822,38 +785,6 @@ impl PlaytakSession {
 
                         tree.best_move()
                     } else {
-                        #[cfg(feature = "aws-lambda-client")]
-                        {
-                            let aws_function_name = self.aws_function_name.as_ref().unwrap();
-                            let start_time = Instant::now();
-                            let event = aws::Event {
-                                size: S,
-                                tps: None,
-                                moves: moves
-                                    .iter()
-                                    .map(|PtnMove { mv, .. }: &PtnMove<Move<S>>| mv.to_string())
-                                    .collect(),
-                                time_control: search::TimeControl::Time(our_time_left, game.increment),
-                                komi: position.komi().into(),
-                                eval_komi: None,
-                                dirichlet_noise: playtak_settings.dirichlet_noise,
-                                rollout_depth: playtak_settings.rollout_depth,
-                                rollout_temperature: playtak_settings.rollout_temperature,
-                            };
-                            let aws::Output { pv, score, nodes, mem_usage, time_taken } =
-                                aws::client::best_move_aws(aws_function_name, &event)?;
-
-                            debug!("{} nodes, {}MB, {:.1}s taken, {}ms overhead",
-                                nodes,
-                                mem_usage / (1024 * 1024),
-                                time_taken.as_secs_f32(),
-                                (start_time.elapsed() - time_taken).as_millis()
-                            );
-
-                            (position.move_from_san(&pv[0]).unwrap(), score)
-                        }
-
-                        #[cfg(not(feature = "aws-lambda-client"))]
                         {
                             let maximum_time = if let Some(target_move_time) =  playtak_settings.target_move_time {
                                 (our_time_left / 6 + game.increment / 2).min(2 * target_move_time)

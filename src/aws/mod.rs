@@ -5,8 +5,6 @@ use serde::Serialize;
 
 use crate::search::TimeControl;
 
-#[cfg(feature = "aws-lambda-client")]
-pub mod client;
 #[cfg(feature = "aws-lambda-runtime")]
 pub mod server;
 

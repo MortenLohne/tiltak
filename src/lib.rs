@@ -32,7 +32,7 @@ extern crate pgn_traits;
 
 pub use search::mcts;
 
-#[cfg(any(feature = "aws-lambda-runtime", feature = "aws-lambda-client"))]
+#[cfg(feature = "aws-lambda-runtime")]
 pub mod aws;
 pub mod minmax;
 pub mod move_gen;
