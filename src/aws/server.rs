@@ -3,7 +3,7 @@ use crate::position::{Komi, Position};
 use crate::search::MctsSetting;
 use crate::search::{self, MonteCarloTree};
 use board_game_traits::{GameResult, Position as EvalPosition};
-use lambda_runtime::Context;
+use lambda_runtime::LambdaEvent;
 use pgn_traits::PgnPosition;
 use std::convert::TryFrom;
 use std::time::{Duration, Instant};
@@ -11,16 +11,16 @@ use std::time::{Duration, Instant};
 type Error = Box<dyn std::error::Error + Sync + Send>;
 
 /// AWS serverside handler
-pub async fn handle_aws_event(e: Event, c: Context) -> Result<Output, Error> {
-    match e.size {
-        4 => handle_aws_event_generic::<4>(e, c),
-        5 => handle_aws_event_generic::<5>(e, c),
-        6 => handle_aws_event_generic::<6>(e, c),
+pub async fn handle_aws_event(event: LambdaEvent<Event>) -> Result<Output, Error> {
+    match event.payload.size {
+        4 => handle_aws_event_generic::<4>(event.payload),
+        5 => handle_aws_event_generic::<5>(event.payload),
+        6 => handle_aws_event_generic::<6>(event.payload),
         s => panic!("Unsupported board size {}", s),
     }
 }
 
-pub fn handle_aws_event_generic<const S: usize>(e: Event, _c: Context) -> Result<Output, Error> {
+pub fn handle_aws_event_generic<const S: usize>(e: Event) -> Result<Output, Error> {
     let komi = Komi::try_from(e.komi)?;
     let eval_komi = match e.eval_komi {
         Some(komi_f64) => Komi::try_from(komi_f64)?,
