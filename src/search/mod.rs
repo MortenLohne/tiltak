@@ -38,6 +38,7 @@ pub struct MctsSetting<const S: usize> {
     search_params: Box<[Score]>,
     dirichlet: Option<f32>,
     excluded_moves: Vec<Move<S>>,
+    static_eval_variance: Option<f32>,
     rollout_depth: u16,
     rollout_temperature: Option<f64>,
 }
@@ -51,6 +52,7 @@ impl<const S: usize> Default for MctsSetting<S> {
             search_params: vec![1.50, 2200.0, 0.61].into_boxed_slice(),
             dirichlet: None,
             excluded_moves: vec![],
+            static_eval_variance: None,
             rollout_depth: 0,
             rollout_temperature: None,
         }
@@ -101,6 +103,11 @@ impl<const S: usize> MctsSetting<S> {
 
     pub fn exclude_moves(mut self, excluded_moves: Vec<Move<S>>) -> Self {
         self.excluded_moves = excluded_moves;
+        self
+    }
+
+    pub fn add_static_eval_variance(mut self, static_eval_variance: f32) -> Self {
+        self.static_eval_variance = Some(static_eval_variance);
         self
     }
 

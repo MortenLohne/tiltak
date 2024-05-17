@@ -132,7 +132,7 @@ fn parse_go_string<const S: usize>(line: &str, position: &Position<S>, is_slateb
     let mcts_settings = if is_slatebot {
         MctsSetting::default().add_rollout_depth(200)
     } else {
-        MctsSetting::default()
+        MctsSetting::default().add_static_eval_variance(1.0)
     };
 
     match words.next() {

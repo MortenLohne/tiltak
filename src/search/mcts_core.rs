@@ -286,13 +286,21 @@ pub fn rollout<const S: usize>(
 
         (game_result_for_us.score(), true)
     } else if depth == 0 {
-        let static_eval = cp_to_win_percentage(position.static_eval_with_params_and_data(
+        let centipawn_score = position.static_eval_with_params_and_data(
             &group_data,
             match settings.value_params.as_ref() {
                 Some(params) => params,
                 None => <Position<S>>::value_params(position.komi()),
             },
-        ));
+        );
+        let static_eval = if let Some(static_eval_variance) = settings.static_eval_variance {
+            let mut rng = rand::thread_rng();
+            cp_to_win_percentage(
+                centipawn_score + rng.gen_range((-static_eval_variance)..static_eval_variance),
+            )
+        } else {
+            cp_to_win_percentage(centipawn_score)
+        };
         match position.side_to_move() {
             Color::White => (static_eval, false),
             Color::Black => (1.0 - static_eval, false),

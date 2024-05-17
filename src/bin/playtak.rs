@@ -37,20 +37,29 @@ pub struct PlaytakSettings {
     seek_unrated: bool,
     target_move_time: Option<Duration>,
     komi: Komi,
+    opening_value_variance: Option<f32>,
+    middlegame_value_variance: Option<f32>,
 }
 
 impl PlaytakSettings {
-    pub fn to_mcts_setting<const S: usize>(&self) -> MctsSetting<S> {
+    pub fn to_mcts_setting<const S: usize>(&self, ply_number: usize) -> MctsSetting<S> {
+        let mut settings = MctsSetting::default()
+            .add_rollout_depth(self.rollout_depth)
+            .add_rollout_temperature(self.rollout_temperature);
+
         if let Some(dirichlet) = self.dirichlet_noise {
-            MctsSetting::default()
-                .add_dirichlet(dirichlet)
-                .add_rollout_depth(self.rollout_depth)
-                .add_rollout_temperature(self.rollout_temperature)
-        } else {
-            MctsSetting::default()
-                .add_rollout_depth(self.rollout_depth)
-                .add_rollout_temperature(self.rollout_temperature)
+            settings = settings.add_dirichlet(dirichlet);
         }
+        if ply_number < S * 2 {
+            if let Some(value_variance) = self.opening_value_variance {
+                settings = settings.add_static_eval_variance(value_variance)
+            }
+        } else if ply_number < S * 4 {
+            if let Some(value_variance) = self.middlegame_value_variance {
+                settings = settings.add_static_eval_variance(value_variance)
+            }
+        }
+        settings
     }
 }
 
@@ -146,6 +155,13 @@ pub fn main() -> Result<()> {
             .long("policy-noise")
             .env("POLICY_NOISE")
             .help("Add dirichlet noise to the policy scores of the root node in search. This gives the bot a small amount of randomness in its play, especially on low nodecounts.")
+            .num_args(1)
+            .value_parser(["none", "low", "medium", "high"])
+            .default_value("none"))
+        .arg(Arg::new("valueNoise")
+            .long("value-noise")
+            .env("VALUE_NOISE")
+            .help("Add random, flat noise to the value scores of every node in the search. This gives the bot a substantial amount of randomness in the early game, especially on low nodecounts.")
             .num_args(1)
             .value_parser(["none", "low", "medium", "high"])
             .default_value("none"))
@@ -248,6 +264,24 @@ pub fn main() -> Result<()> {
             s => panic!("policyNoise cannot be {}", s),
         };
 
+    let opening_value_noise: Option<f32> =
+        match matches.get_one::<String>("valueNoise").unwrap().as_ref() {
+            "none" => None,
+            "low" => Some(0.5),
+            "medium" => Some(1.0),
+            "high" => Some(1.5),
+            s => panic!("valueNoise cannot be {}", s),
+        };
+
+    let middlegame_value_noise: Option<f32> =
+        match matches.get_one::<String>("valueNoise").unwrap().as_ref() {
+            "none" => None,
+            "low" => Some(0.25),
+            "medium" => Some(0.5),
+            "high" => Some(0.75),
+            s => panic!("valueNoise cannot be {}", s),
+        };
+
     let rollout_depth: u16 = *matches.get_one::<u16>("rolloutDepth").unwrap();
     let rollout_temperature: f64 = match matches.get_one::<String>("rolloutNoise").unwrap().as_ref()
     {
@@ -291,6 +325,8 @@ pub fn main() -> Result<()> {
         seek_unrated,
         target_move_time,
         komi,
+        opening_value_variance: opening_value_noise,
+        middlegame_value_variance: middlegame_value_noise,
     };
 
     loop {
@@ -768,7 +804,7 @@ impl PlaytakSession {
                         (*corner_placements.choose(&mut rng).unwrap(), 0.0)
                     } else if let Some(fixed_nodes) = playtak_settings.fixed_nodes {
                         let settings =
-                            playtak_settings.to_mcts_setting()
+                            playtak_settings.to_mcts_setting(position.half_moves_played())
                             .arena_size_for_nodes(fixed_nodes as u32);
                         let mut tree = search::MonteCarloTree::with_settings(position.clone(), settings);
                         for _ in 0..fixed_nodes {
@@ -805,7 +841,7 @@ impl PlaytakSession {
                             };
 
                             let settings =
-                                playtak_settings.to_mcts_setting()
+                                playtak_settings.to_mcts_setting(position.half_moves_played())
                                 .arena_size(max_arena_size.min(2_u32.pow(31)));
 
                             search::play_move_time(position.clone(), maximum_time, settings)
