@@ -17,7 +17,9 @@ use crate::position::Role::{Cap, Flat, Wall};
 use super::{GroupEdgeConnection, Square, SquareCacheEntry};
 
 #[derive(Clone, Copy, Debug, Default, Hash, PartialEq, Eq, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Komi {
+    #[cfg_attr(feature = "serde", serde(rename = "komi"))]
     half_komi: i8,
 }
 
@@ -34,8 +36,8 @@ impl Komi {
         self.half_komi
     }
 
-    pub fn game_result_with_flatcounts(self, white_flats: i8, black_flats: i8) -> GameResult {
-        match (2 * (white_flats - black_flats) - self.half_komi).signum() {
+    pub fn game_result_with_flatcounts(self, white_flats: u8, black_flats: u8) -> GameResult {
+        match (2 * (white_flats as i16 - black_flats as i16) - self.half_komi as i16).signum() {
             -1 => GameResult::BlackWin,
             0 => GameResult::Draw,
             1 => GameResult::WhiteWin,

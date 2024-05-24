@@ -1033,8 +1033,8 @@ impl<const S: usize> Position<S> {
             || group_data.all_pieces().count() as usize == S * S
         {
             // Count points
-            let white_points = group_data.white_flat_stones.count() as i8;
-            let black_points = group_data.black_flat_stones.count() as i8;
+            let white_points = group_data.white_flat_stones.count();
+            let black_points = group_data.black_flat_stones.count();
 
             let result = self
                 .komi

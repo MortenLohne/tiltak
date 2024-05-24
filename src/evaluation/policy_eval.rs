@@ -203,14 +203,15 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, P: PolicyApplier, const
         return;
     }
 
-    let our_flatcount = Us::flats(group_data).count() as i8;
-    let their_flatcount = Them::flats(group_data).count() as i8;
+    let our_flatcount = Us::flats(group_data).count();
+    let their_flatcount = Them::flats(group_data).count();
 
-    let our_flatcount_after_move = our_flatcount + fcd;
+    let our_flatcount_after_move = (our_flatcount as i8 + fcd) as u8;
 
     match mv.expand() {
         ExpMove::Place(role, square) => {
-            let our_flat_lead_after_move = our_flatcount_after_move - their_flatcount;
+            let our_flat_lead_after_move: i8 =
+                our_flatcount_after_move as i8 - their_flatcount as i8;
 
             // Apply special bonuses if the game ends on this move
             if Us::stones_left(position) + Us::caps_left(position) == 1
@@ -237,10 +238,10 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, P: PolicyApplier, const
             // TODO: These two bonuses don't take komi into account, but they should
             else if Us::stones_left(position) == 2 && Us::caps_left(position) == 0 {
                 policy.eval_one(indexes.two_flats_left, 0);
-                policy.eval_i8(indexes.two_flats_left, 1, our_flat_lead_after_move);
+                policy.eval_i8(indexes.two_flats_left, 1, our_flat_lead_after_move as i8);
             } else if Us::stones_left(position) == 3 && Us::caps_left(position) == 0 {
                 policy.eval_one(indexes.three_flats_left, 0);
-                policy.eval_i8(indexes.three_flats_left, 1, our_flat_lead_after_move);
+                policy.eval_i8(indexes.three_flats_left, 1, our_flat_lead_after_move as i8);
             }
 
             let their_open_critical_squares =
@@ -316,6 +317,7 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, P: PolicyApplier, const
                 }
             }
 
+            // Bonus for placing between our groups, either joining them or separating them
             if our_unique_neighbour_groups.len() > 1 {
                 let total_neighbours_group_size: u8 = our_unique_neighbour_groups
                     .iter()
@@ -331,6 +333,7 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, P: PolicyApplier, const
                 );
             }
 
+            // Bonus for placing between their groups, blocking them from merging
             if their_unique_neighbour_groups.len() > 1 {
                 let total_neighbours_group_size: u8 = their_unique_neighbour_groups
                     .iter()
@@ -432,22 +435,27 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, P: PolicyApplier, const
                 }
             }
 
+            // Bonus for blocking their critical square with a wall
             if role == Wall {
                 if !their_open_critical_squares.is_empty() {
                     if their_open_critical_squares == BitBoard::empty().set_square(square) {
                         policy.eval_one(indexes.place_their_critical_square, 1);
                     } else {
+                        // Malus for ignoring their critical square
                         policy.eval_one(indexes.ignore_their_critical_square, 0);
                     }
                 }
             } else if role == Cap {
+                // Bonus for placing a cap on our critical square
                 if Us::is_critical_square(group_data, square) {
                     policy.eval_one(indexes.place_our_critical_square, 0);
                     policy.set_immediate_win();
                 } else if !their_open_critical_squares.is_empty() {
+                    // Bonus for blocking their critical square with a cap
                     if their_open_critical_squares == BitBoard::empty().set_square(square) {
                         policy.eval_one(indexes.place_their_critical_square, 2);
                     } else {
+                        // Malus for ignoring their critical square
                         policy.eval_one(indexes.ignore_their_critical_square, 0);
                     }
                 }
@@ -914,8 +922,8 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, P: PolicyApplier, const
 
 fn check_flat_win_next_move<Us: ColorTr, P: PolicyApplier, const S: usize>(
     position: &Position<S>,
-    our_flatcount_after_move: i8,
-    their_flatcount: i8,
+    our_flatcount_after_move: u8,
+    their_flatcount: u8,
     policy: &mut P,
 ) {
     let indexes = policy_indexes::<S>();
@@ -942,8 +950,8 @@ fn check_flat_win_next_move<Us: ColorTr, P: PolicyApplier, const S: usize>(
 
 fn check_flat_win<Us: ColorTr, P: PolicyApplier, const S: usize>(
     position: &Position<S>,
-    our_flatcount_after_move: i8,
-    their_flatcount: i8,
+    our_flatcount_after_move: u8,
+    their_flatcount: u8,
     policy: &mut P,
 ) {
     let indexes = policy_indexes::<S>();
