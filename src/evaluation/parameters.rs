@@ -13,10 +13,10 @@ pub const NUM_VALUE_FEATURES_4S: usize = 312;
 pub const NUM_POLICY_FEATURES_4S: usize = 176;
 
 pub const NUM_VALUE_FEATURES_5S: usize = 392;
-pub const NUM_POLICY_FEATURES_5S: usize = 200;
+pub const NUM_POLICY_FEATURES_5S: usize = 208;
 
 pub const NUM_VALUE_FEATURES_6S: usize = 416;
-pub const NUM_POLICY_FEATURES_6S: usize = 208;
+pub const NUM_POLICY_FEATURES_6S: usize = 216;
 
 const fn value_padding<const S: usize>() -> usize {
     match S {
@@ -29,9 +29,9 @@ const fn value_padding<const S: usize>() -> usize {
 
 const fn policy_padding<const S: usize>() -> usize {
     match S {
-        4 => 7,
-        5 => 3,
-        6 => 1,
+        4 => 1,
+        5 => 5,
+        6 => 3,
         _ => unimplemented!(),
     }
 }
@@ -223,6 +223,7 @@ pub struct PolicyIndexes<const S: usize> {
     pub cap_psqt_black: IndexPair,
     pub move_role_bonus_white: IndexPair,
     pub move_role_bonus_black: IndexPair,
+    pub repeats_previous_move: IndexPair,
     pub decline_win: IndexPair,
     pub place_to_win: IndexPair,
     pub place_to_draw: IndexPair,
@@ -271,6 +272,7 @@ pub struct PolicyIndexes<const S: usize> {
     pub continue_spread: IndexPair,
     pub move_onto_critical_square: IndexPair,
     pub spread_that_connects_groups_to_win: IndexPair,
+    pub spread_that_creates_critical_square: IndexPair,
     pub padding: IndexPair,
 }
 
@@ -308,6 +310,7 @@ impl<const S: usize> PolicyIndexes<S> {
         let (cap_psqt_black, i) = IndexPair::next(i, num_square_symmetries::<S>());
         let (move_role_bonus_white, i) = IndexPair::next(i, 3);
         let (move_role_bonus_black, i) = IndexPair::next(i, 3);
+        let (repeats_previous_move, i) = IndexPair::next(i, 4);
         let (decline_win, i) = IndexPair::next(i, 1);
         let (place_to_win, i) = IndexPair::next(i, 1);
         let (place_to_draw, i) = IndexPair::next(i, 1);
@@ -356,6 +359,7 @@ impl<const S: usize> PolicyIndexes<S> {
         let (continue_spread, i) = IndexPair::next(i, 3);
         let (move_onto_critical_square, i) = IndexPair::next(i, 3);
         let (spread_that_connects_groups_to_win, i) = IndexPair::next(i, 1);
+        let (spread_that_creates_critical_square, i) = IndexPair::next(i, 2);
         let (padding, i) = IndexPair::next(i, policy_padding::<S>());
 
         assert!(i == num_policy_features::<S>());
@@ -369,6 +373,7 @@ impl<const S: usize> PolicyIndexes<S> {
             cap_psqt_black,
             move_role_bonus_white,
             move_role_bonus_black,
+            repeats_previous_move,
             decline_win,
             place_to_win,
             place_to_draw,
@@ -417,6 +422,7 @@ impl<const S: usize> PolicyIndexes<S> {
             continue_spread,
             move_onto_critical_square,
             spread_that_connects_groups_to_win,
+            spread_that_creates_critical_square,
             padding,
         }
     }
@@ -2268,6 +2274,14 @@ pub const POLICY_PARAMS_5S_0KOMI: [f32; NUM_POLICY_FEATURES_5S] = [
     -0.0031571696,
     -0.0045039677,
     -0.0037830565,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
 ];
 
 #[allow(clippy::unreadable_literal)]
@@ -2865,6 +2879,14 @@ pub const POLICY_PARAMS_5S_2KOMI: [f32; NUM_POLICY_FEATURES_5S] = [
     -0.011423582,
     0.7850744,
     3.0451703,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
     0.0,
     0.0,
     0.0,
@@ -3500,6 +3522,14 @@ pub const POLICY_PARAMS_6S_0KOMI: [f32; NUM_POLICY_FEATURES_6S] = [
     0.77732676,
     2.8963873,
     0.00053430814,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
 ];
 
 #[allow(clippy::unreadable_literal)]
@@ -3966,6 +3996,10 @@ pub const POLICY_PARAMS_6S_2KOMI: [f32; NUM_POLICY_FEATURES_6S] = [
     -0.20560668,
     -0.13817734,
     -0.15567772,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
     -1.6164923,
     1.0326616,
     0.21477142,
@@ -4131,5 +4165,9 @@ pub const POLICY_PARAMS_6S_2KOMI: [f32; NUM_POLICY_FEATURES_6S] = [
     0.98338044,
     0.8225161,
     2.7357512,
-    0.00053430814,
+    1.0,
+    0.2,
+    0.0,
+    0.0,
+    0.0,
 ];

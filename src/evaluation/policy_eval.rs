@@ -208,6 +208,16 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, P: PolicyApplier, const
 
     let our_flatcount_after_move = our_flatcount + fcd;
 
+    for move_history in [2, 4, 6, 8] {
+        if position
+            .moves()
+            .get(position.moves().len().overflowing_sub(move_history).0)
+            .is_some_and(|old_move| old_move == mv)
+        {
+            policy.eval_one(indexes.repeats_previous_move, move_history / 2 - 1);
+        }
+    }
+
     match mv.expand() {
         ExpMove::Place(role, square) => {
             let our_flat_lead_after_move = our_flatcount_after_move - their_flatcount;
@@ -907,6 +917,23 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, P: PolicyApplier, const
             if group_edge_connection.is_winning() {
                 policy.eval_one(indexes.spread_that_connects_groups_to_win, 0);
                 policy.set_immediate_win();
+            }
+
+            // Check if spread creates a critical square
+            for neighbor in destination_square.neighbors() {
+                if neighbor
+                    != destination_square
+                        .go_direction(direction.reverse())
+                        .unwrap()
+                    && (neighbor.group_edge_connection() | group_edge_connection).is_winning()
+                {
+                    // Different bonus if the critical square is open
+                    if position.top_stones()[neighbor].is_none() {
+                        policy.eval_one(indexes.spread_that_creates_critical_square, 0);
+                    } else {
+                        policy.eval_one(indexes.spread_that_creates_critical_square, 1);
+                    }
+                }
             }
         }
     }
