@@ -176,6 +176,7 @@ fn main() {
             }
             "mem_usage" => mem_usage::<6>(),
             "bench" => bench::<6>(),
+            "bench2" => bench2(),
             "bench_old" => bench_old(),
             "selfplay" => mcts_selfplay(time::Duration::from_secs(10)),
             "process_ptn" => process_ptn::<6>("games_6s_2komi_all.ptn"),
@@ -800,11 +801,9 @@ fn play_human(mut position: Position<5>) {
     }
 }
 
-fn bench<const S: usize>() {
-    println!("Starting benchmark");
-    const NODES: u32 = 5_000_000;
-    let start_time = time::Instant::now();
+// 2,2,22221C,2,x2/x,1,1,x,1,2/x,1,111212C,1212,x,2/x,112S,1,x,112S,2/11212,x,1,112S,1112,2/x2,1,1,1,1 1 40
 
+fn bench<const S: usize>() {
     let mut position = <Position<S>>::default();
 
     // Start the benchmark from opposite corners opening
@@ -812,6 +811,24 @@ fn bench<const S: usize>() {
     let opposite_corner = squares_iterator().last().unwrap();
     position.do_move(Move::placement(Role::Flat, corner));
     position.do_move(Move::placement(Role::Flat, opposite_corner));
+
+    bench_position(position);
+}
+
+fn bench2() {
+    // Position from game #618571 on Playtak, Tiltak vs Tones
+    let position = <Position<6>>::from_fen_with_komi(
+        "2,2,22221C,2,x2/x,1,1,x,1,2/x,1,111212C,1212,x,2/x,112S,1,x,112S,2/11212,x,1,112S,1112,2/x2,1,1,1,1 1 40",
+        Komi::from_half_komi(4).unwrap()
+    ).unwrap();
+
+    bench_position(position);
+}
+
+fn bench_position<const S: usize>(position: Position<S>) {
+    println!("Starting benchmark");
+    const NODES: u32 = 5_000_000;
+    let start_time = time::Instant::now();
 
     let settings = search::MctsSetting::default().arena_size_for_nodes(NODES);
     let mut tree = search::MonteCarloTree::with_settings(position, settings);
