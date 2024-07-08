@@ -144,9 +144,11 @@ fn parse_go_string<const S: usize>(line: &str, position: &Position<S>, is_slateb
 
             for i in 0.. {
                 let nodes_to_search = (200.0 * f64::powf(1.26, i as f64)) as u64;
+                let mut oom = false;
                 for _ in 0..nodes_to_search {
                     if tree.select().is_none() {
                         eprintln!("Warning: Search stopped early due to OOM");
+                        oom = true;
                         break;
                     };
                 }
@@ -165,7 +167,7 @@ fn parse_go_string<const S: usize>(line: &str, position: &Position<S>, is_slateb
                         .collect::<Vec<String>>()
                         .join(" ")
                 );
-                if start_time.elapsed().as_secs_f64() > movetime.as_secs_f64() * 0.7 {
+                if oom || start_time.elapsed().as_secs_f64() > movetime.as_secs_f64() * 0.7 {
                     println!("bestmove {}", position.move_to_san(&best_move));
                     break;
                 }
