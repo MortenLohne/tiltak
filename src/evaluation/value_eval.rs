@@ -1,3 +1,5 @@
+use std::f32::consts::PI;
+
 use arrayvec::ArrayVec;
 use board_game_traits::{Color, Position as EvalPosition};
 use half::f16;
@@ -15,6 +17,14 @@ use crate::position::{
 };
 
 use super::parameters::ValueApplier;
+
+pub fn sigmoid(x: f32) -> f32 {
+    0.5 + f32::atan(x) / PI
+}
+
+pub fn sigmoid_derived(x: f32) -> f32 {
+    1.0 / (PI * (1.0 + x.powi(2)))
+}
 
 pub fn static_eval_game_phase<const S: usize, V: ValueApplier>(
     position: &Position<S>,

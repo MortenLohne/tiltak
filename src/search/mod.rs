@@ -5,6 +5,7 @@
 use half::f16;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
+use std::f32::consts::PI;
 use std::{mem, time};
 use std::{process, sync};
 
@@ -479,7 +480,7 @@ pub fn mcts_training<const S: usize>(
 
 /// Convert a static evaluation in centipawns to a winning probability between 0.0 and 1.0.
 pub fn cp_to_win_percentage(cp: f32) -> Score {
-    1.0 / (1.0 + Score::exp(-cp as Score))
+    0.5 + f32::atan(cp) / PI
 }
 
 // Utility for testing

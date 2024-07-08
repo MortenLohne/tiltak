@@ -44,6 +44,10 @@ pub fn sigmoid(x: f32) -> f32 {
     1.0 / (1.0 + f32::exp(-x))
 }
 
+pub fn sigmoid_derived(x: f32) -> f32 {
+    f32::exp(x) / f32::powi(1.0 + f32::exp(x), 2)
+}
+
 fn inverse_sigmoid(x: f32) -> f32 {
     assert!(x > 0.0 && x < 1.0, "Tried to inverse sigmoid {}", x);
     f32::ln(x / (1.0 - x))
