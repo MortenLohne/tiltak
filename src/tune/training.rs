@@ -11,7 +11,9 @@ use crate::evaluation::parameters::Policy;
 use crate::evaluation::parameters::PolicyApplier;
 use crate::evaluation::parameters::Value;
 use crate::evaluation::parameters::ValueApplier;
+use crate::evaluation::policy_eval;
 use crate::evaluation::policy_eval::policy_offset;
+use crate::evaluation::value_eval;
 use crate::position::Komi;
 use crate::search::TimeControl;
 use board_game_traits::GameResult;
@@ -429,8 +431,14 @@ pub fn tune_value_from_file<const S: usize, const N: usize>(
 
     samples.shuffle(&mut rng);
 
-    let tuned_parameters =
-        gradient_descent::gradient_descent(&samples, &initial_params, 10.0, &mut rng);
+    let tuned_parameters = gradient_descent::gradient_descent(
+        &samples,
+        &initial_params,
+        10.0,
+        &mut rng,
+        &value_eval::sigmoid,
+        &value_eval::sigmoid_derived,
+    );
 
     Ok(tuned_parameters)
 }
@@ -551,6 +559,8 @@ pub fn tune_value_and_policy<const S: usize, const N: usize, const M: usize>(
         initial_value_params,
         50.0,
         &mut rng,
+        &value_eval::sigmoid,
+        &value_eval::sigmoid_derived,
     );
 
     let tuned_policy_parameters = gradient_descent::gradient_descent(
@@ -558,6 +568,8 @@ pub fn tune_value_and_policy<const S: usize, const N: usize, const M: usize>(
         initial_policy_params,
         500.0,
         &mut rng,
+        &policy_eval::sigmoid,
+        &policy_eval::sigmoid_derived,
     );
 
     Ok((tuned_value_parameters, tuned_policy_parameters))

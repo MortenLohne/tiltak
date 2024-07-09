@@ -9,12 +9,18 @@ pub struct TrainingSample<const N: usize> {
     pub result: f16,
 }
 
-pub fn gradient_descent<R: rand::Rng, const N: usize>(
+pub fn gradient_descent<R: rand::Rng, F, FDx, const N: usize>(
     samples: &[TrainingSample<N>],
     params: &[f32; N],
     initial_learning_rate: f32,
     rng: &mut R,
-) -> [f32; N] {
+    sigmoid: &F,
+    sigmoid_derived: &FDx,
+) -> [f32; N]
+where
+    F: Fn(f32) -> f32 + Sync,
+    FDx: Fn(f32) -> f32 + Sync,
+{
     let start_time = Instant::now();
     let beta = 0.98;
 
@@ -23,7 +29,7 @@ pub fn gradient_descent<R: rand::Rng, const N: usize>(
     const ERROR_THRESHOLD: f64 = 1.000_000_1;
     const MINIBATCH_SIZE: usize = 10000;
 
-    let initial_error = average_error(samples, params);
+    let initial_error = average_error(samples, params, sigmoid);
     let num_minibatches = samples.len().div_ceil(MINIBATCH_SIZE);
     println!("Running gradient descent on {} positions", samples.len(),);
     trace!("Initial parameters: {:?}", params);
@@ -55,7 +61,8 @@ pub fn gradient_descent<R: rand::Rng, const N: usize>(
                     let start_index = rng.gen_range(0..(samples.len() - MINIBATCH_SIZE));
                     &samples[start_index..(start_index + MINIBATCH_SIZE)]
                 };
-                let slopes = calc_slope(minibatch_samples, &parameter_set);
+                let slopes =
+                    calc_slope(minibatch_samples, &parameter_set, sigmoid, sigmoid_derived);
                 trace!("Slopes: {:?}", slopes);
                 gradients
                     .iter_mut()
@@ -72,7 +79,7 @@ pub fn gradient_descent<R: rand::Rng, const N: usize>(
             }
             trace!("New parameters: {:?}", parameter_set);
 
-            let error = average_error(samples, &parameter_set);
+            let error = average_error(samples, &parameter_set, sigmoid);
 
             if i % 100 == 0 {
                 println!(
@@ -86,7 +93,7 @@ pub fn gradient_descent<R: rand::Rng, const N: usize>(
                     lowest_error / error,
                     num_minibatches
                 );
-                if i % 1000 == 0 {
+                if i % 500 == 0 {
                     trace!("New parameters: {:?}", parameter_set);
                 }
             } else {
@@ -155,7 +162,16 @@ pub fn gradient_descent<R: rand::Rng, const N: usize>(
 }
 
 /// For each parameter, calculate the slope for that dimension
-fn calc_slope<const N: usize>(samples: &[TrainingSample<N>], params: &[f32; N]) -> [f32; N] {
+fn calc_slope<F, FDx, const N: usize>(
+    samples: &[TrainingSample<N>],
+    params: &[f32; N],
+    sigmoid: &F,
+    sigmoid_derived: &FDx,
+) -> [f32; N]
+where
+    F: Fn(f32) -> f32 + Sync,
+    FDx: Fn(f32) -> f32 + Sync,
+{
     let mut slopes = samples
         .par_iter()
         .map(
@@ -192,7 +208,14 @@ fn calc_slope<const N: usize>(samples: &[TrainingSample<N>], params: &[f32; N]) 
 }
 
 /// Mean squared error of the parameter set, measured against given results and positions
-fn average_error<const N: usize>(samples: &[TrainingSample<N>], params: &[f32; N]) -> f64 {
+fn average_error<F, const N: usize>(
+    samples: &[TrainingSample<N>],
+    params: &[f32; N],
+    sigmoid: &F,
+) -> f64
+where
+    F: Fn(f32) -> f32 + Sync,
+{
     samples
         .par_iter()
         .map(
@@ -225,12 +248,4 @@ pub fn eval_from_params<const N: usize>(
         });
 
     partial_sums.iter().sum::<f32>() + offset
-}
-
-pub fn sigmoid(x: f32) -> f32 {
-    1.0 / (1.0 + f32::exp(-x))
-}
-
-pub fn sigmoid_derived(x: f32) -> f32 {
-    f32::exp(x) / f32::powi(1.0 + f32::exp(x), 2)
 }
