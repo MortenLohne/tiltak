@@ -13,7 +13,9 @@ use pgn_traits::PgnPosition;
 #[cfg(feature = "constant-tuning")]
 use rayon::prelude::*;
 
-use tiltak::evaluation::parameters::{self, IncrementalPolicy, PolicyIndexes, ValueIndexes};
+use tiltak::evaluation::parameters::{
+    self, IncrementalPolicy, PolicyIndexes, Value, ValueApplier, ValueIndexes,
+};
 #[cfg(feature = "sqlite")]
 use tiltak::policy_sqlite;
 use tiltak::position::Role;
@@ -22,7 +24,7 @@ use tiltak::position::{
 };
 use tiltak::position::{Position, Stack};
 use tiltak::ptn::{Game, PtnMove};
-use tiltak::search::MctsSetting;
+use tiltak::search::{cp_to_win_percentage, MctsSetting};
 use tiltak::{minmax, ptn};
 use tiltak::{position, search};
 
@@ -193,6 +195,19 @@ fn main() {
                     s => panic!("Unsupported size {}", s),
                 }
             }
+            "value_features" => {
+                if words.len() < 3 {
+                    println!("Error: format is 'value_features <size> <komi>'");
+                    continue;
+                }
+                let komi = Komi::from_str(words[2]).unwrap();
+                match words[1] {
+                    "4" => value_features::<4>(Position::start_position_with_komi(komi)),
+                    "5" => value_features::<5>(Position::start_position_with_komi(komi)),
+                    "6" => value_features::<6>(Position::start_position_with_komi(komi)),
+                    s => panic!("Unsupported size {}", s),
+                }
+            }
             "policy_params" => {
                 if words.len() < 3 {
                     println!("Error: format is 'policy_params <size> <komi>'");
@@ -207,6 +222,83 @@ fn main() {
                 }
             }
             s => println!("Unknown option \"{}\"", s),
+        }
+    }
+}
+
+fn value_features<const S: usize>(position: Position<S>) {
+    let indexes: ValueIndexes<S> = parameters::value_indexes();
+    let indexes_string = format!("{:?}", indexes);
+
+    let params = match S {
+        4 => parameters::value_features_4s(position.komi()).as_slice(),
+        5 => parameters::value_features_5s(position.komi()).as_slice(),
+        6 => parameters::value_features_6s(position.komi()).as_slice(),
+        _ => panic!("Unsupported size {}", S),
+    };
+
+    let black_start_index = params.len() / 2;
+    let mut white_value: Value<S> = Value::new(&params[0..black_start_index]);
+    let mut black_value: Value<S> = Value::new(&params[black_start_index..]);
+    position.static_eval_features(&mut white_value, &mut black_value);
+
+    let raw_eval = white_value.clone().finish() + black_value.clone().finish();
+    println!(
+        "Total eval: {:.3}, {:.1}%",
+        raw_eval,
+        100.0 * cp_to_win_percentage(raw_eval)
+    );
+
+    println!("\nValue features:\n");
+
+    for part in indexes_string
+        .strip_prefix("ValueIndexes { ")
+        .unwrap()
+        .split("},")
+    {
+        let words: Vec<&str> = part.split_whitespace().collect();
+        let name = words[0].strip_suffix(':').unwrap_or_default();
+        let start: usize = words[4]
+            .strip_suffix(',')
+            .unwrap()
+            .parse()
+            .unwrap_or_default();
+        let length: usize = words[6].parse().unwrap_or_default();
+
+        if white_value.features[start..(start + length)]
+            .iter()
+            .chain(&black_value.features[start..(start + length)])
+            .any(|f| *f != f16::ZERO)
+        {
+            let white_features = &params[start..(start + length)]
+                .iter()
+                .zip(&white_value.features[start..(start + length)])
+                .map(|(a, b)| a * b.to_f32())
+                .collect::<Vec<f32>>();
+            let black_features = &params
+                [(start + black_start_index)..(start + black_start_index + length)]
+                .iter()
+                .zip(&black_value.features[start..(start + length)])
+                .map(|(a, b)| a * b.to_f32())
+                .collect::<Vec<f32>>();
+
+            println!(
+                "{:40} (white): {:.3}, {:?}",
+                name,
+                white_features.iter().sum::<f32>(),
+                &white_features
+            );
+            println!(
+                "{:40} (black): {:.3}, {:?}",
+                name,
+                black_features.iter().sum::<f32>(),
+                &black_features
+            );
+            println!(
+                "Total impact: {:.3}",
+                white_features.iter().sum::<f32>() + black_features.iter().sum::<f32>()
+            );
+            println!();
         }
     }
 }
