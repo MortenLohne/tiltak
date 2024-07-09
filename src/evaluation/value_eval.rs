@@ -226,11 +226,6 @@ pub fn static_eval_game_phase<const S: usize, V: ValueApplier>(
         );
     }
 
-    // Give the side to move a bonus/malus depending on flatstone lead
-    let white_flatstone_lead = white_flat_count - black_flat_count;
-    let black_flatstone_lead_komi =
-        black_flat_count - white_flat_count + position.komi().half_komi() * 2;
-
     // Bonus/malus depending on the number of groups each side has
     let mut seen_groups: ArrayVec<bool, 257> = ArrayVec::new();
     seen_groups.push(true);
@@ -264,82 +259,45 @@ pub fn static_eval_game_phase<const S: usize, V: ValueApplier>(
     debug_assert!(middlegame_scale_factor <= f16::ONE);
     debug_assert!(opening_scale_factor == f16::ZERO || endgame_scale_factor == f16::ZERO);
 
-    if position.side_to_move() == Color::White {
-        let index = (white_flatstone_lead + 3).clamp(0, 6) as usize;
-        white_value.eval(
-            indexes.us_to_move_opening_flatstone_lead,
-            index,
-            opening_scale_factor,
-        );
-        white_value.eval(
-            indexes.us_to_move_middlegame_flatstone_lead,
-            index,
-            middlegame_scale_factor,
-        );
-        white_value.eval(
-            indexes.us_to_move_endgame_flatstone_lead,
-            index,
-            endgame_scale_factor,
-        );
+    // Give the side to move a bonus/malus depending on flatstone lead
+    let white_flatstone_lead = white_flat_count - black_flat_count;
+    let black_flatstone_lead = black_flat_count - white_flat_count;
 
-        let komi_index = (black_flatstone_lead_komi + 3).clamp(0, 6) as usize;
-        black_value.eval(
-            indexes.them_to_move_opening_flatstone_lead,
-            komi_index,
+    if position.side_to_move() == Color::White {
+        let index = (white_flatstone_lead + 4).clamp(0, 8) as usize;
+        white_value.eval(
+            indexes.to_move_opening_flatstone_lead,
+            index,
             opening_scale_factor,
         );
-        black_value.eval(
-            indexes.them_to_move_middlegame_flatstone_lead,
-            komi_index,
+        white_value.eval(
+            indexes.to_move_middlegame_flatstone_lead,
+            index,
             middlegame_scale_factor,
         );
-        black_value.eval(
-            indexes.them_to_move_endgame_flatstone_lead,
-            komi_index,
+        white_value.eval(
+            indexes.to_move_endgame_flatstone_lead,
+            index,
             endgame_scale_factor,
         );
     } else {
-        let index = (white_flatstone_lead + 3).clamp(0, 6) as usize;
-        white_value.eval(
-            indexes.them_to_move_opening_flatstone_lead,
+        let index = (black_flatstone_lead + 4).clamp(0, 8) as usize;
+        black_value.eval(
+            indexes.to_move_opening_flatstone_lead,
             index,
             opening_scale_factor,
         );
-        white_value.eval(
-            indexes.them_to_move_middlegame_flatstone_lead,
+        black_value.eval(
+            indexes.to_move_middlegame_flatstone_lead,
             index,
             middlegame_scale_factor,
         );
-        white_value.eval(
-            indexes.them_to_move_endgame_flatstone_lead,
+        black_value.eval(
+            indexes.to_move_endgame_flatstone_lead,
             index,
-            endgame_scale_factor,
-        );
-
-        let komi_index = (black_flatstone_lead_komi + 3).clamp(0, 6) as usize;
-        black_value.eval(
-            indexes.us_to_move_opening_flatstone_lead,
-            komi_index,
-            opening_scale_factor,
-        );
-        black_value.eval(
-            indexes.us_to_move_middlegame_flatstone_lead,
-            komi_index,
-            middlegame_scale_factor,
-        );
-        black_value.eval(
-            indexes.us_to_move_endgame_flatstone_lead,
-            komi_index,
             endgame_scale_factor,
         );
     }
-
-    // if position.side_to_move() == Color::White {
-    //     white_value_features.side_to_move[0, opening_scale_factor;
-    // } else {
-    //     black_value_features.side_to_move[0] = opening_scale_factor;
-    // }
-    // white_value_features.flatstone_lead[0] = white_flatstone_lead as f32 * opening_scale_factor;
 
     white_value.eval(
         indexes.i_number_of_groups,
@@ -352,13 +310,6 @@ pub fn static_eval_game_phase<const S: usize, V: ValueApplier>(
         f16::from_i32(num_black_groups).unwrap() * opening_scale_factor,
     );
 
-    // if position.side_to_move() == Color::White {
-    //     white_value_features.side_to_move[1] = middlegame_scale_factor;
-    // } else {
-    //     black_value_features.side_to_move[1] = middlegame_scale_factor;
-    // }
-    // white_value_features.flatstone_lead[1] = white_flatstone_lead as f32 * middlegame_scale_factor;
-
     white_value.eval(
         indexes.i_number_of_groups,
         1,
@@ -369,13 +320,6 @@ pub fn static_eval_game_phase<const S: usize, V: ValueApplier>(
         1,
         f16::from_i32(num_black_groups).unwrap() * middlegame_scale_factor,
     );
-
-    // if position.side_to_move() == Color::White {
-    //     white_value_features.side_to_move[2] = endgame_scale_factor;
-    // } else {
-    //     black_value_features.side_to_move[2] = endgame_scale_factor;
-    // }
-    // white_value_features.flatstone_lead[2] = white_flatstone_lead as f32 * endgame_scale_factor;
 
     white_value.eval(
         indexes.i_number_of_groups,
