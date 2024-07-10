@@ -670,6 +670,7 @@ fn critical_squares_eval<Us: ColorTr, Them: ColorTr, V: ValueApplier, const S: u
     }
 }
 
+#[inline(always)] // Force-inlining gives a 1.5% performance boost
 fn line_score<Us: ColorTr, Them: ColorTr, V: ValueApplier, const S: usize>(
     position: &Position<S>,
     group_data: &GroupData<S>,
