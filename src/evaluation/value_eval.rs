@@ -693,10 +693,10 @@ fn line_score<Us: ColorTr, Them: ColorTr, V: ValueApplier, const S: usize>(
             for square in (Them::flats(group_data) & line).into_iter() {
                 let (direction, neighbor) = square
                     .direction_neighbors()
-                    .find(|(_, neigh)| (BitBoard::empty().set_square(*neigh) & line).is_empty())
+                    .find(|(_, neigh)| !line.get_square(*neigh))
                     .unwrap();
-                if let Some(neighbor_piece) = position.top_stones()[neighbor] {
-                    if Them::piece_is_ours(neighbor_piece)
+                if let Some(neighbor_piece) = position.top_stones()[neighbor].filter(|piece| {
+                    Them::piece_is_ours(*piece)
                         && !direction
                             .orthogonal_directions()
                             .into_iter()
@@ -704,26 +704,14 @@ fn line_score<Us: ColorTr, Them: ColorTr, V: ValueApplier, const S: usize>(
                             .all(|sq| {
                                 position.top_stones()[sq].is_some_and(|p| Us::is_road_stone(p))
                             })
-                    {
-                        match neighbor_piece.role() {
-                            Flat => value.eval(
-                                indexes.line_control_guarded_flat,
-                                index + 3 - S,
-                                f16::ONE,
-                            ),
-                            Wall => value.eval(
-                                indexes.line_control_guarded_wall,
-                                index + 3 - S,
-                                f16::ONE,
-                            ),
-                            Cap => value.eval(
-                                indexes.line_control_guarded_cap,
-                                index + 3 - S,
-                                f16::ONE,
-                            ),
-                        }
-                        guarded = true;
+                }) {
+                    let i = index + 3 - S;
+                    match neighbor_piece.role() {
+                        Flat => value.eval(indexes.line_control_guarded_flat, i, f16::ONE),
+                        Wall => value.eval(indexes.line_control_guarded_wall, i, f16::ONE),
+                        Cap => value.eval(indexes.line_control_guarded_cap, i, f16::ONE),
                     }
+                    guarded = true;
                 }
             }
             // The guarded bonus can be applied several times, but if it's applied at least once,
