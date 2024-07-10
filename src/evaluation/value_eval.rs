@@ -425,10 +425,10 @@ pub fn static_eval_game_phase<const S: usize, V: ValueApplier>(
     for i in 0..(S as u8) {
         let rank = BitBoard::full().rank::<S>(i);
         let file = BitBoard::full().file::<S>(i);
-        line_score::<WhiteTr, BlackTr, V, S>(group_data, rank, i, white_value);
-        line_score::<BlackTr, WhiteTr, V, S>(group_data, rank, i, black_value);
-        line_score::<WhiteTr, BlackTr, V, S>(group_data, file, i, white_value);
-        line_score::<BlackTr, WhiteTr, V, S>(group_data, file, i, black_value);
+        line_score::<WhiteTr, BlackTr, V, S>(position, group_data, rank, i, white_value);
+        line_score::<BlackTr, WhiteTr, V, S>(position, group_data, rank, i, black_value);
+        line_score::<WhiteTr, BlackTr, V, S>(position, group_data, file, i, white_value);
+        line_score::<BlackTr, WhiteTr, V, S>(position, group_data, file, i, black_value);
     }
 
     for i in 0..S as u8 {
@@ -671,6 +671,7 @@ fn critical_squares_eval<Us: ColorTr, Them: ColorTr, V: ValueApplier, const S: u
 }
 
 fn line_score<Us: ColorTr, Them: ColorTr, V: ValueApplier, const S: usize>(
+    position: &Position<S>,
     group_data: &GroupData<S>,
     line: BitBoard,
     i: u8,
@@ -684,6 +685,53 @@ fn line_score<Us: ColorTr, Them: ColorTr, V: ValueApplier, const S: usize>(
     if !(Them::blocking_stones(group_data) & line).is_empty() {
         value.eval(indexes.line_control_their_blocking_piece, index, f16::ONE);
     } else if !((Us::walls(group_data) | Them::flats(group_data)) & line).is_empty() {
+        // Specific bonus for strong lines at the edge of the board,
+        // if they have a flat in our line that is flanked by another one of their pieces
+        if road_pieces_in_line >= S - 3 && (i == 0 || i == S as u8 - 1) {
+            let mut guarded = false;
+            // TODO: Also check protection for critical squares?
+            for square in (Them::flats(group_data) & line).into_iter() {
+                let (direction, neighbor) = square
+                    .direction_neighbors()
+                    .find(|(_, neigh)| (BitBoard::empty().set_square(*neigh) & line).is_empty())
+                    .unwrap();
+                if let Some(neighbor_piece) = position.top_stones()[neighbor] {
+                    if Them::piece_is_ours(neighbor_piece)
+                        && !direction
+                            .orthogonal_directions()
+                            .into_iter()
+                            .flat_map(|dir| neighbor.go_direction(dir))
+                            .all(|sq| {
+                                position.top_stones()[sq].is_some_and(|p| Us::is_road_stone(p))
+                            })
+                    {
+                        match neighbor_piece.role() {
+                            Flat => value.eval(
+                                indexes.line_control_guarded_flat,
+                                index + 3 - S,
+                                f16::ONE,
+                            ),
+                            Wall => value.eval(
+                                indexes.line_control_guarded_wall,
+                                index + 3 - S,
+                                f16::ONE,
+                            ),
+                            Cap => value.eval(
+                                indexes.line_control_guarded_cap,
+                                index + 3 - S,
+                                f16::ONE,
+                            ),
+                        }
+                        guarded = true;
+                    }
+                }
+            }
+            // The guarded bonus can be applied several times, but if it's applied at least once,
+            // skip the regular `line_control_other` value
+            if guarded {
+                return;
+            }
+        }
         value.eval(indexes.line_control_other, index, f16::ONE);
     } else {
         value.eval(indexes.line_control_empty, index, f16::ONE);
