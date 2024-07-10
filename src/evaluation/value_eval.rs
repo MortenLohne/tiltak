@@ -168,8 +168,6 @@ pub fn static_eval_game_phase<const S: usize, V: ValueApplier>(
                 num_reachable_squares += 1;
             }
         }
-        // Arbitrarily divide value by 8, because the tuner might act weird on large values
-        let reachable_squares_weight = num_reachable_squares as f32 / 8.0;
 
         let top_role_index = match piece.role() {
             Flat => 0,
@@ -178,6 +176,7 @@ pub fn static_eval_game_phase<const S: usize, V: ValueApplier>(
             Cap => 3,
         };
         let data = stack_data[square];
+        let shallow_pieces = (data.shallow_supports + data.shallow_captives + 1) as f32;
         let value_for_stack = match controlling_player {
             Color::White => &mut *white_value,
             Color::Black => &mut *black_value,
@@ -196,8 +195,14 @@ pub fn static_eval_game_phase<const S: usize, V: ValueApplier>(
         value_for_stack.eval(
             indexes.shallow_supports_per_piece_mobility,
             top_role_index,
-            f16::from_f32(data.shallow_supports as f32 * reachable_squares_weight),
+            f16::from_f32((data.shallow_supports * num_reachable_squares) as f32 / 16.0), // Arbitrarily divide by 16, to avoid passing too large value to the tuner
         );
+        value_for_stack.eval(
+            indexes.shallow_supports_per_piece_mob_scaled,
+            top_role_index,
+            f16::from_f32((data.shallow_supports * num_reachable_squares) as f32 / shallow_pieces),
+        );
+
         value_for_stack.eval(
             indexes.deep_captives_per_piece,
             top_role_index,
@@ -211,7 +216,12 @@ pub fn static_eval_game_phase<const S: usize, V: ValueApplier>(
         value_for_stack.eval(
             indexes.shallow_captives_per_piece_mobility,
             top_role_index,
-            f16::from_f32(data.shallow_captives as f32 * reachable_squares_weight),
+            f16::from_f32((data.shallow_captives * num_reachable_squares) as f32 / 16.0), // Arbitrarily divide by 16, to avoid passing too large value to the tuner
+        );
+        value_for_stack.eval(
+            indexes.shallow_captives_per_piece_mob_scaled,
+            top_role_index,
+            f16::from_f32((data.shallow_captives * num_reachable_squares) as f32 / shallow_pieces),
         );
 
         value_for_stack.eval(
