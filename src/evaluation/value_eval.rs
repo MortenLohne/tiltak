@@ -716,12 +716,22 @@ fn line_score<Us: ColorTr, Them: ColorTr, V: ValueApplier, const S: usize>(
                 }
             }
             // The guarded bonus can be applied several times, but if it's applied at least once,
-            // skip the regular `line_control_other` value
+            // skip the regular `line_control_almost_empty` value
             if guarded {
                 return;
             }
         }
-        value.eval(indexes.line_control_other, index, f16::ONE);
+        if ((Us::walls(group_data) | Them::flats(group_data)) & line).count() == 1 {
+            value.eval(indexes.line_control_almost_empty, index, f16::ONE);
+        } else {
+            // `S - 1` flats in the is not possible here, because it would trigger `line_control_almost_empty`,
+            // so offset the index
+            value.eval(
+                indexes.line_control_other,
+                index - line_symmetries::<S>()[i as usize],
+                f16::ONE,
+            );
+        }
     } else {
         value.eval(indexes.line_control_empty, index, f16::ONE);
     }
