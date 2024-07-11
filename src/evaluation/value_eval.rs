@@ -15,6 +15,7 @@ use crate::position::{
     Role::*,
     Square,
 };
+use crate::position::{starting_capstones, starting_stones};
 
 use super::parameters::ValueApplier;
 
@@ -256,14 +257,17 @@ pub fn static_eval_game_phase<const S: usize, V: ValueApplier>(
         }
     }
 
-    let opening_scale_factor = f16::from_f32(f32::min(
-        f32::max((24.0 - position.half_moves_played() as f32) / 12.0, 0.0),
-        1.0,
-    ));
-    let endgame_scale_factor = f16::from_f32(f32::min(
-        f32::max((position.half_moves_played() as f32 - 24.0) / 24.0, 0.0),
-        1.0,
-    ));
+    let lowest_reserves_fraction = u8::min(
+        position.white_reserves_left() + position.white_caps_left(),
+        position.black_reserves_left() + position.black_caps_left(),
+    ) as f32
+        / (starting_stones(S) + starting_capstones(S)) as f32;
+
+    let opening_scale_factor =
+        f16::from_f32((2.0 * lowest_reserves_fraction - 1.0).clamp(0.0, 1.0));
+    let endgame_scale_factor =
+        f16::from_f32((1.0 - (2.0 * lowest_reserves_fraction)).clamp(0.0, 1.0));
+
     let middlegame_scale_factor = f16::ONE - opening_scale_factor - endgame_scale_factor;
 
     debug_assert!(middlegame_scale_factor <= f16::ONE);
