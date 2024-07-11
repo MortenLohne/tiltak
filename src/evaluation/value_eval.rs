@@ -55,6 +55,22 @@ pub fn static_eval_game_phase<const S: usize, V: ValueApplier>(
     let mut white_flat_count = 0;
     let mut black_flat_count = 0;
 
+    let lowest_reserves_fraction = u8::min(
+        position.white_reserves_left() + position.white_caps_left(),
+        position.black_reserves_left() + position.black_caps_left(),
+    ) as f32
+        / (starting_stones(S) + starting_capstones(S)) as f32;
+
+    let opening_scale_factor =
+        f16::from_f32((2.0 * lowest_reserves_fraction - 1.0).clamp(0.0, 1.0));
+    let endgame_scale_factor =
+        f16::from_f32((1.0 - (2.0 * lowest_reserves_fraction)).clamp(0.0, 1.0));
+
+    let middlegame_scale_factor = f16::ONE - opening_scale_factor - endgame_scale_factor;
+
+    debug_assert!(middlegame_scale_factor <= f16::ONE);
+    debug_assert!(opening_scale_factor == f16::ZERO || endgame_scale_factor == f16::ZERO);
+
     #[derive(Default, Clone, Copy, Debug)]
     struct StackData {
         shallow_supports: u8,
@@ -97,43 +113,107 @@ pub fn static_eval_game_phase<const S: usize, V: ValueApplier>(
         match piece {
             WhiteFlat => {
                 white_value.eval(
-                    indexes.flat_psqt,
+                    indexes.flat_psqt_opening,
                     lookup_square_symmetries::<S>(square),
-                    f16::ONE,
+                    opening_scale_factor,
+                );
+                white_value.eval(
+                    indexes.flat_psqt_middlegame,
+                    lookup_square_symmetries::<S>(square),
+                    middlegame_scale_factor,
+                );
+                white_value.eval(
+                    indexes.flat_psqt_endgame,
+                    lookup_square_symmetries::<S>(square),
+                    endgame_scale_factor,
                 );
                 white_flat_count += 1;
             }
             BlackFlat => {
                 black_value.eval(
-                    indexes.flat_psqt,
+                    indexes.flat_psqt_opening,
                     lookup_square_symmetries::<S>(square),
-                    f16::ONE,
+                    opening_scale_factor,
+                );
+                black_value.eval(
+                    indexes.flat_psqt_middlegame,
+                    lookup_square_symmetries::<S>(square),
+                    middlegame_scale_factor,
+                );
+                black_value.eval(
+                    indexes.flat_psqt_endgame,
+                    lookup_square_symmetries::<S>(square),
+                    endgame_scale_factor,
                 );
                 black_flat_count += 1;
             }
-            WhiteWall => white_value.eval(
-                indexes.wall_psqt,
-                lookup_square_symmetries::<S>(square),
-                f16::ONE,
-            ),
-            BlackWall => black_value.eval(
-                indexes.wall_psqt,
-                lookup_square_symmetries::<S>(square),
-                f16::ONE,
-            ),
+            WhiteWall => {
+                white_value.eval(
+                    indexes.wall_psqt_opening,
+                    lookup_square_symmetries::<S>(square),
+                    opening_scale_factor,
+                );
+                white_value.eval(
+                    indexes.wall_psqt_middlegame,
+                    lookup_square_symmetries::<S>(square),
+                    middlegame_scale_factor,
+                );
+                white_value.eval(
+                    indexes.wall_psqt_endgame,
+                    lookup_square_symmetries::<S>(square),
+                    endgame_scale_factor,
+                )
+            }
+            BlackWall => {
+                black_value.eval(
+                    indexes.wall_psqt_opening,
+                    lookup_square_symmetries::<S>(square),
+                    opening_scale_factor,
+                );
+                black_value.eval(
+                    indexes.wall_psqt_middlegame,
+                    lookup_square_symmetries::<S>(square),
+                    middlegame_scale_factor,
+                );
+                black_value.eval(
+                    indexes.wall_psqt_endgame,
+                    lookup_square_symmetries::<S>(square),
+                    endgame_scale_factor,
+                )
+            }
             WhiteCap => {
                 white_value.eval(
-                    indexes.cap_psqt,
+                    indexes.cap_psqt_opening,
                     lookup_square_symmetries::<S>(square),
-                    f16::ONE,
+                    opening_scale_factor,
+                );
+                white_value.eval(
+                    indexes.cap_psqt_middlegame,
+                    lookup_square_symmetries::<S>(square),
+                    middlegame_scale_factor,
+                );
+                white_value.eval(
+                    indexes.cap_psqt_endgame,
+                    lookup_square_symmetries::<S>(square),
+                    endgame_scale_factor,
                 );
                 cap_activity::<WhiteTr, BlackTr, V, S>(position, square, white_value);
             }
             BlackCap => {
                 black_value.eval(
-                    indexes.cap_psqt,
+                    indexes.cap_psqt_opening,
                     lookup_square_symmetries::<S>(square),
-                    f16::ONE,
+                    opening_scale_factor,
+                );
+                black_value.eval(
+                    indexes.cap_psqt_middlegame,
+                    lookup_square_symmetries::<S>(square),
+                    middlegame_scale_factor,
+                );
+                black_value.eval(
+                    indexes.cap_psqt_endgame,
+                    lookup_square_symmetries::<S>(square),
+                    endgame_scale_factor,
                 );
                 cap_activity::<BlackTr, WhiteTr, V, S>(position, square, black_value);
             }
@@ -226,14 +306,38 @@ pub fn static_eval_game_phase<const S: usize, V: ValueApplier>(
         );
 
         value_for_stack.eval(
-            indexes.supports_psqt,
+            indexes.supports_psqt_opening,
             lookup_square_symmetries::<S>(square),
-            (data.deep_supports + data.shallow_supports).into(),
+            f16::from(data.deep_supports + data.shallow_supports) * opening_scale_factor,
         );
         value_for_stack.eval(
-            indexes.captives_psqt,
+            indexes.supports_psqt_middlegame,
             lookup_square_symmetries::<S>(square),
-            (-(data.deep_captives as i8) - data.shallow_captives as i8).into(),
+            f16::from(data.deep_supports + data.shallow_supports) * middlegame_scale_factor,
+        );
+        value_for_stack.eval(
+            indexes.supports_psqt_endgame,
+            lookup_square_symmetries::<S>(square),
+            f16::from(data.deep_supports + data.shallow_supports) * endgame_scale_factor,
+        );
+
+        value_for_stack.eval(
+            indexes.captives_psqt_opening,
+            lookup_square_symmetries::<S>(square),
+            f16::from(-(data.deep_captives as i8) - data.shallow_captives as i8)
+                * opening_scale_factor,
+        );
+        value_for_stack.eval(
+            indexes.captives_psqt_middlegame,
+            lookup_square_symmetries::<S>(square),
+            f16::from(-(data.deep_captives as i8) - data.shallow_captives as i8)
+                * middlegame_scale_factor,
+        );
+        value_for_stack.eval(
+            indexes.captives_psqt_endgame,
+            lookup_square_symmetries::<S>(square),
+            f16::from(-(data.deep_captives as i8) - data.shallow_captives as i8)
+                * endgame_scale_factor,
         );
     }
 
@@ -256,22 +360,6 @@ pub fn static_eval_game_phase<const S: usize, V: ValueApplier>(
             }
         }
     }
-
-    let lowest_reserves_fraction = u8::min(
-        position.white_reserves_left() + position.white_caps_left(),
-        position.black_reserves_left() + position.black_caps_left(),
-    ) as f32
-        / (starting_stones(S) + starting_capstones(S)) as f32;
-
-    let opening_scale_factor =
-        f16::from_f32((2.0 * lowest_reserves_fraction - 1.0).clamp(0.0, 1.0));
-    let endgame_scale_factor =
-        f16::from_f32((1.0 - (2.0 * lowest_reserves_fraction)).clamp(0.0, 1.0));
-
-    let middlegame_scale_factor = f16::ONE - opening_scale_factor - endgame_scale_factor;
-
-    debug_assert!(middlegame_scale_factor <= f16::ONE);
-    debug_assert!(opening_scale_factor == f16::ZERO || endgame_scale_factor == f16::ZERO);
 
     // Give the side to move a bonus/malus depending on flatstone lead
     let white_flatstone_lead = white_flat_count - black_flat_count;
