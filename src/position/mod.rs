@@ -145,10 +145,10 @@ impl GroupEdgeConnection {
 
     pub const fn connect_square_const<const S: usize>(self, square: Square<S>) -> Self {
         let mut edge_connection = self;
-        if square.rank() == S as u8 - 1 {
+        if square.rank() == 0 {
             edge_connection = edge_connection.connect_north();
         }
-        if square.rank() == 0 {
+        if square.rank() == S as u8 - 1 {
             edge_connection = edge_connection.connect_south();
         }
         if square.file() == 0 {

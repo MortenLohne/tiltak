@@ -15,7 +15,7 @@ use crate::position::{
     Role::*,
     Square,
 };
-use crate::position::{starting_capstones, starting_stones};
+use crate::position::{starting_capstones, starting_stones, Direction, Stack};
 
 use super::parameters::ValueApplier;
 
@@ -339,6 +339,48 @@ pub fn static_eval_game_phase<const S: usize, V: ValueApplier>(
             f16::from(-(data.deep_captives as i8) - data.shallow_captives as i8)
                 * endgame_scale_factor,
         );
+
+        // Check if a continuously pure spread can create a road
+        let edge_connection = group_data.amount_in_group[group_data.groups[square] as usize].1;
+        for (is_connected, direction) in [
+            (edge_connection.is_connected_west(), Direction::East),
+            (edge_connection.is_connected_north(), Direction::South),
+            (edge_connection.is_connected_east(), Direction::West),
+            (edge_connection.is_connected_south(), Direction::North),
+        ] {
+            if piece.role() == Wall || !is_connected {
+                continue;
+            }
+            let Some(destination) = pure_winning_spread_to(
+                position,
+                group_data,
+                square,
+                stack,
+                data.shallow_supports,
+                direction,
+            ) else {
+                continue;
+            };
+            let index = (square.rank().abs_diff(destination.rank())
+                + square.file().abs_diff(destination.file())) as usize
+                - 1;
+            match (controlling_player == position.side_to_move(), piece.role()) {
+                (true, _) => {
+                    value_for_stack.eval(indexes.winning_spread_to_move, index.min(1), f16::ONE)
+                }
+                (false, Flat) => value_for_stack.eval(
+                    indexes.winning_flat_spread_not_to_move,
+                    index.min(1),
+                    f16::ONE,
+                ),
+                (false, Cap) => value_for_stack.eval(
+                    indexes.winning_cap_spread_not_to_move,
+                    index.min(1),
+                    f16::ONE,
+                ),
+                (false, Wall) => unreachable!(),
+            }
+        }
     }
 
     // Bonus/malus depending on the number of groups each side has
@@ -695,6 +737,65 @@ fn cap_activity<Us: ColorTr, Them: ColorTr, V: ValueApplier, const S: usize>(
     }) {
         our_value.eval(indexes.semi_isolated_cap, height_index, f16::ONE)
     }
+}
+
+fn pure_winning_spread_to<const S: usize>(
+    position: &Position<S>,
+    group_data: &GroupData<S>,
+    square: Square<S>,
+    stack: Stack,
+    num_shallow_supports: u8,
+    direction: Direction,
+) -> Option<Square<S>> {
+    let mut edge_connection = group_data.amount_in_group[group_data.groups[square] as usize].1;
+
+    let controlling_player = stack.top_stone.unwrap().color();
+    let is_hard_cap = stack.top_stone.unwrap().role() == Cap
+        && stack.get(stack.height - 2).unwrap().color() == controlling_player;
+
+    let mut destination = square;
+    for _ in 0..num_shallow_supports {
+        let Some(dest) = destination.go_direction(direction) else {
+            break;
+        };
+        let top_stone = position.top_stones()[dest];
+        // The spread is blocked by a capstone or a wall, unless we're a hard cap
+        if top_stone
+            .is_some_and(|piece| piece.role() == Cap || (piece.role() == Wall && !is_hard_cap))
+        {
+            break;
+        }
+        destination = dest;
+        edge_connection = edge_connection | destination.group_edge_connection();
+        for orth_dir in direction.orthogonal_directions() {
+            if let Some(sq) = destination.go_direction(orth_dir) {
+                if position.top_stones()[sq].is_some_and(|piece| {
+                    piece.is_road_piece() && piece.color() == controlling_player
+                }) {
+                    edge_connection = edge_connection
+                        | group_data.amount_in_group[group_data.groups[sq] as usize].1;
+                }
+            }
+        }
+        if edge_connection.is_winning() {
+            break;
+        }
+        // Smashing a wall ends the spread
+        if top_stone.is_some_and(|piece| piece.role() == Wall) {
+            break;
+        }
+    }
+    // Connect the square in front of us, if it's ours
+    if let Some(sq) = destination.go_direction(direction) {
+        if position.top_stones()[sq]
+            .is_some_and(|piece| piece.is_road_piece() && piece.color() == controlling_player)
+        {
+            edge_connection =
+                edge_connection | group_data.amount_in_group[group_data.groups[sq] as usize].1;
+        }
+    }
+
+    edge_connection.is_winning().then_some(destination)
 }
 
 /// Give bonus for our critical squares

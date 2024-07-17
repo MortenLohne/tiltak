@@ -114,7 +114,9 @@ fn play_random_games_prop<const S: usize>(num_games: usize) {
             let eval = position.static_eval();
             for rotation in position.symmetries() {
                 assert!(rotation.static_eval() - eval < 0.0001,
-                            "Static eval changed with rotation from {} to {} on board\n{:?}Rotated board:\n{:?}", eval, rotation.static_eval(), position, rotation);
+                            "Static eval changed with rotation from {} to {} on board\nTPS: {}\n{:?}\nRotated TPS: {}\nRotated board:\n{:?}",
+                            eval, rotation.static_eval(), position.to_fen(), position, rotation.to_fen(), rotation
+                        );
             }
 
             moves.clear();
@@ -195,10 +197,12 @@ fn play_random_games_prop<const S: usize>(num_games: usize) {
                 for rotation in position.symmetries() {
                     assert!(
                         rotation.static_eval().abs() - static_eval.abs() < 0.0001,
-                        "Original static eval {}, rotated static eval {}.Board:\n{:?}\nRotated board:\n{:?}",
+                        "Original static eval {}, rotated static eval {}.\nTPS: {}\nBoard:\n{:?}\nRotated TPS: {}\nRotated board:\n{:?}",
                         static_eval,
                         rotation.static_eval(),
+                        position.to_fen(),
                         position,
+                        rotation.to_fen(),
                         rotation
                     );
                 }
@@ -419,10 +423,10 @@ fn group_connection_generic_prop<const S: usize>() {
     let a1_connection =
         group_connection.connect_square_const::<S>(Square::parse_square("a1").unwrap());
 
-    assert!(!a1_connection.is_connected_south());
-    assert!(!a1_connection.is_connected_east());
-    assert!(a1_connection.is_connected_north());
     assert!(a1_connection.is_connected_west());
+    assert!(a1_connection.is_connected_south());
+    assert!(!a1_connection.is_connected_east());
+    assert!(!a1_connection.is_connected_north());
 }
 
 #[test]
