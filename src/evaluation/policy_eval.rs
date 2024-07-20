@@ -302,7 +302,7 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, P: PolicyApplier, const
             let mut their_unique_neighbour_groups: ArrayVec<(Square<S>, u8), 4> = ArrayVec::new();
             for neighbour in square
                 .neighbors()
-                .filter(|sq| position.stack_heights()[*sq] != 0)
+                .filter(|sq| position.top_stones()[*sq].is_some_and(Piece::is_road_piece))
             {
                 let neighbour_group_id = group_data.groups[neighbour];
                 if Us::piece_is_ours(position.top_stones()[neighbour].unwrap()) {
@@ -317,6 +317,38 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, P: PolicyApplier, const
                     .all(|(_sq, id)| *id != neighbour_group_id)
                 {
                     their_unique_neighbour_groups.push((neighbour, neighbour_group_id));
+                }
+            }
+
+            let connection = square.group_edge_connection();
+
+            // Bonus for anchoring our group to the board edge
+            if !connection.is_empty() {
+                for (_, group_id) in our_unique_neighbour_groups.iter() {
+                    let (group_size, group_connection) =
+                        group_data.amount_in_group[*group_id as usize];
+                    if (group_connection & connection) != connection {
+                        policy.eval_one(indexes.anchor_group_base, role_id);
+                        // Divide by 10, as large values confuse the tuner
+                        policy.eval_f32(
+                            indexes.anchor_group_linear,
+                            role_id,
+                            group_size as f32 / 10.0,
+                        );
+                    }
+                }
+                for (_, group_id) in their_unique_neighbour_groups.iter() {
+                    let (group_size, group_connection) =
+                        group_data.amount_in_group[*group_id as usize];
+                    if (group_connection & connection) != connection {
+                        policy.eval_one(indexes.block_anchoring_group_base, role_id);
+                        // Divide by 10, as large values confuse the tuner
+                        policy.eval_f32(
+                            indexes.block_anchoring_group_linear,
+                            role_id,
+                            group_size as f32 / 10.0,
+                        );
+                    }
                 }
             }
 

@@ -143,6 +143,10 @@ impl GroupEdgeConnection {
         Self { data: 0 }
     }
 
+    pub const fn is_empty(self) -> bool {
+        self.data == 0
+    }
+
     pub const fn connect_square_const<const S: usize>(self, square: Square<S>) -> Self {
         let mut edge_connection = self;
         if square.rank() == 0 {
@@ -212,6 +216,16 @@ impl ops::BitOr for GroupEdgeConnection {
     fn bitor(self, rhs: Self) -> Self::Output {
         GroupEdgeConnection {
             data: self.data | rhs.data,
+        }
+    }
+}
+
+impl ops::BitAnd for GroupEdgeConnection {
+    type Output = Self;
+
+    fn bitand(self, rhs: Self) -> Self::Output {
+        GroupEdgeConnection {
+            data: self.data & rhs.data,
         }
     }
 }
