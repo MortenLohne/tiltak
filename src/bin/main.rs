@@ -896,7 +896,7 @@ fn play_human(mut position: Position<5>) {
 // 2,2,22221C,2,x2/x,1,1,x,1,2/x,1,111212C,1212,x,2/x,112S,1,x,112S,2/11212,x,1,112S,1112,2/x2,1,1,1,1 1 40
 
 fn bench<const S: usize>() {
-    let mut position = <Position<S>>::default();
+    let mut position = <Position<S>>::start_position_with_komi(Komi::from_half_komi(4).unwrap());
 
     // Start the benchmark from opposite corners opening
     let corner = squares_iterator().next().unwrap();
