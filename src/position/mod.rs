@@ -438,7 +438,7 @@ pub fn zobrist_to_move<const S: usize>(color: Color) -> u64 {
 
 impl<const S: usize> ZobristKeys<S> {
     pub(crate) fn new() -> Box<Self> {
-        let mut rng = rand::rngs::SmallRng::from_seed([0; 32]);
+        let mut rng = rand::rngs::SmallRng::from_seed(Default::default());
 
         Box::new(ZobristKeys {
             top_stones: AbstractBoard::new_from_fn(|| array::from_fn(|_| rng.gen())),

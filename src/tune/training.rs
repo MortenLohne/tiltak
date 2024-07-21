@@ -48,7 +48,7 @@ pub fn train_from_scratch<const S: usize, const N: usize, const M: usize>(
     options: TrainingOptions,
     komi: Komi,
 ) -> Result<(), DynError> {
-    let mut rng = rand::rngs::StdRng::from_seed([0; 32]);
+    let mut rng = rand::rngs::StdRng::from_seed(Default::default());
 
     let initial_value_params: [f32; N] = array_from_fn(|| rng.gen_range(-0.01..0.01));
 
@@ -422,7 +422,7 @@ pub fn tune_value_from_file<const S: usize, const N: usize>(
         start_time.elapsed().as_secs_f32()
     );
 
-    let mut rng = rand::rngs::StdRng::from_seed([0; 32]);
+    let mut rng = rand::rngs::StdRng::from_seed(Default::default());
     let mut initial_params = [0.00; N];
 
     for param in initial_params.iter_mut() {
@@ -450,7 +450,7 @@ pub fn tune_value_and_policy<const S: usize, const N: usize, const M: usize>(
     initial_value_params: &[f32; N],
     initial_policy_params: &[f32; M],
 ) -> Result<([f32; N], [f32; M]), DynError> {
-    let mut rng = rand::rngs::StdRng::from_seed([0; 32]);
+    let mut rng = rand::rngs::StdRng::from_seed(Default::default());
 
     let (positions, results) = positions_and_results_from_games(games, komi);
 
@@ -582,7 +582,7 @@ pub fn tune_value_and_policy_from_file<const S: usize, const N: usize, const M: 
 ) -> Result<([f32; N], [f32; M]), DynError> {
     let (games, move_scoress) =
         games_and_move_scoress_from_file::<S>(value_file_name, policy_file_name, komi)?;
-    let mut rng = rand::rngs::StdRng::from_seed([0; 32]);
+    let mut rng = rand::rngs::StdRng::from_seed(Default::default());
 
     let initial_value_params: [f32; N] = array_from_fn(|| rng.gen_range(-0.01..0.01));
 
