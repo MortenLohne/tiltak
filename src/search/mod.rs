@@ -140,7 +140,7 @@ impl<const S: usize> MctsSetting<S> {
 
 /// Type alias for winning probability, used for scoring positions.
 pub type Score = f32;
-pub const ARENA_ELEMENT_SIZE: usize = 24;
+pub const ARENA_ELEMENT_SIZE: usize = 16;
 
 /// Abstract representation of a Monte Carlo Search Tree.
 /// Gives more fine-grained control of the search process compared to using the `mcts` function.
