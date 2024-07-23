@@ -68,6 +68,11 @@ impl<const S: usize> MctsSetting<S> {
         self.arena_size((S * S) as u32 * 3 * nodes)
     }
 
+    // Useful on 32-bit platforms, where the arena's underlying memory allocation cannot be larger than isize::MAX
+    pub fn max_arena_size(self) -> Self {
+        self.mem_usage(isize::MAX as usize - 2 * ARENA_ELEMENT_SIZE)
+    }
+
     pub fn mem_usage(self, mem_usage: usize) -> Self {
         assert!(
             mem_usage < u32::MAX as usize // Check for 32-bit platforms
@@ -140,7 +145,7 @@ impl<const S: usize> MctsSetting<S> {
 
 /// Type alias for winning probability, used for scoring positions.
 pub type Score = f32;
-pub const ARENA_ELEMENT_SIZE: usize = 24;
+pub const ARENA_ELEMENT_SIZE: usize = 16;
 
 /// Abstract representation of a Monte Carlo Search Tree.
 /// Gives more fine-grained control of the search process compared to using the `mcts` function.
@@ -162,6 +167,12 @@ impl<const S: usize> MonteCarloTree<S> {
     pub fn with_settings(position: Position<S>, settings: MctsSetting<S>) -> Self {
         let arena = match Arena::new(settings.arena_size) {
             Ok(arena) => arena,
+            Err(ArenaError::AllocationFailed(num_bytes)) if !sysinfo::IS_SUPPORTED_SYSTEM => {
+                panic!(
+                    "Fatal error: failed to allocate {}MB memory for search tree. Could not detect total system memory.",
+                    num_bytes
+                )
+            }
             Err(ArenaError::AllocationFailed(num_bytes)) => {
                 // The allocation may have failed because the system doesn't have enough memory
                 // Check the system's max memory, and try again
@@ -171,7 +182,14 @@ impl<const S: usize> MonteCarloTree<S> {
 
                 if sys.total_memory() < num_bytes as u64 {
                     // Note: The actual memory allocation is two slots larger, to ensure correct alignment
-                    let max_num_slots = (sys.total_memory() / 16).min(u32::MAX as u64) as u32 - 2;
+                    let Some(max_num_slots) =
+                        ((sys.total_memory() / 16).min(u32::MAX as u64) as u32).checked_sub(2)
+                    else {
+                        panic!(
+                            "Failed to allocated arena, system reports {} bytes total memory",
+                            sys.total_memory()
+                        );
+                    };
                     eprintln!("Warning: failed to allocate {}MB memory for the search tree. Trying again with {}MB.", num_bytes / (1024 * 1024), sys.total_memory() / (1024 * 1024));
 
                     match <Arena<16>>::new(max_num_slots) {
