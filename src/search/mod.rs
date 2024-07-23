@@ -68,6 +68,11 @@ impl<const S: usize> MctsSetting<S> {
         self.arena_size((S * S) as u32 * 3 * nodes)
     }
 
+    // Useful on 32-bit platforms, where the arena's underlying memory allocation cannot be larger than isize::MAX
+    pub fn max_arena_size(self) -> Self {
+        self.mem_usage(isize::MAX as usize - 2 * ARENA_ELEMENT_SIZE)
+    }
+
     pub fn mem_usage(self, mem_usage: usize) -> Self {
         assert!(
             mem_usage < u32::MAX as usize // Check for 32-bit platforms
