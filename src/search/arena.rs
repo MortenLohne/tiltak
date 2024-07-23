@@ -1,5 +1,5 @@
 use std::{
-    alloc::{self, Layout},
+    alloc::{self, Layout, LayoutError},
     any,
     error::Error,
     fmt::{self, Display},
@@ -90,17 +90,27 @@ const fn raw_alignment(mut alignment: usize) -> usize {
 
 #[derive(Debug)]
 pub enum ArenaError {
+    TooLarge(u64),
     AllocationFailed(usize),
-    InvalidSettings,
+    AllocationLayoutError(LayoutError, usize),
+    InvalidNumberOfSlots(u32),
 }
 
 impl Display for ArenaError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            ArenaError::TooLarge(num_bytes) => {
+                write!(f, "Arena with {} bytes overflows usize", num_bytes)
+            }
             ArenaError::AllocationFailed(num_bytes) => {
                 write!(f, "Failed to allocate {} bytes for arena", num_bytes)
             }
-            ArenaError::InvalidSettings => write!(f, "Invalid settings for arena"),
+            ArenaError::AllocationLayoutError(err, size) => {
+                write!(f, "Layout error when allocating {} bytes: {}", size, err)
+            }
+            ArenaError::InvalidNumberOfSlots(num_slots) => {
+                write!(f, "Arena cannot be allocated with {} slots", *num_slots)
+            }
         }
     }
 }
@@ -109,14 +119,19 @@ impl Error for ArenaError {}
 
 impl<const S: usize> Arena<S> {
     pub fn new(num_slots: u32) -> Result<Self, ArenaError> {
-        if S == 0 || num_slots == 0 || num_slots >= u32::MAX - 1 {
-            return Err(ArenaError::InvalidSettings);
+        if S == 0 {
+            panic!("Arena slots cannot have size zero")
+        }
+        if num_slots == 0 || num_slots >= u32::MAX - 1 {
+            return Err(ArenaError::InvalidNumberOfSlots(num_slots));
         }
         let raw_alignment = raw_alignment(S);
-        let size = (num_slots as usize + 2) * S;
+        let Some(size) = (num_slots as usize + 2).checked_mul(S) else {
+            return Err(ArenaError::TooLarge((num_slots as u64 + 2) * S as u64));
+        };
 
         let layout = Layout::from_size_align(size, raw_alignment)
-            .map_err(|_| ArenaError::InvalidSettings)?;
+            .map_err(|err| ArenaError::AllocationLayoutError(err, size))?;
 
         let (data, orig_pointer) = unsafe {
             let ptr = alloc::alloc(layout);
