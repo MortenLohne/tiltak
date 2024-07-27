@@ -115,6 +115,7 @@ pub struct ValueIndexes<const S: usize> {
 }
 
 impl<const S: usize> ValueIndexes<S> {
+    #[allow(clippy::new_without_default)] // A `Default` impl cannot be const
     pub const fn new() -> Self {
         let i = 0;
 
@@ -242,7 +243,7 @@ pub const VALUE_INDEXES_6S: ValueIndexes<6> = ValueIndexes::new();
 impl<const S: usize> ValueIndexes<S> {
     pub const fn downcast_size<const N: usize>(self) -> ValueIndexes<N> {
         if S == N {
-            unsafe { mem::transmute(self) }
+            unsafe { mem::transmute::<ValueIndexes<S>, ValueIndexes<N>>(self) }
         } else {
             panic!()
         }
@@ -330,7 +331,7 @@ pub const POLICY_INDEXES_6S: PolicyIndexes<6> = PolicyIndexes::new();
 impl<const S: usize> PolicyIndexes<S> {
     pub const fn downcast_size<const N: usize>(self) -> PolicyIndexes<N> {
         if S == N {
-            unsafe { mem::transmute(self) }
+            unsafe { mem::transmute::<PolicyIndexes<S>, PolicyIndexes<N>>(self) }
         } else {
             panic!()
         }
@@ -347,6 +348,7 @@ pub const fn policy_indexes<const S: usize>() -> PolicyIndexes<S> {
 }
 
 impl<const S: usize> PolicyIndexes<S> {
+    #[allow(clippy::new_without_default)] // A `Default` impl cannot be const
     pub const fn new() -> Self {
         let i = 0;
         let (flat_psqt_white, i) = IndexPair::next(i, num_square_symmetries::<S>());

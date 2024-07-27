@@ -241,7 +241,7 @@ impl<const S: usize> MonteCarloTree<S> {
                 })
                 .collect();
             arena.get_mut(root_edge.child.as_mut().unwrap()).children =
-                arena.add_slice(&mut filtered_edges.drain(..)).unwrap();
+                arena.add_slice(filtered_edges.drain(..)).unwrap();
         }
 
         MonteCarloTree {

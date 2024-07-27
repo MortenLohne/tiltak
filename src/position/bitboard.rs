@@ -55,9 +55,7 @@ impl BitBoard {
     }
     #[inline]
     pub const fn full() -> Self {
-        BitBoard {
-            board: u64::max_value(),
-        }
+        BitBoard { board: u64::MAX }
     }
 
     pub fn lines_for_square<const S: usize>(square: Square<S>) -> [Self; 2] {

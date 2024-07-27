@@ -1294,8 +1294,8 @@ impl<const S: usize> PositionTrait for Position<S> {
 
     /// Adds all legal moves to the provided vector. Some notes on the interpretation of the rules:
     /// * Suicide moves are considered legal, and are generated like any other move.
-    /// This includes moves that complete a road for the opponent without creating an own road,
-    /// and moves that fill the board when that would result in an immediate loss.
+    ///   This includes moves that complete a road for the opponent without creating an own road,
+    ///   and moves that fill the board when that would result in an immediate loss.
     ///
     /// * Capstones are not counted towards a flat win, but all capstones must also be placed to trigger a flat win.
     ///

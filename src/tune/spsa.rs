@@ -34,7 +34,7 @@ pub fn tune<const S: usize>(variables: &mut [Variable], book_path: Option<&str>,
     };
     let mutex_variables = Mutex::new(variables);
 
-    (1..usize::max_value()).into_par_iter().for_each(|i| {
+    (1..usize::MAX).into_par_iter().for_each(|i| {
         let cloned_variables = (*mutex_variables.lock().unwrap()).to_vec();
         let mut rng = rand::rngs::StdRng::from_entropy();
 

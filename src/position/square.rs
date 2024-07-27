@@ -53,7 +53,7 @@ impl<const S: usize> Square<S> {
 
     pub fn downcast_size<const N: usize>(self) -> Square<N> {
         if S == N {
-            unsafe { mem::transmute(self) }
+            unsafe { mem::transmute::<Square<S>, Square<N>>(self) }
         } else {
             panic!("Tried to use {}s square as {}s square", S, N)
         }
@@ -211,7 +211,7 @@ impl<const S: usize> SquareCacheEntry<S> {
 
     pub fn downcast_size<const N: usize>(self) -> SquareCacheEntry<N> {
         if S == N {
-            unsafe { mem::transmute(self) }
+            unsafe { mem::transmute::<SquareCacheEntry<S>, SquareCacheEntry<N>>(self) }
         } else {
             panic!(
                 "Tried to use {}s neighbor array as {}s neighbor array",

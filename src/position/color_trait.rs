@@ -1,7 +1,7 @@
 //* Traits for white/black colors. Useful for writing functions that are generic over color,
 //* like how the move generator is structured.
 
-use board_game_traits::{Color, GameResult};
+use board_game_traits::Color;
 
 use crate::position::bitboard::BitBoard;
 use crate::position::utils::Piece;
@@ -14,8 +14,6 @@ use super::Square;
 
 pub(crate) trait ColorTr {
     fn color() -> Color;
-
-    fn win() -> GameResult;
 
     fn stones_left<const S: usize>(position: &Position<S>) -> u8;
 
@@ -51,10 +49,6 @@ pub(crate) struct WhiteTr {}
 impl ColorTr for WhiteTr {
     fn color() -> Color {
         Color::White
-    }
-
-    fn win() -> GameResult {
-        GameResult::WhiteWin
     }
 
     fn stones_left<const S: usize>(position: &Position<S>) -> u8 {
@@ -119,10 +113,6 @@ pub(crate) struct BlackTr {}
 impl ColorTr for BlackTr {
     fn color() -> Color {
         Color::Black
-    }
-
-    fn win() -> GameResult {
-        GameResult::BlackWin
     }
 
     fn stones_left<const S: usize>(position: &Position<S>) -> u8 {
