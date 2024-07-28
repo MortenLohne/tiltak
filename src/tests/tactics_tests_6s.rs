@@ -268,3 +268,21 @@ fn capture_stack_for_gaelet() {
     let test_position = TestPosition::from_tps_with_komi("2,2,1,1,x,2/2,2,x2,1,2/1,2S,x,2,1,x/x,11121S,x,112S,21112221,2/22221S,11,1112S,1,2S,2112221C/x,1212121S,1,2C,x2 2 57", Komi::from_half_komi(4).unwrap());
     test_position.plays_correct_move_long_prop::<6>(&["f3<", "e2+"]);
 }
+
+#[test]
+fn create_hard_cap_next_to_critical_square_tinue_3() {
+    let test_position = TestPosition::from_tps_with_komi(
+        "1,1S,x4/2,12C,1,x3/2,x,1,1,x2/2,2,1,1,x2/2,2,1,x3/x,2,x3,1 2 11",
+        Komi::from_half_komi(4).unwrap(),
+    );
+    test_position.plays_correct_move_long_prop::<6>(&["b5<"])
+}
+
+#[test]
+fn setup_smash_tinue() {
+    let test_position = TestPosition::from_tps_with_komi(
+        "1,1,1121S,21C,1,1/x2,12C,22,1,x/x2,2,x,2,x/x2,2,2,x2/x2,2,x3/2,x5 1 15",
+        Komi::from_half_komi(4).unwrap(),
+    );
+    test_position.plays_correct_move_long_prop::<6>(&["e5<"])
+}
