@@ -197,7 +197,7 @@ pub fn static_eval_game_phase<const S: usize, V: ValueApplier>(
                     lookup_square_symmetries::<S>(square),
                     endgame_scale_factor,
                 );
-                cap_activity::<WhiteTr, BlackTr, V, S>(position, square, white_value);
+                cap_activity::<WhiteTr, BlackTr, V, S>(position, group_data, square, white_value);
             }
             BlackCap => {
                 black_value.eval(
@@ -215,7 +215,7 @@ pub fn static_eval_game_phase<const S: usize, V: ValueApplier>(
                     lookup_square_symmetries::<S>(square),
                     endgame_scale_factor,
                 );
-                cap_activity::<BlackTr, WhiteTr, V, S>(position, square, black_value);
+                cap_activity::<BlackTr, WhiteTr, V, S>(position, group_data, square, black_value);
             }
         }
         if stack.height < 2 {
@@ -520,42 +520,40 @@ pub fn static_eval_game_phase<const S: usize, V: ValueApplier>(
             let controlling_player = top_stone.color();
 
             // Malus for them having stones next to our stack with flat stones on top
-            for neighbour in square.neighbors() {
-                if let Some(neighbour_top_stone) = position.top_stones()[neighbour] {
-                    if top_stone.role() == Flat && neighbour_top_stone.color() != controlling_player
-                    {
-                        match (neighbour_top_stone.role(), top_stone.color()) {
-                            (Flat, Color::White) => white_value.eval(
-                                indexes.flat_next_to_our_stack,
-                                0,
-                                f16::from_u8(stack.len()).unwrap(),
-                            ),
-                            (Flat, Color::Black) => black_value.eval(
-                                indexes.flat_next_to_our_stack,
-                                0,
-                                f16::from_u8(stack.len()).unwrap(),
-                            ),
-                            (Wall, Color::White) => white_value.eval(
-                                indexes.wall_next_to_our_stack,
-                                0,
-                                f16::from_u8(stack.len()).unwrap(),
-                            ),
-                            (Wall, Color::Black) => black_value.eval(
-                                indexes.wall_next_to_our_stack,
-                                0,
-                                f16::from_u8(stack.len()).unwrap(),
-                            ),
-                            (Cap, Color::White) => white_value.eval(
-                                indexes.cap_next_to_our_stack,
-                                0,
-                                f16::from_u8(stack.len()).unwrap(),
-                            ),
-                            (Cap, Color::Black) => black_value.eval(
-                                indexes.cap_next_to_our_stack,
-                                0,
-                                f16::from_u8(stack.len()).unwrap(),
-                            ),
-                        }
+            for neighbour in (square.neighbors_bitboard() & group_data.all_pieces()).into_iter() {
+                let neighbour_top_stone = position.top_stones()[neighbour].unwrap();
+                if top_stone.role() == Flat && neighbour_top_stone.color() != controlling_player {
+                    match (neighbour_top_stone.role(), top_stone.color()) {
+                        (Flat, Color::White) => white_value.eval(
+                            indexes.flat_next_to_our_stack,
+                            0,
+                            f16::from_u8(stack.len()).unwrap(),
+                        ),
+                        (Flat, Color::Black) => black_value.eval(
+                            indexes.flat_next_to_our_stack,
+                            0,
+                            f16::from_u8(stack.len()).unwrap(),
+                        ),
+                        (Wall, Color::White) => white_value.eval(
+                            indexes.wall_next_to_our_stack,
+                            0,
+                            f16::from_u8(stack.len()).unwrap(),
+                        ),
+                        (Wall, Color::Black) => black_value.eval(
+                            indexes.wall_next_to_our_stack,
+                            0,
+                            f16::from_u8(stack.len()).unwrap(),
+                        ),
+                        (Cap, Color::White) => white_value.eval(
+                            indexes.cap_next_to_our_stack,
+                            0,
+                            f16::from_u8(stack.len()).unwrap(),
+                        ),
+                        (Cap, Color::Black) => black_value.eval(
+                            indexes.cap_next_to_our_stack,
+                            0,
+                            f16::from_u8(stack.len()).unwrap(),
+                        ),
                     }
                 }
             }
@@ -697,6 +695,7 @@ fn flat_win<Us: ColorTr, Them: ColorTr, V: ValueApplier, const S: usize>(
 
 fn cap_activity<Us: ColorTr, Them: ColorTr, V: ValueApplier, const S: usize>(
     position: &Position<S>,
+    group_data: &GroupData<S>,
     square: Square<S>,
     our_value: &mut V,
 ) {
@@ -706,35 +705,35 @@ fn cap_activity<Us: ColorTr, Them: ColorTr, V: ValueApplier, const S: usize>(
     let height_index = stack.height.min(3) as usize - 1;
 
     // Malus if our capstone's line towards the center is blocked
-    if square.neighbors().any(|neighbour| {
-        lookup_square_symmetries::<S>(neighbour) > lookup_square_symmetries::<S>(square)
-            && position.top_stones()[neighbour].map(Piece::role) == Some(Cap)
-    }) {
-        our_value.eval(indexes.sidelined_cap, height_index, f16::ONE)
+    for neighbour in (square.neighbors_bitboard() & Them::caps(group_data)).into_iter() {
+        if lookup_square_symmetries::<S>(neighbour) > lookup_square_symmetries::<S>(square) {
+            our_value.eval(indexes.sidelined_cap, height_index, f16::ONE)
+        }
     }
 
     let is_soft_cap = stack
         .get(stack.height.overflowing_sub(2).0)
         .map(Them::is_our_piece)
         == Some(true);
-    if square.neighbors().all(|neighbour| {
-        matches!(
-            position.top_stones()[neighbour],
-            Some(WhiteCap) | Some(BlackCap) | None
-        )
-    }) {
+    if square.neighbors_bitboard()
+        & !(group_data.white_flat_stones
+            | group_data.white_walls
+            | group_data.black_flat_stones
+            | group_data.black_walls)
+        == square.neighbors_bitboard()
+    {
         our_value.eval(indexes.fully_isolated_cap, height_index, f16::ONE)
-    } else if square.neighbors().all(|neighbour| {
-        if let Some(neighbour_top_stone) = position.top_stones()[neighbour] {
+    } else if (square.neighbors_bitboard() & group_data.all_pieces())
+        .into_iter()
+        .all(|neighbour| {
+            let neighbour_top_stone = position.top_stones()[neighbour].unwrap();
             if neighbour_top_stone == Them::wall_piece() {
                 is_soft_cap
             } else {
                 neighbour_top_stone != Them::flat_piece()
             }
-        } else {
-            true
-        }
-    }) {
+        })
+    {
         our_value.eval(indexes.semi_isolated_cap, height_index, f16::ONE)
     }
 }

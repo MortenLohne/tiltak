@@ -1827,28 +1827,26 @@ impl<const S: usize> pgn_traits::PgnPosition for Position<S> {
 }
 
 pub(crate) fn connected_components_graph<const S: usize>(
-    road_pieces: BitBoard,
+    mut road_pieces: BitBoard,
     components: &mut AbstractBoard<u8, S>,
     id: &mut u8,
 ) {
-    for square in square::squares_iterator::<S>() {
-        if components[square] == 0 && road_pieces.get_square(square) {
-            connect_component(road_pieces, components, square, *id);
-            *id += 1;
-        }
+    while let Some(square) = road_pieces.occupied_square() {
+        connect_component(&mut road_pieces, components, square, *id);
+        *id += 1;
     }
 }
 
 fn connect_component<const S: usize>(
-    road_pieces: BitBoard,
+    road_pieces: &mut BitBoard,
     components: &mut AbstractBoard<u8, S>,
     square: Square<S>,
     id: u8,
 ) {
     components[square] = id;
-    for neighbour in square.neighbors() {
-        if road_pieces.get_square(neighbour) && components[neighbour] == 0 {
-            connect_component(road_pieces, components, neighbour, id);
-        }
+    *road_pieces = road_pieces.clear_square(square);
+    let neighbors = square.neighbors_bitboard();
+    while let Some(neighbor) = (neighbors & *road_pieces).occupied_square() {
+        connect_component(road_pieces, components, neighbor, id);
     }
 }

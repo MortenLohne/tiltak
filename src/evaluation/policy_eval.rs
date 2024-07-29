@@ -300,19 +300,21 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, P: PolicyApplier, const
             // If square is next to a group
             let mut our_unique_neighbour_groups: ArrayVec<(Square<S>, u8), 4> = ArrayVec::new();
             let mut their_unique_neighbour_groups: ArrayVec<(Square<S>, u8), 4> = ArrayVec::new();
-            for neighbour in square
-                .neighbors()
-                .filter(|sq| position.top_stones()[*sq].is_some_and(Piece::is_road_piece))
+            for neighbour in (square.neighbors_bitboard() & Us::road_stones(group_data)).into_iter()
             {
                 let neighbour_group_id = group_data.groups[neighbour];
-                if Us::is_our_piece(position.top_stones()[neighbour].unwrap()) {
-                    if our_unique_neighbour_groups
-                        .iter()
-                        .all(|(_sq, id)| *id != neighbour_group_id)
-                    {
-                        our_unique_neighbour_groups.push((neighbour, neighbour_group_id));
-                    }
-                } else if their_unique_neighbour_groups
+                if our_unique_neighbour_groups
+                    .iter()
+                    .all(|(_sq, id)| *id != neighbour_group_id)
+                {
+                    our_unique_neighbour_groups.push((neighbour, neighbour_group_id));
+                }
+            }
+            for neighbour in
+                (square.neighbors_bitboard() & Them::road_stones(group_data)).into_iter()
+            {
+                let neighbour_group_id = group_data.groups[neighbour];
+                if their_unique_neighbour_groups
                     .iter()
                     .all(|(_sq, id)| *id != neighbour_group_id)
                 {
@@ -427,8 +429,8 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, P: PolicyApplier, const
                     if last_role == Flat || last_role == Cap {
                         if square.neighbors().any(|neigh| neigh == last_square) {
                             policy.eval_one(indexes.next_to_our_last_stone, 0);
-                        } else if (square.rank() as i8 - last_square.rank() as i8).abs() == 1
-                            && (square.file() as i8 - last_square.file() as i8).abs() == 1
+                        } else if square.rank().abs_diff(last_square.rank()) == 1
+                            && square.file().abs_diff(last_square.file()) == 1
                         {
                             policy.eval_one(indexes.diagonal_to_our_last_stone, 0);
                         }
@@ -440,8 +442,8 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, P: PolicyApplier, const
                     if last_role == Flat {
                         if square.neighbors().any(|neigh| neigh == last_square) {
                             policy.eval_one(indexes.next_to_their_last_stone, 0);
-                        } else if (square.rank() as i8 - last_square.rank() as i8).abs() == 1
-                            && (square.file() as i8 - last_square.file() as i8).abs() == 1
+                        } else if square.rank().abs_diff(last_square.rank()) == 1
+                            && square.file().abs_diff(last_square.file()) == 1
                         {
                             policy.eval_one(indexes.diagonal_to_their_last_stone, 0);
                         }
@@ -449,21 +451,17 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, P: PolicyApplier, const
                 }
 
                 // Bonus for attacking a flatstone in a rank/file where we are strong
-                for neighbour in square.neighbors() {
-                    if position.top_stones()[neighbour] == Some(Them::flat_piece()) {
-                        let our_road_stones = Us::road_stones(group_data)
-                            .rank::<S>(neighbour.rank())
-                            .count()
-                            + Us::road_stones(group_data)
-                                .file::<S>(neighbour.file())
-                                .count();
-                        if our_road_stones >= 2 {
-                            policy.eval_i8(
-                                indexes.attack_strong_flats,
-                                0,
-                                our_road_stones as i8 - 1,
-                            );
-                        }
+                for neighbour in
+                    (square.neighbors_bitboard() & Them::flats(group_data)).into_iter::<S>()
+                {
+                    let our_road_stones = Us::road_stones(group_data)
+                        .rank::<S>(neighbour.rank())
+                        .count()
+                        + Us::road_stones(group_data)
+                            .file::<S>(neighbour.file())
+                            .count();
+                    if our_road_stones >= 2 {
+                        policy.eval_i8(indexes.attack_strong_flats, 0, our_road_stones as i8 - 1);
                     }
                 }
             }
@@ -683,17 +681,15 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, P: PolicyApplier, const
                 if Us::is_our_road_piece(piece) {
                     let mut neighbour_group_ids = <ArrayVec<u8, S>>::new();
 
-                    for neighbour in Square::neighbors(destination_square) {
-                        if destination_square != square
-                            && destination_square.go_direction(direction.reverse())
-                                == Some(neighbour)
+                    for neighbour in (destination_square.neighbors_bitboard()
+                        & Us::road_stones(group_data))
+                    .into_iter()
+                    {
+                        if destination_square == square
+                            || destination_square.go_direction(direction.reverse())
+                                != Some(neighbour)
                         {
-                            continue;
-                        }
-                        if let Some(neighbour_piece) = position.top_stones()[neighbour] {
-                            if Us::is_our_road_piece(neighbour_piece) {
-                                neighbour_group_ids.push(group_data.groups[neighbour]);
-                            }
+                            neighbour_group_ids.push(group_data.groups[neighbour]);
                         }
                     }
 
@@ -735,9 +731,9 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, P: PolicyApplier, const
                     let road_piece_count = destination_line.count() as usize;
                     if road_piece_count > 2 {
                         policy.eval_one(indexes.move_cap_onto_strong_line, road_piece_count - 3);
-                        if destination_square
-                            .neighbors()
-                            .any(|n| Us::is_critical_square(group_data, n))
+                        if !(destination_square.neighbors_bitboard()
+                            & Us::critical_squares(group_data))
+                        .is_empty()
                         {
                             policy.eval_one(
                                 indexes.move_cap_onto_strong_line_with_critical_square,
@@ -891,15 +887,14 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, P: PolicyApplier, const
                     // Check if reaching the critical square still wins, in case our
                     // stack spread lost some of our flats
                     let mut edge_connection = critical_square.group_edge_connection();
-                    for neighbour in critical_square.neighbors() {
-                        if let Some(neighbour_piece) = position.top_stones()[neighbour] {
-                            if Us::is_our_piece(neighbour_piece) {
-                                let group_id = group_data.groups[neighbour];
-                                if our_groups_affected.iter().all(|g| *g != group_id) {
-                                    edge_connection = edge_connection
-                                        | group_data.amount_in_group[group_id as usize].1;
-                                }
-                            }
+                    for neighbour in (critical_square.neighbors_bitboard()
+                        & (Us::road_stones(group_data) | Us::walls(group_data)))
+                    .into_iter()
+                    {
+                        let group_id = group_data.groups[neighbour];
+                        if our_groups_affected.iter().all(|g| *g != group_id) {
+                            edge_connection =
+                                edge_connection | group_data.amount_in_group[group_id as usize].1;
                         }
                     }
 
@@ -911,21 +906,26 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, P: PolicyApplier, const
                     // If the critical square has two neighbours of the same group,
                     // and neither the origin square nor the critical square is a wall,
                     // at least one of the spreads onto the critical square will be a road win
-                    else if our_squares_affected.len() == 1
-                        && critical_square
-                            .neighbors()
-                            .any(|sq| sq == our_squares_affected[0])
-                        && critical_square
-                            .neighbors()
-                            .filter(|sq| {
-                                group_data.groups[*sq] == group_data.groups[our_squares_affected[0]]
-                            })
-                            .count()
-                            > 1
-                        && position.top_stones()[critical_square].map(Piece::role) != Some(Wall)
-                    {
-                        policy.eval_one(indexes.move_onto_critical_square, 1);
-                        policy.set_immediate_win();
+                    else if our_squares_affected.len() == 1 {
+                        let our_affected_square_bitboard =
+                            BitBoard::empty().set_square(our_squares_affected[0]);
+                        let critical_square_neighbors = critical_square.neighbors_bitboard();
+                        if !(critical_square_neighbors & our_affected_square_bitboard).is_empty()
+                            && critical_square
+                                .neighbors()
+                                .filter(|sq| {
+                                    group_data.groups[*sq]
+                                        == group_data.groups[our_squares_affected[0]]
+                                })
+                                .count()
+                                > 1
+                            && position.top_stones()[critical_square].map(Piece::role) != Some(Wall)
+                        {
+                            policy.eval_one(indexes.move_onto_critical_square, 1);
+                            policy.set_immediate_win();
+                        } else {
+                            policy.eval_one(indexes.move_onto_critical_square, 2)
+                        }
                     } else {
                         policy.eval_one(indexes.move_onto_critical_square, 2)
                     }
