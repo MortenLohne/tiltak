@@ -512,54 +512,56 @@ pub fn static_eval_game_phase<const S: usize, V: ValueApplier>(
         ),
     }
 
-    squares_iterator::<S>()
-        .map(|sq| (sq, position.get_stack(sq)))
-        .filter(|(_, stack)| stack.len() > 1)
-        .for_each(|(square, stack)| {
-            let top_stone = stack.top_stone().unwrap();
-            let controlling_player = top_stone.color();
+    for square in group_data.white_flat_stones.into_iter() {
+        let stack_height = position.stack_heights()[square];
+        if stack_height < 2 {
+            continue;
+        }
+        let neighbors = square.neighbors_bitboard();
+        // Malus for them having stones next to our stack with flat stones on top
+        white_value.eval(
+            indexes.flat_next_to_our_stack,
+            0,
+            f16::from_u8(stack_height * (neighbors & group_data.black_flat_stones).count())
+                .unwrap(),
+        );
+        white_value.eval(
+            indexes.wall_next_to_our_stack,
+            0,
+            f16::from_u8(stack_height * (neighbors & group_data.black_walls).count()).unwrap(),
+        );
+        white_value.eval(
+            indexes.cap_next_to_our_stack,
+            0,
+            f16::from_u8(stack_height * (neighbors & group_data.black_caps).count()).unwrap(),
+        );
+    }
 
-            // Malus for them having stones next to our stack with flat stones on top
-            for neighbour in square.neighbors() {
-                if let Some(neighbour_top_stone) = position.top_stones()[neighbour] {
-                    if top_stone.role() == Flat && neighbour_top_stone.color() != controlling_player
-                    {
-                        match (neighbour_top_stone.role(), top_stone.color()) {
-                            (Flat, Color::White) => white_value.eval(
-                                indexes.flat_next_to_our_stack,
-                                0,
-                                f16::from_u8(stack.len()).unwrap(),
-                            ),
-                            (Flat, Color::Black) => black_value.eval(
-                                indexes.flat_next_to_our_stack,
-                                0,
-                                f16::from_u8(stack.len()).unwrap(),
-                            ),
-                            (Wall, Color::White) => white_value.eval(
-                                indexes.wall_next_to_our_stack,
-                                0,
-                                f16::from_u8(stack.len()).unwrap(),
-                            ),
-                            (Wall, Color::Black) => black_value.eval(
-                                indexes.wall_next_to_our_stack,
-                                0,
-                                f16::from_u8(stack.len()).unwrap(),
-                            ),
-                            (Cap, Color::White) => white_value.eval(
-                                indexes.cap_next_to_our_stack,
-                                0,
-                                f16::from_u8(stack.len()).unwrap(),
-                            ),
-                            (Cap, Color::Black) => black_value.eval(
-                                indexes.cap_next_to_our_stack,
-                                0,
-                                f16::from_u8(stack.len()).unwrap(),
-                            ),
-                        }
-                    }
-                }
-            }
-        });
+    for square in group_data.black_flat_stones.into_iter() {
+        let stack_height = position.stack_heights()[square];
+        if stack_height < 2 {
+            continue;
+        }
+
+        let neighbors = square.neighbors_bitboard();
+        // Malus for them having stones next to our stack with flat stones on top
+        black_value.eval(
+            indexes.flat_next_to_our_stack,
+            0,
+            f16::from_u8(stack_height * (neighbors & group_data.white_flat_stones).count())
+                .unwrap(),
+        );
+        black_value.eval(
+            indexes.wall_next_to_our_stack,
+            0,
+            f16::from_u8(stack_height * (neighbors & group_data.white_walls).count()).unwrap(),
+        );
+        black_value.eval(
+            indexes.cap_next_to_our_stack,
+            0,
+            f16::from_u8(stack_height * (neighbors & group_data.white_caps).count()).unwrap(),
+        );
+    }
 
     let mut num_ranks_occupied_white = 0;
     let mut num_files_occupied_white = 0;
