@@ -904,7 +904,7 @@ fn bench<const S: usize>() {
     position.do_move(Move::placement(Role::Flat, corner));
     position.do_move(Move::placement(Role::Flat, opposite_corner));
 
-    bench_position(position);
+    bench_position(position, 5_000_000);
 }
 
 fn bench2() {
@@ -914,21 +914,20 @@ fn bench2() {
         Komi::from_half_komi(4).unwrap()
     ).unwrap();
 
-    bench_position(position);
+    bench_position(position, 5_000_000);
 }
 
-fn bench_position<const S: usize>(position: Position<S>) {
+fn bench_position<const S: usize>(position: Position<S>, nodes: u32) {
     println!("Starting benchmark");
-    const NODES: u32 = 5_000_000;
     let start_time = time::Instant::now();
 
-    let settings = search::MctsSetting::default().arena_size_for_nodes(NODES);
+    let settings = search::MctsSetting::default().arena_size_for_nodes(nodes);
     let mut tree = search::MonteCarloTree::with_settings(position, settings);
     let mut last_iteration_start_time = time::Instant::now();
-    for n in 1..=NODES {
+    for n in 1..=nodes {
         tree.select().unwrap();
-        if n % 500_000 == 0 {
-            let knps = 500.0 / last_iteration_start_time.elapsed().as_secs_f32();
+        if n % (nodes / 10) == 0 {
+            let knps = nodes as f32 / (last_iteration_start_time.elapsed().as_secs_f32() * 10000.0);
             last_iteration_start_time = time::Instant::now();
             println!(
                 "n={}, {:.2}s, {:.1} knps",
