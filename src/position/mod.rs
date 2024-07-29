@@ -220,6 +220,12 @@ impl ops::BitOr for GroupEdgeConnection {
     }
 }
 
+impl ops::BitOrAssign for GroupEdgeConnection {
+    fn bitor_assign(&mut self, rhs: Self) {
+        *self = *self | rhs
+    }
+}
+
 impl ops::BitAnd for GroupEdgeConnection {
     type Output = Self;
 
@@ -752,8 +758,8 @@ impl<const S: usize> Position<S> {
         let mut our_neighbors = neighbors_bitboard & our_road_stones;
         let mut sum_of_connections = square.group_edge_connection();
         while let Some(neighbor_square) = our_neighbors.occupied_square() {
-            sum_of_connections = sum_of_connections
-                | group_data.amount_in_group[group_data.groups[neighbor_square] as usize].1;
+            sum_of_connections |=
+                group_data.amount_in_group[group_data.groups[neighbor_square] as usize].1;
             our_neighbors = our_neighbors.clear_square(neighbor_square);
         }
 
@@ -899,13 +905,11 @@ impl<const S: usize> Position<S> {
             &mut highest_component_id,
         );
 
-        for square in square::squares_iterator::<S>() {
-            group_data.amount_in_group[group_data.groups[square] as usize].0 += 1;
-            if self.top_stones[square].is_some_and(Piece::is_road_piece) {
-                group_data.amount_in_group[group_data.groups[square] as usize].1 =
-                    group_data.amount_in_group[group_data.groups[square] as usize].1
-                        | square.group_edge_connection();
-            }
+        for square in (group_data.black_road_pieces() | group_data.white_road_pieces()).into_iter()
+        {
+            let group_id = group_data.groups[square] as usize;
+            group_data.amount_in_group[group_id].0 += 1;
+            group_data.amount_in_group[group_id].1 |= square.group_edge_connection();
         }
 
         for square in square::squares_iterator::<S>() {

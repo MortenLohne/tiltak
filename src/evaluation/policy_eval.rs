@@ -703,8 +703,7 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, P: PolicyApplier, const
                         our_groups_joined.clear();
                         group_edge_connection = GroupEdgeConnection::default();
                     }
-                    group_edge_connection =
-                        group_edge_connection | destination_square.group_edge_connection();
+                    group_edge_connection |= destination_square.group_edge_connection();
 
                     for group_id in neighbour_group_ids {
                         if !our_groups_joined.contains(&group_id) {
@@ -893,8 +892,7 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, P: PolicyApplier, const
                     {
                         let group_id = group_data.groups[neighbor];
                         if our_groups_affected.iter().all(|g| *g != group_id) {
-                            edge_connection =
-                                edge_connection | group_data.amount_in_group[group_id as usize].1;
+                            edge_connection |= group_data.amount_in_group[group_id as usize].1;
                         }
                     }
 
@@ -929,8 +927,7 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, P: PolicyApplier, const
 
             for group_id in our_groups_joined {
                 if !our_groups_affected.contains(&group_id) {
-                    group_edge_connection =
-                        group_edge_connection | group_data.amount_in_group[group_id as usize].1;
+                    group_edge_connection |= group_data.amount_in_group[group_id as usize].1;
                 }
             }
 

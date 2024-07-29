@@ -766,14 +766,13 @@ fn pure_winning_spread_to<const S: usize>(
             break;
         }
         destination = dest;
-        edge_connection = edge_connection | destination.group_edge_connection();
+        edge_connection |= destination.group_edge_connection();
         for orth_dir in direction.orthogonal_directions() {
             if let Some(sq) = destination.go_direction(orth_dir) {
                 if position.top_stones()[sq].is_some_and(|piece| {
                     piece.is_road_piece() && piece.color() == controlling_player
                 }) {
-                    edge_connection = edge_connection
-                        | group_data.amount_in_group[group_data.groups[sq] as usize].1;
+                    edge_connection |= group_data.amount_in_group[group_data.groups[sq] as usize].1;
                 }
             }
         }
@@ -790,8 +789,7 @@ fn pure_winning_spread_to<const S: usize>(
         if position.top_stones()[sq]
             .is_some_and(|piece| piece.is_road_piece() && piece.color() == controlling_player)
         {
-            edge_connection =
-                edge_connection | group_data.amount_in_group[group_data.groups[sq] as usize].1;
+            edge_connection |= group_data.amount_in_group[group_data.groups[sq] as usize].1;
         }
     }
 
