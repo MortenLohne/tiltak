@@ -954,11 +954,12 @@ fn bench_position<const S: usize>(position: Position<S>, nodes: u32) {
     let knps = nodes as f32 / (start_time.elapsed().as_secs_f32() * 1000.0);
 
     println!(
-        "{}: {:.2}%, {:.2}s, {:.1} knps",
+        "{}: {:.2}%, {:.2}s, {:.1} knps, {}MiB used",
         mv,
         score * 100.0,
         start_time.elapsed().as_secs_f32(),
         knps,
+        tree.mem_usage() / (1024 * 1024)
     );
 }
 
