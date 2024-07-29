@@ -715,7 +715,7 @@ fn cap_activity<Us: ColorTr, Them: ColorTr, V: ValueApplier, const S: usize>(
 
     let is_soft_cap = stack
         .get(stack.height.overflowing_sub(2).0)
-        .map(Them::piece_is_ours)
+        .map(Them::is_our_piece)
         == Some(true);
     if square.neighbors().all(|neighbour| {
         matches!(
@@ -840,11 +840,11 @@ fn critical_squares_eval<Us: ColorTr, Them: ColorTr, V: ValueApplier, const S: u
         let cap_stack = position.get_stack(capstone_square);
         let is_hard_cap = cap_stack
             .get(cap_stack.len().saturating_sub(2))
-            .is_some_and(Us::piece_is_ours);
+            .is_some_and(Us::is_our_piece);
         let num_high_supports = cap_stack
             .into_iter()
             .skip((cap_stack.len() as usize).saturating_sub(S + 1))
-            .filter(|piece| Us::piece_is_ours(*piece))
+            .filter(|piece| Us::is_our_piece(*piece))
             .count() as u8
             - 1;
         if top_stone_role != Some(Cap) && distance <= cap_stack.len() {
@@ -900,13 +900,13 @@ fn line_score<Us: ColorTr, Them: ColorTr, V: ValueApplier, const S: usize>(
                     .find(|(_, neigh)| !line.get_square(*neigh))
                     .unwrap();
                 if let Some(neighbor_piece) = position.top_stones()[neighbor].filter(|piece| {
-                    Them::piece_is_ours(*piece)
+                    Them::is_our_piece(*piece)
                         && !direction
                             .orthogonal_directions()
                             .into_iter()
                             .flat_map(|dir| neighbor.go_direction(dir))
                             .all(|sq| {
-                                position.top_stones()[sq].is_some_and(|p| Us::is_road_stone(p))
+                                position.top_stones()[sq].is_some_and(|p| Us::is_our_road_piece(p))
                             })
                 }) {
                     let i = index + 3 - S;

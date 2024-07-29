@@ -35,9 +35,9 @@ pub(crate) trait ColorTr {
 
     fn cap_piece() -> Piece;
 
-    fn is_road_stone(piece: Piece) -> bool;
+    fn is_our_road_piece(piece: Piece) -> bool;
 
-    fn piece_is_ours(piece: Piece) -> bool;
+    fn is_our_piece(piece: Piece) -> bool;
 
     fn is_critical_square<const S: usize>(group_data: &GroupData<S>, square: Square<S>) -> bool;
 
@@ -91,11 +91,11 @@ impl ColorTr for WhiteTr {
         Piece::WhiteCap
     }
 
-    fn is_road_stone(piece: Piece) -> bool {
+    fn is_our_road_piece(piece: Piece) -> bool {
         piece == WhiteFlat || piece == WhiteCap
     }
 
-    fn piece_is_ours(piece: Piece) -> bool {
+    fn is_our_piece(piece: Piece) -> bool {
         piece == WhiteFlat || piece == WhiteWall || piece == WhiteCap
     }
 
@@ -155,11 +155,11 @@ impl ColorTr for BlackTr {
         Piece::BlackCap
     }
 
-    fn is_road_stone(piece: Piece) -> bool {
+    fn is_our_road_piece(piece: Piece) -> bool {
         piece == BlackFlat || piece == BlackCap
     }
 
-    fn piece_is_ours(piece: Piece) -> bool {
+    fn is_our_piece(piece: Piece) -> bool {
         piece == BlackFlat || piece == BlackCap || piece == BlackWall
     }
 
