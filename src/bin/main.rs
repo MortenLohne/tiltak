@@ -179,6 +179,7 @@ fn main() {
             "mem_usage" => mem_usage::<6>(),
             "bench" => bench::<6>(),
             "bench2" => bench2(),
+            "bench_mcts" => bench_mcts(),
             "bench_old" => bench_old(),
             "selfplay" => mcts_selfplay(time::Duration::from_secs(10)),
             "process_ptn" => process_ptn::<6>("games_6s_2komi_all.ptn"),
@@ -917,6 +918,17 @@ fn bench2() {
     bench_position(position, 5_000_000);
 }
 
+fn bench_mcts() {
+    // Position from Alion's puzzle #5. The engine solves it quickly, so this benchmark is for mcts select speed
+    let position = <Position<6>>::from_fen_with_komi(
+        "2,x4,11/x5,221/x,2,2,2,x,221/2,1,12C,1,21C,2/2,x,2,x2,2/x,2,2,2,x,121 1 25",
+        Komi::from_half_komi(4).unwrap(),
+    )
+    .unwrap();
+
+    bench_position(position, 20_000_000);
+}
+
 fn bench_position<const S: usize>(position: Position<S>, nodes: u32) {
     println!("Starting benchmark");
     let start_time = time::Instant::now();
@@ -939,7 +951,7 @@ fn bench_position<const S: usize>(position: Position<S>, nodes: u32) {
     }
 
     let (mv, score) = tree.best_move();
-    let knps = 5000.0 / start_time.elapsed().as_secs_f32();
+    let knps = nodes as f32 / (start_time.elapsed().as_secs_f32() * 1000.0);
 
     println!(
         "{}: {:.2}%, {:.2}s, {:.1} knps",
