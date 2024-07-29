@@ -251,7 +251,7 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, P: PolicyApplier, const
                 Them::critical_squares(group_data) & (!group_data.all_pieces());
 
             // Apply PSQT
-            match (role, position.side_to_move()) {
+            match (role, Us::color()) {
                 (Flat, Color::White) => policy.eval_one(
                     indexes.flat_psqt_white,
                     lookup_square_symmetries::<S>(square),
@@ -580,7 +580,7 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, P: PolicyApplier, const
                 Wall => 1,
                 Cap => 2,
             };
-            match position.side_to_move() {
+            match Us::color() {
                 Color::White => policy.eval_one(indexes.move_role_bonus_white, role_id),
                 Color::Black => policy.eval_one(indexes.move_role_bonus_black, role_id),
             }
