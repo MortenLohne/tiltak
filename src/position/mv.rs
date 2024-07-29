@@ -1,5 +1,6 @@
 use std::fmt::{self, Write};
 use std::iter;
+use std::num::NonZeroU16;
 use std::str::FromStr;
 
 use arrayvec::ArrayVec;
@@ -25,7 +26,7 @@ pub enum ExpMove<const S: usize> {
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Move<const S: usize> {
-    inner: u16,
+    inner: NonZeroU16,
 }
 
 impl<const S: usize> Move<S> {
@@ -40,7 +41,8 @@ impl<const S: usize> Move<S> {
 
     pub fn placement(role: Role, square: Square<S>) -> Move<S> {
         Move {
-            inner: square.into_inner() as u16 | (role as u16) << 6,
+            inner: NonZeroU16::try_from(square.into_inner() as u16 | (role as u16 + 1) << 6)
+                .unwrap(),
         }
     }
 
@@ -50,35 +52,39 @@ impl<const S: usize> Move<S> {
         stack_movement: StackMovement<S>,
     ) -> Move<S> {
         Move {
-            inner: square.into_inner() as u16
-                | (direction as u16) << 6
-                | (stack_movement.into_inner() as u16) << 8,
+            inner: NonZeroU16::try_from(
+                square.into_inner() as u16
+                    | (direction as u16) << 6
+                    | (stack_movement.into_inner() as u16) << 8,
+            )
+            .unwrap(),
         }
     }
 
     pub fn expand(self) -> ExpMove<S> {
-        if self.inner >> 8 == 0 {
+        let inner = self.inner.get();
+        if inner >> 8 == 0 {
             unsafe {
                 ExpMove::Place(
-                    Role::from_disc_unchecked(self.inner as u8 >> 6),
-                    Square::from_u8(self.inner as u8 & 63),
+                    Role::from_disc_unchecked((inner as u8 >> 6) - 1),
+                    Square::from_u8(inner as u8 & 63),
                 )
             }
         } else {
             ExpMove::Move(
-                Square::from_u8(self.inner as u8 & 63),
-                Direction::from_disc((self.inner as u8 >> 6) & 3),
-                StackMovement::from_u8((self.inner >> 8) as u8),
+                Square::from_u8(inner as u8 & 63),
+                Direction::from_disc((inner as u8 >> 6) & 3),
+                StackMovement::from_u8((inner >> 8) as u8),
             )
         }
     }
 
     pub fn is_placement(self) -> bool {
-        self.inner >> 8 == 0
+        self.inner.get() >> 8 == 0
     }
 
     pub fn origin_square(self) -> Square<S> {
-        Square::from_u8(self.inner as u8 & 63)
+        Square::from_u8(self.inner.get() as u8 & 63)
     }
 
     pub fn from_string(input: &str) -> Result<Self, pgn_traits::Error> {
