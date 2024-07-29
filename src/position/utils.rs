@@ -610,6 +610,10 @@ impl<const S: usize> Square<S> {
             .map(|(_, neighbor)| neighbor)
     }
 
+    pub(crate) fn neighbors_bitboard(self) -> BitBoard {
+        lookup_neighbor_table::<S>(self)
+    }
+
     pub fn directions(self) -> impl Iterator<Item = Direction> {
         lookup_neighbor_array_table::<S>(self)
             .into_iter()
