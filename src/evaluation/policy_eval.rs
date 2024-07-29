@@ -451,21 +451,17 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, P: PolicyApplier, const
                 }
 
                 // Bonus for attacking a flatstone in a rank/file where we are strong
-                for neighbour in square.neighbors() {
-                    if position.top_stones()[neighbour] == Some(Them::flat_piece()) {
-                        let our_road_stones = Us::road_stones(group_data)
-                            .rank::<S>(neighbour.rank())
-                            .count()
-                            + Us::road_stones(group_data)
-                                .file::<S>(neighbour.file())
-                                .count();
-                        if our_road_stones >= 2 {
-                            policy.eval_i8(
-                                indexes.attack_strong_flats,
-                                0,
-                                our_road_stones as i8 - 1,
-                            );
-                        }
+                for neighbor in
+                    (square.neighbors_bitboard() & Them::flats(group_data)).into_iter::<S>()
+                {
+                    let our_road_stones = Us::road_stones(group_data)
+                        .rank::<S>(neighbor.rank())
+                        .count()
+                        + Us::road_stones(group_data)
+                            .file::<S>(neighbor.file())
+                            .count();
+                    if our_road_stones >= 2 {
+                        policy.eval_i8(indexes.attack_strong_flats, 0, our_road_stones as i8 - 1);
                     }
                 }
             }
