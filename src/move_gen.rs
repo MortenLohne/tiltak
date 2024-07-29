@@ -40,7 +40,7 @@ impl<const S: usize> Position<S> {
                     moves.extend(iter::once(Move::placement(Cap, square)));
                 }
             }
-            Some(piece) if Us::piece_is_ours(piece) => {
+            Some(piece) if Us::is_our_piece(piece) => {
                 for direction in square.directions() {
                     let mut movements = ArrayVec::new();
                     if piece == Us::cap_piece() {
@@ -52,7 +52,7 @@ impl<const S: usize> Position<S> {
                             StackMovement::new(),
                             &mut movements,
                         );
-                    } else if Us::piece_is_ours(piece) {
+                    } else {
                         self.generate_moving_moves_non_cap::<Us>(
                             direction,
                             square,

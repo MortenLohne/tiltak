@@ -305,7 +305,7 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, P: PolicyApplier, const
                 .filter(|sq| position.top_stones()[*sq].is_some_and(Piece::is_road_piece))
             {
                 let neighbour_group_id = group_data.groups[neighbour];
-                if Us::piece_is_ours(position.top_stones()[neighbour].unwrap()) {
+                if Us::is_our_piece(position.top_stones()[neighbour].unwrap()) {
                     if our_unique_neighbour_groups
                         .iter()
                         .all(|(_sq, id)| *id != neighbour_group_id)
@@ -492,26 +492,26 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, P: PolicyApplier, const
                 for (direction, neighbour) in square.direction_neighbors() {
                     // If square blocks an extension of two flats
                     if position.top_stones()[neighbour]
-                        .map(Them::is_road_stone)
+                        .map(Them::is_our_road_piece)
                         .unwrap_or_default()
                         && neighbour
                             .go_direction(direction)
                             .and_then(|sq| position.top_stones()[sq])
-                            .map(Them::is_road_stone)
+                            .map(Them::is_our_road_piece)
                             .unwrap_or_default()
                     {
                         policy.eval_one(indexes.blocking_stone_blocks_extensions_of_two_flats, 0);
                     }
 
                     if position.stack_heights()[neighbour] > 2
-                        && Them::piece_is_ours(position.top_stones()[neighbour].unwrap())
+                        && Them::is_our_piece(position.top_stones()[neighbour].unwrap())
                     {
                         let stack = position.get_stack(neighbour);
                         let top_stone = stack.top_stone().unwrap();
                         let mut captives: u8 = 0;
                         let mut reserves: u8 = 0;
                         for piece in stack.into_iter().take(stack.len() as usize - 1) {
-                            if Us::piece_is_ours(piece) {
+                            if Us::is_our_piece(piece) {
                                 captives += 1;
                             } else {
                                 reserves += 1;
@@ -654,7 +654,7 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, P: PolicyApplier, const
                 .top_stones_left_behind_by_move(square, &stack_movement)
                 .flatten()
             {
-                if Us::piece_is_ours(piece) {
+                if Us::is_our_piece(piece) {
                     if Us::is_critical_square(group_data, destination_square)
                         && piece.is_road_piece()
                     {
@@ -680,7 +680,7 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, P: PolicyApplier, const
                     }
                 }
 
-                if Us::piece_is_ours(piece) && piece.is_road_piece() {
+                if Us::is_our_road_piece(piece) {
                     let mut neighbour_group_ids = <ArrayVec<u8, S>>::new();
 
                     for neighbour in Square::neighbors(destination_square) {
@@ -691,8 +691,7 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, P: PolicyApplier, const
                             continue;
                         }
                         if let Some(neighbour_piece) = position.top_stones()[neighbour] {
-                            if Us::piece_is_ours(neighbour_piece) && neighbour_piece.is_road_piece()
-                            {
+                            if Us::is_our_road_piece(neighbour_piece) {
                                 neighbour_group_ids.push(group_data.groups[neighbour]);
                             }
                         }
@@ -755,7 +754,7 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, P: PolicyApplier, const
                     // whether it's captured by us or them
                     let destination_stack_height = position.stack_heights()[destination_square];
                     if piece.color() != destination_top_stone.color() {
-                        if Us::piece_is_ours(piece) {
+                        if Us::is_our_piece(piece) {
                             policy.eval_i8(
                                 indexes.stack_captured_by_movement,
                                 0,
@@ -781,14 +780,14 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, P: PolicyApplier, const
                             }
                         }
                     }
-                    if Us::piece_is_ours(destination_top_stone) && piece.role() == Wall {
+                    if Us::is_our_piece(destination_top_stone) && piece.role() == Wall {
                         our_squares_affected.push(destination_square);
                         our_groups_affected.push(group_data.groups[destination_square]);
                     }
 
                     for &line in BitBoard::lines_for_square::<S>(destination_square).iter() {
                         let our_road_stones = (line & Us::road_stones(group_data)).count() as usize;
-                        let color_factor: i8 = if Us::piece_is_ours(piece) { 1 } else { -1 };
+                        let color_factor: i8 = if Us::is_our_piece(piece) { 1 } else { -1 };
                         if our_road_stones > 2 {
                             if piece.role() == Cap {
                                 policy.eval_i8(
@@ -894,7 +893,7 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, P: PolicyApplier, const
                     let mut edge_connection = critical_square.group_edge_connection();
                     for neighbour in critical_square.neighbors() {
                         if let Some(neighbour_piece) = position.top_stones()[neighbour] {
-                            if Us::piece_is_ours(neighbour_piece) {
+                            if Us::is_our_piece(neighbour_piece) {
                                 let group_id = group_data.groups[neighbour];
                                 if our_groups_affected.iter().all(|g| *g != group_id) {
                                     edge_connection = edge_connection
@@ -1027,18 +1026,18 @@ fn spread_damages_our_group<const S: usize, Us: ColorTr>(
             let flank_square = square.go_direction(orthogonal).unwrap();
             let opposite_flank = square.go_direction(orthogonal.reverse());
 
-            position.top_stones()[flank_square].is_some_and(Us::is_road_stone)
+            position.top_stones()[flank_square].is_some_and(Us::is_our_road_piece)
                 && position.top_stones()[flank_square.go_direction(direction).unwrap()]
-                    .is_some_and(Us::is_road_stone)
+                    .is_some_and(Us::is_our_road_piece)
                 && (opposite_flank.is_none() // This is probably not fully correct, it assumes the connection to the edge will be restored because the next piece dropped is ours
                 || behind_square.is_none() // Ditto
                 || !position.top_stones()[opposite_flank.unwrap()]
-                    .is_some_and(Us::is_road_stone))
+                    .is_some_and(Us::is_our_road_piece))
                 && (behind_square.is_none()
                     || !position.top_stones()[behind_square.unwrap()]
-                        .is_some_and(Us::is_road_stone)
+                        .is_some_and(Us::is_our_road_piece)
                     || position.top_stones()
                         [behind_square.unwrap().go_direction(orthogonal).unwrap()]
-                    .is_some_and(Us::is_road_stone))
+                    .is_some_and(Us::is_our_road_piece))
         })
 }

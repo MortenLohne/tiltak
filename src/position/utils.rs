@@ -168,7 +168,7 @@ impl Piece {
     }
 
     pub fn is_road_piece(self) -> bool {
-        WhiteTr::is_road_stone(self) || BlackTr::is_road_stone(self)
+        WhiteTr::is_our_road_piece(self) || BlackTr::is_our_road_piece(self)
     }
 
     pub fn flip_color(self) -> Self {
