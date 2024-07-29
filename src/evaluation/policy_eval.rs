@@ -427,7 +427,7 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, P: PolicyApplier, const
                 // If square is next to a road stone laid on our last turn
                 if let Some((last_role, last_square)) = our_last_placement(position) {
                     if last_role == Flat || last_role == Cap {
-                        if square.neighbors().any(|neigh| neigh == last_square) {
+                        if square.neighbors_bitboard().get_square(last_square) {
                             policy.eval_one(indexes.next_to_our_last_stone, 0);
                         } else if square.rank().abs_diff(last_square.rank()) == 1
                             && square.file().abs_diff(last_square.file()) == 1
@@ -440,7 +440,7 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, P: PolicyApplier, const
                 // If square is next to a road stone laid on their last turn
                 if let Some((last_role, last_square)) = their_last_placement(position) {
                     if last_role == Flat {
-                        if square.neighbors().any(|neigh| neigh == last_square) {
+                        if square.neighbors_bitboard().get_square(last_square) {
                             policy.eval_one(indexes.next_to_their_last_stone, 0);
                         } else if square.rank().abs_diff(last_square.rank()) == 1
                             && square.file().abs_diff(last_square.file()) == 1
