@@ -429,8 +429,8 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, P: PolicyApplier, const
                     if last_role == Flat || last_role == Cap {
                         if square.neighbors().any(|neigh| neigh == last_square) {
                             policy.eval_one(indexes.next_to_our_last_stone, 0);
-                        } else if (square.rank() as i8 - last_square.rank() as i8).abs() == 1
-                            && (square.file() as i8 - last_square.file() as i8).abs() == 1
+                        } else if square.rank().abs_diff(last_square.rank()) == 1
+                            && square.file().abs_diff(last_square.file()) == 1
                         {
                             policy.eval_one(indexes.diagonal_to_our_last_stone, 0);
                         }
@@ -442,8 +442,8 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, P: PolicyApplier, const
                     if last_role == Flat {
                         if square.neighbors().any(|neigh| neigh == last_square) {
                             policy.eval_one(indexes.next_to_their_last_stone, 0);
-                        } else if (square.rank() as i8 - last_square.rank() as i8).abs() == 1
-                            && (square.file() as i8 - last_square.file() as i8).abs() == 1
+                        } else if square.rank().abs_diff(last_square.rank()) == 1
+                            && square.file().abs_diff(last_square.file()) == 1
                         {
                             policy.eval_one(indexes.diagonal_to_their_last_stone, 0);
                         }
