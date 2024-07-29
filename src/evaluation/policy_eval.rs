@@ -298,25 +298,27 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, P: PolicyApplier, const
             }
 
             // If square is next to a group
-            let mut our_unique_neighbour_groups: ArrayVec<(Square<S>, u8), 4> = ArrayVec::new();
-            let mut their_unique_neighbour_groups: ArrayVec<(Square<S>, u8), 4> = ArrayVec::new();
-            for neighbour in square
-                .neighbors()
-                .filter(|sq| position.top_stones()[*sq].is_some_and(Piece::is_road_piece))
+            let mut our_unique_neighbor_groups: ArrayVec<(Square<S>, u8), 4> = ArrayVec::new();
+            let mut their_unique_neighbor_groups: ArrayVec<(Square<S>, u8), 4> = ArrayVec::new();
+            for neighbor in (square.neighbors_bitboard() & Us::road_stones(group_data)).into_iter()
             {
-                let neighbour_group_id = group_data.groups[neighbour];
-                if Us::is_our_piece(position.top_stones()[neighbour].unwrap()) {
-                    if our_unique_neighbour_groups
-                        .iter()
-                        .all(|(_sq, id)| *id != neighbour_group_id)
-                    {
-                        our_unique_neighbour_groups.push((neighbour, neighbour_group_id));
-                    }
-                } else if their_unique_neighbour_groups
+                let neighbor_group_id = group_data.groups[neighbor];
+                if our_unique_neighbor_groups
                     .iter()
-                    .all(|(_sq, id)| *id != neighbour_group_id)
+                    .all(|(_sq, id)| *id != neighbor_group_id)
                 {
-                    their_unique_neighbour_groups.push((neighbour, neighbour_group_id));
+                    our_unique_neighbor_groups.push((neighbor, neighbor_group_id));
+                }
+            }
+            for neighbor in
+                (square.neighbors_bitboard() & Them::road_stones(group_data)).into_iter()
+            {
+                let neighbor_group_id = group_data.groups[neighbor];
+                if their_unique_neighbor_groups
+                    .iter()
+                    .all(|(_sq, id)| *id != neighbor_group_id)
+                {
+                    their_unique_neighbor_groups.push((neighbor, neighbor_group_id));
                 }
             }
 
@@ -324,7 +326,7 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, P: PolicyApplier, const
 
             // Bonus for anchoring our group to the board edge
             if !connection.is_empty() {
-                for (_, group_id) in our_unique_neighbour_groups.iter() {
+                for (_, group_id) in our_unique_neighbor_groups.iter() {
                     let (group_size, group_connection) =
                         group_data.amount_in_group[*group_id as usize];
                     if (group_connection & connection) != connection {
@@ -337,7 +339,7 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, P: PolicyApplier, const
                         );
                     }
                 }
-                for (_, group_id) in their_unique_neighbour_groups.iter() {
+                for (_, group_id) in their_unique_neighbor_groups.iter() {
                     let (group_size, group_connection) =
                         group_data.amount_in_group[*group_id as usize];
                     if (group_connection & connection) != connection {
@@ -352,8 +354,8 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, P: PolicyApplier, const
                 }
             }
 
-            if our_unique_neighbour_groups.len() > 1 {
-                let total_neighbours_group_size: u8 = our_unique_neighbour_groups
+            if our_unique_neighbor_groups.len() > 1 {
+                let total_neighbours_group_size: u8 = our_unique_neighbor_groups
                     .iter()
                     .map(|(_, group_id)| group_data.amount_in_group[*group_id as usize].0)
                     .sum();
@@ -367,8 +369,8 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, P: PolicyApplier, const
                 );
             }
 
-            if their_unique_neighbour_groups.len() > 1 {
-                let total_neighbours_group_size: u8 = their_unique_neighbour_groups
+            if their_unique_neighbor_groups.len() > 1 {
+                let total_neighbours_group_size: u8 = their_unique_neighbor_groups
                     .iter()
                     .map(|(_, group_id)| group_data.amount_in_group[*group_id as usize].0)
                     .sum();
@@ -381,8 +383,8 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, P: PolicyApplier, const
                     total_neighbours_group_size as f32 / 10.0,
                 );
             }
-            if our_unique_neighbour_groups.len() == 1 {
-                let group_id = our_unique_neighbour_groups[0].1;
+            if our_unique_neighbor_groups.len() == 1 {
+                let group_id = our_unique_neighbor_groups[0].1;
                 let amount_in_group = group_data.amount_in_group[group_id as usize].0;
 
                 policy.eval_one(indexes.extend_single_group_base, role_id);
