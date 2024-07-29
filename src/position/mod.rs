@@ -1382,10 +1382,6 @@ impl<const S: usize> PositionTrait for Position<S> {
                 ReverseMove::Place(to)
             }
             ExpMove::Move(square, direction, stack_movement) => {
-                for sq in <MoveIterator<S>>::new(square, direction, stack_movement) {
-                    self.hash ^= self.zobrist_hash_for_square(sq);
-                }
-
                 let mut to = square;
 
                 let mut pieces_left_behind = ArrayVec::new();
@@ -1398,7 +1394,9 @@ impl<const S: usize> PositionTrait for Position<S> {
                 for _ in 0..movement_iter.next().unwrap().pieces_to_take {
                     moving_pieces.push(stack.pop().unwrap());
                 }
+                self.hash ^= self.zobrist_hash_for_square(square);
                 self.set_stack(square, stack);
+                self.hash ^= self.zobrist_hash_for_square(square);
 
                 for Movement { pieces_to_take } in
                     movement_iter.chain(iter::once(Movement { pieces_to_take: 0 }))
@@ -1415,11 +1413,9 @@ impl<const S: usize> PositionTrait for Position<S> {
                     while moving_pieces.len() as u8 > pieces_to_take {
                         to_stack.push(moving_pieces.pop().unwrap());
                     }
+                    self.hash ^= self.zobrist_hash_for_square(to);
                     self.set_stack(to, to_stack);
-                }
-
-                for sq in <MoveIterator<S>>::new(square, direction, stack_movement) {
-                    self.hash ^= self.zobrist_hash_for_square(sq);
+                    self.hash ^= self.zobrist_hash_for_square(to);
                 }
 
                 ReverseMove::Move(
