@@ -185,8 +185,7 @@ impl<const S: usize> TreeRoot<S> {
         }
         self.temp_position.clone_from(&self.position);
         let result = self.tree.select(
-            // &mut self.temp_position,
-            &mut self.position.clone(),
+            &mut self.temp_position,
             &self.settings,
             &mut self.temp_vectors,
             &self.arena,
