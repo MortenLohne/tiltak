@@ -5,6 +5,7 @@ use std::sync;
 
 use board_game_traits::{Color, GameResult, Position as PositionTrait};
 use half::f16;
+use half::slice::HalfFloatSliceExt;
 use pgn_traits::PgnPosition;
 use rand::Rng;
 
@@ -225,6 +226,7 @@ pub struct TempVectors<const S: usize> {
     moves: Vec<(Move<S>, f16)>,
     fcd_per_move: Vec<i8>,
     policy_feature_sets: Vec<IncrementalPolicy<S>>,
+    unpacked_heuristic_scores: Vec<f32>,
 }
 
 impl<const S: usize> Default for TempVectors<S> {
@@ -234,6 +236,7 @@ impl<const S: usize> Default for TempVectors<S> {
             moves: vec![],
             fcd_per_move: vec![],
             policy_feature_sets: vec![],
+            unpacked_heuristic_scores: vec![0.; 65536],
         }
     }
 }
@@ -251,13 +254,13 @@ impl<const S: usize> TreeEdge<S> {
 #[inline(always)]
 pub fn exploration_value(
     mean_action_value: f32,
-    heuristic_score: f16,
+    heuristic_score: f32,
     child_visits: u32,
     parent_visits_sqrt: f32,
     cpuct: f32,
 ) -> f32 {
     (1.0 - mean_action_value)
-        + cpuct * heuristic_score.to_f32() * parent_visits_sqrt / (1 + child_visits) as f32
+        + cpuct * heuristic_score * parent_visits_sqrt / (1 + child_visits) as f32
 }
 
 impl<const S: usize> TreeBridge<S> {
@@ -265,6 +268,7 @@ impl<const S: usize> TreeBridge<S> {
     pub fn best_child(
         &mut self,
         settings: &MctsSetting<S>,
+        temp_vectors: &mut TempVectors<S>,
         arena: &Arena,
         our_visits: u32,
     ) -> usize {
@@ -276,28 +280,59 @@ impl<const S: usize> TreeBridge<S> {
         let mean_action_values = arena.get_slice(&self.mean_action_values);
         let visitss = arena.get_slice(&self.visitss);
 
+        let unpacked_heuristic_scores =
+            &mut temp_vectors.unpacked_heuristic_scores[0..heuristic_scores.len()];
+        heuristic_scores.convert_to_f32_slice(unpacked_heuristic_scores);
+        let heuristic_scores = unpacked_heuristic_scores;
+
         assert_eq!(heuristic_scores.len() % SIMD_WIDTH, 0);
         assert_eq!(heuristic_scores.len(), mean_action_values.len());
         assert_eq!(heuristic_scores.len(), visitss.len());
 
-        let (best_child_node_index, _) = heuristic_scores
-            .iter()
-            .zip(mean_action_values)
-            .zip(visitss)
-            .map(|((heuristic_score, mean_action_value), child_visits)| {
-                exploration_value(
-                    *mean_action_value,
-                    *heuristic_score,
-                    *child_visits,
-                    visits_sqrt,
-                    dynamic_cpuct,
-                )
-            })
+        for i in 0..heuristic_scores.len() {
+            let heuristic_score = &mut heuristic_scores[i];
+            let mean_action_value = &mean_action_values[i];
+            let child_visits = &visitss[i];
+
+            *heuristic_score = exploration_value(
+                *mean_action_value,
+                *heuristic_score,
+                *child_visits,
+                visits_sqrt,
+                dynamic_cpuct,
+            )
+        }
+
+        let mut indices = [0u32; SIMD_WIDTH];
+        let mut maxes = [f32::NEG_INFINITY; SIMD_WIDTH];
+
+        for (heuristic_scores, new_i) in heuristic_scores
+            .chunks_exact(SIMD_WIDTH)
+            .zip((0..).step_by(SIMD_WIDTH))
+        {
+            for i in 0..SIMD_WIDTH {
+                let score = heuristic_scores[i];
+                let max = &mut maxes[i];
+                let index = &mut indices[i];
+
+                let i = *index;
+                let m = *max;
+
+                let increased = score > m;
+                *index = if increased { new_i } else { i };
+                *max = if increased { score } else { m };
+            }
+        }
+
+        let (best_child_node_index, _) = indices
+            .into_iter()
             .enumerate()
+            .map(|(c, i)| i + c as u32)
+            .zip(maxes)
             .max_by(|(_, a), (_, b)| unsafe { a.partial_cmp(b).unwrap_unchecked() })
             .unwrap();
 
-        best_child_node_index
+        best_child_node_index as usize
     }
 
     pub fn select(
@@ -315,7 +350,7 @@ impl<const S: usize> TreeBridge<S> {
             position
         );
 
-        let best_child_node_index = self.best_child(settings, arena, our_visits);
+        let best_child_node_index = self.best_child(settings, temp_vectors, arena, our_visits);
 
         let child_edge = arena
             .get_slice_mut(&mut self.children)
@@ -395,7 +430,7 @@ impl<const S: usize> TreeEdge<S> {
     }
 }
 
-const SIMD_WIDTH: usize = 4;
+const SIMD_WIDTH: usize = 8;
 
 impl<const S: usize> Tree<S> {
     /// Perform one iteration of monte carlo tree search.
