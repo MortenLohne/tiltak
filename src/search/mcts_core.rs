@@ -213,20 +213,9 @@ impl<const S: usize> Tree<S> {
             &mut temp_vectors.fcd_per_move,
             &mut temp_vectors.policy_feature_sets,
         );
-        // let mut children_vec = arena.add_from_iter(length, source) Vec::with_capacity(temp_vectors.moves.len());
-        let policy_sum: f32 = temp_vectors
-            .moves
-            .iter()
-            .map(|(_, score)| score.to_f32())
-            .sum();
-        let inv_sum = 1.0 / policy_sum;
 
         let child_edges = temp_vectors.moves.drain(..).map(|(mv, heuristic_score)| {
-            TreeEdge::new(
-                mv,
-                f16::from_f32(heuristic_score.to_f32() * inv_sum),
-                settings.initial_mean_action_value(),
-            )
+            TreeEdge::new(mv, heuristic_score, settings.initial_mean_action_value())
         });
 
         self.children = arena.add_slice(child_edges)?;

@@ -22,6 +22,7 @@ mod arena;
 /// This module contains the public-facing convenience API for the search.
 /// The implementation itself in in mcts_core.
 mod mcts_core;
+pub mod mcts_core2;
 pub use arena::Arena;
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -76,7 +77,7 @@ impl<const S: usize> MctsSetting<S> {
     pub fn mem_usage(self, mem_usage: usize) -> Self {
         assert!(
             mem_usage < u32::MAX as usize // Check for 32-bit platforms
-            || mem_usage < 24 * 2_usize.pow(32) - 2
+            || mem_usage < ARENA_ELEMENT_SIZE * 2_usize.pow(32) - 2
         );
         self.arena_size((mem_usage / ARENA_ELEMENT_SIZE) as u32)
     }
@@ -427,7 +428,7 @@ impl<const S: usize> MonteCarloTree<S> {
     }
 
     pub fn mem_usage(&self) -> usize {
-        self.arena.slots_used() as usize * 24
+        self.arena.slots_used() as usize * ARENA_ELEMENT_SIZE
     }
 
     pub fn mean_action_value(&self) -> Score {

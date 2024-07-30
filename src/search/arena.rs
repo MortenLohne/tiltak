@@ -254,7 +254,9 @@ impl<const S: usize> Arena<S> {
             return None;
         }
 
-        let index = self.get_index_for_element(Self::num_slots_required::<T>() * length as u32)?;
+        let size = (mem::size_of::<T>() as u32).checked_mul(length as u32)?;
+        let slots_required = size.div_ceil(S as u32);
+        let index = self.get_index_for_element(slots_required)?;
 
         let mut ptr = unsafe { self.ptr_to_index(index) as *mut T };
 
@@ -267,14 +269,13 @@ impl<const S: usize> Arena<S> {
 
         assert!(source.next().is_none());
 
-        let bytes_required = Self::num_slots_required::<T>() as usize * length * S;
+        let bytes_required = slots_required as usize * S;
         self.stats
             .bytes_allocated
             .fetch_add(bytes_required, Ordering::Relaxed);
-        self.stats.padding_bytes.fetch_add(
-            bytes_required - mem::size_of::<T>() * length,
-            Ordering::Relaxed,
-        );
+        self.stats
+            .padding_bytes
+            .fetch_add(bytes_required - size as usize, Ordering::Relaxed);
         self.stats
             .bytes_slices
             .fetch_add(bytes_required, Ordering::Relaxed);
