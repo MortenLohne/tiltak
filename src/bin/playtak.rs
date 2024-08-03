@@ -35,6 +35,7 @@ pub struct PlaytakSettings {
     seek_game_time: Duration,
     seek_increment: Duration,
     seek_unrated: bool,
+    extra_time: Option<(u16, Duration)>,
     target_move_time: Option<Duration>,
     komi: Komi,
     opening_value_variance: Option<f32>,
@@ -130,7 +131,7 @@ pub fn main() -> Result<()> {
                 .long("target-move-time")
                 .env("TARGET_MOVE_TIME")
                 .conflicts_with("fixedNodes")
-                .help("Try spending no more than this number of seconds per move. Will occasionally search longer, assuming the time control allows")
+                .help("Try spending no more than this number of seconds per move. Will occasionally search longer, assuming the time control allows. If --extra-time-trigger is set, the engine will triple the target move time once the game passes the time control.")
                 .num_args(1))
         .arg(Arg::new("allowChoosingColor")
             .long("allow-choosing-color")
@@ -196,6 +197,20 @@ pub fn main() -> Result<()> {
             .help("Seek unrated games")
             .action(ArgAction::SetTrue)
             .num_args(0))
+        .arg(Arg::new("extraTimeAmount")
+            .long("extra-time-amount")
+            .env("EXTRA_TIME_AMOUNT")
+            .help("Amount of extra time for the second time control, in seconds")
+            .num_args(1)
+            .value_parser(clap::value_parser!(u64).range(1..))
+            .requires("extraTimeTrigger"))
+        .arg(Arg::new("extraTimeTrigger")
+            .long("extra-time-trigger")
+            .env("EXTRA_TIME_TRIGGER")
+            .help("Move number to start the second time control")
+            .num_args(1)
+            .value_parser(clap::value_parser!(u16).range(1..))
+            .requires("extraTimeAmount"))
         .arg(Arg::new("playtakBaseUrl")
             .long("playtak-base-url")
             .env("PLAYTAK_BASE_URL")
@@ -304,6 +319,13 @@ pub fn main() -> Result<()> {
 
     let komi = matches.get_one::<String>("komi").unwrap().parse().unwrap();
 
+    let extra_time = matches.get_one::<u64>("extraTimeAmount").map(|secs| {
+        (
+            *matches.get_one::<u16>("extraTimeTrigger").unwrap(),
+            Duration::from_secs(*secs),
+        )
+    });
+
     let seek_unrated = matches.get_flag("seekUnrated");
 
     let playtak_base_url = matches.get_one::<String>("playtakBaseUrl").unwrap();
@@ -323,6 +345,7 @@ pub fn main() -> Result<()> {
         seek_game_time: tc.unwrap_or_default().0,
         seek_increment: tc.unwrap_or_default().1,
         seek_unrated,
+        extra_time,
         target_move_time,
         komi,
         opening_value_variance: opening_value_noise,
@@ -619,21 +642,41 @@ impl PlaytakSession {
         size: usize,
         color: Option<Color>,
     ) -> Result<()> {
-        self.send_line(&format!(
-            "Seek {} {} {} {} {} {} {} {} 0 ",
-            size,
-            playtak_settings.seek_game_time.as_secs(),
-            playtak_settings.seek_increment.as_secs(),
-            match color {
-                Some(Color::White) => "W",
-                Some(Color::Black) => "B",
-                None => "A",
-            },
-            playtak_settings.komi.half_komi(),
-            position::starting_stones(size),
-            position::starting_capstones(size),
-            if playtak_settings.seek_unrated { 1 } else { 0 },
-        ))
+        if let Some((extra_time_trigger, extra_time_amount)) = playtak_settings.extra_time {
+            self.send_line(&format!(
+                "Seek {} {} {} {} {} {} {} {} 0 {} {} ",
+                size,
+                playtak_settings.seek_game_time.as_secs(),
+                playtak_settings.seek_increment.as_secs(),
+                match color {
+                    Some(Color::White) => "W",
+                    Some(Color::Black) => "B",
+                    None => "A",
+                },
+                playtak_settings.komi.half_komi(),
+                position::starting_stones(size),
+                position::starting_capstones(size),
+                if playtak_settings.seek_unrated { 1 } else { 0 },
+                extra_time_trigger,
+                extra_time_amount.as_secs(),
+            ))
+        } else {
+            self.send_line(&format!(
+                "Seek {} {} {} {} {} {} {} {} 0 ",
+                size,
+                playtak_settings.seek_game_time.as_secs(),
+                playtak_settings.seek_increment.as_secs(),
+                match color {
+                    Some(Color::White) => "W",
+                    Some(Color::Black) => "B",
+                    None => "A",
+                },
+                playtak_settings.komi.half_komi(),
+                position::starting_stones(size),
+                position::starting_capstones(size),
+                if playtak_settings.seek_unrated { 1 } else { 0 },
+            ))
+        }
     }
 
     fn seek_playtak_games(&mut self, playtak_settings: PlaytakSettings) -> io::Result<Infallible> {
@@ -823,7 +866,15 @@ impl PlaytakSession {
                     } else {
                         {
                             let maximum_time = if let Some(target_move_time) =  playtak_settings.target_move_time {
+                                if let Some((trigger_move, _)) = playtak_settings.extra_time {
+                                    if position.half_moves_played() / 2 > trigger_move as usize {
+                                        (our_time_left / 6 + game.increment / 2).min(6 * target_move_time)
+                                    } else {
+                                        (our_time_left / 6 + game.increment / 2).min(2 * target_move_time)
+                                    }
+                                } else {
                                 (our_time_left / 6 + game.increment / 2).min(2 * target_move_time)
+                                }
                             } else {
                                 our_time_left / 6 + game.increment / 2
                             };
