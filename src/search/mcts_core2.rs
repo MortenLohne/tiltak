@@ -1,4 +1,3 @@
-use std::array;
 use std::ops;
 use std::process;
 use std::sync;
@@ -6,7 +5,6 @@ use std::sync;
 use board_game_traits::{Color, GameResult, Position as PositionTrait};
 use half::f16;
 use half::slice::HalfFloatSliceExt;
-use pgn_traits::PgnPosition;
 use rand::Rng;
 
 use crate::evaluation::parameters::IncrementalPolicy;
@@ -127,12 +125,17 @@ impl<const S: usize> TreeRoot<S> {
             })
     }
 
+    pub fn pv(&self) -> impl Iterator<Item = Move<S>> + '_ {
+        Pv::new(&self.tree, &self.arena)
+    }
+
     /// Print human-readable information of the search's progress.
     pub fn print_info(&self) {
-        struct GoodEdge<const S: usize> {
+        struct GoodEdge<'a, const S: usize> {
             visits: u32,
             mv: Move<S>,
             mean_action_value: f32,
+            child: &'a TreeEdge<S>,
         }
         let child = self.arena.get(
             self.arena
@@ -146,15 +149,20 @@ impl<const S: usize> TreeRoot<S> {
             .get_slice(&child.visitss)
             .iter()
             .zip(
-                self.arena
-                    .get_slice(&child.moves)
-                    .iter()
-                    .zip(self.arena.get_slice(&child.mean_action_values).iter()),
+                self.arena.get_slice(&child.moves).iter().zip(
+                    self.arena
+                        .get_slice(&child.mean_action_values)
+                        .iter()
+                        .zip(self.arena.get_slice(&child.children).iter()),
+                ),
             )
-            .map(|(visits, (mv, score))| GoodEdge {
-                visits: *visits,
-                mv: mv.unwrap(),
-                mean_action_value: *score,
+            .filter_map(|(visits, (mv, (score, child)))| {
+                Some(GoodEdge {
+                    visits: *visits,
+                    mv: (*mv)?,
+                    mean_action_value: *score,
+                    child,
+                })
             })
             .collect();
 
@@ -172,10 +180,14 @@ impl<const S: usize> TreeRoot<S> {
 
         best_children.iter().take(8).for_each(|edge| {
             println!(
-                "Move {}: {} visits, {:.2}% mean action value",
+                "Move {}: {} visits, {:.2}% mean action value, pv {}",
                 edge.mv,
                 edge.visits,
                 edge.mean_action_value * 100.0,
+                Pv::new(edge.child, &self.arena)
+                    .map(|mv| mv.to_string())
+                    .collect::<Vec<_>>()
+                    .join(" ")
             )
         });
     }
@@ -329,7 +341,7 @@ impl<const S: usize> TreeBridge<S> {
             .enumerate()
             .map(|(c, i)| i + c as u32)
             .zip(maxes)
-            .max_by(|(_, a), (_, b)| unsafe { a.partial_cmp(b).unwrap_unchecked() })
+            .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap())
             .unwrap();
 
         best_child_node_index as usize
@@ -430,7 +442,7 @@ impl<const S: usize> TreeEdge<S> {
     }
 }
 
-const SIMD_WIDTH: usize = 8;
+const SIMD_WIDTH: usize = 4;
 
 impl<const S: usize> Tree<S> {
     /// Perform one iteration of monte carlo tree search.
@@ -544,15 +556,50 @@ impl<const S: usize> Tree<S> {
     }
 }
 
-// impl<const S: usize> Tree<S> {
-//     fn new_node() -> Self {
-//         Tree {
-//             children: arena::SliceIndex::default(),
-//             is_terminal: false,
-//             total_action_value: 0.0,
-//         }
-//     }
+pub struct Pv<'a, const S: usize> {
+    arena: &'a Arena,
+    edge: &'a TreeEdge<S>,
+}
 
+impl<'a, const S: usize> Pv<'a, S> {
+    pub fn new(edge: &'a TreeEdge<S>, arena: &'a Arena) -> Pv<'a, S> {
+        let mut pv = Pv { edge, arena };
+        // Skip the dummy move on the top of the tree
+        pv.next();
+        pv
+    }
+}
+
+impl<'a, const S: usize> Iterator for Pv<'a, S> {
+    type Item = Move<S>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.edge
+            .child
+            .as_ref()
+            .and_then(|child_index| {
+                let child = self.arena.get(child_index);
+                child.children.as_ref()
+            })
+            .and_then(|index| {
+                let bridge = self.arena.get(index);
+                let (_, (mv, child)) = self
+                    .arena
+                    .get_slice(&bridge.visitss)
+                    .iter()
+                    .zip(
+                        self.arena
+                            .get_slice(&bridge.moves)
+                            .iter()
+                            .zip(self.arena.get_slice(&bridge.children)),
+                    )
+                    .filter(|(_, (mv, _))| mv.is_some())
+                    .max_by_key(|(visits, _)| **visits)?;
+                self.edge = child;
+                *mv
+            })
+    }
+}
 //     /// Apply Dirichlet noise to the heuristic scores of the child node
 //     /// The noise is given `epsilon` weight.
 //     /// `alpha` is used to generate the noise, lower values generate more varied noise.
