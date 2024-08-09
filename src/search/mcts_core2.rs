@@ -205,6 +205,7 @@ impl<const S: usize> TreeRoot<S> {
             mv: Move<S>,
             mean_action_value: f32,
             child: &'a TreeEdge<S>,
+            policy: f16,
         }
         let child = self.arena.get(
             self.arena
@@ -219,18 +220,21 @@ impl<const S: usize> TreeRoot<S> {
             .iter()
             .zip(
                 self.arena.get_slice(&child.moves).iter().zip(
-                    self.arena
-                        .get_slice(&child.mean_action_values)
-                        .iter()
-                        .zip(self.arena.get_slice(&child.children).iter()),
+                    self.arena.get_slice(&child.mean_action_values).iter().zip(
+                        self.arena
+                            .get_slice(&child.children)
+                            .iter()
+                            .zip(self.arena.get_slice(&child.heuristic_scores)),
+                    ),
                 ),
             )
-            .filter_map(|(visits, (mv, (score, child)))| {
+            .filter_map(|(visits, (mv, (score, (child, policy))))| {
                 Some(GoodEdge {
                     visits: *visits,
                     mv: (*mv)?,
                     mean_action_value: *score,
                     child,
+                    policy: *policy,
                 })
             })
             .collect();
@@ -249,10 +253,11 @@ impl<const S: usize> TreeRoot<S> {
 
         best_children.iter().take(8).for_each(|edge| {
             println!(
-                "Move {}: {} visits, {:.2}% mean action value, pv {}",
+                "Move {}: {} visits, {:.2}% mean action value, {:.3}% static score, pv {}",
                 edge.mv,
                 edge.visits,
                 edge.mean_action_value * 100.0,
+                edge.policy.to_f32() * 100.0,
                 Pv::new(edge.child, &self.arena)
                     .map(|mv| mv.to_string())
                     .collect::<Vec<_>>()
