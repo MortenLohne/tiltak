@@ -128,21 +128,10 @@ impl<const S: usize> TreeRoot<S> {
                     .unwrap()
                     .0;
                 let moves = arena.get_slice_mut(&mut bridge.moves);
-                let children = arena.get_slice_mut(&mut bridge.children);
-                let visitss = arena.get_slice_mut(&mut bridge.visitss);
                 let heuristic_scores = arena.get_slice_mut(&mut bridge.heuristic_scores);
-                let mean_action_values = arena.get_slice_mut(&mut bridge.mean_action_values);
 
                 moves[index] = None;
                 heuristic_scores[index] = f16::NEG_INFINITY; // TODO: Also set infinite visitss?
-
-                for i in index..(moves.len() - 1) {
-                    moves.swap(i, i + 1);
-                    children.swap(i, i + 1);
-                    visitss.swap(i, i + 1);
-                    heuristic_scores.swap(i, i + 1);
-                    mean_action_values.swap(i, i + 1);
-                }
             }
         }
 
@@ -335,8 +324,7 @@ pub fn exploration_value(
     parent_visits_sqrt: f32,
     cpuct: f32,
 ) -> f32 {
-    (1.0 - mean_action_value)
-        + cpuct * heuristic_score * parent_visits_sqrt / (1 + child_visits) as f32
+    cpuct * heuristic_score * parent_visits_sqrt / (1 + child_visits) as f32 - mean_action_value
 }
 
 impl<const S: usize> TreeBridge<S> {
@@ -610,13 +598,7 @@ impl<const S: usize> Tree<S> {
                 )
                 .ok_or(MctsError::OOM)?,
             visitss: arena
-                .add_slice((0..(num_children + padding)).map(|i| {
-                    if i < num_children {
-                        0
-                    } else {
-                        u32::MAX - 1 // Avoid overflow, because the exploration formula uses `visits + 1`
-                    }
-                }))
+                .add_slice((0..(num_children + padding)).map(|_| 0))
                 .ok_or(MctsError::OOM)?,
             heuristic_scores: arena
                 .add_slice((0..(num_children + padding)).map(|i| {
