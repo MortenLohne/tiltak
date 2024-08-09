@@ -6,6 +6,7 @@ use board_game_traits::{Color, GameResult, Position as PositionTrait};
 use half::f16;
 use half::slice::HalfFloatSliceExt;
 use rand::Rng;
+use rand_distr::Distribution;
 
 use crate::evaluation::parameters::IncrementalPolicy;
 use crate::position::Move;
@@ -77,13 +78,81 @@ impl<const S: usize> TreeRoot<S> {
             }
             Err(err) => panic!("{}", err),
         };
+
+        let mut tree = TreeEdge { child: None };
+        let mut temp_vectors = TempVectors::default();
+
+        // Applying dirichlet noise or excluding moves can only be done once the child edges of the root are initialized,
+        // which is done on the 2nd select
+        tree.select(
+            &mut position.clone(),
+            &settings,
+            &mut temp_vectors,
+            &arena,
+            0,
+        )
+        .unwrap();
+        tree.select(
+            &mut position.clone(),
+            &settings,
+            &mut temp_vectors,
+            &arena,
+            1,
+        )
+        .unwrap();
+
+        if let Some(alpha) = settings.dirichlet {
+            arena
+                .get_mut(
+                    (arena.get_mut(tree.child.as_mut().unwrap()))
+                        .children
+                        .as_mut()
+                        .unwrap(),
+                )
+                .apply_dirichlet(&arena, 0.25, alpha);
+        }
+
+        if !settings.excluded_moves.is_empty() {
+            let bridge = arena.get_mut(
+                (arena.get_mut(tree.child.as_mut().unwrap()))
+                    .children
+                    .as_mut()
+                    .unwrap(),
+            );
+            for excluded_move in settings.excluded_moves.iter() {
+                let index = arena
+                    .get_slice(&bridge.moves)
+                    .iter()
+                    .enumerate()
+                    .find(|(_, mv)| **mv == Some(*excluded_move))
+                    .unwrap()
+                    .0;
+                let moves = arena.get_slice_mut(&mut bridge.moves);
+                let children = arena.get_slice_mut(&mut bridge.children);
+                let visitss = arena.get_slice_mut(&mut bridge.visitss);
+                let heuristic_scores = arena.get_slice_mut(&mut bridge.heuristic_scores);
+                let mean_action_values = arena.get_slice_mut(&mut bridge.mean_action_values);
+
+                moves[index] = None;
+                heuristic_scores[index] = f16::NEG_INFINITY; // TODO: Also set infinite visitss?
+
+                for i in index..(moves.len() - 1) {
+                    moves.swap(i, i + 1);
+                    children.swap(i, i + 1);
+                    visitss.swap(i, i + 1);
+                    heuristic_scores.swap(i, i + 1);
+                    mean_action_values.swap(i, i + 1);
+                }
+            }
+        }
+
         TreeRoot {
-            tree: TreeEdge { child: None },
+            tree,
             visits: 0,
             position: position.clone(),
             temp_position: position,
             settings,
-            temp_vectors: TempVectors::default(),
+            temp_vectors,
             arena,
         }
     }
@@ -253,16 +322,6 @@ impl<const S: usize> Default for TempVectors<S> {
     }
 }
 
-impl<const S: usize> TreeEdge<S> {
-    pub fn new() -> Self {
-        TreeEdge { child: None }
-    }
-
-    pub fn shallow_clone(&self) -> Self {
-        Self { child: None }
-    }
-}
-
 #[inline(always)]
 pub fn exploration_value(
     mean_action_value: f32,
@@ -404,6 +463,25 @@ impl<const S: usize> TreeBridge<S> {
                 .get_mut(best_child_node_index)
                 .unwrap() as f32;
         Ok(result)
+    }
+
+    /// Apply Dirichlet noise to the heuristic scores of the child node
+    /// The noise is given `epsilon` weight.
+    /// `alpha` is used to generate the noise, lower values generate more varied noise.
+    /// Values above 1 are less noisy, and tend towards uniform outputs
+    pub fn apply_dirichlet(&mut self, arena: &Arena, epsilon: f32, alpha: f32) {
+        let mut rng = rand::thread_rng();
+        let dirichlet =
+            rand_distr::Dirichlet::new_with_size(alpha, arena.get_slice(&self.children).len())
+                .unwrap();
+        let noise_vec = dirichlet.sample(&mut rng);
+        for (child_prior, eta) in arena
+            .get_slice_mut(&mut self.heuristic_scores)
+            .iter_mut()
+            .zip(noise_vec)
+        {
+            *child_prior = f16::from_f32(child_prior.to_f32() * (1.0 - epsilon) + epsilon * eta);
+        }
     }
 }
 
@@ -600,26 +678,6 @@ impl<'a, const S: usize> Iterator for Pv<'a, S> {
             })
     }
 }
-//     /// Apply Dirichlet noise to the heuristic scores of the child node
-//     /// The noise is given `epsilon` weight.
-//     /// `alpha` is used to generate the noise, lower values generate more varied noise.
-//     /// Values above 1 are less noisy, and tend towards uniform outputs
-//     pub fn apply_dirichlet(&mut self, arena: &Arena, epsilon: f32, alpha: f32) {
-//         let mut rng = rand::thread_rng();
-//         let dirichlet =
-//             rand_distr::Dirichlet::new_with_size(alpha, arena.get_slice(&self.children).len())
-//                 .unwrap();
-//         let noise_vec = dirichlet.sample(&mut rng);
-//         for (child_prior, eta) in arena
-//             .get_slice_mut(&mut self.children)
-//             .iter_mut()
-//             .map(|child| &mut child.heuristic_score)
-//             .zip(noise_vec)
-//         {
-//             *child_prior = f16::from_f32(child_prior.to_f32() * (1.0 - epsilon) + epsilon * eta);
-//         }
-//     }
-// }
 
 /// Do a mcts rollout up to `depth` plies, before doing a static evaluation.
 /// Depth is 0 on default settings, in which case it immediately does a static evaluation
