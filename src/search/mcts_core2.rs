@@ -561,8 +561,6 @@ impl<const S: usize> Tree<S> {
         arena: &Arena,
     ) -> Result<f32, MctsError> {
         assert!(self.children.is_none());
-        // TODO: This assert is to ensure that this method is only called on the node's second visit, but it may trigger through normal execution
-        assert!(self.total_action_value != 0.0);
         let group_data = position.group_data();
         assert!(temp_vectors.simple_moves.is_empty());
         assert!(temp_vectors.moves.is_empty());
@@ -628,10 +626,7 @@ pub struct Pv<'a, const S: usize> {
 
 impl<'a, const S: usize> Pv<'a, S> {
     pub fn new(edge: &'a TreeEdge<S>, arena: &'a Arena) -> Pv<'a, S> {
-        let mut pv = Pv { edge, arena };
-        // Skip the dummy move on the top of the tree
-        pv.next();
-        pv
+        Pv { edge, arena }
     }
 }
 
