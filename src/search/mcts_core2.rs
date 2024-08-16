@@ -1,6 +1,7 @@
 use std::ops;
 use std::process;
 use std::sync;
+use std::time;
 
 use board_game_traits::{Color, GameResult, Position as PositionTrait};
 use half::f16;
@@ -146,6 +147,76 @@ impl<const S: usize> TreeRoot<S> {
         }
     }
 
+    pub fn search_for_time<F>(&mut self, max_time: time::Duration, callback: F)
+    where
+        F: Fn(&Self),
+    {
+        let start_time = time::Instant::now();
+
+        for i in 0.. {
+            let nodes = (50.0 * 2.0_f32.powf(0.125).powi(i)) as u64;
+            for _ in 0..nodes {
+                match self.select() {
+                    Err(MctsError::OOM) => {
+                        eprintln!("Warning: Search stopped early due to OOM");
+                        callback(self);
+                        return;
+                    }
+                    Err(MctsError::MaxVisits) => {
+                        eprintln!("Warning: Reached {} max visit count", self.visits());
+                        callback(self);
+                        return;
+                    }
+                    Ok(_) => (),
+                };
+            }
+
+            let mut shallow_edges = self.shallow_edges().unwrap();
+
+            // Always return when we have less than 10ms left
+            if max_time < (time::Duration::from_millis(10))
+                || start_time.elapsed() > max_time - (time::Duration::from_millis(10))
+                || shallow_edges.len() == 1
+            {
+                callback(self);
+                return;
+            }
+
+            shallow_edges.sort_by_key(|edge| edge.visits);
+            shallow_edges.reverse();
+
+            let node_ratio =
+                (1 + shallow_edges[1].visits) as f32 / (1 + shallow_edges[0].visits) as f32;
+            let time_ratio = start_time.elapsed().as_secs_f32() / max_time.as_secs_f32();
+
+            let visits_sqrt = (self.visits() as f32).sqrt();
+            let dynamic_cpuct = self.settings.c_puct_init()
+                + f32::ln(
+                    (self.visits() as f32 + self.settings.c_puct_base())
+                        / self.settings.c_puct_base(),
+                );
+
+            let best_edge = shallow_edges.iter().max_by_key(|edge| edge.visits).unwrap();
+
+            let best_exploration_value = best_edge.exploration_value(visits_sqrt, dynamic_cpuct);
+
+            if time_ratio.powf(2.0) > node_ratio / 2.0 {
+                callback(self);
+                // Do not stop if any other child nodes have better exploration value
+                if shallow_edges.iter().any(|edge| {
+                    edge.mv != best_edge.mv
+                        && edge.exploration_value(visits_sqrt, dynamic_cpuct)
+                            > best_exploration_value + 0.01
+                }) {
+                    continue;
+                }
+                return;
+            } else if i % 2 == 0 {
+                callback(self);
+            }
+        }
+    }
+
     // TODO: Count up to u64 on root?
     pub fn visits(&self) -> u32 {
         self.visits
@@ -164,23 +235,11 @@ impl<const S: usize> TreeRoot<S> {
     }
 
     pub fn best_move(&self) -> Option<(Move<S>, f32)> {
-        self.tree
-            .child
-            .as_ref()
-            .and_then(|index| self.arena.get(index).children.as_ref())
-            .and_then(|index| {
-                let child = self.arena.get(index);
-                let (mv, score) = self
-                    .arena
-                    .get_slice(&child.moves)
-                    .iter()
-                    .zip(self.arena.get_slice(&child.mean_action_values))
-                    .zip(self.arena.get_slice(&child.visitss))
-                    .filter(|((mv, _), _)| mv.is_some())
-                    .max_by_key(|(_, visits)| *visits)?
-                    .0;
-                Some((mv.unwrap(), 1.0 - *score))
-            })
+        let best_edge = self
+            .shallow_edges()?
+            .into_iter()
+            .max_by_key(|edge| edge.visits)?;
+        Some((best_edge.mv, 1.0 - best_edge.mean_action_value))
     }
 
     pub fn pv(&self) -> impl Iterator<Item = Move<S>> + '_ {
@@ -189,44 +248,7 @@ impl<const S: usize> TreeRoot<S> {
 
     /// Print human-readable information of the search's progress.
     pub fn print_info(&self) {
-        struct GoodEdge<'a, const S: usize> {
-            visits: u32,
-            mv: Move<S>,
-            mean_action_value: f32,
-            child: &'a TreeEdge<S>,
-            policy: f16,
-        }
-        let child = self.arena.get(
-            self.arena
-                .get(self.tree.child.as_ref().unwrap())
-                .children
-                .as_ref()
-                .unwrap(),
-        );
-        let mut best_children: Vec<GoodEdge<S>> = self
-            .arena
-            .get_slice(&child.visitss)
-            .iter()
-            .zip(
-                self.arena.get_slice(&child.moves).iter().zip(
-                    self.arena.get_slice(&child.mean_action_values).iter().zip(
-                        self.arena
-                            .get_slice(&child.children)
-                            .iter()
-                            .zip(self.arena.get_slice(&child.heuristic_scores)),
-                    ),
-                ),
-            )
-            .filter_map(|(visits, (mv, (score, (child, policy))))| {
-                Some(GoodEdge {
-                    visits: *visits,
-                    mv: (*mv)?,
-                    mean_action_value: *score,
-                    child,
-                    policy: *policy,
-                })
-            })
-            .collect();
+        let mut best_children: Vec<ShallowEdge<S>> = self.shallow_edges().unwrap_or_default();
 
         best_children.sort_by_key(|edge| edge.visits);
         best_children.reverse();
@@ -269,6 +291,61 @@ impl<const S: usize> TreeRoot<S> {
         )?;
         self.visits += 1;
         Ok(result)
+    }
+
+    pub fn shallow_edges(&self) -> Option<Vec<ShallowEdge<'_, S>>> {
+        let child = self.arena.get(
+            self.arena
+                .get(self.tree.child.as_ref()?)
+                .children
+                .as_ref()?,
+        );
+
+        Some(
+            self.arena
+                .get_slice(&child.visitss)
+                .iter()
+                .zip(
+                    self.arena.get_slice(&child.moves).iter().zip(
+                        self.arena.get_slice(&child.mean_action_values).iter().zip(
+                            self.arena
+                                .get_slice(&child.children)
+                                .iter()
+                                .zip(self.arena.get_slice(&child.heuristic_scores)),
+                        ),
+                    ),
+                )
+                .filter_map(|(visits, (mv, (score, (child, policy))))| {
+                    Some(ShallowEdge {
+                        visits: *visits,
+                        mv: (*mv)?,
+                        mean_action_value: *score,
+                        child,
+                        policy: *policy,
+                    })
+                })
+                .collect(),
+        )
+    }
+}
+// More convenient edge representation, allowing them to be stored as array-of-structs rather than struct-of-arrays
+pub struct ShallowEdge<'a, const S: usize> {
+    visits: u32,
+    mv: Move<S>,
+    mean_action_value: f32,
+    child: &'a TreeEdge<S>,
+    policy: f16,
+}
+
+impl<'a, const S: usize> ShallowEdge<'a, S> {
+    pub fn exploration_value(&self, parent_visits_sqrt: f32, dynamic_cpuct: f32) -> f32 {
+        exploration_value(
+            self.mean_action_value,
+            self.policy.to_f32(),
+            self.visits,
+            parent_visits_sqrt,
+            dynamic_cpuct,
+        )
     }
 }
 
