@@ -83,10 +83,10 @@ pub fn handle_aws_event_generic<const S: usize>(e: Event) -> Result<Output, Erro
                 Duration::min(time_left / 40 + increment / 3, Duration::from_secs(40))
             };
 
-            let mut tree = MonteCarloTree::with_settings(position, settings);
+            let mut tree = MonteCarloTree::new(position, settings);
             tree.search_for_time(max_time, |_| {});
 
-            let score = 1.0 - tree.best_move().1;
+            let score = 1.0 - tree.best_move().unwrap().1;
             let pv = tree.pv().map(|mv| mv.to_string()).collect();
             Ok(Output {
                 pv,
@@ -97,14 +97,14 @@ pub fn handle_aws_event_generic<const S: usize>(e: Event) -> Result<Output, Erro
             })
         }
         TimeControl::FixedNodes(nodes) => {
-            let mut tree = search::MonteCarloTree::with_settings(position, settings);
+            let mut tree = search::MonteCarloTree::new(position, settings);
             for _ in 0..nodes {
-                if tree.select().is_none() {
-                    eprintln!("Warning: Search stopped early due to OOM");
+                if let Err(err) = tree.select() {
+                    eprintln!("Warning: {err}");
                     break;
-                };
+                }
             }
-            let score = 1.0 - tree.best_move().1;
+            let score = 1.0 - tree.best_move().unwrap().1;
             let pv = tree.pv().map(|mv| mv.to_string()).collect();
             Ok(Output {
                 pv,

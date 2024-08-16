@@ -12,7 +12,7 @@ use crate::position::Move;
 use crate::position::Position;
 use crate::search::{cp_to_win_percentage, MctsSetting};
 
-use super::{arena, Arena, MctsError};
+use super::{arena, Arena, Error};
 
 /// A Monte Carlo Search Tree, containing every node that has been seen in search.
 #[derive(PartialEq, Debug)]
@@ -148,7 +148,7 @@ impl<const S: usize> TreeBridge<S> {
         temp_vectors: &mut TempVectors<S>,
         arena: &Arena,
         our_visits: u32,
-    ) -> Result<f32, MctsError> {
+    ) -> Result<f32, Error> {
         assert_ne!(
             arena.get_slice(&self.children).len(),
             0,
@@ -228,7 +228,7 @@ impl<const S: usize> TreeEdge<S> {
         temp_vectors: &mut TempVectors<S>,
         arena: &Arena,
         parent_visits: u32,
-    ) -> Result<f32, MctsError> {
+    ) -> Result<f32, Error> {
         if let Some(child) = self.child.as_mut() {
             return arena.get_mut(child).select(
                 position,
@@ -248,7 +248,7 @@ impl<const S: usize> TreeEdge<S> {
                     game_result,
                     children: None,
                 })
-                .ok_or(MctsError::OOM)?,
+                .ok_or(Error::OOM)?,
         );
 
         Ok(result)
@@ -268,7 +268,7 @@ impl<const S: usize> Tree<S> {
         temp_vectors: &mut TempVectors<S>,
         arena: &Arena,
         parent_visits: u32,
-    ) -> Result<f32, MctsError> {
+    ) -> Result<f32, Error> {
         // TODO: Assume node has already had 1 visit before?
         if let Some(game_result) = self.game_result {
             let result = game_result.score();
@@ -301,7 +301,7 @@ impl<const S: usize> Tree<S> {
         settings: &MctsSetting<S>,
         temp_vectors: &mut TempVectors<S>,
         arena: &Arena,
-    ) -> Result<f32, MctsError> {
+    ) -> Result<f32, Error> {
         assert!(self.children.is_none());
         let group_data = position.group_data();
         assert!(temp_vectors.simple_moves.is_empty());
@@ -325,21 +325,21 @@ impl<const S: usize> Tree<S> {
         let mut tree_edge = TreeBridge {
             children: arena
                 .add_slice((0..(num_children + padding)).map(|_| TreeEdge { child: None }))
-                .ok_or(MctsError::OOM)?,
+                .ok_or(Error::OOM)?,
             moves: arena
                 .add_slice(
                     (0..(num_children + padding))
                         .map(|i| temp_vectors.moves.get(i).map(|(mv, _)| *mv)),
                 )
-                .ok_or(MctsError::OOM)?,
+                .ok_or(Error::OOM)?,
             mean_action_values: arena
                 .add_slice(
                     (0..(num_children + padding)).map(|_| settings.initial_mean_action_value()),
                 )
-                .ok_or(MctsError::OOM)?,
+                .ok_or(Error::OOM)?,
             visitss: arena
                 .add_slice((0..(num_children + padding)).map(|_| 0))
-                .ok_or(MctsError::OOM)?,
+                .ok_or(Error::OOM)?,
             heuristic_scores: arena
                 .add_slice((0..(num_children + padding)).map(|i| {
                     temp_vectors
@@ -348,14 +348,14 @@ impl<const S: usize> Tree<S> {
                         .map(|(_, score)| *score)
                         .unwrap_or(f16::NEG_INFINITY) // Ensure that this move never actually gets selected
                 }))
-                .ok_or(MctsError::OOM)?,
+                .ok_or(Error::OOM)?,
         };
         temp_vectors.moves.clear();
 
         // Select child edge before writing the child node into the tree, in case we OOM inside this call
         let result = tree_edge.select(position, settings, temp_vectors, arena, 1)?;
 
-        self.children = Some(arena.add(tree_edge).ok_or(MctsError::OOM)?);
+        self.children = Some(arena.add(tree_edge).ok_or(Error::OOM)?);
 
         Ok(result)
     }

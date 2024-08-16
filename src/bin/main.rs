@@ -6,8 +6,8 @@ use std::str::FromStr;
 use std::sync::atomic::{self, AtomicU64};
 use std::{fs, io, time};
 
+use board_game_traits::Position as PositionTrait;
 use board_game_traits::{Color, GameResult};
-use board_game_traits::{EvalPosition, Position as PositionTrait};
 use half::f16;
 use pgn_traits::PgnPosition;
 #[cfg(feature = "constant-tuning")]
@@ -57,15 +57,6 @@ fn main() {
             .map(|komi_str| Komi::from_str(komi_str).unwrap())
             .unwrap_or_default();
         match words[0] {
-            "tps2" => match words.get(1) {
-                Some(&"4") => analyze_position_from_tps_2::<4>(komi),
-                Some(&"5") => analyze_position_from_tps_2::<5>(komi),
-                Some(&"6") => analyze_position_from_tps_2::<6>(komi),
-                Some(&"7") => analyze_position_from_tps_2::<7>(komi),
-                Some(&"8") => analyze_position_from_tps_2::<8>(komi),
-                Some(s) => println!("Unsupported size {}", s),
-                None => analyze_position_from_tps_2::<5>(komi),
-            },
             "play" => {
                 let position = Position::default();
                 play_human(position);
@@ -189,7 +180,6 @@ fn main() {
             "bench" => bench::<6>(),
             "bench2" => bench2(),
             "bench_mcts" => bench_mcts(),
-            "bench_mcts2" => bench_mcts2(),
             "bench_old" => bench_old(),
             "selfplay" => mcts_selfplay(time::Duration::from_secs(10)),
             "process_ptn" => process_ptn::<6>("games_6s_2komi_all.ptn"),
@@ -544,18 +534,21 @@ fn analyze_openings<const S: usize>(komi: Komi, nodes: u32) {
             }
             let start_time = time::Instant::now();
             let settings = search::MctsSetting::default().arena_size_for_nodes(nodes);
-            let mut tree = search::MonteCarloTree::with_settings(position.clone(), settings);
+            let mut tree = search::MonteCarloTree::new(position.clone(), settings);
             for _ in 0..nodes {
-                if tree.select().is_none() {
-                    eprintln!("Warning: Search stopped early due to OOM");
-                    break;
-                };
+                match tree.select() {
+                    Ok(_) => (),
+                    Err(err) => {
+                        eprintln!("Warning: {}", err);
+                        break;
+                    }
+                }
             }
             let pv: Vec<Move<S>> = tree.pv().take(4).collect();
             print!(
                 "{}: {:.4}, {:.1}s, ",
                 line.trim(),
-                tree.best_move().1,
+                tree.best_move().unwrap().1,
                 start_time.elapsed().as_secs_f32()
             );
             for mv in pv {
@@ -729,43 +722,6 @@ fn analyze_position_from_tps<const S: usize>(komi: Komi) {
     analyze_position(&position)
 }
 
-fn analyze_position_from_tps_2<const S: usize>(komi: Komi) {
-    println!("Enter TPS");
-    let mut input = String::new();
-    io::stdin().read_line(&mut input).unwrap();
-    let position = <Position<S>>::from_fen_with_komi(&input, komi).unwrap();
-    // analyze_position(&position)
-    let settings: MctsSetting<S> = search::MctsSetting::default()
-        .arena_size(2_u32.pow(30) * 3)
-        .exclude_moves(vec![]);
-    let start_time = time::Instant::now();
-
-    let mut tree = search::mcts_core2::TreeRoot::new(position.clone(), settings);
-    for i in 1.. {
-        if tree.select().is_err() {
-            println!("Search stopped due to OOM");
-            break;
-        };
-        if i % 100_000 == 0 {
-            let static_eval: f32 =
-                position.static_eval() * position.side_to_move().multiplier() as f32;
-            println!(
-            "{} visits, eval: {:.2}%, Wilem-style eval: {:+.2}, static eval: {:.4}, static winning probability: {:.2}%, {:.2}s",
-            tree.visits(),
-            tree.mean_action_value() * 100.0,
-            tree.mean_action_value() * 2.0 - 1.0,
-            static_eval,
-            search::cp_to_win_percentage(static_eval) * 100.0,
-            start_time.elapsed().as_secs_f64()
-        );
-            tree.print_info();
-            if let Some((mv, value)) = tree.best_move() {
-                println!("Best move: ({}, {})", mv, value);
-            }
-        }
-    }
-}
-
 fn analyze_position<const S: usize>(position: &Position<S>) {
     println!("TPS {}", position.to_fen());
     println!("{:?}", position);
@@ -773,6 +729,7 @@ fn analyze_position<const S: usize>(position: &Position<S>) {
 
     // Change which sets of eval parameters to use in search
     // Can be different from the komi used to determine the game result at terminal nodes
+    // let eval_komi = Komi::from_half_komi(4).unwrap();
     let eval_komi = position.komi();
 
     assert_eq!(position.game_result(), None, "Cannot analyze finished game");
@@ -793,18 +750,21 @@ fn analyze_position<const S: usize>(position: &Position<S>) {
 
     let settings: MctsSetting<S> = search::MctsSetting::default()
         .arena_size(2_u32.pow(30) * 3)
+        .add_policy_params(<Position<S>>::policy_params(eval_komi))
+        .add_value_params(<Position<S>>::value_params(eval_komi))
+        // .add_rollout_depth(1000)
         .exclude_moves(vec![]);
     let start_time = time::Instant::now();
 
-    let mut tree = search::MonteCarloTree::with_settings(position.clone(), settings);
+    let mut tree = search::MonteCarloTree::new(position.clone(), settings);
     for i in 1.. {
-        if tree.select().is_none() {
-            println!("Search stopped due to OOM");
-            break;
+        if let Err(err) = tree.select() {
+            println!("{err}");
+            return;
         };
         if i % 100_000 == 0 {
-            let static_eval: f32 =
-                position.static_eval() * position.side_to_move().multiplier() as f32;
+            // let static_eval = position.static_eval() * position.side_to_move().multiplier() as f32;
+            let static_eval = 0.5;
             println!(
                 "{} visits, eval: {:.2}%, Wilem-style eval: {:+.2}, static eval: {:.4}, static winning probability: {:.2}%, {:.2}s",
                 tree.visits(),
@@ -815,8 +775,9 @@ fn analyze_position<const S: usize>(position: &Position<S>) {
                 start_time.elapsed().as_secs_f64()
             );
             tree.print_info();
-            let (mv, value) = tree.best_move();
-            println!("Best move: ({}, {})", mv, value);
+            if let Some((mv, value)) = tree.best_move() {
+                println!("Best move: ({}, {})", mv, value);
+            }
         }
     }
 }
@@ -981,52 +942,7 @@ fn bench_position<const S: usize>(position: Position<S>, nodes: u32) {
     let start_time = time::Instant::now();
 
     let settings = search::MctsSetting::default().arena_size_for_nodes(nodes);
-    let mut tree = search::MonteCarloTree::with_settings(position, settings);
-    let mut last_iteration_start_time = time::Instant::now();
-    for n in 1..=nodes {
-        tree.select().unwrap();
-        if n % (nodes / 10) == 0 {
-            let knps = nodes as f32 / (last_iteration_start_time.elapsed().as_secs_f32() * 10000.0);
-            last_iteration_start_time = time::Instant::now();
-            println!(
-                "n={}, {:.2}s, {:.1} knps",
-                n,
-                start_time.elapsed().as_secs_f32(),
-                knps
-            );
-        }
-    }
-
-    let (mv, score) = tree.best_move();
-    let knps = nodes as f32 / (start_time.elapsed().as_secs_f32() * 1000.0);
-
-    println!(
-        "{}: {:.2}%, {:.2}s, {:.1} knps, {}MiB used",
-        mv,
-        score * 100.0,
-        start_time.elapsed().as_secs_f32(),
-        knps,
-        tree.mem_usage() / (1024 * 1024)
-    );
-}
-
-fn bench_mcts2() {
-    // Position from Alion's puzzle #5. The engine solves it quickly, so this benchmark is for mcts select speed
-    let position = <Position<6>>::from_fen_with_komi(
-        "2,x4,11/x5,221/x,2,2,2,x,221/2,1,12C,1,21C,2/2,x,2,x2,2/x,2,2,2,x,121 1 25",
-        Komi::from_half_komi(4).unwrap(),
-    )
-    .unwrap();
-
-    bench_position2(position, 20_000_000);
-}
-
-fn bench_position2<const S: usize>(position: Position<S>, nodes: u32) {
-    println!("Starting benchmark");
-    let start_time = time::Instant::now();
-
-    let settings = search::MctsSetting::default().arena_size_for_nodes(nodes);
-    let mut tree = search::mcts_core2::TreeRoot::new(position, settings);
+    let mut tree = search::MonteCarloTree::new(position, settings);
     let mut last_iteration_start_time = time::Instant::now();
     for n in 1..=nodes {
         tree.select().unwrap();

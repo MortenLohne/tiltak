@@ -6,6 +6,7 @@ use half::f16;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 use std::f32::consts::PI;
+use std::fmt::Display;
 use std::{mem, time};
 use std::{process, sync};
 
@@ -146,10 +147,25 @@ impl<const S: usize> MctsSetting<S> {
 pub const ARENA_ELEMENT_SIZE: usize = 16;
 
 #[derive(Debug)]
-pub enum MctsError {
+pub enum Error {
     OOM,
     MaxVisits,
 }
+
+impl Display for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Error::OOM => {
+                write!(f, "Search stopped early due to OOM")
+            }
+            Error::MaxVisits => {
+                write!(f, "Reached {} max visit count", u32::MAX)
+            }
+        }
+    }
+}
+
+impl std::error::Error for Error {}
 
 pub struct MonteCarloTree<const S: usize> {
     tree: TreeEdge<S>, // Fake edge to the root node
@@ -282,18 +298,10 @@ impl<const S: usize> MonteCarloTree<S> {
         for i in 0.. {
             let nodes = (50.0 * 2.0_f32.powf(0.125).powi(i)) as u64;
             for _ in 0..nodes {
-                match self.select() {
-                    Err(MctsError::OOM) => {
-                        eprintln!("Warning: Search stopped early due to OOM");
-                        callback(self);
-                        return;
-                    }
-                    Err(MctsError::MaxVisits) => {
-                        eprintln!("Warning: Reached {} max visit count", self.visits());
-                        callback(self);
-                        return;
-                    }
-                    Ok(_) => (),
+                if let Err(err) = self.select() {
+                    eprintln!("Warning: {err}");
+                    callback(self);
+                    return;
                 };
             }
 
@@ -410,9 +418,9 @@ impl<const S: usize> MonteCarloTree<S> {
         });
     }
 
-    pub fn select(&mut self) -> Result<f32, MctsError> {
+    pub fn select(&mut self) -> Result<f32, Error> {
         if self.visits == u32::MAX {
-            return Err(MctsError::MaxVisits);
+            return Err(Error::MaxVisits);
         }
         self.temp_position.clone_from(&self.position);
         let result = self.tree.select(
@@ -519,16 +527,9 @@ pub fn mcts_training<const S: usize>(
     match time_control {
         TimeControl::FixedNodes(nodes) => {
             for _ in 0..*nodes {
-                match tree.select() {
-                    Ok(_) => (),
-                    Err(MctsError::OOM) => {
-                        eprintln!("Warning: Search stopped early due to OOM");
-                        break;
-                    }
-                    Err(MctsError::MaxVisits) => {
-                        eprintln!("Warning: Reached {} max visit count", tree.visits());
-                        break;
-                    }
+                if let Err(err) = tree.select() {
+                    eprintln!("Warning: {err}");
+                    break;
                 }
             }
         }

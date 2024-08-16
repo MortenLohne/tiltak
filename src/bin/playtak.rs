@@ -806,12 +806,12 @@ impl PlaytakSession {
                         let settings =
                             playtak_settings.to_mcts_setting(position.half_moves_played())
                             .arena_size_for_nodes(fixed_nodes as u32);
-                        let mut tree = search::MonteCarloTree::with_settings(position.clone(), settings);
+                        let mut tree = search::MonteCarloTree::new(position.clone(), settings);
                         for _ in 0..fixed_nodes {
-                            if tree.select().is_none() {
-                                eprintln!("Warning: Search stopped early due to OOM");
+                            if let Err(err) = tree.select() {
+                                eprintln!("Warning: {err}");
                                 break;
-                            };
+                            }
                         }
 
                         // Wait for a bit
@@ -819,7 +819,7 @@ impl PlaytakSession {
                         let sleep_duration = Duration::from_millis(rng.gen_range(1000..2500));
                         thread::sleep(sleep_duration);
 
-                        tree.best_move()
+                        tree.best_move().unwrap()
                     } else {
                         {
                             let maximum_time = if let Some(target_move_time) =  playtak_settings.target_move_time {

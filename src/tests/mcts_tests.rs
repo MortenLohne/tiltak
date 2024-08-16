@@ -16,12 +16,12 @@ fn exclude_moves_test() {
     let settings = MctsSetting::default()
         .arena_size_for_nodes(1000)
         .exclude_moves(excluded_moves.clone());
-    let mut tree = MonteCarloTree::with_settings(<Position<6>>::start_position(), settings);
+    let mut tree = MonteCarloTree::new(<Position<6>>::start_position(), settings);
 
     for _ in 0..1000 {
         tree.select().unwrap();
     }
-    let (best_move, _score) = tree.best_move();
+    let (best_move, _score) = tree.best_move().unwrap();
     assert!(
         !excluded_moves.contains(&best_move),
         "{}",
