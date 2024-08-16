@@ -192,7 +192,7 @@ impl<const S: usize> TreeRoot<S> {
             let visits_sqrt = (self.visits() as f32).sqrt();
             let dynamic_cpuct = self.settings.c_puct_init()
                 + f32::ln(
-                    (self.visits() as f32 + self.settings.c_puct_base())
+                    (1.0 + self.visits() as f32 + self.settings.c_puct_base())
                         / self.settings.c_puct_base(),
                 );
 
@@ -262,13 +262,20 @@ impl<const S: usize> TreeRoot<S> {
             self.arena.stats.padding_bytes.load(SeqCst) / (1024 * 1024),
         );
 
+        let dynamic_cpuct = self.settings.c_puct_init()
+            + f32::ln(
+                (1.0 + self.visits() as f32 + self.settings.c_puct_base())
+                    / self.settings.c_puct_base(),
+            );
+
         best_children.iter().take(8).for_each(|edge| {
             println!(
-                "Move {}: {} visits, {:.2}% mean action value, {:.3}% static score, pv {}",
+                "Move {}: {} visits, {:.2}% mean action value, {:.3}% static score, {:.3} exploration value, pv {}",
                 edge.mv,
                 edge.visits,
                 edge.mean_action_value * 100.0,
                 edge.policy.to_f32() * 100.0,
+                1.0 + edge.exploration_value((self.visits() as f32).sqrt(), dynamic_cpuct), // The +1.0 doesn't matter, but positive numbers are easier to read
                 Pv::new(edge.child, &self.arena)
                     .map(|mv| mv.to_string())
                     .collect::<Vec<_>>()
