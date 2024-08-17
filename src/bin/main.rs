@@ -6,8 +6,8 @@ use std::str::FromStr;
 use std::sync::atomic::{self, AtomicU64};
 use std::{fs, io, time};
 
+use board_game_traits::Position as PositionTrait;
 use board_game_traits::{Color, GameResult};
-use board_game_traits::{EvalPosition, Position as PositionTrait};
 use half::f16;
 use pgn_traits::PgnPosition;
 #[cfg(feature = "constant-tuning")]
@@ -534,18 +534,21 @@ fn analyze_openings<const S: usize>(komi: Komi, nodes: u32) {
             }
             let start_time = time::Instant::now();
             let settings = search::MctsSetting::default().arena_size_for_nodes(nodes);
-            let mut tree = search::MonteCarloTree::with_settings(position.clone(), settings);
+            let mut tree = search::MonteCarloTree::new(position.clone(), settings);
             for _ in 0..nodes {
-                if tree.select().is_none() {
-                    eprintln!("Warning: Search stopped early due to OOM");
-                    break;
-                };
+                match tree.select() {
+                    Ok(_) => (),
+                    Err(err) => {
+                        eprintln!("Warning: {}", err);
+                        break;
+                    }
+                }
             }
             let pv: Vec<Move<S>> = tree.pv().take(4).collect();
             print!(
                 "{}: {:.4}, {:.1}s, ",
                 line.trim(),
-                tree.best_move().1,
+                tree.best_move().unwrap().1,
                 start_time.elapsed().as_secs_f32()
             );
             for mv in pv {
@@ -725,8 +728,18 @@ fn analyze_position<const S: usize>(position: &Position<S>) {
     println!("Komi: {}", position.komi());
 
     // Change which sets of eval parameters to use in search
-    // Can be different from the komi used to determine the game result at terminal nodes
-    let eval_komi = position.komi();
+    // Eval komi other than 0 or 2 will crash, since parameters are only trained for those two komi
+    // The raw search still uses the "real" komi to determine the game result at terminal nodes
+    let eval_komi = Komi::from_half_komi(match position.komi().half_komi() {
+        -1 => 0,
+        0 => 0,
+        1 => 0,
+        3 => 4,
+        4 => 4,
+        5 => 4,
+        _ => panic!("No static eval params for komi {}", position.komi()),
+    })
+    .unwrap();
 
     assert_eq!(position.game_result(), None, "Cannot analyze finished game");
 
@@ -746,18 +759,22 @@ fn analyze_position<const S: usize>(position: &Position<S>) {
 
     let settings: MctsSetting<S> = search::MctsSetting::default()
         .arena_size(2_u32.pow(30) * 3)
+        .add_policy_params(<Position<S>>::policy_params(eval_komi))
+        .add_value_params(<Position<S>>::value_params(eval_komi))
+        .add_rollout_depth(1000)
         .exclude_moves(vec![]);
     let start_time = time::Instant::now();
 
-    let mut tree = search::MonteCarloTree::with_settings(position.clone(), settings);
+    let mut tree = search::MonteCarloTree::new(position.clone(), settings);
     for i in 1.. {
-        if tree.select().is_none() {
-            println!("Search stopped due to OOM");
-            break;
+        if let Err(err) = tree.select() {
+            println!("{err}");
+            return;
         };
         if i % 100_000 == 0 {
-            let static_eval: f32 =
-                position.static_eval() * position.side_to_move().multiplier() as f32;
+            let static_eval = position
+                .static_eval_with_params(<Position<S>>::value_params(eval_komi))
+                * position.side_to_move().multiplier() as f32;
             println!(
                 "{} visits, eval: {:.2}%, Wilem-style eval: {:+.2}, static eval: {:.4}, static winning probability: {:.2}%, {:.2}s",
                 tree.visits(),
@@ -768,8 +785,9 @@ fn analyze_position<const S: usize>(position: &Position<S>) {
                 start_time.elapsed().as_secs_f64()
             );
             tree.print_info();
-            let (mv, value) = tree.best_move();
-            println!("Best move: ({}, {})", mv, value);
+            if let Some((mv, value)) = tree.best_move() {
+                println!("Best move: ({}, {})", mv, value);
+            }
         }
     }
 }
@@ -934,7 +952,7 @@ fn bench_position<const S: usize>(position: Position<S>, nodes: u32) {
     let start_time = time::Instant::now();
 
     let settings = search::MctsSetting::default().arena_size_for_nodes(nodes);
-    let mut tree = search::MonteCarloTree::with_settings(position, settings);
+    let mut tree = search::MonteCarloTree::new(position, settings);
     let mut last_iteration_start_time = time::Instant::now();
     for n in 1..=nodes {
         tree.select().unwrap();
@@ -950,7 +968,7 @@ fn bench_position<const S: usize>(position: Position<S>, nodes: u32) {
         }
     }
 
-    let (mv, score) = tree.best_move();
+    let (mv, score) = tree.best_move().unwrap();
     let knps = nodes as f32 / (start_time.elapsed().as_secs_f32() * 1000.0);
 
     println!(

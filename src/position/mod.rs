@@ -1281,6 +1281,16 @@ impl<const S: usize> Position<S> {
             }
         }
     }
+
+    pub fn static_eval_with_params(&self, params: &'static [f32]) -> f32 {
+        let (white_params, black_params) = params.split_at(params.len() / 2);
+        let mut white_value: IncrementalValue<S> = IncrementalValue::new(white_params);
+        let mut black_value: IncrementalValue<S> = IncrementalValue::new(black_params);
+
+        self.static_eval_features(&mut white_value, &mut black_value);
+
+        white_value.finish() + black_value.finish()
+    }
 }
 
 impl<const S: usize> PositionTrait for Position<S> {
@@ -1561,15 +1571,7 @@ impl<const S: usize> Iterator for MoveIterator<S> {
 
 impl<const S: usize> EvalPositionTrait for Position<S> {
     fn static_eval(&self) -> f32 {
-        let params = Self::value_params(self.komi());
-
-        let (white_params, black_params) = params.split_at(params.len() / 2);
-        let mut white_value: IncrementalValue<S> = IncrementalValue::new(white_params);
-        let mut black_value: IncrementalValue<S> = IncrementalValue::new(black_params);
-
-        self.static_eval_features(&mut white_value, &mut black_value);
-
-        white_value.finish() + black_value.finish()
+        self.static_eval_with_params(Self::value_params(self.komi()))
     }
 }
 

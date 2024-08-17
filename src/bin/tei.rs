@@ -7,8 +7,7 @@ use std::{env, io};
 use tiltak::position::{Komi, Position};
 
 use std::any::Any;
-use tiltak::search::MctsSetting;
-use tiltak::search::{self, MonteCarloTree};
+use tiltak::search::{self, MctsSetting, MonteCarloTree};
 
 pub fn main() {
     let is_slatebot = env::args().any(|arg| arg == "--slatebot");
@@ -140,19 +139,19 @@ fn parse_go_string<const S: usize>(line: &str, position: &Position<S>, is_slateb
             let msecs = words.next().unwrap();
             let movetime = Duration::from_millis(u64::from_str(msecs).unwrap());
             let start_time = Instant::now();
-            let mut tree = search::MonteCarloTree::with_settings(position.clone(), mcts_settings);
+            let mut tree = search::MonteCarloTree::new(position.clone(), mcts_settings);
 
             for i in 0.. {
                 let nodes_to_search = (200.0 * f64::powf(1.26, i as f64)) as u64;
                 let mut oom = false;
                 for _ in 0..nodes_to_search {
-                    if tree.select().is_none() {
-                        eprintln!("Warning: Search stopped early due to OOM");
+                    if let Err(err) = tree.select() {
+                        eprintln!("Warning: {err}");
                         oom = true;
                         break;
-                    };
+                    }
                 }
-                let (best_move, best_score) = tree.best_move();
+                let (best_move, best_score) = tree.best_move().unwrap();
                 let pv: Vec<_> = tree.pv().collect();
                 println!(
                     "info depth {} seldepth {} nodes {} score cp {} time {} nps {:.0} pv {}",
@@ -205,9 +204,9 @@ fn parse_go_string<const S: usize>(line: &str, position: &Position<S>, is_slateb
 
             let start_time = Instant::now();
 
-            let mut tree = MonteCarloTree::with_settings(position.clone(), mcts_settings);
+            let mut tree = MonteCarloTree::new(position.clone(), mcts_settings);
             tree.search_for_time(max_time, |tree| {
-                let best_score = tree.best_move().1;
+                let best_score = tree.best_move().unwrap().1;
                 let pv: Vec<_> = tree.pv().collect();
                 println!(
                     "info depth {} seldepth {} nodes {} score cp {} time {} nps {:.0} pv {}",
@@ -223,7 +222,7 @@ fn parse_go_string<const S: usize>(line: &str, position: &Position<S>, is_slateb
                         .join(" ")
                 );
             });
-            let best_move = tree.best_move().0;
+            let best_move = tree.best_move().unwrap().0;
 
             println!("bestmove {}", position.move_to_san(&best_move));
         }

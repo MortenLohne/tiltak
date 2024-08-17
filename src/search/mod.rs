@@ -6,12 +6,12 @@ use half::f16;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 use std::f32::consts::PI;
+use std::fmt::Display;
 use std::{mem, time};
 use std::{process, sync};
 
 use crate::position::Move;
 use crate::position::Position;
-use crate::position::{Role, Square};
 pub use crate::search::mcts_core::best_move;
 use crate::search::mcts_core::{TempVectors, Tree, TreeEdge};
 
@@ -36,7 +36,7 @@ pub struct MctsSetting<const S: usize> {
     arena_size: u32,
     value_params: Option<&'static [f32]>,
     policy_params: Option<&'static [f32]>,
-    search_params: Box<[Score]>,
+    search_params: Box<[f32]>,
     dirichlet: Option<f32>,
     excluded_moves: Vec<Move<S>>,
     static_eval_variance: Option<f32>,
@@ -76,7 +76,7 @@ impl<const S: usize> MctsSetting<S> {
     pub fn mem_usage(self, mem_usage: usize) -> Self {
         assert!(
             mem_usage < u32::MAX as usize // Check for 32-bit platforms
-            || mem_usage < 24 * 2_usize.pow(32) - 2
+            || mem_usage < ARENA_ELEMENT_SIZE * 2_usize.pow(32) - 2
         );
         self.arena_size((mem_usage / ARENA_ELEMENT_SIZE) as u32)
     }
@@ -130,28 +130,46 @@ impl<const S: usize> MctsSetting<S> {
         self
     }
 
-    pub fn c_puct_init(&self) -> Score {
+    pub fn c_puct_init(&self) -> f32 {
         self.search_params[0]
     }
 
-    pub fn c_puct_base(&self) -> Score {
+    pub fn c_puct_base(&self) -> f32 {
         self.search_params[1]
     }
 
-    pub fn initial_mean_action_value(&self) -> Score {
+    pub fn initial_mean_action_value(&self) -> f32 {
         self.search_params[2]
     }
 }
 
 /// Type alias for winning probability, used for scoring positions.
-pub type Score = f32;
 pub const ARENA_ELEMENT_SIZE: usize = 16;
 
-/// Abstract representation of a Monte Carlo Search Tree.
-/// Gives more fine-grained control of the search process compared to using the `mcts` function.
-// #[derive(Clone, PartialEq, Debug)]
+#[derive(Debug)]
+pub enum Error {
+    OOM,
+    MaxVisits,
+}
+
+impl Display for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Error::OOM => {
+                write!(f, "Search stopped early due to OOM")
+            }
+            Error::MaxVisits => {
+                write!(f, "Reached {} max visit count", u32::MAX)
+            }
+        }
+    }
+}
+
+impl std::error::Error for Error {}
+
 pub struct MonteCarloTree<const S: usize> {
-    edge: TreeEdge<S>, // A virtual edge to the first node, with fake move and heuristic score
+    tree: TreeEdge<S>, // Fake edge to the root node
+    visits: u32,
     position: Position<S>,
     temp_position: Position<S>,
     settings: MctsSetting<S>,
@@ -160,11 +178,7 @@ pub struct MonteCarloTree<const S: usize> {
 }
 
 impl<const S: usize> MonteCarloTree<S> {
-    pub fn new(position: Position<S>) -> Self {
-        Self::with_settings(position, MctsSetting::default())
-    }
-
-    pub fn with_settings(position: Position<S>, settings: MctsSetting<S>) -> Self {
+    pub fn new(position: Position<S>, settings: MctsSetting<S>) -> MonteCarloTree<S> {
         let arena = match Arena::new(settings.arena_size) {
             Ok(arena) => arena,
             Err(ArenaError::AllocationFailed(num_bytes)) if !sysinfo::IS_SUPPORTED_SYSTEM => {
@@ -207,59 +221,72 @@ impl<const S: usize> MonteCarloTree<S> {
             }
             Err(err) => panic!("{}", err),
         };
-        let mut temp_vectors = TempVectors::default();
-        let mut root_edge = TreeEdge {
-            child: None,
-            mv: Move::placement(Role::Flat, Square::default()),
-            mean_action_value: 0.0,
-            visits: 0,
-            heuristic_score: f16::ZERO,
-        };
 
-        root_edge
-            .select(&mut position.clone(), &settings, &mut temp_vectors, &arena)
-            .unwrap();
-        root_edge
-            .select(&mut position.clone(), &settings, &mut temp_vectors, &arena)
-            .unwrap();
+        let mut tree = TreeEdge { child: None };
+        let mut temp_vectors = TempVectors::default();
+
+        // Applying dirichlet noise or excluding moves can only be done once the child edges of the root are initialized,
+        // which is done on the 2nd select
+        tree.select(
+            &mut position.clone(),
+            &settings,
+            &mut temp_vectors,
+            &arena,
+            0,
+        )
+        .unwrap();
+        tree.select(
+            &mut position.clone(),
+            &settings,
+            &mut temp_vectors,
+            &arena,
+            1,
+        )
+        .unwrap();
 
         if let Some(alpha) = settings.dirichlet {
-            (arena.get_mut(root_edge.child.as_mut().unwrap())).apply_dirichlet(&arena, 0.25, alpha);
+            arena
+                .get_mut(
+                    (arena.get_mut(tree.child.as_mut().unwrap()))
+                        .children
+                        .as_mut()
+                        .unwrap(),
+                )
+                .apply_dirichlet(&arena, 0.25, alpha);
         }
 
         if !settings.excluded_moves.is_empty() {
-            let mut filtered_edges: Vec<TreeEdge<S>> = arena
-                .get_slice_mut(&mut arena.get_mut(root_edge.child.as_mut().unwrap()).children)
-                .iter_mut()
-                .filter(|edge| !settings.excluded_moves.contains(&edge.mv))
-                .map(|edge| TreeEdge {
-                    child: edge.child.take(),
-                    mv: edge.mv,
-                    mean_action_value: edge.mean_action_value,
-                    visits: edge.visits,
-                    heuristic_score: edge.heuristic_score,
-                })
-                .collect();
-            arena.get_mut(root_edge.child.as_mut().unwrap()).children =
-                arena.add_slice(filtered_edges.drain(..)).unwrap();
+            let bridge = arena.get_mut(
+                (arena.get_mut(tree.child.as_mut().unwrap()))
+                    .children
+                    .as_mut()
+                    .unwrap(),
+            );
+            for excluded_move in settings.excluded_moves.iter() {
+                let index = arena
+                    .get_slice(&bridge.moves)
+                    .iter()
+                    .enumerate()
+                    .find(|(_, mv)| **mv == Some(*excluded_move))
+                    .unwrap()
+                    .0;
+                let moves = arena.get_slice_mut(&mut bridge.moves);
+                let heuristic_scores = arena.get_slice_mut(&mut bridge.heuristic_scores);
+
+                moves[index] = None;
+                heuristic_scores[index] = f16::NEG_INFINITY; // TODO: Also set infinite visitss?
+            }
         }
 
         MonteCarloTree {
-            edge: root_edge,
-            temp_position: position.clone(),
-            position,
+            tree,
+            visits: 0,
+            position: position.clone(),
+            temp_position: position,
             settings,
             temp_vectors,
             arena,
         }
-    }
-
-    pub fn get_child(&self) -> &Tree<S> {
-        self.arena.get(self.edge.child.as_ref().unwrap())
-    }
-
-    pub fn get_child_mut(&mut self) -> &mut Tree<S> {
-        self.arena.get_mut(self.edge.child.as_mut().unwrap())
     }
 
     pub fn search_for_time<F>(&mut self, max_time: time::Duration, callback: F)
@@ -271,52 +298,46 @@ impl<const S: usize> MonteCarloTree<S> {
         for i in 0.. {
             let nodes = (50.0 * 2.0_f32.powf(0.125).powi(i)) as u64;
             for _ in 0..nodes {
-                if self.select().is_none() {
-                    eprintln!("Warning: Search stopped early due to OOM");
+                if let Err(err) = self.select() {
+                    eprintln!("Warning: {err}");
                     callback(self);
                     return;
                 };
             }
 
+            let mut shallow_edges = self.shallow_edges().unwrap();
+
             // Always return when we have less than 10ms left
             if max_time < (time::Duration::from_millis(10))
                 || start_time.elapsed() > max_time - (time::Duration::from_millis(10))
-                || self.children().len() == 1
+                || shallow_edges.len() == 1
             {
                 callback(self);
                 return;
             }
 
-            let child = self.get_child();
-            let mut child_refs: Vec<&TreeEdge<S>> =
-                self.arena.get_slice(&child.children).iter().collect();
+            shallow_edges.sort_by_key(|edge| edge.visits);
+            shallow_edges.reverse();
 
-            child_refs.sort_by_key(|edge| edge.visits);
-            child_refs.reverse();
-
-            let node_ratio = (1 + child_refs[1].visits) as f32 / (1 + child_refs[0].visits) as f32;
+            let node_ratio =
+                (1 + shallow_edges[1].visits) as f32 / (1 + shallow_edges[0].visits) as f32;
             let time_ratio = start_time.elapsed().as_secs_f32() / max_time.as_secs_f32();
 
             let visits_sqrt = (self.visits() as f32).sqrt();
             let dynamic_cpuct = self.settings.c_puct_init()
-                + Score::ln(
-                    (1.0 + self.visits() as Score + self.settings.c_puct_base())
+                + f32::ln(
+                    (1.0 + self.visits() as f32 + self.settings.c_puct_base())
                         / self.settings.c_puct_base(),
                 );
 
-            let best_edge = self
-                .children()
-                .iter()
-                .max_by_key(|edge| edge.visits)
-                .unwrap()
-                .shallow_clone();
+            let best_edge = shallow_edges.iter().max_by_key(|edge| edge.visits).unwrap();
 
             let best_exploration_value = best_edge.exploration_value(visits_sqrt, dynamic_cpuct);
 
             if time_ratio.powf(2.0) > node_ratio / 2.0 {
                 callback(self);
                 // Do not stop if any other child nodes have better exploration value
-                if self.children().iter().any(|edge| {
+                if shallow_edges.iter().any(|edge| {
                     edge.mv != best_edge.mv
                         && edge.exploration_value(visits_sqrt, dynamic_cpuct)
                             > best_exploration_value + 0.01
@@ -330,78 +351,41 @@ impl<const S: usize> MonteCarloTree<S> {
         }
     }
 
-    /// Run one iteration of MCTS
-    #[must_use]
-    pub fn select(&mut self) -> Option<f32> {
-        self.temp_position.clone_from(&self.position);
-        self.edge.select(
-            &mut self.temp_position,
-            &self.settings,
-            &mut self.temp_vectors,
-            &self.arena,
-        )
+    // TODO: Count up to u64 on root?
+    pub fn visits(&self) -> u32 {
+        self.visits
     }
 
-    /// Returns the best move, and its score (as winning probability) from the perspective of the side to move
-    /// Panics if no search iterations have been run
-    pub fn best_move(&self) -> (Move<S>, f32) {
-        self.arena
-            .get_slice(&self.get_child().children)
-            .iter()
-            .max_by_key(|edge| edge.visits)
-            .map(|edge| (edge.mv, 1.0 - edge.mean_action_value))
-            .unwrap_or_else(|| panic!("Couldn't find best move"))
+    pub fn mem_usage(&self) -> usize {
+        self.arena.slots_used() as usize * ARENA_ELEMENT_SIZE
     }
 
-    pub fn node_edge_sizes(&self, arena: &Arena) -> (usize, usize) {
-        pub fn edge_sizes<const S: usize>(edge: &TreeEdge<S>, arena: &Arena) -> (usize, usize) {
-            if let Some(child_index) = &edge.child {
-                let (child_nodes, child_edges) = node_sizes(arena.get(child_index), arena);
-                (child_nodes, child_edges + 1)
-            } else {
-                (0, 1)
-            }
-        }
-        pub fn node_sizes<const S: usize>(node: &Tree<S>, arena: &Arena) -> (usize, usize) {
-            arena
-                .get_slice(&node.children)
-                .iter()
-                .map(|edge| edge_sizes(edge, arena))
-                .fold(
-                    (1, 0),
-                    |(acc_nodes, acc_edges), (child_nodes, child_edges)| {
-                        (acc_nodes + child_nodes, acc_edges + child_edges)
-                    },
-                )
-        }
-        edge_sizes(&self.edge, arena)
+    pub fn mean_action_value(&self) -> f32 {
+        self.tree
+            .child
+            .as_ref()
+            .map(|index| self.arena.get(index).total_action_value as f32 / self.visits as f32)
+            .unwrap_or(self.settings.initial_mean_action_value())
     }
 
-    fn children(&self) -> Vec<TreeEdge<S>> {
-        self.arena
-            .get_slice(&self.get_child().children)
-            .iter()
-            .map(|edge| edge.shallow_clone())
-            .collect()
+    pub fn best_move(&self) -> Option<(Move<S>, f32)> {
+        let best_edge = self
+            .shallow_edges()?
+            .into_iter()
+            .max_by_key(|edge| edge.visits)?;
+        Some((best_edge.mv, 1.0 - best_edge.mean_action_value))
     }
 
     pub fn pv(&self) -> impl Iterator<Item = Move<S>> + '_ {
-        Pv::new(&self.edge, &self.arena)
+        Pv::new(&self.tree, &self.arena)
     }
 
     /// Print human-readable information of the search's progress.
     pub fn print_info(&self) {
-        let child = self.get_child();
-        let mut best_children: Vec<&TreeEdge<S>> =
-            self.arena.get_slice(&child.children).iter().collect();
+        let mut best_children: Vec<ShallowEdge<S>> = self.shallow_edges().unwrap_or_default();
 
         best_children.sort_by_key(|edge| edge.visits);
         best_children.reverse();
-        let dynamic_cpuct = self.settings.c_puct_init()
-            + Score::ln(
-                (1.0 + self.visits() as Score + self.settings.c_puct_base())
-                    / self.settings.c_puct_base(),
-            );
 
         use sync::atomic::Ordering::*;
         println!(
@@ -412,38 +396,109 @@ impl<const S: usize> MonteCarloTree<S> {
             self.arena.stats.padding_bytes.load(SeqCst) / (1024 * 1024),
         );
 
+        let dynamic_cpuct = self.settings.c_puct_init()
+            + f32::ln(
+                (1.0 + self.visits() as f32 + self.settings.c_puct_base())
+                    / self.settings.c_puct_base(),
+            );
+
         best_children.iter().take(8).for_each(|edge| {
             println!(
                 "Move {}: {} visits, {:.2}% mean action value, {:.3}% static score, {:.3} exploration value, pv {}",
-                edge.mv, edge.visits, edge.mean_action_value * 100.0, edge.heuristic_score.to_f32() * 100.0,
-                edge.exploration_value((self.visits() as Score).sqrt(), dynamic_cpuct),
-                Pv::new(edge, &self.arena).map(|mv| mv.to_string() + " ").collect::<String>()
+                edge.mv,
+                edge.visits,
+                edge.mean_action_value * 100.0,
+                edge.policy.to_f32() * 100.0,
+                1.0 + edge.exploration_value((self.visits() as f32).sqrt(), dynamic_cpuct), // The +1.0 doesn't matter, but positive numbers are easier to read
+                Pv::new(edge.child, &self.arena)
+                    .map(|mv| mv.to_string())
+                    .collect::<Vec<_>>()
+                    .join(" ")
             )
         });
     }
 
-    pub fn visits(&self) -> u32 {
-        self.edge.visits
+    pub fn select(&mut self) -> Result<f32, Error> {
+        if self.visits == u32::MAX {
+            return Err(Error::MaxVisits);
+        }
+        self.temp_position.clone_from(&self.position);
+        let result = self.tree.select(
+            &mut self.temp_position,
+            &self.settings,
+            &mut self.temp_vectors,
+            &self.arena,
+            self.visits,
+        )?;
+        self.visits += 1;
+        Ok(result)
     }
 
-    pub fn mem_usage(&self) -> usize {
-        self.arena.slots_used() as usize * 24
-    }
+    pub fn shallow_edges(&self) -> Option<Vec<ShallowEdge<'_, S>>> {
+        let child = self.arena.get(
+            self.arena
+                .get(self.tree.child.as_ref()?)
+                .children
+                .as_ref()?,
+        );
 
-    pub fn mean_action_value(&self) -> Score {
-        self.edge.mean_action_value
+        Some(
+            self.arena
+                .get_slice(&child.visitss)
+                .iter()
+                .zip(
+                    self.arena.get_slice(&child.moves).iter().zip(
+                        self.arena.get_slice(&child.mean_action_values).iter().zip(
+                            self.arena
+                                .get_slice(&child.children)
+                                .iter()
+                                .zip(self.arena.get_slice(&child.heuristic_scores)),
+                        ),
+                    ),
+                )
+                .filter_map(|(visits, (mv, (score, (child, policy))))| {
+                    Some(ShallowEdge {
+                        visits: *visits,
+                        mv: (*mv)?,
+                        mean_action_value: *score,
+                        child,
+                        policy: *policy,
+                    })
+                })
+                .collect(),
+        )
+    }
+}
+// More convenient edge representation, allowing them to be stored as array-of-structs rather than struct-of-arrays
+pub struct ShallowEdge<'a, const S: usize> {
+    visits: u32,
+    mv: Move<S>,
+    mean_action_value: f32,
+    child: &'a TreeEdge<S>,
+    policy: f16,
+}
+
+impl<'a, const S: usize> ShallowEdge<'a, S> {
+    pub fn exploration_value(&self, parent_visits_sqrt: f32, dynamic_cpuct: f32) -> f32 {
+        mcts_core::exploration_value(
+            self.mean_action_value,
+            self.policy.to_f32(),
+            self.visits,
+            parent_visits_sqrt,
+            dynamic_cpuct,
+        )
     }
 }
 
 /// The simplest way to use the mcts module. Run Monte Carlo Tree Search for `nodes` nodes, returning the best move, and its estimated winning probability for the side to move.
-pub fn mcts<const S: usize>(position: Position<S>, nodes: u64) -> (Move<S>, Score) {
+pub fn mcts<const S: usize>(position: Position<S>, nodes: u64) -> (Move<S>, f32) {
     let settings = MctsSetting::default().arena_size_for_nodes(nodes as u32);
-    let mut tree = MonteCarloTree::with_settings(position, settings);
+    let mut tree = MonteCarloTree::new(position, settings);
 
     for _ in 0..nodes.max(2) {
         tree.select().unwrap();
     }
-    let (mv, score) = tree.best_move();
+    let (mv, score) = tree.best_move().unwrap();
     (mv, score)
 }
 
@@ -454,10 +509,10 @@ pub fn play_move_time<const S: usize>(
     board: Position<S>,
     max_time: time::Duration,
     settings: MctsSetting<S>,
-) -> (Move<S>, Score) {
-    let mut tree = MonteCarloTree::with_settings(board.clone(), settings);
+) -> (Move<S>, f32) {
+    let mut tree = MonteCarloTree::new(board.clone(), settings);
     tree.search_for_time(max_time, |_| {});
-    tree.best_move()
+    tree.best_move().unwrap()
 }
 
 /// Run mcts with specific static evaluation parameters, for optimization the parameter set.
@@ -467,15 +522,15 @@ pub fn mcts_training<const S: usize>(
     time_control: &TimeControl,
     settings: MctsSetting<S>,
 ) -> Vec<(Move<S>, f16)> {
-    let mut tree = MonteCarloTree::with_settings(position, settings);
+    let mut tree = MonteCarloTree::new(position, settings);
 
     match time_control {
         TimeControl::FixedNodes(nodes) => {
             for _ in 0..*nodes {
-                if tree.select().is_none() {
-                    eprintln!("Warning: Search stopped early due to OOM");
+                if let Err(err) = tree.select() {
+                    eprintln!("Warning: {err}");
                     break;
-                };
+                }
             }
         }
         TimeControl::Time(time, increment) => {
@@ -483,9 +538,9 @@ pub fn mcts_training<const S: usize>(
             tree.search_for_time(max_time, |_| {});
         }
     }
-
-    let child_visits: u32 = tree.children().iter().map(|edge| edge.visits).sum();
-    tree.children()
+    let shallow_edges = tree.shallow_edges().unwrap();
+    let child_visits: u32 = shallow_edges.iter().map(|edge| edge.visits).sum();
+    shallow_edges
         .iter()
         .map(|edge| {
             (
@@ -497,7 +552,7 @@ pub fn mcts_training<const S: usize>(
 }
 
 /// Convert a static evaluation in centipawns to a winning probability between 0.0 and 1.0.
-pub fn cp_to_win_percentage(cp: f32) -> Score {
+pub fn cp_to_win_percentage(cp: f32) -> f32 {
     0.5 + f32::atan(cp) / PI
 }
 
