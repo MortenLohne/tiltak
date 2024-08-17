@@ -728,9 +728,18 @@ fn analyze_position<const S: usize>(position: &Position<S>) {
     println!("Komi: {}", position.komi());
 
     // Change which sets of eval parameters to use in search
-    // Can be different from the komi used to determine the game result at terminal nodes
-    // let eval_komi = Komi::from_half_komi(4).unwrap();
-    let eval_komi = position.komi();
+    // Eval komi other than 0 or 2 will crash, since parameters are only trained for those two komi
+    // The raw search still uses the "real" komi to determine the game result at terminal nodes
+    let eval_komi = Komi::from_half_komi(match position.komi().half_komi() {
+        -1 => 0,
+        0 => 0,
+        1 => 0,
+        3 => 4,
+        4 => 4,
+        5 => 4,
+        _ => panic!("No static eval params for komi {}", position.komi()),
+    })
+    .unwrap();
 
     assert_eq!(position.game_result(), None, "Cannot analyze finished game");
 
@@ -752,7 +761,7 @@ fn analyze_position<const S: usize>(position: &Position<S>) {
         .arena_size(2_u32.pow(30) * 3)
         .add_policy_params(<Position<S>>::policy_params(eval_komi))
         .add_value_params(<Position<S>>::value_params(eval_komi))
-        // .add_rollout_depth(1000)
+        .add_rollout_depth(1000)
         .exclude_moves(vec![]);
     let start_time = time::Instant::now();
 
@@ -763,8 +772,9 @@ fn analyze_position<const S: usize>(position: &Position<S>) {
             return;
         };
         if i % 100_000 == 0 {
-            // let static_eval = position.static_eval() * position.side_to_move().multiplier() as f32;
-            let static_eval = 0.5;
+            let static_eval = position
+                .static_eval_with_params(<Position<S>>::value_params(eval_komi))
+                * position.side_to_move().multiplier() as f32;
             println!(
                 "{} visits, eval: {:.2}%, Wilem-style eval: {:+.2}, static eval: {:.4}, static winning probability: {:.2}%, {:.2}s",
                 tree.visits(),
