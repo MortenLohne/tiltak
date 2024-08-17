@@ -761,7 +761,7 @@ fn analyze_position<const S: usize>(position: &Position<S>) {
         .arena_size(2_u32.pow(30) * 3)
         .add_policy_params(<Position<S>>::policy_params(eval_komi))
         .add_value_params(<Position<S>>::value_params(eval_komi))
-        .add_rollout_depth(1000)
+        // .add_rollout_depth(1000)
         .exclude_moves(vec![]);
     let start_time = time::Instant::now();
 
