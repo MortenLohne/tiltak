@@ -286,3 +286,30 @@ fn setup_smash_tinue() {
     );
     test_position.plays_correct_move_long_prop::<6>(&["e5<"])
 }
+
+#[test]
+fn setup_strong_2nd_line_tinue() {
+    let test_position = TestPosition::from_tps_with_komi(
+        "x2,1,1,2,2/2,12,2212,21S,2,1/x,2,2,x,1,x/x,2S,12C,1C,1,1/x,1,12S,x,1,x/1,1,1,2S,x2 2 22",
+        Komi::from_half_komi(4).unwrap(),
+    );
+    test_position.plays_correct_move_long_prop::<6>(&["2c3+11"])
+}
+
+#[test]
+fn setup_strong_1st_line_tinue() {
+    let test_position = TestPosition::from_tps_with_komi(
+        "2,x4,1/x5,1/x4,1,112/x,2,x,2C,12,1/x,2,2,21C,x,1S/x5,1 1 12",
+        Komi::from_half_komi(4).unwrap(),
+    );
+    test_position.plays_correct_move_long_prop::<6>(&["e4>"])
+}
+
+#[test]
+fn smash_strong_line_tinue() {
+    let test_position = TestPosition::from_tps_with_komi(
+        "1,2S,2,x,2,2/112S,1,2,x3/x,211,21,x3/1,2121,2,22C,x2/1,x,2,2S,x2/1,221C,1,121S,1,1 1 27",
+        Komi::from_half_komi(4).unwrap(),
+    );
+    test_position.plays_correct_move_long_prop::<6>(&["3b1>21", "2b1>11"])
+}
