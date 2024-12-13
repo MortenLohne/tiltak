@@ -960,10 +960,11 @@ fn bench_position<const S: usize>(position: Position<S>, nodes: u32) {
             let knps = nodes as f32 / (last_iteration_start_time.elapsed().as_secs_f32() * 10000.0);
             last_iteration_start_time = time::Instant::now();
             println!(
-                "n={}, {:.2}s, {:.1} knps",
+                "n={}, {:.2}s, {:.1} knps, {:.1}MiB used",
                 n,
                 start_time.elapsed().as_secs_f32(),
-                knps
+                knps,
+                tree.mem_usage() as f64 / (1024.0 * 1024.0)
             );
         }
     }
