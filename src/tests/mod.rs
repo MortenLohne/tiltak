@@ -5,6 +5,7 @@ mod board_tests;
 mod komi_policy_tests;
 mod mcts_tests;
 mod move_gen_5s_tests;
+mod move_gen_6s_tests;
 mod move_gen_generic_tests;
 mod policy_tests;
 mod ptn_tests;
