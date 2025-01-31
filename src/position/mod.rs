@@ -1234,8 +1234,10 @@ impl<const S: usize> Position<S> {
     }
 
     pub fn perft(&mut self, depth: u16) -> u64 {
-        if depth == 0 || self.game_result().is_some() {
+        if depth == 0 {
             1
+        } else if self.game_result().is_some() {
+            0
         } else {
             let mut moves = vec![];
             self.generate_moves(&mut moves);
@@ -1260,8 +1262,10 @@ impl<const S: usize> Position<S> {
     }
 
     pub fn bulk_perft(&mut self, depth: u16) -> u64 {
-        if depth == 0 || self.game_result().is_some() {
+        if depth == 0 {
             1
+        } else if self.game_result().is_some() {
+            0
         } else {
             let mut moves = Vec::with_capacity(S * S * 4);
             self.generate_moves(&mut moves);

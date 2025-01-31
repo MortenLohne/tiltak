@@ -95,5 +95,5 @@ fn suicide_perf_test() {
 
     let mut position = <Position<5>>::default();
     do_moves_and_check_validity(&mut position, &move_strings);
-    perft_check_answers(&mut position, &[1, 85, 11_206, 957_000]);
+    perft_check_answers(&mut position, &[1, 85, 11_204, 956_736]);
 }
