@@ -22,6 +22,7 @@ use std::{fs, io, time};
 use board_game_traits::Position as PositionTrait;
 use board_game_traits::{Color, GameResult};
 use half::f16;
+use num_traits::Float;
 use pgn_traits::PgnPosition;
 #[cfg(feature = "constant-tuning")]
 use rayon::prelude::*;
@@ -31,10 +32,11 @@ use tiltak::evaluation::parameters::{
 };
 #[cfg(feature = "sqlite")]
 use tiltak::policy_sqlite;
-use tiltak::position::Role;
 use tiltak::position::{
-    squares_iterator, AbstractBoard, Direction, Komi, Move, Square, SquareCacheEntry,
+    squares_iterator, starting_capstones, AbstractBoard, Direction, Komi, Move, Square,
+    SquareCacheEntry,
 };
+use tiltak::position::{starting_stones, Role};
 use tiltak::position::{Position, Stack};
 use tiltak::ptn::{Game, PtnMove};
 use tiltak::search::{cp_to_win_percentage, MctsSetting};
@@ -76,6 +78,25 @@ fn main() {
             "play" => {
                 let position = Position::default();
                 play_human(position);
+            }
+            "count" => {
+                for size in 3..=8 {
+                    let num_positions = position::position_gen::configs_total2(
+                        size,
+                        size * size,
+                        starting_stones(size as usize) as u64,
+                        starting_stones(size as usize) as u64,
+                        starting_capstones(size as usize) as u64,
+                        starting_capstones(size as usize) as u64,
+                    );
+                    use num_traits::cast::ToPrimitive;
+                    let num_digits = (num_positions.bits() as f64 * f64::log10(2.0)).floor();
+                    println!(
+                        "Number of states for size {size}: {num_positions}, {:.2} * 10^{}",
+                        num_positions.to_f64().unwrap() / (10.0.powf(num_digits)),
+                        num_digits
+                    );
+                }
             }
             "aimatch" => {
                 for i in 1..10 {

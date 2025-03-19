@@ -33,6 +33,7 @@ use crate::position::color_trait::ColorTr;
 pub(crate) mod bitboard;
 pub(crate) mod color_trait;
 mod mv;
+pub mod position_gen;
 mod square;
 mod utils;
 
