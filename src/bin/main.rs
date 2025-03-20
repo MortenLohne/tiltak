@@ -84,10 +84,10 @@ fn main() {
                     let num_positions = position::position_gen::configs_total2(
                         size,
                         size * size,
-                        starting_stones(size as usize) as u64,
-                        starting_stones(size as usize) as u64,
-                        starting_capstones(size as usize) as u64,
-                        starting_capstones(size as usize) as u64,
+                        starting_stones(size as usize),
+                        starting_stones(size as usize),
+                        starting_capstones(size as usize),
+                        starting_capstones(size as usize),
                     );
                     use num_traits::cast::ToPrimitive;
                     let num_digits = (num_positions.bits() as f64 * f64::log10(2.0)).floor();
