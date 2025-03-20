@@ -79,21 +79,21 @@ pub fn blocking_configs_max(
 
 #[derive(Copy, Clone, PartialOrd, Ord, PartialEq, Eq, Debug)]
 struct FlatsConfiguration {
-    player: u8,
     w_stones: u8,
     b_stones: u8,
+    player: u8,
 }
 
 impl FlatsConfiguration {
     /// All flat board configurations, except the first two ply where walls/caps cannot be placed
     pub fn all_after_opening(num_reserves: u8) -> Vec<Self> {
-        let configuration_classes: Vec<FlatsConfiguration> = (1..=2)
-            .flat_map(|player| {
-                (1..=num_reserves).flat_map(move |w_stones| {
-                    (1..=num_reserves).map(move |b_stones| FlatsConfiguration {
-                        player,
+        let configuration_classes: Vec<FlatsConfiguration> = (1..=num_reserves)
+            .flat_map(move |w_stones| {
+                (1..=num_reserves).flat_map(move |b_stones| {
+                    (1..=2).map(move |player| FlatsConfiguration {
                         w_stones,
                         b_stones,
+                        player,
                     })
                 })
             })
@@ -107,12 +107,7 @@ struct FlatConfigurationData {
     start_index: BigUint,
     size: BigUint,
     num_flats_permutations: BigUint,
-    blocking_configurations: BTreeMap<WallConfiguration, WallConfigurationData>,
-}
-
-struct WallConfigurationData {
-    start_index: BigUint,
-    size: BigUint,
+    blocking_configurations: BTreeMap<WallConfiguration, BigUint>,
 }
 
 #[derive(Copy, Clone, PartialOrd, Ord, PartialEq, Eq, Debug)]
@@ -126,6 +121,34 @@ struct WallConfiguration {
 type BoardConfigurations =
     BTreeMap<FlatsConfiguration, (BigUint, BTreeMap<WallConfiguration, BigUint>)>;
 
+/// Return the starting index and the number of positions for the given configuration
+fn lookup(
+    configurations: &BoardConfigurations,
+    w_reserves_placed: u8,
+    b_reserves_placed: u8,
+    player: u8,
+    w_walls: u8,
+    b_walls: u8,
+    w_caps: u8,
+    b_caps: u8,
+) -> (BigUint, BigUint) {
+    let flats = FlatsConfiguration {
+        w_stones: w_reserves_placed,
+        b_stones: b_reserves_placed,
+        player,
+    };
+    let flat_data = configurations.get(&flats).unwrap();
+    let blocking_configs = flat_data.1.get(&WallConfiguration {
+        w_walls,
+        b_walls,
+        w_caps,
+        b_caps,
+    });
+    let start_index = flat_data.0.clone();
+    let size = blocking_configs.unwrap().clone();
+    (start_index, size)
+}
+
 pub fn configs_total2(
     size: u8,
     tiles: u8,
@@ -135,10 +158,7 @@ pub fn configs_total2(
     max_b_caps: u8,
 ) -> BigUint {
     let mut total = BigUint::from(1 + size * size);
-    let mut position_classes: BTreeMap<
-        FlatsConfiguration,
-        (BigUint, BTreeMap<WallConfiguration, BigUint>),
-    > = BTreeMap::new();
+    let mut position_classes: BTreeMap<FlatsConfiguration, FlatConfigurationData> = BTreeMap::new();
 
     // Insert start position
     let unit_wall_config = WallConfiguration {
@@ -149,22 +169,35 @@ pub fn configs_total2(
     };
     let unit_wall_config_map: BTreeMap<WallConfiguration, BigUint> =
         [(unit_wall_config, 1u64.into())].into_iter().collect();
+
     position_classes.insert(
         FlatsConfiguration {
             player: 1,
             w_stones: 0,
             b_stones: 0,
         },
-        (1u64.into(), unit_wall_config_map.clone()),
+        FlatConfigurationData {
+            start_index: 0u64.into(),
+            size: 1u64.into(),
+            num_flats_permutations: 1u64.into(),
+            blocking_configurations: unit_wall_config_map.clone(),
+        },
     );
+
     position_classes.insert(
         FlatsConfiguration {
             player: 2,
             w_stones: 1,
             b_stones: 0,
         },
-        ((size * size).into(), unit_wall_config_map),
+        FlatConfigurationData {
+            start_index: 1u64.into(),
+            size: (size * size).into(),
+            num_flats_permutations: (size * size).into(),
+            blocking_configurations: unit_wall_config_map,
+        },
     );
+
     for class @ FlatsConfiguration {
         player,
         w_stones,
@@ -189,12 +222,21 @@ pub fn configs_total2(
             &[tiles as u64 - 1, w_stones as u64, b_stones as u64],
         );
 
-        let old_value = position_classes.insert(
-            class,
-            (num_flat_configurations.clone(), blocking_configurations),
-        );
-        total += num_flat_configurations * num_blocking_configurations;
+        let flat_config_data = FlatConfigurationData {
+            start_index: total.clone(),
+            size: num_flat_configurations.clone() * num_blocking_configurations.clone(),
+            num_flats_permutations: num_flat_configurations.clone(),
+            blocking_configurations,
+        };
+
+        let old_value = position_classes.insert(class, flat_config_data);
         assert!(old_value.is_none(), "{:?} was duplicate", class);
+        assert_eq!(
+            total,
+            position_classes.last_entry().unwrap().get().start_index
+        );
+
+        total += num_flat_configurations * num_blocking_configurations;
     }
 
     println!(
@@ -202,26 +244,48 @@ pub fn configs_total2(
         position_classes.len(),
         position_classes
             .values()
-            .map(
-                |(num_flat_configurations, blocking_configurations)| num_flat_configurations
-                    * blocking_configurations.values().sum::<BigUint>()
-            )
+            .map(|flat_configuration_data| flat_configuration_data.size.clone())
             .sum::<BigUint>()
     );
-    println!(
-        "1 flat each stats: {:?}, {:?}",
-        position_classes[&FlatsConfiguration {
-            player: 1,
-            w_stones: 1,
-            b_stones: 1
-        }],
-        position_classes[&FlatsConfiguration {
-            player: 2,
-            w_stones: 1,
-            b_stones: 1
-        }]
+
+    let final_configuration = position_classes.last_key_value().as_ref().unwrap().1;
+    assert_eq!(
+        total,
+        final_configuration.start_index.clone() + final_configuration.size.clone()
     );
-    // position_classes.values().sum::<BigUint>()
+    for (position_class, next_position_class) in position_classes
+        .values()
+        .zip(position_classes.values().skip(1))
+    {
+        assert_eq!(
+            position_class.size,
+            position_class.num_flats_permutations.clone()
+                * position_class
+                    .blocking_configurations
+                    .values()
+                    .sum::<BigUint>()
+        );
+        assert_eq!(
+            position_class.start_index.clone() + position_class.size.clone(),
+            next_position_class.start_index.clone()
+        );
+    }
+
+    let biggest = position_classes
+        .iter()
+        .flat_map(|(config, data)| {
+            data.blocking_configurations
+                .iter()
+                .map(|(wall_config, wall_data)| (config.clone(), wall_config, wall_data))
+        })
+        .max_by_key(|(flat_config, wall_config, data)| data.clone())
+        .unwrap();
+
+    println!(
+        "Biggest class: {:?} {:?}, size {}",
+        biggest.0, biggest.1, biggest.2
+    );
+
     total
 }
 
