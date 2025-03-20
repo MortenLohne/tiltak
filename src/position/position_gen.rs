@@ -1,3 +1,4 @@
+use num_traits::ToPrimitive;
 use std::collections::BTreeMap;
 
 use num_bigint::BigUint;
@@ -107,7 +108,7 @@ struct FlatConfigurationData {
     start_index: BigUint,
     size: BigUint,
     num_flats_permutations: BigUint,
-    blocking_configurations: BTreeMap<WallConfiguration, BigUint>,
+    blocking_configurations: BTreeMap<WallConfiguration, u128>,
 }
 
 #[derive(Copy, Clone, PartialOrd, Ord, PartialEq, Eq, Debug)]
@@ -118,36 +119,35 @@ struct WallConfiguration {
     b_caps: u8,
 }
 
-type BoardConfigurations =
-    BTreeMap<FlatsConfiguration, (BigUint, BTreeMap<WallConfiguration, BigUint>)>;
+type BoardConfigurations = BTreeMap<FlatsConfiguration, FlatConfigurationData>;
 
 /// Return the starting index and the number of positions for the given configuration
-fn lookup(
-    configurations: &BoardConfigurations,
-    w_reserves_placed: u8,
-    b_reserves_placed: u8,
-    player: u8,
-    w_walls: u8,
-    b_walls: u8,
-    w_caps: u8,
-    b_caps: u8,
-) -> (BigUint, BigUint) {
-    let flats = FlatsConfiguration {
-        w_stones: w_reserves_placed,
-        b_stones: b_reserves_placed,
-        player,
-    };
-    let flat_data = configurations.get(&flats).unwrap();
-    let blocking_configs = flat_data.1.get(&WallConfiguration {
-        w_walls,
-        b_walls,
-        w_caps,
-        b_caps,
-    });
-    let start_index = flat_data.0.clone();
-    let size = blocking_configs.unwrap().clone();
-    (start_index, size)
-}
+// fn lookup(
+//     configurations: &BoardConfigurations,
+//     w_reserves_placed: u8,
+//     b_reserves_placed: u8,
+//     player: u8,
+//     w_walls: u8,
+//     b_walls: u8,
+//     w_caps: u8,
+//     b_caps: u8,
+// ) -> (BigUint, BigUint) {
+//     let flats = FlatsConfiguration {
+//         w_stones: w_reserves_placed,
+//         b_stones: b_reserves_placed,
+//         player,
+//     };
+//     let flat_data = configurations.get(&flats).unwrap();
+//     let blocking_configs = flat_data.1.get(&WallConfiguration {
+//         w_walls,
+//         b_walls,
+//         w_caps,
+//         b_caps,
+//     });
+//     let start_index = flat_data.
+//         let size = blocking_configs.unwrap().clone();
+//     (start_index, size)
+// }
 
 pub fn configs_total2(
     size: u8,
@@ -158,7 +158,7 @@ pub fn configs_total2(
     max_b_caps: u8,
 ) -> BigUint {
     let mut total = BigUint::from(1 + size * size);
-    let mut position_classes: BTreeMap<FlatsConfiguration, FlatConfigurationData> = BTreeMap::new();
+    let mut position_classes: BoardConfigurations = BTreeMap::new();
 
     // Insert start position
     let unit_wall_config = WallConfiguration {
@@ -167,7 +167,7 @@ pub fn configs_total2(
         w_caps: 0,
         b_caps: 0,
     };
-    let unit_wall_config_map: BTreeMap<WallConfiguration, BigUint> =
+    let unit_wall_config_map: BTreeMap<WallConfiguration, u128> =
         [(unit_wall_config, 1u64.into())].into_iter().collect();
 
     position_classes.insert(
@@ -278,7 +278,7 @@ pub fn configs_total2(
                 .iter()
                 .map(|(wall_config, wall_data)| (config.clone(), wall_config, wall_data))
         })
-        .max_by_key(|(flat_config, wall_config, data)| data.clone())
+        .max_by_key(|(_, _, data)| *data)
         .unwrap();
 
     println!(
@@ -298,8 +298,8 @@ fn inner_configs(
     player: u8,
     w_stones: u8,
     b_stones: u8,
-) -> BTreeMap<WallConfiguration, BigUint> {
-    let mut config_classes: BTreeMap<WallConfiguration, BigUint> = BTreeMap::new();
+) -> BTreeMap<WallConfiguration, u128> {
+    let mut config_classes: BTreeMap<WallConfiguration, u128> = BTreeMap::new();
 
     for w_wall in 0..=(max_w_stones - w_stones) {
         for b_wall in 0..=(max_b_stones - b_stones) {
@@ -320,7 +320,9 @@ fn inner_configs(
                             w_cap as u64,
                             b_cap as u64,
                         ],
-                    );
+                    )
+                    .to_u128()
+                    .unwrap();
                     let wall_config = WallConfiguration {
                         w_walls: w_wall,
                         b_walls: b_wall,
