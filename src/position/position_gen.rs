@@ -25,66 +25,6 @@ pub fn legal_positions(size: u8) -> BigUint {
     .sum()
 }
 
-/// Number of board configuarions with exactly this number of white and black flats
-pub fn flat_configs_exact(tiles: u64, w_stones: u64, b_stones: u64) -> BigUint {
-    choose_multinomial(
-        tiles - 1 + w_stones + b_stones,
-        &[tiles - 1, w_stones, b_stones],
-    )
-}
-
-/// Number of board configuarion with *up to* this number of white and black flats
-pub fn flat_configs_max(tiles: u64, max_w_stones: u64, max_b_stones: u64) -> BigUint {
-    (0..=max_w_stones)
-        .flat_map(|w_stones| {
-            (0..=max_b_stones).map(move |b_stones| flat_configs_exact(tiles, w_stones, b_stones))
-        })
-        .sum()
-}
-
-pub fn blocking_configs_exact(
-    tiles: u64,
-    w_walls: u64,
-    b_walls: u64,
-    w_caps: u64,
-    b_caps: u64,
-) -> BigUint {
-    if w_walls + b_walls + w_caps + b_caps > tiles {
-        BigUint::default()
-    } else {
-        choose_multinomial(
-            tiles,
-            &[
-                tiles - w_walls - b_walls - w_caps - b_caps,
-                w_walls,
-                b_walls,
-                w_caps,
-                b_caps,
-            ],
-        )
-    }
-}
-
-pub fn blocking_configs_max(
-    tiles: u64,
-    max_w_walls: u64,
-    max_b_walls: u64,
-    max_w_caps: u64,
-    max_b_caps: u64,
-) -> BigUint {
-    (0..=max_w_walls)
-        .flat_map(|w_walls| {
-            (0..=max_b_walls).flat_map(move |b_walls| {
-                (0..=max_w_caps).flat_map(move |w_caps| {
-                    (0..=max_b_caps).map(move |b_caps| {
-                        blocking_configs_exact(tiles, w_walls, b_walls, w_caps, b_caps)
-                    })
-                })
-            })
-        })
-        .sum()
-}
-
 #[derive(Copy, Clone, PartialOrd, Ord, PartialEq, Eq, Debug)]
 pub struct FlatsConfiguration {
     w_stones: u8,
