@@ -23,7 +23,6 @@ use board_game_traits::Position as PositionTrait;
 use board_game_traits::{Color, GameResult};
 use half::f16;
 use num_bigint::RandBigInt;
-use num_traits::Float;
 use pgn_traits::PgnPosition;
 #[cfg(feature = "constant-tuning")]
 use rayon::prelude::*;
@@ -81,14 +80,13 @@ fn main() {
             }
             "decode" => {
                 fn decode_sized<const S: usize>() {
-                    let data = position::position_gen::configs_total::<S>();
-                    let max_index = position::position_gen::max_index(&data);
+                    let data = position::position_gen::PositionEncoder::<S>::initialize();
+                    let max_index = data.count_legal_positions();
                     let mut rng: rand::prelude::ThreadRng = rand::thread_rng();
 
                     for _ in 0..10 {
                         let k = rng.gen_biguint_below(&max_index);
-                        let position =
-                            position::position_gen::decode_position::<S>(&data, k.clone());
+                        let position = data.decode(k.clone());
 
                         println!("{}, {}", k, position.to_fen());
                     }
@@ -102,18 +100,6 @@ fn main() {
                     Some(&"8") => decode_sized::<8>(),
                     Some(s) => println!("Unsupported size {}", s),
                     None => println!("No size provided"),
-                }
-            }
-            "count" => {
-                for size in 3..=8 {
-                    let num_positions = position::position_gen::legal_positions(size);
-                    use num_traits::cast::ToPrimitive;
-                    let num_digits = (num_positions.bits() as f64 * f64::log10(2.0)).floor();
-                    println!(
-                        "Number of states for size {size}: {num_positions}, {:.2} * 10^{}",
-                        num_positions.to_f64().unwrap() / (10.0.powf(num_digits)),
-                        num_digits
-                    );
                 }
             }
             "aimatch" => {

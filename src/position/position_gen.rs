@@ -9,24 +9,8 @@ use crate::position::{Piece, Role};
 
 use super::{squares_iterator, starting_capstones, starting_stones, Position};
 
-pub fn legal_positions(size: u8) -> BigUint {
-    let num_reserves = starting_stones(size as usize);
-    let num_caps = starting_capstones(size as usize);
-    configs_total2(
-        size,
-        size * size,
-        num_reserves,
-        num_reserves,
-        num_caps,
-        num_caps,
-    )
-    .values()
-    .map(|data| data.size.clone())
-    .sum()
-}
-
 #[derive(Copy, Clone, PartialOrd, Ord, PartialEq, Eq, Debug)]
-pub struct FlatsConfiguration {
+struct FlatsConfiguration {
     w_stones: u8,
     b_stones: u8,
     player: u8,
@@ -34,7 +18,7 @@ pub struct FlatsConfiguration {
 
 impl FlatsConfiguration {
     /// All flat board configurations, except the first two ply where walls/caps cannot be placed
-    pub fn all_after_opening(num_reserves: u8) -> Vec<Self> {
+    fn all_after_opening(num_reserves: u8) -> Vec<Self> {
         let configuration_classes: Vec<FlatsConfiguration> = (1..=num_reserves)
             .flat_map(move |w_stones| {
                 (1..=num_reserves).flat_map(move |b_stones| {
@@ -51,7 +35,7 @@ impl FlatsConfiguration {
     }
 }
 
-pub struct FlatConfigurationData {
+struct FlatConfigurationData {
     start_index: BigUint,
     size: BigUint,
     num_flats_permutations: BigUint,
@@ -72,26 +56,137 @@ struct WallConfigurationData {
     size: u128,
 }
 
-pub type BoardConfigurations = BTreeMap<FlatsConfiguration, FlatConfigurationData>;
-
-pub fn configs_total<const S: usize>() -> BoardConfigurations {
-    configs_total2(
-        S as u8,
-        S as u8 * S as u8,
-        starting_stones(S),
-        starting_stones(S),
-        starting_capstones(S),
-        starting_capstones(S),
-    )
+/// A struct with a pre-computed index required to encode and decode positions
+pub struct PositionEncoder<const S: usize> {
+    data: BoardConfigurations,
 }
 
-pub fn max_index(configurations: &BoardConfigurations) -> BigUint {
-    configurations
-        .values()
-        .map(|data| data.start_index.clone() + data.size.clone())
-        .max()
-        .unwrap()
+impl<const S: usize> PositionEncoder<S> {
+    /// Initialize the encoder.
+    /// This is an expensive and memory-heavy operation, especially for larger board sizes, so re-use this data structure when possible.
+    pub fn initialize() -> Self {
+        if !(3..=8).contains(&S) {
+            panic!("Unsupported board size {}", S);
+        }
+        let starting_reserves = starting_stones(S);
+        let starting_caps = starting_capstones(S);
+        Self {
+            data: configs_total2(
+                S as u8,
+                (S * S) as u8,
+                starting_reserves,
+                starting_reserves,
+                starting_caps,
+                starting_caps,
+            ),
+        }
+    }
+
+    pub fn count_legal_positions(&self) -> BigUint {
+        self.data
+            .values()
+            .map(|data| data.start_index.clone() + data.size.clone())
+            .max()
+            .unwrap()
+    }
+
+    pub fn encode(&self, position: &Position<S>) -> BigUint {
+        let group_data = position.group_data();
+        let flat_config = FlatsConfiguration {
+            player: match position.side_to_move() {
+                Color::White => 1,
+                Color::Black => 2,
+            },
+            w_stones: starting_stones(S)
+                - position.white_reserves_left() as u8
+                - group_data.white_walls.count(),
+            b_stones: starting_stones(S)
+                - position.black_reserves_left() as u8
+                - group_data.black_walls.count(),
+        };
+
+        let wall_config = WallConfiguration {
+            w_walls: group_data.white_walls.count(),
+            b_walls: group_data.black_walls.count(),
+            w_caps: group_data.white_caps.count(),
+            b_caps: group_data.black_caps.count(),
+        };
+
+        let flat_data = self.data.get(&flat_config).unwrap();
+        let wall_data = flat_data.blocking_configurations.get(&wall_config).unwrap();
+
+        let flat_permutation = encode_flats(position);
+        let wall_permutation = encode_walls_caps(position);
+
+        let flat_index = flat_permutation;
+        let wall_index = flat_data.num_flats_permutations.clone()
+            * (wall_data.start_index.clone() + wall_permutation);
+
+        flat_data.start_index.clone() + flat_index + wall_index
+    }
+
+    /// Decodes a position
+    /// The move counter is guessed on a best-effort basis, as it is not stored in the encoded data
+    pub fn decode(&self, k: BigUint) -> Position<S> {
+        let (flat_config, flat_data) = self
+            .data
+            .iter()
+            .find(|(_, data)| {
+                k >= data.start_index && k < data.start_index.clone() + data.size.clone()
+            })
+            .unwrap();
+
+        let local_index = k.clone() - flat_data.start_index.clone();
+
+        let side_to_move = if flat_config.player == 1 {
+            Color::White
+        } else {
+            Color::Black
+        };
+
+        let (walls_local_k, flat_identifier) =
+            local_index.div_rem(&flat_data.num_flats_permutations);
+
+        let (wall_config, wall_size) = flat_data
+            .blocking_configurations
+            .iter()
+            .find(|(_config, data)| {
+                walls_local_k >= data.start_index
+                    && walls_local_k < data.start_index.clone() + data.size
+            })
+            .unwrap();
+
+        let mut position: Position<S> = decode_flats(
+            flat_identifier.clone(),
+            flat_config.w_stones as u64,
+            flat_config.b_stones as u64,
+        );
+        if side_to_move == Color::Black {
+            position.null_move();
+        }
+
+        assert_eq!(flat_identifier, encode_flats(&position));
+
+        let walls_local_index = walls_local_k - wall_size.start_index.clone();
+
+        decode_walls_caps(
+            walls_local_index.clone(),
+            &mut position,
+            wall_config.w_walls as u64,
+            wall_config.b_walls as u64,
+            wall_config.w_caps as u64,
+            wall_config.b_caps as u64,
+        );
+
+        assert_eq!(walls_local_index, encode_walls_caps(&position));
+
+        assert_eq!(k, self.encode(&position));
+
+        position
+    }
 }
+
+type BoardConfigurations = BTreeMap<FlatsConfiguration, FlatConfigurationData>;
 
 /// Find the k-th permutation of a multiset with arbitrary category counts.
 fn kth_permutation(mut k: BigUint, mut categories: Vec<u64>) -> Vec<u8> {
@@ -231,45 +326,7 @@ fn decode_walls_caps<const S: usize>(
     }
 }
 
-pub fn encode_position<const S: usize>(
-    configurations: &BoardConfigurations,
-    position: &Position<S>,
-) -> BigUint {
-    let group_data = position.group_data();
-    let flat_config = FlatsConfiguration {
-        player: match position.side_to_move() {
-            Color::White => 1,
-            Color::Black => 2,
-        },
-        w_stones: starting_stones(S)
-            - position.white_reserves_left() as u8
-            - group_data.white_walls.count(),
-        b_stones: starting_stones(S)
-            - position.black_reserves_left() as u8
-            - group_data.black_walls.count(),
-    };
-
-    let wall_config = WallConfiguration {
-        w_walls: group_data.white_walls.count(),
-        b_walls: group_data.black_walls.count(),
-        w_caps: group_data.white_caps.count(),
-        b_caps: group_data.black_caps.count(),
-    };
-
-    let flat_data = configurations.get(&flat_config).unwrap();
-    let wall_data = flat_data.blocking_configurations.get(&wall_config).unwrap();
-
-    let flat_permutation = encode_flats(position);
-    let wall_permutation = encode_walls_caps(position);
-
-    let flat_index = flat_permutation;
-    let wall_index = flat_data.num_flats_permutations.clone()
-        * (wall_data.start_index.clone() + wall_permutation);
-
-    flat_data.start_index.clone() + flat_index + wall_index
-}
-
-pub fn encode_flats<const S: usize>(position: &Position<S>) -> BigUint {
+fn encode_flats<const S: usize>(position: &Position<S>) -> BigUint {
     let group_data = position.group_data();
     let flat_config = FlatsConfiguration {
         player: match position.side_to_move() {
@@ -307,7 +364,7 @@ pub fn encode_flats<const S: usize>(position: &Position<S>) -> BigUint {
     kth
 }
 
-pub fn encode_walls_caps<const S: usize>(position: &Position<S>) -> BigUint {
+fn encode_walls_caps<const S: usize>(position: &Position<S>) -> BigUint {
     let group_data = position.group_data();
     let wall_config = WallConfiguration {
         w_walls: group_data.white_walls.count(),
@@ -342,63 +399,6 @@ pub fn encode_walls_caps<const S: usize>(position: &Position<S>) -> BigUint {
         ],
     );
     kth
-}
-
-pub fn decode_position<const S: usize>(
-    configurations: &BoardConfigurations,
-    k: BigUint,
-) -> Position<S> {
-    let (flat_config, flat_data) = configurations
-        .iter()
-        .find(|(_, data)| k >= data.start_index && k < data.start_index.clone() + data.size.clone())
-        .unwrap();
-
-    let local_index = k.clone() - flat_data.start_index.clone();
-
-    let side_to_move = if flat_config.player == 1 {
-        Color::White
-    } else {
-        Color::Black
-    };
-
-    let (walls_local_k, flat_identifier) = local_index.div_rem(&flat_data.num_flats_permutations);
-
-    let (wall_config, wall_size) = flat_data
-        .blocking_configurations
-        .iter()
-        .find(|(_config, data)| {
-            walls_local_k >= data.start_index
-                && walls_local_k < data.start_index.clone() + data.size
-        })
-        .unwrap();
-
-    let mut position: Position<S> = decode_flats(
-        flat_identifier.clone(),
-        flat_config.w_stones as u64,
-        flat_config.b_stones as u64,
-    );
-    if side_to_move == Color::Black {
-        position.null_move();
-    }
-
-    assert_eq!(flat_identifier, encode_flats(&position));
-
-    let walls_local_index = walls_local_k - wall_size.start_index.clone();
-
-    decode_walls_caps(
-        walls_local_index.clone(),
-        &mut position,
-        wall_config.w_walls as u64,
-        wall_config.b_walls as u64,
-        wall_config.w_caps as u64,
-        wall_config.b_caps as u64,
-    );
-
-    assert_eq!(walls_local_index, encode_walls_caps(&position));
-
-    assert_eq!(k, encode_position(configurations, &position));
-
-    position
 }
 
 fn configs_total2(
@@ -597,11 +597,11 @@ fn inner_configs(
     config_classes
 }
 
-pub fn choose_multinomial(n: u64, ks: &[u64]) -> BigUint {
+fn choose_multinomial(n: u64, ks: &[u64]) -> BigUint {
     factorial(n) / ks.iter().map(|&k| factorial(k)).product::<BigUint>()
 }
 
-pub fn factorial(n: u64) -> BigUint {
+fn factorial(n: u64) -> BigUint {
     (1..=n).product()
 }
 
@@ -627,13 +627,16 @@ fn factorial_test() {
 
 #[test]
 fn count_positions_3s() {
-    assert_eq!(legal_positions(3), "96317109784544".parse().unwrap());
+    assert_eq!(
+        <PositionEncoder<3>>::initialize().count_legal_positions(),
+        "96317109784544".parse().unwrap()
+    );
 }
 
 #[test]
 fn count_positions_4s() {
     assert_eq!(
-        legal_positions(4),
+        <PositionEncoder<4>>::initialize().count_legal_positions(),
         "186068001400694400221565".parse().unwrap()
     );
 }
@@ -641,7 +644,7 @@ fn count_positions_4s() {
 #[test]
 fn count_positions_5s() {
     assert_eq!(
-        legal_positions(5),
+        <PositionEncoder<5>>::initialize().count_legal_positions(),
         "17373764696009420300241450342663955626".parse().unwrap()
     );
 }
@@ -649,7 +652,7 @@ fn count_positions_5s() {
 #[test]
 fn count_positions_6s() {
     assert_eq!(
-        legal_positions(6),
+        <PositionEncoder<6>>::initialize().count_legal_positions(),
         "234953877228339135776421063941057364108851372312359713"
             .parse()
             .unwrap()
@@ -666,10 +669,10 @@ fn encode_start_position_test() {
 #[cfg(test)]
 fn encode_start_position_prop<const S: usize>() {
     let k: BigUint = 0u64.into();
-    let data = configs_total::<S>();
-    let position: Position<S> = decode_position(&data, k.clone());
+    let data = PositionEncoder::<S>::initialize();
+    let position: Position<S> = data.decode(k.clone());
     assert_eq!(position, Position::start_position());
-    assert_eq!(k, encode_position(&data, &position));
+    assert_eq!(k, data.encode(&position));
 }
 
 #[test]
@@ -684,9 +687,9 @@ fn encode_2nd_ply_prop<const S: usize>() {
     use crate::position::{Move, Square};
 
     let k: BigUint = 1u64.into();
-    let data = configs_total::<S>();
-    let position: Position<S> = decode_position(&data, k.clone());
-    assert_eq!(k, encode_position(&data, &position));
+    let data = <PositionEncoder<S>>::initialize();
+    let position: Position<S> = data.decode(k.clone());
+    assert_eq!(k, data.encode(&position));
 
     let mut start_position = Position::start_position();
     start_position.do_move(Move::placement(Role::Flat, Square::from_u8(0)));
