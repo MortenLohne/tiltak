@@ -217,6 +217,27 @@ fn kth_permutation(mut k: BigUint, mut categories: Vec<u64>) -> Vec<u8> {
     permutation
 }
 
+/// Compute the lexicographic index of a given permutation.
+fn permutation_to_index(permutation: &[u8], categories: Vec<u64>) -> BigUint {
+    let mut index = BigUint::default();
+    let mut categories = categories.clone();
+
+    for &perm in permutation {
+        // Count permutations that start with a "smaller" character
+        for i in 0..perm {
+            if categories[i as usize] > 0 {
+                let mut reduced_categories = categories.clone();
+                reduced_categories[i as usize] -= 1;
+                index += choose_multinomial(reduced_categories.iter().sum(), &reduced_categories);
+            }
+        }
+
+        categories[perm as usize] -= 1;
+    }
+
+    index
+}
+
 fn decode_flats<const S: usize>(
     k: BigUint,
     num_white_flats: u64,
@@ -650,6 +671,15 @@ pub fn choose_multinomial(n: u64, ks: &[u64]) -> BigUint {
 
 pub fn factorial(n: u64) -> BigUint {
     (1..=n).product()
+}
+
+#[test]
+fn kth_permutation_inverse_test() {
+    let k: BigUint = 1234u64.into();
+    let categories = vec![2, 5, 3, 10];
+    let permutation = kth_permutation(k.clone(), categories.clone());
+    let index = permutation_to_index(&permutation, categories);
+    assert_eq!(index, k);
 }
 
 #[test]
