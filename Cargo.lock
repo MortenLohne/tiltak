@@ -1110,6 +1110,7 @@ dependencies = [
  "lambda_runtime",
  "log",
  "num-bigint",
+ "num-integer",
  "num-traits",
  "pgn-traits",
  "rand",
