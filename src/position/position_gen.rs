@@ -6,7 +6,7 @@ use std::collections::BTreeMap;
 use num_bigint::BigUint;
 use num_integer::Integer;
 
-use crate::position::Piece;
+use crate::position::{Piece, Role};
 
 use super::{squares_iterator, starting_capstones, starting_stones, Position};
 
@@ -135,6 +135,14 @@ struct WallConfigurationData {
 
 pub type BoardConfigurations = BTreeMap<FlatsConfiguration, FlatConfigurationData>;
 
+pub fn max_index(configurations: &BoardConfigurations) -> BigUint {
+    configurations
+        .values()
+        .map(|data| data.start_index.clone() + data.size.clone())
+        .max()
+        .unwrap()
+}
+
 fn lookup_multiset(mut k: BigUint, mut categories: Vec<u64>) -> Vec<u8> {
     let mut output: Vec<u8> = vec![];
     let num_elements = categories.iter().sum::<u64>();
@@ -236,9 +244,52 @@ fn decode_flats<const S: usize>(
             let mut stack = position.get_stack(square);
             stack.push(piece);
             position.set_stack(square, stack);
+            position.half_moves_played += 1;
         }
     }
     unreachable!()
+}
+
+fn decode_walls_caps<const S: usize>(
+    k: BigUint,
+    position: &mut Position<S>,
+    num_white_walls: u64,
+    num_black_walls: u64,
+    num_white_caps: u64,
+    num_black_caps: u64,
+) {
+    let permutations = kth_permutation(
+        k,
+        vec![
+            num_white_walls,
+            num_black_walls,
+            num_white_caps,
+            num_black_caps,
+            (S * S) as u64 - num_white_walls - num_black_walls - num_white_caps - num_black_caps,
+        ],
+    );
+    println!("Walls permutations: {:?}", permutations);
+    let mut permutations_iter = permutations.into_iter();
+    'square_loop: for square in squares_iterator::<S>() {
+        let next = permutations_iter.next().unwrap();
+        if next == 4 {
+            continue 'square_loop;
+        }
+        let piece = match next {
+            0 => Piece::WhiteWall,
+            1 => Piece::BlackWall,
+            2 => Piece::WhiteCap,
+            3 => Piece::BlackCap,
+            _ => unreachable!(),
+        };
+        let mut stack = position.get_stack(square);
+        assert!(stack
+            .top_stone()
+            .is_none_or(|piece| piece.role() == Role::Flat));
+        stack.push(piece);
+        position.set_stack(square, stack);
+        position.half_moves_played += 1;
+    }
 }
 
 pub fn decode_position<const S: usize>(
@@ -248,7 +299,7 @@ pub fn decode_position<const S: usize>(
     println!("Decoding {} for {}s", k, S);
     let (flat_config, flat_data) = configurations
         .iter()
-        .find(|(_, data)| k > data.start_index && k < data.start_index.clone() + data.size.clone())
+        .find(|(_, data)| k >= data.start_index && k < data.start_index.clone() + data.size.clone())
         .unwrap();
     println!(
         "Found flat configuration in the {}-{} index range",
@@ -272,20 +323,34 @@ pub fn decode_position<const S: usize>(
         flat_data.num_flats_permutations,
         flat_data.size
     );
-    let (walls_local_k, flat_local_k) = local_index.div_rem(&flat_data.num_flats_permutations);
+    let (walls_local_k, flat_identifier) = local_index.div_rem(&flat_data.num_flats_permutations);
     println!(
         "Extracted k={} for the flats, and k={} for the wall configuration",
-        flat_local_k, walls_local_k
+        flat_identifier, walls_local_k
     );
 
-    // let (wall_config, wall_size) = flat_data
-    //     .blocking_configurations
-    //     .iter()
-    //     .find(|(config, size)| walls_local_k < size)
-    //     .unwrap();
+    let (wall_config, wall_size) = flat_data
+        .blocking_configurations
+        .iter()
+        .find(|(_config, data)| {
+            walls_local_k >= data.start_index
+                && walls_local_k < data.start_index.clone() + data.size
+        })
+        .unwrap();
 
-    let mut position: Position<3> = decode_flats(
-        flat_local_k,
+    println!(
+        "Found wall configuration in the {}-{} index range",
+        wall_size.start_index,
+        wall_size.start_index.clone() + wall_size.size
+    );
+
+    println!(
+        "Determined {} white walls, {} black walls, {} white caps, {} black caps",
+        wall_config.w_walls, wall_config.b_walls, wall_config.w_caps, wall_config.b_caps
+    );
+
+    let mut position: Position<S> = decode_flats(
+        flat_identifier,
         flat_config.w_stones as u64,
         flat_config.b_stones as u64,
     );
@@ -293,8 +358,23 @@ pub fn decode_position<const S: usize>(
         position.null_move();
     }
 
+    let walls_local_index = walls_local_k - wall_size.start_index.clone();
+
     println!("Got flats position: {}", position.to_fen());
-    todo!()
+    println!("Extracted local index for walls: {}", walls_local_index);
+
+    decode_walls_caps(
+        walls_local_index,
+        &mut position,
+        wall_config.w_walls as u64,
+        wall_config.b_walls as u64,
+        wall_config.w_caps as u64,
+        wall_config.b_caps as u64,
+    );
+
+    println!("Got full position: {}", position.to_fen());
+
+    position
 }
 
 /// Return the starting index and the number of positions for the given configuration

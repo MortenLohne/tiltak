@@ -22,6 +22,7 @@ use std::{fs, io, time};
 use board_game_traits::Position as PositionTrait;
 use board_game_traits::{Color, GameResult};
 use half::f16;
+use num_bigint::RandBigInt;
 use num_traits::Float;
 use pgn_traits::PgnPosition;
 #[cfg(feature = "constant-tuning")]
@@ -80,18 +81,33 @@ fn main() {
                 play_human(position);
             }
             "decode" => {
-                let size: u8 = 3;
-                let reserves = starting_stones(size as usize);
-                let caps = starting_capstones(size as usize);
-                let data = position::position_gen::configs_total2(
-                    size,
-                    size * size,
-                    reserves,
-                    reserves,
-                    caps,
-                    caps,
-                );
-                position::position_gen::decode_position::<3>(&data, 109784544u64.into());
+                fn decode_sized<const S: usize>() {
+                    let reserves = starting_stones(S);
+                    let caps = starting_capstones(S);
+                    let data = position::position_gen::configs_total2(
+                        S as u8,
+                        (S * S) as u8,
+                        reserves,
+                        reserves,
+                        caps,
+                        caps,
+                    );
+                    let max_index = position::position_gen::max_index(&data);
+                    let k = rand::thread_rng().gen_biguint_below(&max_index);
+                    position::position_gen::decode_position::<S>(&data, k.into());
+                    position::position_gen::decode_position::<S>(&data, 0u64.into());
+                    position::position_gen::decode_position::<S>(&data, 1u64.into());
+                }
+                match words.get(1) {
+                    Some(&"3") => decode_sized::<3>(),
+                    Some(&"4") => decode_sized::<4>(),
+                    Some(&"5") => decode_sized::<5>(),
+                    Some(&"6") => decode_sized::<6>(),
+                    Some(&"7") => decode_sized::<7>(),
+                    Some(&"8") => decode_sized::<8>(),
+                    Some(s) => println!("Unsupported size {}", s),
+                    None => decode_sized::<5>(),
+                }
             }
             "count" => {
                 for size in 3..=8 {
