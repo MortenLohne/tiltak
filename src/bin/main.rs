@@ -20,11 +20,10 @@ use tiltak::evaluation::parameters::{
 };
 #[cfg(feature = "sqlite")]
 use tiltak::policy_sqlite;
+use tiltak::position::Role;
 use tiltak::position::{
-    squares_iterator, starting_capstones, AbstractBoard, Direction, Komi, Move, Square,
-    SquareCacheEntry,
+    squares_iterator, AbstractBoard, Direction, Komi, Move, Square, SquareCacheEntry,
 };
-use tiltak::position::{starting_stones, Role};
 use tiltak::position::{Position, Stack};
 use tiltak::ptn::{Game, PtnMove};
 use tiltak::search::{cp_to_win_percentage, MctsSetting};
@@ -66,21 +65,17 @@ fn main() {
             }
             "decode" => {
                 fn decode_sized<const S: usize>() {
-                    let reserves = starting_stones(S);
-                    let caps = starting_capstones(S);
-                    let data = position::position_gen::configs_total2(
-                        S as u8,
-                        (S * S) as u8,
-                        reserves,
-                        reserves,
-                        caps,
-                        caps,
-                    );
+                    let data = position::position_gen::configs_total::<S>();
                     let max_index = position::position_gen::max_index(&data);
-                    let k = rand::thread_rng().gen_biguint_below(&max_index);
-                    position::position_gen::decode_position::<S>(&data, k.into());
-                    position::position_gen::decode_position::<S>(&data, 0u64.into());
-                    position::position_gen::decode_position::<S>(&data, 1u64.into());
+                    let mut rng: rand::prelude::ThreadRng = rand::thread_rng();
+
+                    for _ in 0..100 {
+                        let k = rng.gen_biguint_below(&max_index);
+                        let position =
+                            position::position_gen::decode_position::<S>(&data, k.clone());
+
+                        println!("{}, {}", k, position.to_fen());
+                    }
                 }
                 match words.get(1) {
                     Some(&"3") => decode_sized::<3>(),
@@ -90,7 +85,7 @@ fn main() {
                     Some(&"7") => decode_sized::<7>(),
                     Some(&"8") => decode_sized::<8>(),
                     Some(s) => println!("Unsupported size {}", s),
-                    None => decode_sized::<5>(),
+                    None => println!("No size provided"),
                 }
             }
             "count" => {
@@ -763,6 +758,12 @@ fn analyze_position_from_tps<const S: usize>(komi: Komi) {
     let mut input = String::new();
     io::stdin().read_line(&mut input).unwrap();
     let position = <Position<S>>::from_fen_with_komi(&input, komi).unwrap();
+
+    let data = position::position_gen::configs_total::<S>();
+    println!(
+        "Encoded: {}",
+        position::position_gen::encode_position(&data, &position)
+    );
     analyze_position(&position)
 }
 
