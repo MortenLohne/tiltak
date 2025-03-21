@@ -85,7 +85,7 @@ fn main() {
                     let max_index = position::position_gen::max_index(&data);
                     let mut rng: rand::prelude::ThreadRng = rand::thread_rng();
 
-                    for _ in 0..100 {
+                    for _ in 0..10 {
                         let k = rng.gen_biguint_below(&max_index);
                         let position =
                             position::position_gen::decode_position::<S>(&data, k.clone());
