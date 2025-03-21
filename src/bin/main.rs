@@ -79,16 +79,23 @@ fn main() {
                 let position = Position::default();
                 play_human(position);
             }
+            "decode" => {
+                let size: u8 = 3;
+                let reserves = starting_stones(size as usize);
+                let caps = starting_capstones(size as usize);
+                let data = position::position_gen::configs_total2(
+                    size,
+                    size * size,
+                    reserves,
+                    reserves,
+                    caps,
+                    caps,
+                );
+                position::position_gen::decode_position::<3>(&data, 109784544u64.into());
+            }
             "count" => {
                 for size in 3..=8 {
-                    let num_positions = position::position_gen::configs_total2(
-                        size,
-                        size * size,
-                        starting_stones(size as usize),
-                        starting_stones(size as usize),
-                        starting_capstones(size as usize),
-                        starting_capstones(size as usize),
-                    );
+                    let num_positions = position::position_gen::legal_positions(size);
                     use num_traits::cast::ToPrimitive;
                     let num_digits = (num_positions.bits() as f64 * f64::log10(2.0)).floor();
                     println!(

@@ -65,3 +65,4 @@ mimalloc = {version = "0.1.47", optional = true }
 dhat = { version = "0.3.3", optional = true }
 trybox = "0.1.2"
 num-bigint = "0.4.6"
+num-integer = "0.1.46"

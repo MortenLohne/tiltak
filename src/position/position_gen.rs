@@ -1,9 +1,14 @@
+use board_game_traits::{Color, Position as PositionTrait};
 use num_traits::ToPrimitive;
+use pgn_traits::PgnPosition;
 use std::collections::BTreeMap;
 
 use num_bigint::BigUint;
+use num_integer::Integer;
 
-use super::{starting_capstones, starting_stones};
+use crate::position::Piece;
+
+use super::{squares_iterator, starting_capstones, starting_stones, Position};
 
 pub fn legal_positions(size: u8) -> BigUint {
     let num_reserves = starting_stones(size as usize);
@@ -16,6 +21,9 @@ pub fn legal_positions(size: u8) -> BigUint {
         num_caps,
         num_caps,
     )
+    .values()
+    .map(|data| data.size.clone())
+    .sum()
 }
 
 /// Number of board configuarions with exactly this number of white and black flats
@@ -79,7 +87,7 @@ pub fn blocking_configs_max(
 }
 
 #[derive(Copy, Clone, PartialOrd, Ord, PartialEq, Eq, Debug)]
-struct FlatsConfiguration {
+pub struct FlatsConfiguration {
     w_stones: u8,
     b_stones: u8,
     player: u8,
@@ -104,7 +112,7 @@ impl FlatsConfiguration {
     }
 }
 
-struct FlatConfigurationData {
+pub struct FlatConfigurationData {
     start_index: BigUint,
     size: BigUint,
     num_flats_permutations: BigUint,
@@ -119,7 +127,169 @@ struct WallConfiguration {
     b_caps: u8,
 }
 
-type BoardConfigurations = BTreeMap<FlatsConfiguration, FlatConfigurationData>;
+pub type BoardConfigurations = BTreeMap<FlatsConfiguration, FlatConfigurationData>;
+
+fn lookup_multiset(mut k: BigUint, mut categories: Vec<u64>) -> Vec<u8> {
+    let mut output: Vec<u8> = vec![];
+    let num_elements = categories.iter().sum::<u64>();
+    'outer: while output.len() < num_elements as usize {
+        let num_elements_left = categories.iter().sum::<u64>();
+
+        let mut ns = vec![];
+        for i in 0..categories.len() {
+            if categories[i] == 0 {
+                ns.push(BigUint::default());
+            } else {
+                categories[i] -= 1;
+                let n = choose_multinomial(num_elements_left - 1, &categories);
+                ns.push(n);
+                categories[i] += 1;
+            }
+        }
+
+        let mut cumulative_sum = BigUint::default();
+
+        for (i, n) in ns.iter().enumerate() {
+            if i == ns.len() - 1 || k < cumulative_sum.clone() + n {
+                assert!(
+                    categories[i] > 0,
+                    "Should have found a category to remove, k {}, categories {:?}, output {:?}",
+                    k,
+                    categories,
+                    output
+                );
+                output.push(i as u8);
+                categories[i] -= 1;
+                k -= cumulative_sum;
+                continue 'outer;
+            }
+            cumulative_sum += n;
+        }
+        unreachable!(
+            "Should have found a category to remove, k {}, categories {:?}, output {:?}",
+            k, categories, output
+        );
+    }
+    output
+}
+
+/// Find the k-th permutation of a multiset with arbitrary category counts.
+fn kth_permutation(mut k: BigUint, mut categories: Vec<u64>) -> Vec<u8> {
+    let mut permutation = Vec::new();
+
+    while categories.iter().sum::<u64>() > 0 {
+        for (i, &count) in categories.iter().enumerate() {
+            if count == 0 {
+                continue;
+            }
+
+            // Compute number of permutations starting with this category
+            let mut reduced_categories = categories.clone();
+            reduced_categories[i] -= 1;
+            let num_permutations =
+                choose_multinomial(reduced_categories.iter().sum(), &reduced_categories);
+
+            if k < num_permutations {
+                // Choose this category for the next position
+                permutation.push(i as u8);
+                categories[i] -= 1;
+                break;
+            } else {
+                // Skip this many permutations and move to the next category
+                k -= num_permutations;
+            }
+        }
+    }
+    permutation
+}
+
+fn decode_flats<const S: usize>(
+    k: BigUint,
+    num_white_flats: u64,
+    num_black_flats: u64,
+) -> Position<S> {
+    let permutations = kth_permutation(
+        k,
+        vec![num_white_flats, num_black_flats, (S * S) as u64 - 1],
+    );
+    let mut position = Position::default();
+    let mut permutations_iter = permutations.into_iter();
+    'square_loop: for square in squares_iterator::<S>() {
+        loop {
+            let Some(next) = permutations_iter.next() else {
+                return position;
+            };
+            if next == 2 {
+                continue 'square_loop;
+            }
+            let piece = match next {
+                0 => Piece::WhiteFlat,
+                1 => Piece::BlackFlat,
+                _ => unreachable!(),
+            };
+            let mut stack = position.get_stack(square);
+            stack.push(piece);
+            position.set_stack(square, stack);
+        }
+    }
+    unreachable!()
+}
+
+pub fn decode_position<const S: usize>(
+    configurations: &BoardConfigurations,
+    k: BigUint,
+) -> Position<S> {
+    println!("Decoding {} for {}s", k, S);
+    let (flat_config, flat_data) = configurations
+        .iter()
+        .find(|(_, data)| k > data.start_index && k < data.start_index.clone() + data.size.clone())
+        .unwrap();
+    println!(
+        "Found flat configuration in the {}-{} index range",
+        flat_data.start_index,
+        flat_data.start_index.clone() + flat_data.size.clone()
+    );
+    let local_index = k - flat_data.start_index.clone();
+    println!("Local index: {}", local_index);
+
+    let side_to_move = if flat_config.player == 1 {
+        Color::White
+    } else {
+        Color::Black
+    };
+
+    println!(
+        "Determined {} to move, {} white flats and {} black flats, {} flat configurations, {} total size for this configuration",
+        side_to_move,
+        flat_config.w_stones,
+        flat_config.b_stones,
+        flat_data.num_flats_permutations,
+        flat_data.size
+    );
+    let (walls_local_k, flat_local_k) = local_index.div_rem(&flat_data.num_flats_permutations);
+    println!(
+        "Extracted k={} for the flats, and k={} for the wall configuration",
+        flat_local_k, walls_local_k
+    );
+
+    // let (wall_config, wall_size) = flat_data
+    //     .blocking_configurations
+    //     .iter()
+    //     .find(|(config, size)| walls_local_k < size)
+    //     .unwrap();
+
+    let mut position: Position<3> = decode_flats(
+        flat_local_k,
+        flat_config.w_stones as u64,
+        flat_config.b_stones as u64,
+    );
+    if side_to_move == Color::Black {
+        position.null_move();
+    }
+
+    println!("Got flats position: {}", position.to_fen());
+    todo!()
+}
 
 /// Return the starting index and the number of positions for the given configuration
 // fn lookup(
@@ -131,21 +301,22 @@ type BoardConfigurations = BTreeMap<FlatsConfiguration, FlatConfigurationData>;
 //     b_walls: u8,
 //     w_caps: u8,
 //     b_caps: u8,
-// ) -> (BigUint, BigUint) {
+// ) -> (BigUint, u128) {
 //     let flats = FlatsConfiguration {
 //         w_stones: w_reserves_placed,
 //         b_stones: b_reserves_placed,
 //         player,
 //     };
 //     let flat_data = configurations.get(&flats).unwrap();
-//     let blocking_configs = flat_data.1.get(&WallConfiguration {
+//     let blocking_configs = flat_data.blocking_configurations.get(&WallConfiguration {
 //         w_walls,
 //         b_walls,
 //         w_caps,
 //         b_caps,
 //     });
-//     let start_index = flat_data.
-//         let size = blocking_configs.unwrap().clone();
+//     let start_index = flat_data.start_index.clone();
+//     let size = blocking_configs.unwrap().clone();
+//     println!("")
 //     (start_index, size)
 // }
 
@@ -156,7 +327,7 @@ pub fn configs_total2(
     max_b_stones: u8,
     max_w_caps: u8,
     max_b_caps: u8,
-) -> BigUint {
+) -> BoardConfigurations {
     let mut total = BigUint::from(1 + size * size);
     let mut position_classes: BoardConfigurations = BTreeMap::new();
 
@@ -271,7 +442,12 @@ pub fn configs_total2(
         );
     }
 
-    let biggest = position_classes
+    let biggest_flat = position_classes
+        .iter()
+        .max_by_key(|(_, data)| data.size.clone())
+        .unwrap();
+
+    let biggest_wall = position_classes
         .iter()
         .flat_map(|(config, data)| {
             data.blocking_configurations
@@ -282,11 +458,24 @@ pub fn configs_total2(
         .unwrap();
 
     println!(
-        "Biggest class: {:?} {:?}, size {}",
-        biggest.0, biggest.1, biggest.2
+        "Biggest flat class: {:?}, flat permutations: {}, total size {}",
+        biggest_flat.0, biggest_flat.1.num_flats_permutations, biggest_flat.1.size
+    );
+    println!(
+        "Biggest wall class: {:?} {:?}, size {}",
+        biggest_wall.0, biggest_wall.1, biggest_wall.2
     );
 
-    total
+    println!(
+        "Looking up multiset k=10, a=2, b=1, c=1: {:?}",
+        lookup_multiset(0u64.into(), vec![2, 1, 1])
+    );
+    println!(
+        "Looking up multiset k=10, a=2, b=1, c=1: {:?}",
+        kth_permutation(0u64.into(), vec![2, 1, 1])
+    );
+
+    position_classes
 }
 
 fn inner_configs(
