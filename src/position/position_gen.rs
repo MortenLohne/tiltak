@@ -83,11 +83,8 @@ impl<const S: usize> PositionEncoder<S> {
     }
 
     pub fn count_legal_positions(&self) -> BigUint {
-        self.data
-            .values()
-            .map(|data| data.start_index.clone() + data.size.clone())
-            .max()
-            .unwrap()
+        let last_flat_data = self.data.last_key_value().unwrap().1;
+        last_flat_data.start_index.clone() + last_flat_data.size.clone()
     }
 
     pub fn encode(&self, position: &Position<S>) -> BigUint {
@@ -127,6 +124,9 @@ impl<const S: usize> PositionEncoder<S> {
 
     /// Decodes a position
     /// The move counter is guessed on a best-effort basis, as it is not stored in the encoded data
+    ///
+    /// # Panics
+    /// Panics if the input is greater than or equal to the total number of positions
     pub fn decode(&self, k: BigUint) -> Position<S> {
         let (flat_config, flat_data) = self
             .data
@@ -134,7 +134,7 @@ impl<const S: usize> PositionEncoder<S> {
             .find(|(_, data)| {
                 k >= data.start_index && k < data.start_index.clone() + data.size.clone()
             })
-            .unwrap();
+            .expect("Tried to decode an integer greater than the total number of positions");
 
         let local_index = k.clone() - flat_data.start_index.clone();
 
@@ -657,6 +657,19 @@ fn count_positions_6s() {
             .parse()
             .unwrap()
     );
+}
+
+#[test]
+fn decode_max_number_test() {
+    let encoder = <PositionEncoder<5>>::initialize();
+    encoder.decode(encoder.count_legal_positions() - BigUint::from(1u64));
+}
+
+#[test]
+#[should_panic]
+fn decode_too_large_number_test() {
+    let encoder = <PositionEncoder<5>>::initialize();
+    encoder.decode(encoder.count_legal_positions());
 }
 
 #[test]
