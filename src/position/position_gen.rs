@@ -866,6 +866,44 @@ fn count_positions_6s() {
 }
 
 #[test]
+fn encode_start_position_test() {
+    encode_start_position_prop::<3>();
+    encode_start_position_prop::<4>();
+    encode_start_position_prop::<5>();
+}
+
+#[cfg(test)]
+fn encode_start_position_prop<const S: usize>() {
+    let k: BigUint = 0u64.into();
+    let data = configs_total::<S>();
+    let position: Position<S> = decode_position(&data, k.clone());
+    assert_eq!(position, Position::start_position());
+    assert_eq!(k, encode_position(&data, &position));
+}
+
+#[test]
+fn encode_2nd_ply_test() {
+    encode_2nd_ply_prop::<3>();
+    encode_2nd_ply_prop::<4>();
+    encode_2nd_ply_prop::<5>();
+}
+
+#[cfg(test)]
+fn encode_2nd_ply_prop<const S: usize>() {
+    use crate::position::{Move, Square};
+
+    let k: BigUint = 1u64.into();
+    let data = configs_total::<S>();
+    let position: Position<S> = decode_position(&data, k.clone());
+    assert_eq!(k, encode_position(&data, &position));
+
+    let mut start_position = Position::start_position();
+    start_position.do_move(Move::placement(Role::Flat, Square::from_u8(0)));
+
+    assert_eq!(position, start_position);
+}
+
+#[test]
 fn configuration_classes_are_sorted_test() {
     let classes = FlatsConfiguration::all_after_opening(10);
     assert!(classes.is_sorted());
