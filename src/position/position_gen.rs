@@ -116,7 +116,7 @@ pub struct FlatConfigurationData {
     start_index: BigUint,
     size: BigUint,
     num_flats_permutations: BigUint,
-    blocking_configurations: BTreeMap<WallConfiguration, u128>,
+    blocking_configurations: BTreeMap<WallConfiguration, WallConfigurationData>,
 }
 
 #[derive(Copy, Clone, PartialOrd, Ord, PartialEq, Eq, Debug)]
@@ -125,6 +125,12 @@ struct WallConfiguration {
     b_walls: u8,
     w_caps: u8,
     b_caps: u8,
+}
+
+#[derive(Clone, Debug)]
+struct WallConfigurationData {
+    start_index: BigUint, // This is the start index relative to the flat configuration context that the wall configuration is in
+    size: u128,
 }
 
 pub type BoardConfigurations = BTreeMap<FlatsConfiguration, FlatConfigurationData>;
@@ -338,8 +344,15 @@ pub fn configs_total2(
         w_caps: 0,
         b_caps: 0,
     };
-    let unit_wall_config_map: BTreeMap<WallConfiguration, u128> =
-        [(unit_wall_config, 1u64.into())].into_iter().collect();
+    let unit_wall_config_map: BTreeMap<WallConfiguration, WallConfigurationData> = [(
+        unit_wall_config,
+        WallConfigurationData {
+            start_index: 0u64.into(),
+            size: 1,
+        },
+    )]
+    .into_iter()
+    .collect();
 
     position_classes.insert(
         FlatsConfiguration {
@@ -386,7 +399,10 @@ pub fn configs_total2(
             b_stones,
         );
 
-        let num_blocking_configurations = blocking_configurations.values().sum::<BigUint>();
+        let num_blocking_configurations = blocking_configurations
+            .values()
+            .map(|data| data.size)
+            .sum::<BigUint>();
 
         let num_flat_configurations = choose_multinomial(
             (tiles - 1 + w_stones + b_stones) as u64,
@@ -434,12 +450,26 @@ pub fn configs_total2(
                 * position_class
                     .blocking_configurations
                     .values()
+                    .map(|data| data.size)
                     .sum::<BigUint>()
         );
         assert_eq!(
             position_class.start_index.clone() + position_class.size.clone(),
             next_position_class.start_index.clone()
         );
+    }
+
+    for position_class in position_classes.values() {
+        for (wall_data, next_wall_data) in position_class
+            .blocking_configurations
+            .values()
+            .zip(position_class.blocking_configurations.values().skip(1))
+        {
+            assert_eq!(
+                wall_data.start_index.clone() + wall_data.size.clone(),
+                next_wall_data.start_index.clone()
+            );
+        }
     }
 
     let biggest_flat = position_classes
@@ -454,7 +484,7 @@ pub fn configs_total2(
                 .iter()
                 .map(|(wall_config, wall_data)| (config.clone(), wall_config, wall_data))
         })
-        .max_by_key(|(_, _, data)| *data)
+        .max_by_key(|(_, _, data)| data.size)
         .unwrap();
 
     println!(
@@ -463,7 +493,7 @@ pub fn configs_total2(
     );
     println!(
         "Biggest wall class: {:?} {:?}, size {}",
-        biggest_wall.0, biggest_wall.1, biggest_wall.2
+        biggest_wall.0, biggest_wall.1, biggest_wall.2.size
     );
 
     println!(
@@ -487,8 +517,9 @@ fn inner_configs(
     player: u8,
     w_stones: u8,
     b_stones: u8,
-) -> BTreeMap<WallConfiguration, u128> {
-    let mut config_classes: BTreeMap<WallConfiguration, u128> = BTreeMap::new();
+) -> BTreeMap<WallConfiguration, WallConfigurationData> {
+    let mut config_classes: BTreeMap<WallConfiguration, WallConfigurationData> = BTreeMap::new();
+    let mut total = BigUint::default();
 
     for w_wall in 0..=(max_w_stones - w_stones) {
         for b_wall in 0..=(max_b_stones - b_stones) {
@@ -518,8 +549,14 @@ fn inner_configs(
                         w_caps: w_cap,
                         b_caps: b_cap,
                     };
-                    let old_value = config_classes.insert(wall_config, result);
+                    let wall_data: WallConfigurationData = WallConfigurationData {
+                        start_index: total.clone(),
+                        size: result,
+                    };
+                    let old_value = config_classes.insert(wall_config, wall_data);
                     assert!(old_value.is_none());
+
+                    total += result;
                 }
             }
         }
