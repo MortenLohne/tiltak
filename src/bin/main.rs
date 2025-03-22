@@ -102,6 +102,82 @@ fn main() {
                     None => println!("No size provided"),
                 }
             }
+            "random_positions" => {
+                fn random_positions<const S: usize>() {
+                    let data = position::position_gen::PositionEncoder::<S>::initialize();
+                    let max_index = data.count_legal_positions();
+                    let mut rng: rand::prelude::ThreadRng = rand::thread_rng();
+
+                    let mut white_wins = 0;
+                    let mut draws = 0;
+                    let mut black_wins = 0;
+
+                    let mut games_reversed = 0;
+
+                    for i in 0..10 {
+                        let k = rng.gen_biguint_below(&max_index);
+                        let position = data.decode(k.clone());
+                        match position.game_result() {
+                            Some(GameResult::WhiteWin) => white_wins += 1,
+                            Some(GameResult::Draw) => draws += 1,
+                            Some(GameResult::BlackWin) => black_wins += 1,
+                            None => (),
+                        }
+
+                        let mut reverse_moves = vec![];
+                        position.generate_reverse_moves(&mut reverse_moves);
+                        // println!("Generated positions: {}", position.to_fen());
+                        // println!(
+                        //     "Reverse moves: {}",
+                        //     reverse_moves
+                        //         .iter()
+                        //         .map(|mv| mv.to_string())
+                        //         .collect::<Vec<_>>()
+                        //         .join(", ")
+                        // );
+                        let mut position_cloned = position.clone();
+                        let game = position_cloned.reverse_analysis();
+                        if game.is_some() {
+                            games_reversed += 1;
+                        } else {
+                            // println!("Failed to solve {}", position.to_fen());
+                        }
+                        if i % 1000 == 999 {
+                            println!("Successfully reversed {}/{}", games_reversed, i + 1);
+                        }
+                        println!(
+                            "Game: {:?}",
+                            game.map(|game| game
+                                .iter()
+                                .map(|mv| mv.to_string())
+                                .collect::<Vec<_>>()
+                                .join(" "))
+                        );
+                        println!();
+
+                        if i % 10000 == 0 {
+                            println!(
+                                "Total: {}, White wins: {}, Black wins: {}, Draws: {}",
+                                i, white_wins, black_wins, draws
+                            );
+                            println!(
+                                "Decisive games percentage: {:.1}%",
+                                100.0 * (white_wins + draws + black_wins) as f32 / i as f32
+                            );
+                        }
+                    }
+                }
+                match words.get(1) {
+                    Some(&"3") => random_positions::<3>(),
+                    Some(&"4") => random_positions::<4>(),
+                    Some(&"5") => random_positions::<5>(),
+                    Some(&"6") => random_positions::<6>(),
+                    Some(&"7") => random_positions::<7>(),
+                    Some(&"8") => random_positions::<8>(),
+                    Some(s) => println!("Unsupported size {}", s),
+                    None => println!("No size provided"),
+                }
+            }
             "aimatch" => {
                 for i in 1..10 {
                     mcts_vs_minmax(3, 50000 * i);

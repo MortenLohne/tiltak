@@ -1,4 +1,4 @@
-use std::fmt::{self, Write};
+use std::fmt::{self, Display, Write};
 use std::iter;
 use std::num::NonZeroU16;
 use std::str::FromStr;
@@ -355,4 +355,39 @@ pub enum ReverseMove<const S: usize> {
         ArrayVec<u8, 8>,
         bool,
     ),
+}
+
+impl<const S: usize> Display for ReverseMove<S> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ReverseMove::Place(square) => write!(f, "{}", square),
+            ReverseMove::Move(square, direction, stack_movements, _, flattens) => {
+                let mut pieces_held = stack_movements.get_first().pieces_to_take;
+                if pieces_held == 1 {
+                    write!(f, "{}", square).unwrap();
+                } else {
+                    write!(f, "{}{}", pieces_held, square).unwrap();
+                }
+                match direction {
+                    North => f.write_char('+')?,
+                    West => f.write_char('<')?,
+                    East => f.write_char('>')?,
+                    South => f.write_char('-')?,
+                }
+                // Omit number of pieces dropped, if all stones are dropped immediately
+                if stack_movements.len() > 1 {
+                    for movement in stack_movements.into_iter().skip(1) {
+                        let pieces_to_drop = pieces_held - movement.pieces_to_take;
+                        write!(f, "{}", pieces_to_drop)?;
+                        pieces_held -= pieces_to_drop;
+                    }
+                    write!(f, "{}", pieces_held)?;
+                }
+                if *flattens {
+                    f.write_char('*')?;
+                }
+                Ok(())
+            }
+        }
+    }
 }

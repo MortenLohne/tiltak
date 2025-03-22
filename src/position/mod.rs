@@ -662,6 +662,7 @@ impl<const S: usize> fmt::Debug for Position<S> {
             "Hash: {}, hash history: {:?}",
             self.hash, self.hash_history
         )?;
+        writeln!(f, "TPS: {}", self.to_fen())?;
         Ok(())
     }
 }
@@ -1550,7 +1551,7 @@ impl<const S: usize> PositionTrait for Position<S> {
         );
 
         self.moves.push(mv);
-        self.half_moves_played += 1;
+        self.half_moves_played = self.half_moves_played.overflowing_add(1).0;
 
         self.hash ^= zobrist_to_move::<S>(self.to_move);
         self.to_move = !self.to_move;
@@ -1627,7 +1628,7 @@ impl<const S: usize> PositionTrait for Position<S> {
 
         self.moves.pop();
         self.hash_history.pop();
-        self.half_moves_played -= 1;
+        self.half_moves_played = self.half_moves_played.overflowing_sub(1).0;
 
         self.hash ^= zobrist_to_move::<S>(self.to_move);
         self.to_move = !self.to_move;

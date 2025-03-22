@@ -1,5 +1,7 @@
 use crate::position::ExpMove;
 use crate::position::Position;
+use crate::position::ReverseMove;
+use crate::position::Square;
 use crate::tests::do_moves_and_check_validity;
 use crate::tests::move_gen_generic_tests::perft_check_answers;
 use board_game_traits::Position as PositionTrait;
@@ -96,4 +98,45 @@ fn suicide_perf_test() {
     let mut position = <Position<5>>::default();
     do_moves_and_check_validity(&mut position, &move_strings);
     perft_check_answers(&mut position, &[1, 85, 11_204, 956_736]);
+}
+
+#[test]
+fn start_position_reverse_movegen_test() {
+    let mut position = <Position<5>>::start_position();
+    do_moves_and_check_validity(&mut position, &["a1"]);
+    let mut moves = vec![];
+    position.generate_reverse_moves(&mut moves);
+    assert_eq!(
+        moves,
+        vec![ReverseMove::Place(Square::parse_square("a1").unwrap())]
+    );
+}
+
+#[test]
+fn second_ply_reverse_movegen_test() {
+    let mut position = <Position<5>>::start_position();
+    do_moves_and_check_validity(&mut position, &["a1", "e5"]);
+    let mut moves = vec![];
+    position.generate_reverse_moves(&mut moves);
+    assert_eq!(moves.len(), 3);
+    assert!(moves.contains(&ReverseMove::Place(Square::parse_square("e5").unwrap())));
+    let a1: Square<5> = Square::parse_square("a2").unwrap();
+    assert!(
+        moves
+            .iter()
+            .any(|mv| matches!(mv, ReverseMove::Move(sq, _, _, _, _) if *sq == a1)),
+        "{:?}",
+        moves
+    );
+}
+
+#[test]
+fn fourth_ply_reverse_movegen_test() {
+    let mut position = <Position<5>>::start_position();
+    do_moves_and_check_validity(&mut position, &["e1", "e5", "e5<", "Sa1"]);
+
+    let mut reverse_moves = vec![];
+    position.generate_reverse_moves(&mut reverse_moves);
+
+    assert_eq!(reverse_moves.len(), 5);
 }

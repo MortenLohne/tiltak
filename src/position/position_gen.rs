@@ -138,10 +138,10 @@ impl<const S: usize> PositionEncoder<S> {
 
         let local_index = k.clone() - flat_data.start_index.clone();
 
-        let side_to_move = if flat_config.player == 1 {
-            Color::White
-        } else {
-            Color::Black
+        let side_to_move = match flat_config.player {
+            1 => Color::White,
+            2 => Color::Black,
+            _ => panic!(),
         };
 
         let (walls_local_k, flat_identifier) =
@@ -559,8 +559,8 @@ fn inner_configs(
             for w_cap in 0..=max_w_caps {
                 for b_cap in 0..=max_b_caps {
                     if (w_wall + b_wall + w_cap + b_cap > tiles)
-                        || (player == 1 && b_stones + b_wall + b_cap == max_b_stones + max_b_caps)
-                        || (player == 2 && w_stones + w_wall + w_cap == max_w_stones + max_w_caps)
+                        || (player == 2 && b_stones + b_wall + b_cap == max_b_stones + max_b_caps)
+                        || (player == 1 && w_stones + w_wall + w_cap == max_w_stones + max_w_caps)
                     {
                         continue;
                     }

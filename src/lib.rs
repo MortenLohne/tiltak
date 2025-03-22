@@ -40,6 +40,7 @@ pub mod move_gen;
 #[cfg(feature = "sqlite")]
 pub mod policy_sqlite;
 pub mod position;
+pub mod reverse_move_gen;
 pub mod search;
 #[cfg(test)]
 mod tests;
