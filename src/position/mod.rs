@@ -1357,16 +1357,19 @@ impl<const S: usize> PositionTrait for Position<S> {
     ///
     /// * A game is considered a draw after a three-fold repetition of the same position.
     fn generate_moves<E: Extend<Self::Move>>(&self, moves: &mut E) {
-        match self.half_moves_played() {
-            0 | 1 => moves.extend(
+        if self.white_stones_left == starting_stones(S)
+            || self.black_stones_left == starting_stones(S)
+        {
+            moves.extend(
                 square::squares_iterator::<S>()
                     .filter(|square| self.stack_heights[*square] == 0)
                     .map(|square| Move::placement(Flat, square)),
-            ),
-            _ => match self.side_to_move() {
+            )
+        } else {
+            match self.side_to_move() {
                 Color::White => self.generate_moves_colortr::<E, WhiteTr, BlackTr>(moves),
                 Color::Black => self.generate_moves_colortr::<E, BlackTr, WhiteTr>(moves),
-            },
+            }
         }
     }
 
@@ -1409,10 +1412,12 @@ impl<const S: usize> PositionTrait for Position<S> {
             ExpMove::Place(role, to) => {
                 debug_assert!(self.stack_heights[to] == 0);
                 // On the first move, the players place the opponent's color
-                let color_to_place = if self.half_moves_played() > 1 {
-                    self.side_to_move()
-                } else {
+                let color_to_place = if self.white_reserves_left() == starting_stones(S)
+                    || self.black_reserves_left() == starting_stones(S)
+                {
                     !self.side_to_move()
+                } else {
+                    self.side_to_move()
                 };
                 let piece = Piece::from_role_color(role, color_to_place);
 
@@ -1564,7 +1569,11 @@ impl<const S: usize> PositionTrait for Position<S> {
                 self.hash ^= zobrist_top_stones::<S>(square, piece);
                 self.hash ^= zobrist_stack_heights(square, 1);
 
-                debug_assert!(piece.color() != self.side_to_move() || self.half_moves_played() < 3);
+                debug_assert!(
+                    piece.color() != self.side_to_move()
+                        || self.black_reserves_left() == starting_stones(S) - 1
+                        || self.white_reserves_left() == starting_stones(S) - 1,
+                );
 
                 match piece {
                     WhiteFlat | WhiteWall => self.white_stones_left += 1,
