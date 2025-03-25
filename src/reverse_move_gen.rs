@@ -3,8 +3,8 @@ use board_game_traits::{Color, Position as _};
 use pgn_traits::PgnPosition;
 
 use crate::position::{
-    squares_iterator, starting_capstones, starting_stones, AbstractBoard, Move, Movement, Position,
-    ReverseMove, Role, Square, StackMovement,
+    squares_iterator, starting_capstones, starting_stones, AbstractBoard, Move, Movement, Piece,
+    Position, ReverseMove, Role, Square, StackMovement,
 };
 
 #[derive(Debug)]
@@ -131,13 +131,21 @@ impl<const S: usize> Position<S> {
             return;
         };
 
-        let group_data = self.group_data();
+        let mut num_white_walls = 0;
+        let mut num_black_walls = 0;
+        for top_stone in squares_iterator().flat_map(|sq| self.top_stones()[sq]) {
+            match top_stone {
+                Piece::WhiteWall => num_white_walls += 1,
+                Piece::BlackWall => num_black_walls += 1,
+                _ => (),
+            }
+        }
 
         let white_flats_on_board =
-            starting_stones(S) - self.white_reserves_left() - group_data.white_walls.count();
+            starting_stones(S) - self.white_reserves_left() - num_white_walls;
 
         let black_flats_on_board =
-            starting_stones(S) - self.black_reserves_left() - group_data.black_walls.count();
+            starting_stones(S) - self.black_reserves_left() - num_black_walls;
 
         let has_one_flat_left = last_side_to_move == Color::White && white_flats_on_board == 1
             || last_side_to_move == Color::Black && black_flats_on_board == 1;
