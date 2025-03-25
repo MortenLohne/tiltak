@@ -692,6 +692,18 @@ impl<const S: usize> Position<S> {
         Ok(position)
     }
 
+    /// Check whether the raw board states are equal, disregarding move history and the number of moves played
+    pub fn eq_board(&self, other: &Position<S>) -> bool {
+        self.stacks == other.stacks
+            && self.stack_heights == other.stack_heights
+            && self.top_stones == other.top_stones
+            && self.to_move == other.to_move
+            && self.white_stones_left == other.white_stones_left
+            && self.black_stones_left == other.black_stones_left
+            && self.white_caps_left == other.white_caps_left
+            && self.black_caps_left == other.black_caps_left
+    }
+
     pub fn get_stack(&self, square: Square<S>) -> Stack {
         let bitboard = self.stacks[square];
         let top_stone = self.top_stones[square];
