@@ -38,6 +38,7 @@ use tiltak::position::{
 };
 use tiltak::position::{Position, Stack};
 use tiltak::ptn::{Game, PtnMove};
+use tiltak::reverse_move_gen::ReverseAnalysisResult;
 use tiltak::search::{cp_to_win_percentage, MctsSetting};
 use tiltak::{minmax, ptn};
 use tiltak::{position, search};
@@ -114,7 +115,7 @@ fn main() {
 
                     let mut games_reversed = 0;
 
-                    for i in 0..10 {
+                    for i in 0..10_000_000 {
                         let k = rng.gen_biguint_below(&max_index);
                         let position = data.decode(k.clone());
                         match position.game_result() {
@@ -123,39 +124,64 @@ fn main() {
                             Some(GameResult::BlackWin) => black_wins += 1,
                             None => (),
                         }
-
-                        let mut reverse_moves = vec![];
-                        position.generate_reverse_moves(&mut reverse_moves);
-                        // println!("Generated positions: {}", position.to_fen());
-                        // println!(
-                        //     "Reverse moves: {}",
-                        //     reverse_moves
-                        //         .iter()
-                        //         .map(|mv| mv.to_string())
-                        //         .collect::<Vec<_>>()
-                        //         .join(", ")
-                        // );
-                        let mut position_cloned = position.clone();
-                        let game = position_cloned.reverse_analysis();
-                        if game.is_some() {
+                        let new_result_game = position.clone().reverse_analysis();
+                        if let ReverseAnalysisResult::Solution(moves) = &new_result_game {
                             games_reversed += 1;
-                        } else {
-                            // println!("Failed to solve {}", position.to_fen());
-                        }
-                        if i % 1000 == 999 {
-                            println!("Successfully reversed {}/{}", games_reversed, i + 1);
-                        }
-                        println!(
-                            "Game: {:?}",
-                            game.map(|game| game
-                                .iter()
-                                .map(|mv| mv.to_string())
-                                .collect::<Vec<_>>()
-                                .join(" "))
-                        );
-                        println!();
 
-                        if i % 10000 == 0 {
+                            // Check if game is legal, and results in the same board state
+                            let mut test_position: Position<S> = Position::start_position();
+                            for mv in moves.iter() {
+                                assert!(test_position.move_is_legal(*mv));
+                                assert!(test_position.game_result().is_none(), "Re-constructed game ended early. TPS {}, all moves {}, current position {}",
+                                    position.to_fen(),
+                                    moves.iter().map(|mv| mv.to_string()).collect::<Vec<_>>().join(" "),
+                                    test_position.to_fen());
+                                test_position.do_move(*mv);
+                            }
+
+                            assert!(test_position.eq_board(&position));
+
+                            // println!(
+                            //     "Solution: {}",
+                            //     moves
+                            //         .iter()
+                            //         .map(|mv| mv.to_string())
+                            //         .collect::<Vec<_>>()
+                            //         .join(" ")
+                            // );
+                        } else if let ReverseAnalysisResult::NoSolution(0) = new_result_game {
+                            // println!(
+                            //     "Failed to solve new TPS {}: {:?}",
+                            //     position.to_fen(),
+                            //     new_result_game
+                            // );
+                        } else {
+                            println!(
+                                "Failed to solve interesting new TPS {}: {:?}",
+                                position.to_fen(),
+                                new_result_game
+                            );
+                        }
+
+                        if !matches!(new_result_game, ReverseAnalysisResult::Solution(_))
+                            && position.game_result().is_none()
+                        {
+                            println!(
+                                "Got {:?} with no game result on TPS: {}",
+                                new_result_game,
+                                position.to_fen(),
+                            );
+                        }
+
+                        if i % 100_000 == 99_999 {
+                            println!(
+                                "Successfully reversed {}/{} positions",
+                                games_reversed,
+                                i + 1
+                            );
+                        }
+
+                        if i % 1_000_000 == 999_999 {
                             println!(
                                 "Total: {}, White wins: {}, Black wins: {}, Draws: {}",
                                 i, white_wins, black_wins, draws
