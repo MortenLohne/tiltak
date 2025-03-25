@@ -165,7 +165,7 @@ impl<const S: usize> PositionEncoder<S> {
             position.null_move();
         }
 
-        assert_eq!(flat_identifier, encode_flats(&position));
+        debug_assert_eq!(flat_identifier, encode_flats(&position));
 
         let walls_local_index = walls_local_k - wall_size.start_index.clone();
 
@@ -178,9 +178,9 @@ impl<const S: usize> PositionEncoder<S> {
             wall_config.b_caps as u64,
         );
 
-        assert_eq!(walls_local_index, encode_walls_caps(&position));
+        debug_assert_eq!(walls_local_index, encode_walls_caps(&position));
 
-        assert_eq!(k, self.encode(&position));
+        debug_assert_eq!(k, self.encode(&position));
 
         position
     }
