@@ -69,6 +69,13 @@ pub fn exploration_value(
     cpuct * heuristic_score * parent_visits_sqrt / (1 + child_visits) as f32 - mean_action_value
 }
 
+// A fast approximation for ln(x) invented by ChatGPT. Seems to be accurate to within +/- 5%
+fn fast_ln(f: f32) -> f32 {
+    assert!(f > 0.0);
+    let result = f.to_bits() as f32 * 1.1920928955078125e-7;
+    (result - 127.0) * 0.69314718
+}
+
 impl<const S: usize> TreeBridge<S> {
     #[inline(always)]
     pub fn best_child(
@@ -80,7 +87,7 @@ impl<const S: usize> TreeBridge<S> {
     ) -> usize {
         let visits_sqrt = (our_visits as f32).sqrt();
         let dynamic_cpuct = settings.c_puct_init()
-            + f32::ln((1.0 + our_visits as f32 + settings.c_puct_base()) / settings.c_puct_base());
+            + fast_ln((1.0 + our_visits as f32 + settings.c_puct_base()) / settings.c_puct_base());
 
         let heuristic_scores = arena.get_slice(&self.heuristic_scores);
         let mean_action_values = arena.get_slice(&self.mean_action_values);
