@@ -1377,17 +1377,15 @@ impl<const S: usize> PositionTrait for Position<S> {
                     !self.side_to_move()
                 };
                 let piece = Piece::from_role_color(role, color_to_place);
-                let mut to_stack = self.get_stack(to);
-                to_stack.push(piece);
-                self.set_stack(to, to_stack);
 
-                match (color_to_place, role) {
-                    (Color::White, Flat) => self.white_stones_left -= 1,
-                    (Color::White, Wall) => self.white_stones_left -= 1,
-                    (Color::White, Cap) => self.white_caps_left -= 1,
-                    (Color::Black, Flat) => self.black_stones_left -= 1,
-                    (Color::Black, Wall) => self.black_stones_left -= 1,
-                    (Color::Black, Cap) => self.black_caps_left -= 1,
+                self.top_stones[to] = Some(piece);
+                self.stack_heights[to] = 1;
+
+                match piece {
+                    WhiteFlat | WhiteWall => self.white_stones_left -= 1,
+                    WhiteCap => self.white_caps_left -= 1,
+                    BlackFlat | BlackWall => self.black_stones_left -= 1,
+                    BlackCap => self.black_caps_left -= 1,
                 }
 
                 self.hash ^= zobrist_top_stones::<S>(to, piece);
@@ -1402,15 +1400,33 @@ impl<const S: usize> PositionTrait for Position<S> {
                 let mut flattens_stone = false;
 
                 let mut movement_iter = stack_movement.into_iter();
-                let mut moving_pieces: ArrayVec<Piece, 8> = ArrayVec::new();
+                let mut moving_stack: Stack = Stack::default();
 
+                let to_take_first = movement_iter.next().unwrap().pieces_to_take;
                 let mut stack = self.get_stack(square);
-                for _ in 0..movement_iter.next().unwrap().pieces_to_take {
-                    moving_pieces.push(stack.pop().unwrap());
-                }
+
+                moving_stack.top_stone = stack.top_stone;
+                moving_stack.height = to_take_first;
+                moving_stack.bitboard = BitBoard {
+                    board: stack.bitboard.board >> (stack.height - to_take_first),
+                };
+
+                stack.top_stone = if stack.height == to_take_first {
+                    None
+                } else if stack.bitboard.get(stack.height - to_take_first - 1) {
+                    Some(WhiteFlat)
+                } else {
+                    Some(BlackFlat)
+                };
+                stack.bitboard = stack.bitboard
+                    & BitBoard::lower_n_bits(stack.height.saturating_sub(to_take_first + 1));
+                stack.height -= to_take_first;
+
                 self.hash ^= self.zobrist_hash_for_square(square);
                 self.set_stack(square, stack);
                 self.hash ^= self.zobrist_hash_for_square(square);
+
+                let mut pieces_held = to_take_first;
 
                 for Movement { pieces_to_take } in
                     movement_iter.chain(iter::once(Movement { pieces_to_take: 0 }))
@@ -1421,12 +1437,50 @@ impl<const S: usize> PositionTrait for Position<S> {
                         flattens_stone = true;
                     }
 
-                    pieces_left_behind.push(moving_pieces.len() as u8 - pieces_to_take);
+                    let pieces_to_drop = pieces_held - pieces_to_take;
+                    pieces_left_behind.push(pieces_to_drop);
 
                     let mut to_stack = self.get_stack(to);
-                    while moving_pieces.len() as u8 > pieces_to_take {
-                        to_stack.push(moving_pieces.pop().unwrap());
+
+                    // Put the top piece into the stack bitboard
+                    // This implicitly flattens walls, since it only looks at the top stone's color
+                    if to_stack
+                        .top_stone
+                        .is_some_and(|piece| piece.color() == Color::White)
+                    {
+                        to_stack.bitboard = to_stack.bitboard.set(to_stack.height - 1);
                     }
+
+                    to_stack.bitboard = BitBoard {
+                        board: to_stack.bitboard.board
+                            | ((moving_stack.bitboard
+                                & BitBoard::lower_n_bits(pieces_to_drop - 1))
+                            .board
+                                << to_stack.height),
+                    };
+
+                    if pieces_to_take == 0 {
+                        to_stack.top_stone = moving_stack.top_stone;
+                    } else {
+                        if moving_stack.bitboard.get(pieces_to_drop - 1) {
+                            to_stack.top_stone = Some(WhiteFlat);
+                        } else {
+                            to_stack.top_stone = Some(BlackFlat);
+                        }
+                    }
+
+                    to_stack.bitboard = to_stack
+                        .bitboard
+                        .clear(to_stack.height + pieces_to_drop - 1);
+
+                    to_stack.height += pieces_to_drop;
+                    pieces_held -= pieces_to_drop;
+
+                    moving_stack.height -= pieces_to_drop;
+                    moving_stack.bitboard = BitBoard {
+                        board: moving_stack.bitboard.board >> pieces_to_drop,
+                    };
+
                     self.hash ^= self.zobrist_hash_for_square(to);
                     self.set_stack(to, to_stack);
                     self.hash ^= self.zobrist_hash_for_square(to);
