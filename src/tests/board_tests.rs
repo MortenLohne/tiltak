@@ -444,6 +444,24 @@ fn fake_repetitions_are_not_draws_test() {
 }
 
 #[test]
+fn growing_a_stack_does_not_repeat_test() {
+    let mut position: Position<6> = Position::start_position();
+    let move_strings = [
+        "a1", "f6", "d4", "c3", "c4", "d3", "c4+", "d3<", "c5-", "d3", "d4<", "e3", "c4>", "e3<",
+        "d4<", "e3", "c4>", "e3<",
+    ];
+    let mut position_hashes = vec![];
+    for move_string in move_strings {
+        let mv = position.move_from_san(move_string).unwrap();
+        position.do_move(mv);
+
+        let hash = position.zobrist_hash_from_scratch();
+        assert!(!position_hashes.contains(&hash), "Found a repetition");
+        position_hashes.push(hash);
+    }
+}
+
+#[test]
 fn parse_tps_test() {
     let tps_string = "x4,1/x5/x5/x5/2,x4 1 2";
 
