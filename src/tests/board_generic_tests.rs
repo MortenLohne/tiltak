@@ -245,6 +245,7 @@ fn play_random_games_no_eval_prop<const S: usize>(num_games: usize) {
         let komi = Komi::from_half_komi(rng.gen_range(-6..=6)).unwrap();
         let mut position = <Position<S>>::start_position_with_komi(komi);
         let mut moves = vec![];
+        let mut hash_history = vec![];
 
         for i in 0.. {
             let hash_from_scratch = position.zobrist_hash_from_scratch();
@@ -292,6 +293,12 @@ fn play_random_games_no_eval_prop<const S: usize>(num_games: usize) {
             let fcd = position.fcd_for_move(*mv);
 
             position.do_move(*mv);
+            hash_history.push(position.zobrist_hash());
+            if i >= 3 {
+                assert_ne!(hash_history[i], hash_history[i - 1]);
+                assert_ne!(hash_history[i], hash_history[i - 2]);
+                assert_ne!(hash_history[i], hash_history[i - 3]);
+            }
 
             let new_group_data = position.group_data();
 

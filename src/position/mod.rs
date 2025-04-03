@@ -356,7 +356,7 @@ impl<const S: usize> GroupData<S> {
 #[derive(PartialEq, Eq, Debug)]
 pub struct ZobristKeys<const S: usize> {
     top_stones: AbstractBoard<[u64; 6], S>,
-    stones_in_stack: [Box<AbstractBoard<[u64; 256], S>>; 8],
+    stones_in_stack: [AbstractBoard<[u64; 16], S>; 16],
     to_move: [u64; 2],
 }
 
@@ -449,7 +449,7 @@ impl<const S: usize> ZobristKeys<S> {
         Box::new(ZobristKeys {
             top_stones: AbstractBoard::new_from_fn(|| array::from_fn(|_| rng.gen())),
             stones_in_stack: array::from_fn(|_| {
-                Box::new(AbstractBoard::new_from_fn(|| array::from_fn(|_| rng.gen())))
+                AbstractBoard::new_from_fn(|| array::from_fn(|_| rng.gen()))
             }),
             to_move: array::from_fn(|_| rng.gen()),
         })
@@ -736,11 +736,11 @@ impl<const S: usize> Position<S> {
         if let Some(top_stone) = self.top_stones[square] {
             hash ^= zobrist_top_stones::<S>(square, top_stone);
             // Only enter this loop if stack.len() is 2 or more
-            for i in 0..(self.stack_heights[square] as usize + 6) / 8 {
+            for i in 0..(self.stack_heights[square] as usize + 2) / 4 {
                 hash ^= zobrist_stones_in_stack::<S>(
                     square,
                     i,
-                    self.stacks[square].board as usize >> (i * 8) & 255,
+                    self.stacks[square].board as usize >> (i * 4) & 15,
                 )
             }
         }
