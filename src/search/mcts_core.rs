@@ -142,7 +142,10 @@ impl<const S: usize> TreeBridge<S> {
             .enumerate()
             .map(|(c, i)| i + c as u32)
             .zip(maxes)
-            .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap())
+            .max_by(|(_, a), (_, b)| {
+                // Safety: The values in `maxes` are guaranteed to be larger than `f32::NEG_INFINITY`, so cannot be NaN
+                unsafe { a.partial_cmp(b).unwrap_unchecked() }
+            })
             .unwrap();
 
         best_child_node_index as usize
