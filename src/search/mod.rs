@@ -478,7 +478,7 @@ pub struct ShallowEdge<'a, const S: usize> {
     policy: f16,
 }
 
-impl<'a, const S: usize> ShallowEdge<'a, S> {
+impl<const S: usize> ShallowEdge<'_, S> {
     pub fn exploration_value(&self, parent_visits_sqrt: f32, dynamic_cpuct: f32) -> f32 {
         mcts_core::exploration_value(
             self.mean_action_value,

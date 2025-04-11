@@ -77,7 +77,7 @@ impl<B: PgnPosition + Clone> Game<B> {
                 write!(
                     buffer,
                     "{}. {}",
-                    (i + 1) / 2 + start_move_number,
+                    i.div_ceil(2) + start_move_number,
                     move_string
                 )
                 .unwrap();

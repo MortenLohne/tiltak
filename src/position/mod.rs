@@ -1457,8 +1457,7 @@ impl<const S: usize> PositionTrait for Position<S> {
                 } else {
                     Some(BlackFlat)
                 };
-                stack.bitboard = stack.bitboard
-                    & BitBoard::lower_n_bits(stack.height.saturating_sub(to_take_first + 1));
+                stack.bitboard &= BitBoard::lower_n_bits(stack.height.saturating_sub(to_take_first + 1));
                 stack.height -= to_take_first;
 
                 self.hash ^= self.zobrist_hash_for_square(square);
@@ -1500,12 +1499,10 @@ impl<const S: usize> PositionTrait for Position<S> {
 
                     if pieces_to_take == 0 {
                         to_stack.top_stone = moving_stack.top_stone;
+                    } else if moving_stack.bitboard.get(pieces_to_drop - 1) {
+                        to_stack.top_stone = Some(WhiteFlat);
                     } else {
-                        if moving_stack.bitboard.get(pieces_to_drop - 1) {
-                            to_stack.top_stone = Some(WhiteFlat);
-                        } else {
-                            to_stack.top_stone = Some(BlackFlat);
-                        }
+                        to_stack.top_stone = Some(BlackFlat);
                     }
 
                     to_stack.bitboard = to_stack
