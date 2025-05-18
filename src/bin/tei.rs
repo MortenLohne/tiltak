@@ -2,6 +2,9 @@ use board_game_traits::{Color, Position as PositionTrait};
 use pgn_traits::PgnPosition;
 use std::io::{BufRead, BufReader};
 use std::str::FromStr;
+use std::sync::atomic::{self, AtomicBool};
+use std::sync::Arc;
+use std::thread::{self, JoinHandle};
 use std::time::{Duration, Instant};
 use std::{env, io};
 use tiltak::position::{Komi, Position};
@@ -29,11 +32,26 @@ pub fn main() {
     let mut position: Option<Box<dyn Any>> = None;
     let mut size: Option<usize> = None;
     let mut komi = Komi::default();
+    let mut calculating_handle: Option<JoinHandle<()>> = None;
+    let should_stop: Arc<AtomicBool> = Arc::new(AtomicBool::new(false));
 
     for line in BufReader::new(io::stdin()).lines().map(Result::unwrap) {
         let mut words = line.split_whitespace();
         match words.next().unwrap() {
-            "quit" => break,
+            "quit" => {
+                should_stop.store(true, atomic::Ordering::Relaxed);
+                if let Some(handle) = calculating_handle.take() {
+                    handle.join().unwrap();
+                }
+                break;
+            }
+            "stop" => {
+                should_stop.store(true, atomic::Ordering::Relaxed);
+                if let Some(handle) = calculating_handle.take() {
+                    handle.join().unwrap();
+                }
+                should_stop.store(false, atomic::Ordering::Relaxed);
+            }
             "isready" => println!("readyok"),
             "setoption" => {
                 if [
@@ -76,25 +94,43 @@ pub fn main() {
                     Some(s) => panic!("Unsupported size {}", s),
                 }
             }
-            "go" => match size {
-                Some(4) => parse_go_string::<4>(
-                    &line,
-                    position.as_ref().and_then(|p| p.downcast_ref()).unwrap(),
-                    is_slatebot,
-                ),
-                Some(5) => parse_go_string::<5>(
-                    &line,
-                    position.as_ref().and_then(|p| p.downcast_ref()).unwrap(),
-                    is_slatebot,
-                ),
-                Some(6) => parse_go_string::<6>(
-                    &line,
-                    position.as_ref().and_then(|p| p.downcast_ref()).unwrap(),
-                    is_slatebot,
-                ),
-                Some(s) => panic!("Error: Unsupported size {}", s),
-                None => panic!("Error: Received go without receiving teinewgame string"),
-            },
+            "go" => {
+                let should_stop_clone = should_stop.clone();
+                calculating_handle = match size {
+                    Some(4) => {
+                        let position = position
+                            .as_ref()
+                            .and_then(|p| p.downcast_ref::<Position<4>>())
+                            .unwrap()
+                            .clone();
+                        Some(thread::spawn(move || {
+                            parse_go_string::<4>(&line, position, should_stop_clone, is_slatebot)
+                        }))
+                    }
+                    Some(5) => {
+                        let position = position
+                            .as_ref()
+                            .and_then(|p| p.downcast_ref::<Position<5>>())
+                            .unwrap()
+                            .clone();
+                        Some(thread::spawn(move || {
+                            parse_go_string::<5>(&line, position, should_stop_clone, is_slatebot)
+                        }))
+                    }
+                    Some(6) => {
+                        let position = position
+                            .as_ref()
+                            .and_then(|p| p.downcast_ref::<Position<6>>())
+                            .unwrap()
+                            .clone();
+                        Some(thread::spawn(move || {
+                            parse_go_string::<6>(&line, position, should_stop_clone, is_slatebot)
+                        }))
+                    }
+                    Some(s) => panic!("Error: Unsupported size {}", s),
+                    None => panic!("Error: Received go without receiving teinewgame string"),
+                };
+            }
             s => panic!("Unknown command \"{}\"", s),
         }
     }
@@ -124,7 +160,12 @@ fn parse_position_string<const S: usize>(line: &str, komi: Komi) -> Position<S> 
     position
 }
 
-fn parse_go_string<const S: usize>(line: &str, position: &Position<S>, is_slatebot: bool) {
+fn parse_go_string<const S: usize>(
+    line: &str,
+    position: Position<S>,
+    should_stop: Arc<AtomicBool>,
+    is_slatebot: bool,
+) {
     let mut words = line.split_whitespace();
     words.next(); // go
 
@@ -135,9 +176,12 @@ fn parse_go_string<const S: usize>(line: &str, position: &Position<S>, is_slateb
     };
 
     match words.next() {
-        Some("movetime") => {
-            let msecs = words.next().unwrap();
-            let movetime = Duration::from_millis(u64::from_str(msecs).unwrap());
+        Some(word @ "movetime") | Some(word @ "infinite") => {
+            let movetime = if word == "movetime" {
+                Duration::from_millis(u64::from_str(words.next().unwrap()).unwrap())
+            } else {
+                Duration::MAX // 'go infinite' is just movetime with a very long duration
+            };
             let start_time = Instant::now();
             let mut tree = search::MonteCarloTree::new(position.clone(), mcts_settings);
 
@@ -145,6 +189,9 @@ fn parse_go_string<const S: usize>(line: &str, position: &Position<S>, is_slateb
                 let nodes_to_search = (200.0 * f64::powf(1.26, i as f64)) as u64;
                 let mut oom = false;
                 for _ in 0..nodes_to_search {
+                    if should_stop.load(atomic::Ordering::Relaxed) {
+                        break;
+                    }
                     if let Err(err) = tree.select() {
                         eprintln!("Warning: {err}");
                         oom = true;
@@ -166,7 +213,10 @@ fn parse_go_string<const S: usize>(line: &str, position: &Position<S>, is_slateb
                         .collect::<Vec<String>>()
                         .join(" ")
                 );
-                if oom || start_time.elapsed().as_secs_f64() > movetime.as_secs_f64() * 0.7 {
+                if oom
+                    || should_stop.load(atomic::Ordering::Relaxed)
+                    || start_time.elapsed().as_secs_f64() > movetime.as_secs_f64() * 0.7
+                {
                     println!("bestmove {}", position.move_to_san(&best_move));
                     break;
                 }
@@ -194,8 +244,6 @@ fn parse_go_string<const S: usize>(line: &str, position: &Position<S>, is_slateb
                     _ => (),
                 }
             }
-
-            println!("{:?}, {:?}", white_time, black_time);
 
             let max_time = match position.side_to_move() {
                 Color::White => white_time / 5 + white_inc / 2,
