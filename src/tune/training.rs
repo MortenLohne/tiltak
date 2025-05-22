@@ -7,6 +7,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::time;
 use std::{error, fs, io};
 
+use crate::evaluation::parameters::policy_indexes;
 use crate::evaluation::parameters::Policy;
 use crate::evaluation::parameters::PolicyApplier;
 use crate::evaluation::parameters::Value;
@@ -154,6 +155,7 @@ pub fn train_perpetually<const S: usize, const N: usize, const M: usize>(
                     policy_params,
                     &current_params_wins,
                     &last_params_wins,
+                    options.nodes_per_game as u64,
                     i,
                 )
             })
@@ -270,16 +272,24 @@ fn play_game_pair<const S: usize>(
     policy_params: &'static [f32],
     current_params_wins: &AtomicU64,
     last_params_wins: &AtomicU64,
+    nodes_per_game: u64,
     i: usize,
 ) -> (Game<Position<S>>, MoveScoresForGame<S>) {
     let settings = MctsSetting::default()
         .add_value_params(value_params)
         .add_policy_params(policy_params)
-        .add_dirichlet(0.2);
+        .add_dirichlet(0.2)
+        .add_rollout_depth(100);
     let last_settings = MctsSetting::default()
         .add_value_params(last_value_params)
         .add_policy_params(last_policy_params)
-        .add_dirichlet(0.2);
+        .add_dirichlet(0.2)
+        .add_rollout_depth(100);
+    println!(
+        "Starting game {}, {} decisive games finished",
+        i,
+        current_params_wins.load(Ordering::Relaxed) + last_params_wins.load(Ordering::Relaxed)
+    );
     if i % 2 == 0 {
         let game = play_game::<S>(
             &settings,
@@ -287,7 +297,7 @@ fn play_game_pair<const S: usize>(
             komi,
             &[],
             1.0,
-            &TimeControl::FixedNodes(50_000),
+            &TimeControl::FixedNodes(nodes_per_game),
         );
         match game.0.game_result() {
             Some(GameResult::WhiteWin) => {
@@ -306,7 +316,7 @@ fn play_game_pair<const S: usize>(
             komi,
             &[],
             1.0,
-            &TimeControl::FixedNodes(50_000),
+            &TimeControl::FixedNodes(nodes_per_game),
         );
         match game.0.game_result() {
             Some(GameResult::BlackWin) => {
@@ -522,12 +532,53 @@ pub fn tune_value_and_policy<const S: usize, const N: usize, const M: usize>(
                         &group_data,
                     );
 
+                    let indexes = policy_indexes::<S>();
+                    let mut simplified_policies: Vec<Policy<S>> =
+                        vec![Policy::new(&[]); move_scores.len()];
+                    for (simplfied_policy, full_policy) in
+                        simplified_policies.iter_mut().zip(policies.iter())
+                    {
+                        for index in [
+                            indexes.flat_psqt_white,
+                            indexes.flat_psqt_black,
+                            indexes.wall_psqt_white,
+                            indexes.wall_psqt_black,
+                            indexes.cap_psqt_white,
+                            indexes.cap_psqt_black,
+                            indexes.move_role_bonus_white,
+                            indexes.move_role_bonus_black,
+                            indexes.our_road_stones_in_line,
+                            indexes.their_road_stones_in_line,
+                            indexes.extend_single_group_base,
+                            indexes.extend_single_group_linear,
+                            indexes.extend_single_group_to_new_line_base,
+                            indexes.extend_single_group_to_new_line_linear,
+                            indexes.merge_two_groups_base,
+                            indexes.merge_two_groups_linear,
+                            indexes.block_merger_base,
+                            indexes.block_merger_linear,
+                            indexes.anchor_group_base,
+                            indexes.anchor_group_linear,
+                            indexes.block_anchoring_group_base,
+                            indexes.block_anchoring_group_linear,
+                            indexes.next_to_our_last_stone,
+                            indexes.next_to_their_last_stone,
+                            indexes.simple_movement,
+                            indexes.simple_capture,
+                            indexes.simple_self_capture,
+                        ] {
+                            index
+                                .as_mut_slice(&mut simplfied_policy.features)
+                                .copy_from_slice(index.as_slice(&full_policy.features));
+                        }
+                    }
+
                     position.do_move(*mv);
 
                     move_scores
                         .iter()
                         .zip(
-                            policies
+                            simplified_policies
                                 .into_iter()
                                 .map(|pol| pol.features.try_into().unwrap()),
                         )
