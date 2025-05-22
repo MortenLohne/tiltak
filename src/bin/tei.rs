@@ -14,6 +14,7 @@ use tiltak::search::{self, MctsSetting, MonteCarloTree};
 
 pub fn main() {
     let is_slatebot = env::args().any(|arg| arg == "--slatebot");
+    let is_cobblebot = env::args().any(|arg| arg == "--cobblebot");
 
     loop {
         let mut input = String::new();
@@ -104,7 +105,13 @@ pub fn main() {
                             .unwrap()
                             .clone();
                         Some(thread::spawn(move || {
-                            parse_go_string::<4>(&line, position, should_stop_clone, is_slatebot)
+                            parse_go_string::<4>(
+                                &line,
+                                position,
+                                should_stop_clone,
+                                is_slatebot,
+                                is_cobblebot,
+                            )
                         }))
                     }
                     Some(5) => {
@@ -114,7 +121,13 @@ pub fn main() {
                             .unwrap()
                             .clone();
                         Some(thread::spawn(move || {
-                            parse_go_string::<5>(&line, position, should_stop_clone, is_slatebot)
+                            parse_go_string::<5>(
+                                &line,
+                                position,
+                                should_stop_clone,
+                                is_slatebot,
+                                is_cobblebot,
+                            )
                         }))
                     }
                     Some(6) => {
@@ -124,7 +137,13 @@ pub fn main() {
                             .unwrap()
                             .clone();
                         Some(thread::spawn(move || {
-                            parse_go_string::<6>(&line, position, should_stop_clone, is_slatebot)
+                            parse_go_string::<6>(
+                                &line,
+                                position,
+                                should_stop_clone,
+                                is_slatebot,
+                                is_cobblebot,
+                            )
                         }))
                     }
                     Some(s) => panic!("Error: Unsupported size {}", s),
@@ -165,12 +184,20 @@ fn parse_go_string<const S: usize>(
     position: Position<S>,
     should_stop: Arc<AtomicBool>,
     is_slatebot: bool,
+    is_cobblebot: bool,
 ) {
     let mut words = line.split_whitespace();
     words.next(); // go
 
     let mcts_settings = if is_slatebot {
-        MctsSetting::default().add_rollout_depth(200)
+        MctsSetting::default()
+            .add_rollout_depth(200)
+            .add_rollout_temperature(0.2)
+    } else if is_cobblebot {
+        MctsSetting::default()
+            .add_rollout_depth(200)
+            .add_rollout_temperature(0.2)
+            .add_dirichlet(0.25)
     } else {
         MctsSetting::default()
     };
