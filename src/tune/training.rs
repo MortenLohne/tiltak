@@ -563,9 +563,20 @@ pub fn tune_value_and_policy<const S: usize, const N: usize, const M: usize>(
                             indexes.block_anchoring_group_linear,
                             indexes.next_to_our_last_stone,
                             indexes.next_to_their_last_stone,
+                            indexes.attack_strong_flats,
+                            indexes.attack_strong_stack_with_wall,
+                            indexes.attack_strong_stack_with_cap,
+                            indexes.attack_last_movement,
                             indexes.simple_movement,
                             indexes.simple_capture,
                             indexes.simple_self_capture,
+                            indexes.stack_captured_by_movement,
+                            indexes.stack_capture_in_strong_line,
+                            indexes.stack_capture_in_strong_line_cap,
+                            indexes.move_cap_onto_strong_line,
+                            indexes.recapture_stack_pure,
+                            indexes.recapture_stack_impure,
+                            indexes.move_last_placement,
                         ] {
                             index
                                 .as_mut_slice(&mut simplfied_policy.features)
