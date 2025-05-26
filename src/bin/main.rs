@@ -16,6 +16,7 @@ use rayon::prelude::*;
 use tiltak::evaluation::parameters::{
     self, IncrementalPolicy, PolicyIndexes, Value, ValueApplier, ValueIndexes,
 };
+use tiltak::minmax::minmax_noeval;
 #[cfg(feature = "sqlite")]
 use tiltak::policy_sqlite;
 use tiltak::position::Role;
@@ -32,6 +33,28 @@ use tiltak::{position, search};
 mod tests;
 
 fn main() {
+    let mut position: Position<3> =
+        Position::start_position_with_komi(Komi::from_half_komi(10).unwrap());
+    for mv in ["b2", "b1", "a1"] {
+        position.do_move(Move::from_string(mv).unwrap());
+    }
+    let start_time = time::Instant::now();
+    for depth in 1.. {
+        let (moves, result) = minmax_noeval(&mut position.clone(), depth);
+        println!(
+            "Depth {} in {:.2}s, moves: {}, result: {:?}",
+            depth,
+            start_time.elapsed().as_secs_f32(),
+            moves
+                .iter()
+                .rev()
+                .map(|mv| mv.to_string())
+                .collect::<Vec<_>>()
+                .join(" "),
+            result
+        );
+    }
+
     println!("play: Play against the engine through the command line");
     println!("aimatch: Watch the engine play against a very simple minmax implementation");
     println!("analyze <size>: Analyze a given position, provided from a PTN or a simple move list");
