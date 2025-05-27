@@ -6,6 +6,8 @@ use half::f16;
 use half::slice::HalfFloatSliceExt;
 use rand::Rng;
 use rand_distr::Distribution;
+use wide::f32x4;
+use wide::i32x4;
 
 use crate::evaluation::parameters::IncrementalPolicy;
 use crate::position::Move;
@@ -28,7 +30,7 @@ pub struct TreeBridge<const S: usize> {
     pub children: arena::SliceIndex<TreeEdge<S>>,
     pub moves: arena::SliceIndex<Option<Move<S>>>,
     pub mean_action_values: arena::SliceIndex<f32>,
-    pub visitss: arena::SliceIndex<u32>,
+    pub visitss: arena::SliceIndex<i32>,
     pub heuristic_scores: arena::SliceIndex<f16>,
 }
 
@@ -63,7 +65,7 @@ impl<const S: usize> Default for TempVectors<S> {
 pub fn exploration_value(
     mean_action_value: f32,
     heuristic_score: f32,
-    child_visits: u32,
+    child_visits: i32,
     parent_visits_sqrt: f32,
     cpuct: f32,
 ) -> f32 {
@@ -84,7 +86,7 @@ impl<const S: usize> TreeBridge<S> {
         settings: &MctsSetting<S>,
         temp_vectors: &mut TempVectors<S>,
         arena: &Arena,
-        our_visits: u32,
+        our_visits: i32,
     ) -> usize {
         let visits_sqrt = (our_visits as f32).sqrt();
         let dynamic_cpuct = settings.c_puct_init()
@@ -103,11 +105,38 @@ impl<const S: usize> TreeBridge<S> {
         assert_eq!(heuristic_scores.len(), mean_action_values.len());
         assert_eq!(heuristic_scores.len(), visitss.len());
 
-        for i in 0..heuristic_scores.len() {
-            let heuristic_score = &mut heuristic_scores[i];
-            let mean_action_value = &mean_action_values[i];
-            let child_visits = &visitss[i];
+        let (heuristic_scores_chunks, heuristics_scores_rem) =
+            heuristic_scores.as_chunks_mut::<SIMD_WIDTH>();
+        let (mean_action_values_chunks, mean_action_values_rem) =
+            mean_action_values.as_chunks::<SIMD_WIDTH>();
+        let (visitss_chunks, visitss_rem) = visitss.as_chunks::<SIMD_WIDTH>();
 
+        type SimdVector = f32x4;
+
+        let parent_visits_sqrt: SimdVector = SimdVector::splat(visits_sqrt);
+        let dynamic_cpuct_simd: SimdVector = SimdVector::splat(dynamic_cpuct);
+
+        for (heuristic_scores_array, (mean_action_values_array, visitss_array)) in
+            heuristic_scores_chunks
+                .iter_mut()
+                .zip(mean_action_values_chunks.iter().zip(visitss_chunks))
+        {
+            let heuristic_scores_simd: SimdVector = SimdVector::new(*heuristic_scores_array);
+            let mean_action_values_simd: SimdVector = SimdVector::new(*mean_action_values_array);
+            let vistss_simd: i32x4 = i32x4::new(*visitss_array);
+
+            *heuristic_scores_array = (SimdVector::from_i32x4(vistss_simd + i32x4::ONE).recip()
+                * dynamic_cpuct_simd
+                * heuristic_scores_simd
+                * parent_visits_sqrt
+                - mean_action_values_simd)
+                .to_array();
+        }
+
+        for (heuristic_score, (mean_action_value, child_visits)) in heuristics_scores_rem
+            .iter_mut()
+            .zip(mean_action_values_rem.iter().zip(visitss_rem))
+        {
             *heuristic_score = exploration_value(
                 *mean_action_value,
                 *heuristic_score,
@@ -158,7 +187,7 @@ impl<const S: usize> TreeBridge<S> {
         settings: &MctsSetting<S>,
         temp_vectors: &mut TempVectors<S>,
         arena: &Arena,
-        our_visits: u32,
+        our_visits: i32,
     ) -> Result<f32, Error> {
         assert_ne!(
             arena.get_slice(&self.children).len(),
@@ -238,7 +267,7 @@ impl<const S: usize> TreeEdge<S> {
         settings: &MctsSetting<S>,
         temp_vectors: &mut TempVectors<S>,
         arena: &Arena,
-        parent_visits: u32,
+        parent_visits: i32,
     ) -> Result<f32, Error> {
         if let Some(child) = self.child.as_mut() {
             return arena.get_mut(child).select(
@@ -278,7 +307,7 @@ impl<const S: usize> Tree<S> {
         settings: &MctsSetting<S>,
         temp_vectors: &mut TempVectors<S>,
         arena: &Arena,
-        parent_visits: u32,
+        parent_visits: i32,
     ) -> Result<f32, Error> {
         // TODO: Assume node has already had 1 visit before?
         if let Some(game_result) = self.game_result {

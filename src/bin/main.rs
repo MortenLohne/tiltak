@@ -762,7 +762,7 @@ fn analyze_position<const S: usize>(position: &Position<S>) {
         .add_policy_params(<Position<S>>::policy_params(eval_komi))
         .add_value_params(<Position<S>>::value_params(eval_komi))
         // .add_rollout_depth(1000)
-        .exclude_moves(vec![]);
+        .exclude_moves(vec![Move::from_string("f2").unwrap()]);
     let start_time = time::Instant::now();
 
     let mut tree = search::MonteCarloTree::new(position.clone(), settings);

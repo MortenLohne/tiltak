@@ -25,7 +25,7 @@ pub struct Event {
 pub struct Output {
     pub pv: Vec<String>,
     pub score: f32,
-    pub nodes: u32,
+    pub nodes: i32,
     pub mem_usage: u64,
     pub time_taken: time::Duration,
 }

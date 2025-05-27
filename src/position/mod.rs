@@ -769,9 +769,8 @@ impl<const S: usize> Position<S> {
     }
 
     pub(crate) fn zobrist_hash_for_square(&self, square: Square<S>) -> u64 {
-        let mut hash = 0;
         if let Some(top_stone) = self.top_stones[square] {
-            hash ^= zobrist_top_stones::<S>(square, top_stone);
+            let mut hash = zobrist_top_stones::<S>(square, top_stone);
             hash ^= zobrist_stack_heights::<S>(square, self.stack_heights[square]);
             // Only enter this loop if stack.len() is 2 or more
             for i in 0..(self.stack_heights[square] as usize + 2) / 4 {
@@ -781,8 +780,10 @@ impl<const S: usize> Position<S> {
                     self.stacks[square].board as usize >> (i * 4) & 15,
                 )
             }
+            hash
+        } else {
+            0
         }
-        hash
     }
 
     fn is_critical_square_from_scratch<Us: ColorTr>(
@@ -1457,7 +1458,8 @@ impl<const S: usize> PositionTrait for Position<S> {
                 } else {
                     Some(BlackFlat)
                 };
-                stack.bitboard &= BitBoard::lower_n_bits(stack.height.saturating_sub(to_take_first + 1));
+                stack.bitboard &=
+                    BitBoard::lower_n_bits(stack.height.saturating_sub(to_take_first + 1));
                 stack.height -= to_take_first;
 
                 self.hash ^= self.zobrist_hash_for_square(square);

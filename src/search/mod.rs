@@ -169,7 +169,7 @@ impl std::error::Error for Error {}
 
 pub struct MonteCarloTree<const S: usize> {
     tree: TreeEdge<S>, // Fake edge to the root node
-    visits: u32,
+    visits: i32,
     position: Position<S>,
     temp_position: Position<S>,
     settings: MctsSetting<S>,
@@ -352,7 +352,7 @@ impl<const S: usize> MonteCarloTree<S> {
     }
 
     // TODO: Count up to u64 on root?
-    pub fn visits(&self) -> u32 {
+    pub fn visits(&self) -> i32 {
         self.visits
     }
 
@@ -419,7 +419,7 @@ impl<const S: usize> MonteCarloTree<S> {
     }
 
     pub fn select(&mut self) -> Result<f32, Error> {
-        if self.visits == u32::MAX {
+        if self.visits == i32::MAX {
             return Err(Error::MaxVisits);
         }
         self.temp_position.clone_from(&self.position);
@@ -471,7 +471,7 @@ impl<const S: usize> MonteCarloTree<S> {
 }
 // More convenient edge representation, allowing them to be stored as array-of-structs rather than struct-of-arrays
 pub struct ShallowEdge<'a, const S: usize> {
-    visits: u32,
+    visits: i32,
     mv: Move<S>,
     mean_action_value: f32,
     child: &'a TreeEdge<S>,
@@ -539,7 +539,7 @@ pub fn mcts_training<const S: usize>(
         }
     }
     let shallow_edges = tree.shallow_edges().unwrap();
-    let child_visits: u32 = shallow_edges.iter().map(|edge| edge.visits).sum();
+    let child_visits: i32 = shallow_edges.iter().map(|edge| edge.visits).sum();
     shallow_edges
         .iter()
         .map(|edge| {
