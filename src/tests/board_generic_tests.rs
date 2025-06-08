@@ -293,6 +293,8 @@ fn play_random_games_no_eval_prop<const S: usize>(num_games: usize) {
             let fcd = position.fcd_for_move(*mv);
 
             position.do_move(*mv);
+            assert!(position.stack_heights()[mv.destination_square()] > 0);
+
             hash_history.push(position.zobrist_hash());
             if i >= 3 {
                 assert_ne!(hash_history[i], hash_history[i - 1]);
