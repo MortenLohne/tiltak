@@ -1118,8 +1118,7 @@ impl<const S: usize> Position<S> {
 
         // TODO: Include highest id?
         for id in 1..highest_component_id {
-            if (components.raw[0].iter().any(|&cell| cell == id)
-                && components.raw[S - 1].iter().any(|&cell| cell == id))
+            if (components.raw[0].contains(&id) && components.raw[S - 1].contains(&id))
                 || ((0..S).any(|y| components.raw[y][0] == id)
                     && (0..S).any(|y| components.raw[y][S - 1] == id))
             {
@@ -1457,7 +1456,8 @@ impl<const S: usize> PositionTrait for Position<S> {
                 } else {
                     Some(BlackFlat)
                 };
-                stack.bitboard &= BitBoard::lower_n_bits(stack.height.saturating_sub(to_take_first + 1));
+                stack.bitboard &=
+                    BitBoard::lower_n_bits(stack.height.saturating_sub(to_take_first + 1));
                 stack.height -= to_take_first;
 
                 self.hash ^= self.zobrist_hash_for_square(square);
