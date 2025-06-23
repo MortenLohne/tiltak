@@ -982,7 +982,7 @@ impl<const S: usize> Position<S> {
             .chain(std::iter::once(self.top_stones[square]))
     }
 
-    pub(crate) fn fcd_for_move(&self, mv: Move<S>) -> i8 {
+    pub fn fcd_for_move(&self, mv: Move<S>) -> i8 {
         match mv.expand() {
             ExpMove::Place(Role::Flat, _) if self.half_moves_played() > 1 => 1,
             ExpMove::Place(Role::Flat, _) => -1,
