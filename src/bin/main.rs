@@ -67,22 +67,22 @@ fn main() {
                 }
             }
             "analyze" => match words.get(1) {
-                Some(&"4") => analyze_position_from_ptn::<4>(komi),
-                Some(&"5") => analyze_position_from_ptn::<5>(komi),
-                Some(&"6") => analyze_position_from_ptn::<6>(komi),
-                Some(&"7") => analyze_position_from_ptn::<7>(komi),
-                Some(&"8") => analyze_position_from_ptn::<8>(komi),
+                Some(&"4") => analyze_position_from_ptn::<4>(komi, &words[3..]),
+                Some(&"5") => analyze_position_from_ptn::<5>(komi, &words[3..]),
+                Some(&"6") => analyze_position_from_ptn::<6>(komi, &words[3..]),
+                Some(&"7") => analyze_position_from_ptn::<7>(komi, &words[3..]),
+                Some(&"8") => analyze_position_from_ptn::<8>(komi, &words[3..]),
                 Some(s) => println!("Unsupported size {}", s),
-                None => analyze_position_from_ptn::<5>(komi),
+                None => analyze_position_from_ptn::<5>(komi, &words[3..]),
             },
             "tps" => match words.get(1) {
-                Some(&"4") => analyze_position_from_tps::<4>(komi),
-                Some(&"5") => analyze_position_from_tps::<5>(komi),
-                Some(&"6") => analyze_position_from_tps::<6>(komi),
-                Some(&"7") => analyze_position_from_tps::<7>(komi),
-                Some(&"8") => analyze_position_from_tps::<8>(komi),
+                Some(&"4") => analyze_position_from_tps::<4>(komi, &words[3..]),
+                Some(&"5") => analyze_position_from_tps::<5>(komi, &words[3..]),
+                Some(&"6") => analyze_position_from_tps::<6>(komi, &words[3..]),
+                Some(&"7") => analyze_position_from_tps::<7>(komi, &words[3..]),
+                Some(&"8") => analyze_position_from_tps::<8>(komi, &words[3..]),
                 Some(s) => println!("Unsupported size {}", s),
-                None => analyze_position_from_tps::<5>(komi),
+                None => analyze_position_from_tps::<5>(komi, &words[3..]),
             },
             "perft" => match words.get(1) {
                 Some(&"3") => perft_from_tps::<3>(),
@@ -694,7 +694,7 @@ fn mcts_vs_minmax(minmax_depth: u16, mcts_nodes: u64) {
     println!("\n{:?}\nResult: {:?}", position, position.game_result());
 }
 
-fn analyze_position_from_ptn<const S: usize>(komi: Komi) {
+fn analyze_position_from_ptn<const S: usize>(komi: Komi, excluded_move_strings: &[&str]) {
     println!("Enter move list or a full PTN, then press enter followed by CTRL+D");
 
     let mut input = String::new();
@@ -711,18 +711,32 @@ fn analyze_position_from_ptn<const S: usize>(komi: Komi) {
     for PtnMove { mv, .. } in games[0].moves.clone() {
         position.do_move(mv);
     }
-    analyze_position(&position)
+
+    let excluded_moves: Vec<Move<S>> = excluded_move_strings
+        .iter()
+        .map(|s| Move::from_string(s).unwrap())
+        .collect();
+    assert!(excluded_moves.iter().all(|mv| position.move_is_legal(*mv)),);
+
+    analyze_position(&position, excluded_moves);
 }
 
-fn analyze_position_from_tps<const S: usize>(komi: Komi) {
+fn analyze_position_from_tps<const S: usize>(komi: Komi, excluded_move_strings: &[&str]) {
     println!("Enter TPS");
     let mut input = String::new();
     io::stdin().read_line(&mut input).unwrap();
     let position = <Position<S>>::from_fen_with_komi(&input, komi).unwrap();
-    analyze_position(&position)
+
+    let excluded_moves: Vec<Move<S>> = excluded_move_strings
+        .iter()
+        .map(|s| Move::from_string(s).unwrap())
+        .collect();
+    assert!(excluded_moves.iter().all(|mv| position.move_is_legal(*mv)),);
+
+    analyze_position(&position, excluded_moves);
 }
 
-fn analyze_position<const S: usize>(position: &Position<S>) {
+fn analyze_position<const S: usize>(position: &Position<S>, excluded_moves: Vec<Move<S>>) {
     println!("TPS {}", position.to_fen());
     println!("{:?}", position);
     println!("Komi: {}", position.komi());
@@ -762,7 +776,7 @@ fn analyze_position<const S: usize>(position: &Position<S>) {
         .add_policy_params(<Position<S>>::policy_params(eval_komi))
         .add_value_params(<Position<S>>::value_params(eval_komi))
         // .add_rollout_depth(1000)
-        .exclude_moves(vec![]);
+        .exclude_moves(excluded_moves);
     let start_time = time::Instant::now();
 
     let mut tree = search::MonteCarloTree::new(position.clone(), settings);
