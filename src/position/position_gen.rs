@@ -1,60 +1,21 @@
+//! A module implementing a bijective function between Tak positions and integers.
+//! Based on the counting function described in section 4.2 of "AI agents for the
+//! abstract strategy game Tak" by "Laurens Beljaards", see https://theses.liacs.nl/pdf/LaurensBeljaards2017Tak.pdf
+//!
+//! For example, any 6s position can be represented as an integer between
+//! 0 and 234953877228339135776421063941057364108851372312359713
+//!
+//! This can then be used to generate truly random positions, by generating a random integer and converting to a position.
+
 use board_game_traits::{Color, Position as PositionTrait};
+use num_bigint::BigUint;
+use num_integer::Integer;
 use num_traits::ToPrimitive;
 use std::collections::BTreeMap;
 
-use num_bigint::BigUint;
-use num_integer::Integer;
-
-use crate::position::{Piece, Role};
-
-use super::{squares_iterator, starting_capstones, starting_stones, Position};
-
-#[derive(Copy, Clone, PartialOrd, Ord, PartialEq, Eq, Debug)]
-struct FlatsConfiguration {
-    w_stones: u8,
-    b_stones: u8,
-    player: u8,
-}
-
-impl FlatsConfiguration {
-    /// All flat board configurations, except the first two ply where walls/caps cannot be placed
-    fn all_after_opening(num_reserves: u8) -> Vec<Self> {
-        let configuration_classes: Vec<FlatsConfiguration> = (1..=num_reserves)
-            .flat_map(move |w_stones| {
-                (1..=num_reserves).flat_map(move |b_stones| {
-                    (1..=2).map(move |player| FlatsConfiguration {
-                        w_stones,
-                        b_stones,
-                        player,
-                    })
-                })
-            })
-            .collect();
-        assert!(configuration_classes.is_sorted());
-        configuration_classes
-    }
-}
-
-struct FlatConfigurationData {
-    start_index: BigUint,
-    size: BigUint,
-    num_flats_permutations: BigUint,
-    blocking_configurations: BTreeMap<WallConfiguration, WallConfigurationData>,
-}
-
-#[derive(Copy, Clone, PartialOrd, Ord, PartialEq, Eq, Debug)]
-struct WallConfiguration {
-    w_walls: u8,
-    b_walls: u8,
-    w_caps: u8,
-    b_caps: u8,
-}
-
-#[derive(Clone, Debug)]
-struct WallConfigurationData {
-    start_index: BigUint, // This is the start index relative to the flat configuration context that the wall configuration is in
-    size: u128,
-}
+use crate::position::{
+    squares_iterator, starting_capstones, starting_stones, Piece, Position, Role,
+};
 
 /// A struct with a pre-computed index required to encode and decode positions
 pub struct PositionEncoder<const S: usize> {
@@ -71,7 +32,7 @@ impl<const S: usize> PositionEncoder<S> {
         let starting_reserves = starting_stones(S);
         let starting_caps = starting_capstones(S);
         Self {
-            data: configs_total2(
+            data: configs_total(
                 S as u8,
                 (S * S) as u8,
                 starting_reserves,
@@ -95,10 +56,10 @@ impl<const S: usize> PositionEncoder<S> {
                 Color::Black => 2,
             },
             w_stones: starting_stones(S)
-                - position.white_reserves_left() as u8
+                - position.white_reserves_left()
                 - group_data.white_walls.count(),
             b_stones: starting_stones(S)
-                - position.black_reserves_left() as u8
+                - position.black_reserves_left()
                 - group_data.black_walls.count(),
         };
 
@@ -187,6 +148,53 @@ impl<const S: usize> PositionEncoder<S> {
 }
 
 type BoardConfigurations = BTreeMap<FlatsConfiguration, FlatConfigurationData>;
+
+#[derive(Copy, Clone, PartialOrd, Ord, PartialEq, Eq, Debug)]
+struct FlatsConfiguration {
+    w_stones: u8,
+    b_stones: u8,
+    player: u8,
+}
+
+impl FlatsConfiguration {
+    /// All flat board configurations, except the first two ply where walls/caps cannot be placed
+    fn all_after_opening(num_reserves: u8) -> Vec<Self> {
+        let configuration_classes: Vec<FlatsConfiguration> = (1..=num_reserves)
+            .flat_map(move |w_stones| {
+                (1..=num_reserves).flat_map(move |b_stones| {
+                    (1..=2).map(move |player| FlatsConfiguration {
+                        w_stones,
+                        b_stones,
+                        player,
+                    })
+                })
+            })
+            .collect();
+        assert!(configuration_classes.is_sorted());
+        configuration_classes
+    }
+}
+
+struct FlatConfigurationData {
+    start_index: BigUint,
+    size: BigUint,
+    num_flats_permutations: BigUint,
+    blocking_configurations: BTreeMap<WallConfiguration, WallConfigurationData>,
+}
+
+#[derive(Copy, Clone, PartialOrd, Ord, PartialEq, Eq, Debug)]
+struct WallConfiguration {
+    w_walls: u8,
+    b_walls: u8,
+    w_caps: u8,
+    b_caps: u8,
+}
+
+#[derive(Clone, Debug)]
+struct WallConfigurationData {
+    start_index: BigUint, // This is the start index relative to the flat configuration context that the wall configuration is in
+    size: u128,
+}
 
 /// Find the k-th permutation of a multiset with arbitrary category counts.
 fn kth_permutation(mut k: BigUint, mut categories: Vec<u64>) -> Vec<u8> {
@@ -334,10 +342,10 @@ fn encode_flats<const S: usize>(position: &Position<S>) -> BigUint {
             Color::Black => 2,
         },
         w_stones: starting_stones(S)
-            - position.white_reserves_left() as u8
+            - position.white_reserves_left()
             - group_data.white_walls.count(),
         b_stones: starting_stones(S)
-            - position.black_reserves_left() as u8
+            - position.black_reserves_left()
             - group_data.black_walls.count(),
     };
 
@@ -360,8 +368,7 @@ fn encode_flats<const S: usize>(position: &Position<S>) -> BigUint {
         (S * S) as u64 - 1,
     ];
 
-    let kth = permutation_to_index(&permutation, categories);
-    kth
+    permutation_to_index(&permutation, categories)
 }
 
 fn encode_walls_caps<const S: usize>(position: &Position<S>) -> BigUint {
@@ -384,7 +391,7 @@ fn encode_walls_caps<const S: usize>(position: &Position<S>) -> BigUint {
         }
     }
 
-    let kth = permutation_to_index(
+    permutation_to_index(
         &permutation,
         vec![
             wall_config.w_walls as u64,
@@ -397,11 +404,10 @@ fn encode_walls_caps<const S: usize>(position: &Position<S>) -> BigUint {
                 - wall_config.w_caps as u64
                 - wall_config.b_caps as u64,
         ],
-    );
-    kth
+    )
 }
 
-fn configs_total2(
+fn configs_total(
     size: u8,
     tiles: u8,
     max_w_stones: u8,
@@ -532,7 +538,7 @@ fn configs_total2(
             .zip(position_class.blocking_configurations.values().skip(1))
         {
             assert_eq!(
-                wall_data.start_index.clone() + wall_data.size.clone(),
+                wall_data.start_index.clone() + wall_data.size,
                 next_wall_data.start_index.clone()
             );
         }
@@ -541,6 +547,7 @@ fn configs_total2(
     position_classes
 }
 
+#[allow(clippy::too_many_arguments)]
 fn inner_configs(
     tiles: u8,
     max_w_stones: u8,
