@@ -105,7 +105,7 @@ fn start_position_reverse_movegen_test() {
     let mut position = <Position<5>>::start_position();
     do_moves_and_check_validity(&mut position, &["a1"]);
     let mut moves = vec![];
-    position.generate_reverse_moves(&mut moves);
+    position.generate_partial_reverse_moves(&mut moves);
     assert_eq!(
         moves,
         vec![ReverseMove::Place(Square::parse_square("a1").unwrap())]
@@ -117,7 +117,7 @@ fn second_ply_reverse_movegen_test() {
     let mut position = <Position<5>>::start_position();
     do_moves_and_check_validity(&mut position, &["a1", "e5"]);
     let mut moves = vec![];
-    position.generate_reverse_moves(&mut moves);
+    position.generate_partial_reverse_moves(&mut moves);
     assert_eq!(moves.len(), 3);
     assert!(moves.contains(&ReverseMove::Place(Square::parse_square("e5").unwrap())));
     let a1: Square<5> = Square::parse_square("a2").unwrap();
@@ -136,7 +136,7 @@ fn fourth_ply_reverse_movegen_test() {
     do_moves_and_check_validity(&mut position, &["e1", "e5", "e5<", "Sa1"]);
 
     let mut reverse_moves = vec![];
-    position.generate_reverse_moves(&mut reverse_moves);
+    position.generate_partial_reverse_moves(&mut reverse_moves);
 
     assert_eq!(reverse_moves.len(), 5);
 }

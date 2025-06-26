@@ -15,6 +15,8 @@ pub enum ReverseAnalysisResult<const S: usize> {
 }
 
 impl<const S: usize> Position<S> {
+    /// Perform a reverse analysis on the position,
+    /// attempting to find a sequence of moves that start from the start position, and lead to the current position.
     pub fn reverse_analysis(&mut self) -> ReverseAnalysisResult<S> {
         let mut num_nodes = 0;
         self.recursive_analysis_rec(&mut vec![], &mut num_nodes, 0)
@@ -38,7 +40,7 @@ impl<const S: usize> Position<S> {
         }
 
         let mut reverse_moves = Vec::with_capacity(S * S * S / 2);
-        self.generate_reverse_moves(&mut reverse_moves);
+        self.generate_partial_reverse_moves(&mut reverse_moves);
 
         reverse_moves.sort_by_cached_key(|reverse_move| match reverse_move {
             // Prefer placements, especially cap/wall placements
@@ -115,7 +117,9 @@ impl<const S: usize> Position<S> {
         ReverseAnalysisResult::NoSolution(highest_no_solution_depth)
     }
 
-    pub fn generate_reverse_moves(&self, moves: &mut Vec<ReverseMove<S>>) {
+    /// Partially generate reverse moves for the current position
+    /// WARNING: This does not generate all possible reverse moves, it will skip spreads more than 1 square long for example.
+    pub fn generate_partial_reverse_moves(&self, moves: &mut Vec<ReverseMove<S>>) {
         for square in squares_iterator::<S>() {
             self.generate_reverse_moves_for_square(moves, square)
         }
