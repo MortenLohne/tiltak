@@ -357,7 +357,8 @@ impl<const S: usize> GroupData<S> {
 #[derive(PartialEq, Eq, Debug)]
 pub struct ZobristKeys<const S: usize> {
     top_stones: AbstractBoard<[u64; 6], S>,
-    stones_in_stack: [Box<AbstractBoard<[u64; 256], S>>; 8],
+    stack_heights: AbstractBoard<[u64; 64], S>,
+    stones_in_stack: [AbstractBoard<[u64; 16], S>; 16],
     to_move: [u64; 2],
 }
 
@@ -386,6 +387,41 @@ pub fn zobrist_top_stones<const S: usize>(square: Square<S>, piece: Piece) -> u6
         8 => {
             ZOBRIST_KEYS_8S.get_or_init(ZobristKeys::new).top_stones[square.downcast_size()]
                 [piece as u16 as usize]
+        }
+        _ => panic!("No zobrist keys for size {}. Size not supported.", S),
+    }
+}
+
+/// Returns the zobrist key for the stack height at the given square
+/// Always 0 for empty stacks (height 0)
+pub fn zobrist_stack_heights<const S: usize>(square: Square<S>, height: u8) -> u64 {
+    if height == 0 {
+        return 0;
+    }
+    match S {
+        3 => {
+            ZOBRIST_KEYS_3S.get_or_init(ZobristKeys::new).stack_heights[square.downcast_size()]
+                [height as usize - 1]
+        }
+        4 => {
+            ZOBRIST_KEYS_4S.get_or_init(ZobristKeys::new).stack_heights[square.downcast_size()]
+                [height as usize - 1]
+        }
+        5 => {
+            ZOBRIST_KEYS_5S.get_or_init(ZobristKeys::new).stack_heights[square.downcast_size()]
+                [height as usize - 1]
+        }
+        6 => {
+            ZOBRIST_KEYS_6S.get_or_init(ZobristKeys::new).stack_heights[square.downcast_size()]
+                [height as usize - 1]
+        }
+        7 => {
+            ZOBRIST_KEYS_7S.get_or_init(ZobristKeys::new).stack_heights[square.downcast_size()]
+                [height as usize - 1]
+        }
+        8 => {
+            ZOBRIST_KEYS_8S.get_or_init(ZobristKeys::new).stack_heights[square.downcast_size()]
+                [height as usize - 1]
         }
         _ => panic!("No zobrist keys for size {}. Size not supported.", S),
     }
@@ -449,8 +485,9 @@ impl<const S: usize> ZobristKeys<S> {
 
         Box::new(ZobristKeys {
             top_stones: AbstractBoard::new_from_fn(|| array::from_fn(|_| rng.gen())),
+            stack_heights: AbstractBoard::new_from_fn(|| array::from_fn(|_| rng.gen())),
             stones_in_stack: array::from_fn(|_| {
-                Box::new(AbstractBoard::new_from_fn(|| array::from_fn(|_| rng.gen())))
+                AbstractBoard::new_from_fn(|| array::from_fn(|_| rng.gen()))
             }),
             to_move: array::from_fn(|_| rng.gen()),
         })
@@ -749,12 +786,13 @@ impl<const S: usize> Position<S> {
         let mut hash = 0;
         if let Some(top_stone) = self.top_stones[square] {
             hash ^= zobrist_top_stones::<S>(square, top_stone);
+            hash ^= zobrist_stack_heights::<S>(square, self.stack_heights[square]);
             // Only enter this loop if stack.len() is 2 or more
-            for i in 0..(self.stack_heights[square] as usize + 6) / 8 {
+            for i in 0..(self.stack_heights[square] as usize + 2) / 4 {
                 hash ^= zobrist_stones_in_stack::<S>(
                     square,
                     i,
-                    self.stacks[square].board as usize >> (i * 8) & 255,
+                    self.stacks[square].board as usize >> (i * 4) & 15,
                 )
             }
         }
@@ -958,7 +996,7 @@ impl<const S: usize> Position<S> {
             .chain(std::iter::once(self.top_stones[square]))
     }
 
-    pub(crate) fn fcd_for_move(&self, mv: Move<S>) -> i8 {
+    pub fn fcd_for_move(&self, mv: Move<S>) -> i8 {
         match mv.expand() {
             ExpMove::Place(Role::Flat, _) if self.half_moves_played() > 1 => 1,
             ExpMove::Place(Role::Flat, _) => -1,
@@ -1094,8 +1132,7 @@ impl<const S: usize> Position<S> {
 
         // TODO: Include highest id?
         for id in 1..highest_component_id {
-            if (components.raw[0].iter().any(|&cell| cell == id)
-                && components.raw[S - 1].iter().any(|&cell| cell == id))
+            if (components.raw[0].contains(&id) && components.raw[S - 1].contains(&id))
                 || ((0..S).any(|y| components.raw[y][0] == id)
                     && (0..S).any(|y| components.raw[y][S - 1] == id))
             {
@@ -1396,20 +1433,19 @@ impl<const S: usize> PositionTrait for Position<S> {
                     self.side_to_move()
                 };
                 let piece = Piece::from_role_color(role, color_to_place);
-                let mut to_stack = self.get_stack(to);
-                to_stack.push(piece);
-                self.set_stack(to, to_stack);
 
-                match (color_to_place, role) {
-                    (Color::White, Flat) => self.white_stones_left -= 1,
-                    (Color::White, Wall) => self.white_stones_left -= 1,
-                    (Color::White, Cap) => self.white_caps_left -= 1,
-                    (Color::Black, Flat) => self.black_stones_left -= 1,
-                    (Color::Black, Wall) => self.black_stones_left -= 1,
-                    (Color::Black, Cap) => self.black_caps_left -= 1,
+                self.top_stones[to] = Some(piece);
+                self.stack_heights[to] = 1;
+
+                match piece {
+                    WhiteFlat | WhiteWall => self.white_stones_left -= 1,
+                    WhiteCap => self.white_caps_left -= 1,
+                    BlackFlat | BlackWall => self.black_stones_left -= 1,
+                    BlackCap => self.black_caps_left -= 1,
                 }
 
                 self.hash ^= zobrist_top_stones::<S>(to, piece);
+                self.hash ^= zobrist_stack_heights(to, 1);
                 self.hash_history.clear(); // This move is irreversible, so previous position are never repeated from here
 
                 ReverseMove::Place(to)
@@ -1421,15 +1457,33 @@ impl<const S: usize> PositionTrait for Position<S> {
                 let mut flattens_stone = false;
 
                 let mut movement_iter = stack_movement.into_iter();
-                let mut moving_pieces: ArrayVec<Piece, 8> = ArrayVec::new();
+                let mut moving_stack: Stack = Stack::default();
 
+                let to_take_first = movement_iter.next().unwrap().pieces_to_take;
                 let mut stack = self.get_stack(square);
-                for _ in 0..movement_iter.next().unwrap().pieces_to_take {
-                    moving_pieces.push(stack.pop().unwrap());
-                }
+
+                moving_stack.top_stone = stack.top_stone;
+                moving_stack.height = to_take_first;
+                moving_stack.bitboard = BitBoard {
+                    board: stack.bitboard.board >> (stack.height - to_take_first),
+                };
+
+                stack.top_stone = if stack.height == to_take_first {
+                    None
+                } else if stack.bitboard.get(stack.height - to_take_first - 1) {
+                    Some(WhiteFlat)
+                } else {
+                    Some(BlackFlat)
+                };
+                stack.bitboard &=
+                    BitBoard::lower_n_bits(stack.height.saturating_sub(to_take_first + 1));
+                stack.height -= to_take_first;
+
                 self.hash ^= self.zobrist_hash_for_square(square);
                 self.set_stack(square, stack);
                 self.hash ^= self.zobrist_hash_for_square(square);
+
+                let mut pieces_held = to_take_first;
 
                 for Movement { pieces_to_take } in
                     movement_iter.chain(iter::once(Movement { pieces_to_take: 0 }))
@@ -1440,12 +1494,48 @@ impl<const S: usize> PositionTrait for Position<S> {
                         flattens_stone = true;
                     }
 
-                    pieces_left_behind.push(moving_pieces.len() as u8 - pieces_to_take);
+                    let pieces_to_drop = pieces_held - pieces_to_take;
+                    pieces_left_behind.push(pieces_to_drop);
 
                     let mut to_stack = self.get_stack(to);
-                    while moving_pieces.len() as u8 > pieces_to_take {
-                        to_stack.push(moving_pieces.pop().unwrap());
+
+                    // Put the top piece into the stack bitboard
+                    // This implicitly flattens walls, since it only looks at the top stone's color
+                    if to_stack
+                        .top_stone
+                        .is_some_and(|piece| piece.color() == Color::White)
+                    {
+                        to_stack.bitboard = to_stack.bitboard.set(to_stack.height - 1);
                     }
+
+                    to_stack.bitboard = BitBoard {
+                        board: to_stack.bitboard.board
+                            | ((moving_stack.bitboard
+                                & BitBoard::lower_n_bits(pieces_to_drop - 1))
+                            .board
+                                << to_stack.height),
+                    };
+
+                    if pieces_to_take == 0 {
+                        to_stack.top_stone = moving_stack.top_stone;
+                    } else if moving_stack.bitboard.get(pieces_to_drop - 1) {
+                        to_stack.top_stone = Some(WhiteFlat);
+                    } else {
+                        to_stack.top_stone = Some(BlackFlat);
+                    }
+
+                    to_stack.bitboard = to_stack
+                        .bitboard
+                        .clear(to_stack.height + pieces_to_drop - 1);
+
+                    to_stack.height += pieces_to_drop;
+                    pieces_held -= pieces_to_drop;
+
+                    moving_stack.height -= pieces_to_drop;
+                    moving_stack.bitboard = BitBoard {
+                        board: moving_stack.bitboard.board >> pieces_to_drop,
+                    };
+
                     self.hash ^= self.zobrist_hash_for_square(to);
                     self.set_stack(to, to_stack);
                     self.hash ^= self.zobrist_hash_for_square(to);
@@ -1490,6 +1580,7 @@ impl<const S: usize> PositionTrait for Position<S> {
                 self.set_stack(square, stack);
 
                 self.hash ^= zobrist_top_stones::<S>(square, piece);
+                self.hash ^= zobrist_stack_heights(square, 1);
 
                 debug_assert!(
                     piece.color() != self.side_to_move()

@@ -81,6 +81,15 @@ impl<const S: usize> Move<S> {
         Square::from_u8(self.inner as u8 & 63)
     }
 
+    pub fn destination_square(self) -> Square<S> {
+        match self.expand() {
+            ExpMove::Place(_, square) => square,
+            ExpMove::Move(square, direction, movement) => square
+                .jump_direction(direction, movement.len() as u8)
+                .unwrap(),
+        }
+    }
+
     pub fn from_string(input: &str) -> Result<Self, pgn_traits::Error> {
         // Trim crush notation
         let input = input.trim_end_matches('*');

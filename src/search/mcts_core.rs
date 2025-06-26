@@ -1,3 +1,4 @@
+use std::f32;
 use std::ops;
 
 use board_game_traits::{Color, GameResult, Position as PositionTrait};
@@ -69,6 +70,13 @@ pub fn exploration_value(
     cpuct * heuristic_score * parent_visits_sqrt / (1 + child_visits) as f32 - mean_action_value
 }
 
+// A fast approximation for ln(x) invented by ChatGPT. Seems to be accurate to within +/- 5%
+fn fast_ln(f: f32) -> f32 {
+    assert!(f > 0.0);
+    let result = f.to_bits() as f32 * 1.192_092_9e-7;
+    (result - 127.0) * f32::consts::LN_2
+}
+
 impl<const S: usize> TreeBridge<S> {
     #[inline(always)]
     pub fn best_child(
@@ -80,7 +88,7 @@ impl<const S: usize> TreeBridge<S> {
     ) -> usize {
         let visits_sqrt = (our_visits as f32).sqrt();
         let dynamic_cpuct = settings.c_puct_init()
-            + f32::ln((1.0 + our_visits as f32 + settings.c_puct_base()) / settings.c_puct_base());
+            + fast_ln((1.0 + our_visits as f32 + settings.c_puct_base()) / settings.c_puct_base());
 
         let heuristic_scores = arena.get_slice(&self.heuristic_scores);
         let mean_action_values = arena.get_slice(&self.mean_action_values);
@@ -135,7 +143,10 @@ impl<const S: usize> TreeBridge<S> {
             .enumerate()
             .map(|(c, i)| i + c as u32)
             .zip(maxes)
-            .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap())
+            .max_by(|(_, a), (_, b)| {
+                // Safety: The values in `maxes` are guaranteed to be larger than `f32::NEG_INFINITY`, so cannot be NaN
+                unsafe { a.partial_cmp(b).unwrap_unchecked() }
+            })
             .unwrap();
 
         best_child_node_index as usize
@@ -372,7 +383,7 @@ impl<'a, const S: usize> Pv<'a, S> {
     }
 }
 
-impl<'a, const S: usize> Iterator for Pv<'a, S> {
+impl<const S: usize> Iterator for Pv<'_, S> {
     type Item = Move<S>;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -526,10 +537,10 @@ pub fn best_move<R: Rng, const S: usize>(
         }
         unreachable!()
     } else {
-        return move_scores
+        move_scores
             .iter()
             .max_by(|(_, score1), (_, score2)| score1.total_cmp(score2))
             .unwrap()
-            .0;
+            .0
     }
 }
