@@ -7,6 +7,7 @@ mod move_gen_5s_tests;
 mod move_gen_6s_tests;
 mod move_gen_generic_tests;
 mod policy_tests;
+mod position_gen_tests;
 mod ptn_tests;
 mod tactics_tests_5s;
 mod tactics_tests_6s;
