@@ -1,5 +1,6 @@
 use crate::position::position_gen::PositionEncoder;
 use num_bigint::BigUint;
+use num_bigint::RandBigInt;
 
 #[test]
 fn count_positions_3s() {
@@ -90,4 +91,41 @@ fn encode_2nd_ply_prop<const S: usize>() {
     start_position.do_move(Move::placement(Role::Flat, Square::from_u8(0)));
 
     assert_eq!(position, start_position);
+}
+
+#[test]
+fn decode_encode_random_integers_3s_test() {
+    decode_encode_random_integers_prop::<3>();
+}
+
+#[test]
+fn decode_encode_random_integers_4s_test() {
+    decode_encode_random_integers_prop::<4>();
+}
+
+#[test]
+fn decode_encode_random_integers_5s_test() {
+    decode_encode_random_integers_prop::<5>();
+}
+
+/// Check that converting an integer into a position and back again results in the same integer.
+/// In addition to testing the implementation,
+/// it also provides strong confidence that no two integers ever map to the same position
+/// i.e. that the integer representation has no redundancy
+#[cfg(test)]
+fn decode_encode_random_integers_prop<const S: usize>() {
+    let data = <PositionEncoder<S>>::initialize();
+
+    let max_index = data.count_legal_positions();
+    let mut rng = rand::thread_rng();
+
+    for _ in 0..100_000 {
+        let k = rng.gen_biguint_below(&max_index);
+        assert_eq!(
+            k,
+            data.encode(&data.decode(k.clone())),
+            "Failed for k={}",
+            k
+        );
+    }
 }
