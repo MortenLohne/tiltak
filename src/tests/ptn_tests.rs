@@ -147,3 +147,15 @@ fn tps_with_wall_inside_stack_test() {
     let parse_result = Position::<6>::from_fen(tps);
     assert!(parse_result.is_err());
 }
+
+#[test]
+pub fn tps_with_no_reserves_test() {
+    let tps = "1S,2,2S,2,x,11S/x2,1,12S,1,1221112/1,2,21,x2,211S/2,2222,121S,2C,121S,2S/2,2222S,11211S,21,122,2S/11S,2,x2,2S,1C 2 30";
+    assert!(Position::<6>::from_fen(tps).is_err());
+}
+
+#[test]
+pub fn tps_with_no_opponent_reserves_test() {
+    let tps = "1S,2,2S,2,x,11S/x2,1,12S,1,1221112/1,2,21,x2,211S/2,2222,121S,2C,121S,2S/2,2222S,11211S,21,122,2S/11S,2,x2,2S,1C 1 30";
+    assert!(Position::<6>::from_fen(tps).is_ok());
+}
