@@ -143,6 +143,17 @@ impl<const S: usize> PositionEncoder<S> {
 
         debug_assert_eq!(k, self.encode(&position));
 
+        position.hash = position.zobrist_hash_from_scratch();
+
+        // Make sure the parity of the half-move counter matches the side to move.
+        if position.half_moves_played % 2 == 0 {
+            if position.side_to_move() == Color::Black {
+                position.half_moves_played += 1;
+            }
+        } else if position.side_to_move() == Color::White {
+            position.half_moves_played += 1;
+        }
+
         position
     }
 }

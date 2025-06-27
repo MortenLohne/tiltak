@@ -656,7 +656,12 @@ impl<const S: usize> fmt::Debug for Position<S> {
             "Capstones left: {}/{}.",
             self.white_caps_left, self.black_caps_left
         )?;
-        writeln!(f, "{} to move.", self.side_to_move())?;
+        writeln!(
+            f,
+            "{} to move, {} half-moves played.",
+            self.side_to_move(),
+            self.half_moves_played
+        )?;
         writeln!(
             f,
             "Hash: {}, hash history: {:?}",

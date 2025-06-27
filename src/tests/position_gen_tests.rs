@@ -1,6 +1,8 @@
 use crate::position::position_gen::PositionEncoder;
+use crate::position::Position;
 use num_bigint::BigUint;
 use num_bigint::RandBigInt;
+use pgn_traits::PgnPosition;
 
 #[test]
 fn count_positions_3s() {
@@ -121,11 +123,14 @@ fn decode_encode_random_integers_prop<const S: usize>() {
 
     for _ in 0..100_000 {
         let k = rng.gen_biguint_below(&max_index);
+        let position = data.decode(k.clone());
+        assert_eq!(k, data.encode(&position), "Failed for k={}", k);
+
+        // Check converting to and from TPS, because TPS parsing involves some extra
+        // correctness checks on the position
         assert_eq!(
-            k,
-            data.encode(&data.decode(k.clone())),
-            "Failed for k={}",
-            k
+            <Position<S>>::from_fen(&position.to_fen()).unwrap(),
+            position
         );
     }
 }
