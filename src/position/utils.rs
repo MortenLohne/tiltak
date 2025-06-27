@@ -236,6 +236,17 @@ impl Stack {
         self.height += 1;
     }
 
+    #[must_use]
+    /// Push a new piece to the top of the stack
+    /// If the top piece is already a wall or capstone, does nothing and returns `None`
+    pub fn push_checked(&mut self, piece: Piece) -> Option<()> {
+        if let Some(Wall | Cap) = self.top_stone().map(Piece::role) {
+            None
+        } else {
+            Some(self.push(piece))
+        }
+    }
+
     /// Remove the top piece from the stack, a
     ///
     /// Will not un-flatten a previously flattened stone

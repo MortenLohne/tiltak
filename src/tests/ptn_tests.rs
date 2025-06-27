@@ -112,3 +112,38 @@ fn parse_ptn_without_result2() {
 fn parse_bad_direction_test() {
     assert!(<Move<6>>::from_string("a1d").is_err())
 }
+
+#[test]
+fn tps_with_too_many_pieces_test() {
+    let tps = "2,11C,x,2222,21S,2/1S,x2,121,21S,x/2,2121122S,1221,x,21S,21/x,1,11121111121S,x,1S,222/x3,12S,2C,1S/12S,1,21S,111,2S,22S 2 31";
+    let parse_result = Position::<6>::from_fen(tps);
+    assert!(parse_result.is_err());
+}
+
+#[test]
+fn tps_with_walls_before_flats_test() {
+    let tps = "1S,x5/x6/x6/x6/x6/x6 1 1";
+    let parse_result = Position::<6>::from_fen(tps);
+    assert!(parse_result.is_err());
+}
+
+#[test]
+fn tps_with_caps_before_flats_test() {
+    let tps = "1C,x5/x6/x6/x6/x6/x6 1 1";
+    let parse_result = Position::<6>::from_fen(tps);
+    assert!(parse_result.is_err());
+}
+
+#[test]
+fn tps_with_white_flat_before_black_flat_test() {
+    let tps = "1,x5/x6/x6/x6/x6/x6 1 1";
+    let parse_result = Position::<6>::from_fen(tps);
+    assert!(parse_result.is_err());
+}
+
+#[test]
+fn tps_with_wall_inside_stack_test() {
+    let tps = "1,2,1S2,x3/x6/x6/x6/x6/x6 1 4";
+    let parse_result = Position::<6>::from_fen(tps);
+    assert!(parse_result.is_err());
+}

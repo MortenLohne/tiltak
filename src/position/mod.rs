@@ -1784,13 +1784,73 @@ impl<const S: usize> pgn_traits::PgnPosition for Position<S> {
             let stack = rows[rank as usize][file as usize];
             for piece in stack.into_iter() {
                 match piece {
-                    WhiteFlat | WhiteWall => position.white_stones_left -= 1,
-                    WhiteCap => position.white_caps_left -= 1,
-                    BlackFlat | BlackWall => position.black_stones_left -= 1,
-                    BlackCap => position.black_caps_left -= 1,
+                    WhiteFlat | WhiteWall => {
+                        position.white_stones_left = position
+                            .white_stones_left
+                            .checked_sub(1)
+                            .ok_or(pgn_traits::Error::new(
+                                pgn_traits::ErrorKind::IllegalPosition,
+                                "Too many white stones on the board",
+                            ))?
+                    }
+
+                    WhiteCap => {
+                        position.white_caps_left = position.white_caps_left.checked_sub(1).ok_or(
+                            pgn_traits::Error::new(
+                                pgn_traits::ErrorKind::IllegalPosition,
+                                "Too many white capstones on the board",
+                            ),
+                        )?
+                    }
+                    BlackFlat | BlackWall => {
+                        position.black_stones_left = position
+                            .black_stones_left
+                            .checked_sub(1)
+                            .ok_or(pgn_traits::Error::new(
+                                pgn_traits::ErrorKind::IllegalPosition,
+                                "Too many black stones on the board",
+                            ))?
+                    }
+                    BlackCap => {
+                        position.black_caps_left = position.black_caps_left.checked_sub(1).ok_or(
+                            pgn_traits::Error::new(
+                                pgn_traits::ErrorKind::IllegalPosition,
+                                "Too many black capstones on the board",
+                            ),
+                        )?
+                    }
                 }
             }
             position.set_stack(square, stack);
+        }
+
+        // Check for invalid opening positions
+        if position.black_stones_left == starting_stones(S)
+            && position.white_stones_left < starting_stones(S)
+        {
+            return Err(pgn_traits::Error::new(
+                pgn_traits::ErrorKind::IllegalPosition,
+                "White flat played before any black flats",
+            ));
+        }
+        if position.black_stones_left == starting_stones(S)
+            || position.white_stones_left == starting_stones(S)
+        {
+            if position.white_caps_left < starting_capstones(S)
+                || position.black_caps_left < starting_capstones(S)
+            {
+                return Err(pgn_traits::Error::new(
+                    pgn_traits::ErrorKind::IllegalPosition,
+                    "Capstones placed before opening flats",
+                ));
+            } else if squares_iterator().any(|square| {
+                position.top_stones()[square].is_some_and(|piece| piece.role() == Wall)
+            }) {
+                return Err(pgn_traits::Error::new(
+                    pgn_traits::ErrorKind::IllegalPosition,
+                    "Walls placed before opening flats",
+                ));
+            }
         }
 
         match fen_words[1] {
@@ -1859,15 +1919,19 @@ impl<const S: usize> pgn_traits::PgnPosition for Position<S> {
                         let stack = &mut row[column_id as usize];
                         loop {
                             match row_str_iter.next() {
-                                Some('1') => stack.push(Piece::from_role_color(Flat, Color::White)),
-                                Some('2') => stack.push(Piece::from_role_color(Flat, Color::Black)),
+                                Some('1') => {
+                                    stack.push_checked(Piece::from_role_color(Flat, Color::White))
+                                }
+                                Some('2') => {
+                                    stack.push_checked(Piece::from_role_color(Flat, Color::Black))
+                                }
                                 Some('S') => {
                                     let piece = stack.pop().unwrap();
-                                    stack.push(Piece::from_role_color(Wall, piece.color()));
+                                    stack.push_checked(Piece::from_role_color(Wall, piece.color()))
                                 }
                                 Some('C') => {
                                     let piece = stack.pop().unwrap();
-                                    stack.push(Piece::from_role_color(Cap, piece.color()));
+                                    stack.push_checked(Piece::from_role_color(Cap, piece.color()))
                                 }
                                 Some(',') | None => {
                                     column_id += 1;
@@ -1880,6 +1944,10 @@ impl<const S: usize> pgn_traits::PgnPosition for Position<S> {
                                     )))
                                 }
                             }
+                            .ok_or(pgn_traits::Error::new(
+                                pgn_traits::ErrorKind::IllegalPosition,
+                                "Flat stone on top of wall or capstone",
+                            ))?
                         }
                     }
                     Some(x) => {
