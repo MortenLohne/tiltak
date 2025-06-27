@@ -1829,6 +1829,17 @@ impl<const S: usize> pgn_traits::PgnPosition for Position<S> {
             position.set_stack(square, stack);
         }
 
+        match fen_words[1] {
+            "1" => position.to_move = Color::White,
+            "2" => position.to_move = Color::Black,
+            s => {
+                return Err(pgn_traits::Error::new_parse_error(format!(
+                    "Error parsing TPS \"{}\": Got bad side to move \"{}\"",
+                    fen, s
+                )))
+            }
+        }
+
         // Check for invalid opening positions
         if position.black_stones_left == starting_stones(S)
             && position.white_stones_left < starting_stones(S)
@@ -1857,16 +1868,42 @@ impl<const S: usize> pgn_traits::PgnPosition for Position<S> {
                 ));
             }
         }
+        if position.black_stones_left == starting_stones(S)
+            && position.side_to_move() != Color::White
+        {
+            return Err(pgn_traits::Error::new(
+                pgn_traits::ErrorKind::IllegalPosition,
+                "No moves played, but it's not white's turn",
+            ));
+        }
+        if position.black_stones_left == starting_stones(S) - 1
+            && position.white_stones_left == starting_stones(S)
+            && position.side_to_move() != Color::Black
+        {
+            return Err(pgn_traits::Error::new(
+                pgn_traits::ErrorKind::IllegalPosition,
+                "One half-move played, but it's not black's turn",
+            ));
+        }
 
-        match fen_words[1] {
-            "1" => position.to_move = Color::White,
-            "2" => position.to_move = Color::Black,
-            s => {
-                return Err(pgn_traits::Error::new_parse_error(format!(
-                    "Error parsing TPS \"{}\": Got bad side to move \"{}\"",
-                    fen, s
-                )))
-            }
+        // Check for invalid endgame states
+        if position.white_stones_left == 0
+            && position.white_caps_left == 0
+            && position.side_to_move() == Color::White
+        {
+            return Err(pgn_traits::Error::new(
+                pgn_traits::ErrorKind::IllegalPosition,
+                "White is out of reserves, but it's also their turn",
+            ));
+        }
+        if position.black_stones_left == 0
+            && position.black_caps_left == 0
+            && position.side_to_move() == Color::Black
+        {
+            return Err(pgn_traits::Error::new(
+                pgn_traits::ErrorKind::IllegalPosition,
+                "Black is out of reserves, but it's also their turn",
+            ));
         }
 
         match fen_words[2].parse::<usize>() {
