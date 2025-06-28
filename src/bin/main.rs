@@ -751,6 +751,7 @@ fn analyze_position<const S: usize>(position: &Position<S>, excluded_moves: Vec<
         3 => 4,
         4 => 4,
         5 => 4,
+        8 => 8,
         _ => panic!("No static eval params for komi {}", position.komi()),
     })
     .unwrap();

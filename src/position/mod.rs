@@ -1156,6 +1156,7 @@ impl<const S: usize> Position<S> {
         match komi.half_komi() {
             0 => Self::value_params_0komi(),
             4 => Self::value_params_2komi(),
+            8 => Self::value_params_4komi(),
             _ => unimplemented!("{} komi not supported in {}s", komi, S),
         }
     }
@@ -1164,6 +1165,7 @@ impl<const S: usize> Position<S> {
         match komi.half_komi() {
             0 => Self::policy_params_0komi(),
             4 => Self::policy_params_2komi(),
+            8 => Self::policy_params_4komi(),
             _ => unimplemented!("{} komi not supported in {}s", komi, S),
         }
     }
@@ -1186,6 +1188,13 @@ impl<const S: usize> Position<S> {
         }
     }
 
+    pub fn value_params_4komi() -> &'static [f32] {
+        match S {
+            6 => &parameters::VALUE_PARAMS_6S_4KOMI,
+            _ => unimplemented!("{}s is not supported for 2 komi.", S),
+        }
+    }
+
     pub fn policy_params_0komi() -> &'static [f32] {
         match S {
             4 => &parameters::POLICY_PARAMS_4S_0KOMI,
@@ -1200,6 +1209,13 @@ impl<const S: usize> Position<S> {
             4 => &parameters::POLICY_PARAMS_4S_2KOMI,
             5 => &parameters::POLICY_PARAMS_5S_2KOMI,
             6 => &parameters::POLICY_PARAMS_6S_2KOMI,
+            _ => unimplemented!("{}s is not supported for 2 komi.", S),
+        }
+    }
+
+    pub fn policy_params_4komi() -> &'static [f32] {
+        match S {
+            6 => &parameters::POLICY_PARAMS_6S_4KOMI,
             _ => unimplemented!("{}s is not supported for 2 komi.", S),
         }
     }
