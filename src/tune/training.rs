@@ -41,7 +41,7 @@ pub struct TrainingOptions {
     pub training_id: usize,
     pub batch_size: usize,
     pub num_games_for_tuning: usize,
-    pub nodes_per_game: usize,
+    pub nodes_per_game: u64,
 }
 
 pub fn train_from_scratch<const S: usize, const N: usize, const M: usize>(
@@ -148,6 +148,7 @@ pub fn train_perpetually<const S: usize, const N: usize, const M: usize>(
             .map(|i| {
                 play_game_pair::<S>(
                     komi,
+                    options.nodes_per_game,
                     last_value_params,
                     last_policy_params,
                     value_params,
@@ -264,6 +265,7 @@ pub fn train_perpetually<const S: usize, const N: usize, const M: usize>(
 #[allow(clippy::too_many_arguments)]
 fn play_game_pair<const S: usize>(
     komi: Komi,
+    num_nodes: u64,
     last_value_params: &'static [f32],
     last_policy_params: &'static [f32],
     value_params: &'static [f32],
@@ -287,7 +289,7 @@ fn play_game_pair<const S: usize>(
             komi,
             &[],
             1.0,
-            &TimeControl::FixedNodes(50_000),
+            &TimeControl::FixedNodes(num_nodes),
         );
         match game.0.game_result() {
             Some(GameResult::WhiteWin) => {
@@ -306,7 +308,7 @@ fn play_game_pair<const S: usize>(
             komi,
             &[],
             1.0,
-            &TimeControl::FixedNodes(50_000),
+            &TimeControl::FixedNodes(num_nodes),
         );
         match game.0.game_result() {
             Some(GameResult::BlackWin) => {
@@ -613,12 +615,12 @@ pub fn games_and_move_scoress_from_file<const S: usize>(
 
     match S {
         5 => {
-            move_scoress.truncate(16_000);
-            games.truncate(16_000);
+            move_scoress.truncate(13_000);
+            games.truncate(13_000);
         }
         6 => {
-            move_scoress.truncate(12000);
-            games.truncate(12000);
+            move_scoress.truncate(10_000);
+            games.truncate(10_000);
         }
         _ => (),
     }
