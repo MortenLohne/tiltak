@@ -126,9 +126,9 @@ fn main() {
     };
 
     let num_games_for_tuning = match size {
-        4 => 20_000,
-        5 => 15_000,
-        _ => 12_000,
+        4 => 18_000,
+        5 => 13_000,
+        _ => 10_000,
     };
 
     match matches.subcommand() {
@@ -137,7 +137,7 @@ fn main() {
                 let file_name = format!("games{}_s{}_batch0.ptn", training_id, size);
                 if !Path::new(&file_name).exists() {
                     let batch_size = *arg.get_one::<u64>("batch-size").unwrap() as usize;
-                    let nodes_per_game = *arg.get_one::<u64>("nodes").unwrap() as usize;
+                    let nodes_per_game = *arg.get_one::<u64>("nodes").unwrap();
                     let options = TrainingOptions {
                         training_id,
                         batch_size,
@@ -200,7 +200,7 @@ fn main() {
                 let file_name = format!("games{}_{}s_batch0.ptn", training_id, size);
                 if !Path::new(&file_name).exists() {
                     let batch_size = *arg.get_one::<u64>("batch-size").unwrap() as usize;
-                    let nodes_per_game = *arg.get_one::<u64>("nodes").unwrap() as usize;
+                    let nodes_per_game = *arg.get_one::<u64>("nodes").unwrap();
                     let options = TrainingOptions {
                         training_id,
                         batch_size,
@@ -237,7 +237,7 @@ fn main() {
         Some(("continue-selfplay", arg)) => {
             let training_id = *arg.get_one::<u64>("training-id").unwrap() as usize;
             let batch_size = *arg.get_one::<u64>("batch-size").unwrap() as usize;
-            let nodes_per_game = *arg.get_one::<u64>("nodes").unwrap() as usize;
+            let nodes_per_game = *arg.get_one::<u64>("nodes").unwrap();
             let options = TrainingOptions {
                 training_id,
                 batch_size,
