@@ -40,7 +40,7 @@ type MoveScoresForGame<const S: usize> = Vec<Vec<MoveScore<S>>>;
 pub struct TrainingOptions {
     pub training_id: usize,
     pub batch_size: usize,
-    pub num_games_for_tuning: usize,
+    pub num_games_for_policy_tuning: usize,
     pub nodes_per_game: u64,
 }
 
@@ -224,23 +224,27 @@ pub fn train_perpetually<const S: usize, const N: usize, const M: usize>(
             .iter()
             .cloned()
             .rev()
-            .take(usize::min(max_training_games, options.num_games_for_tuning))
+            .take(max_training_games)
             .collect::<Vec<_>>();
 
         let move_scores_in_training_batch = all_move_scores
             .iter()
             .cloned()
             .rev()
-            .take(usize::min(max_training_games, options.num_games_for_tuning))
+            .take(max_training_games)
             .collect::<Vec<_>>();
 
         let value_tuning_start_time = time::Instant::now();
 
-        let (new_value_params, new_policy_params): ([f32; N], [f32; M]) = tune_value_and_policy(
-            &games_in_training_batch,
-            &move_scores_in_training_batch,
-            komi,
-            value_params,
+        let new_value_params: [f32; N] = tune_value(&games_in_training_batch, komi, value_params)?;
+
+        let num_policy_games_for_policy_tuning = options
+            .num_games_for_policy_tuning
+            .min(move_scores_in_training_batch.len());
+
+        let new_policy_params: [f32; M] = tune_policy(
+            &games_in_training_batch[0..num_policy_games_for_policy_tuning],
+            &move_scores_in_training_batch[0..num_policy_games_for_policy_tuning],
             policy_params,
         )?;
 
@@ -380,79 +384,25 @@ pub fn tune_value_from_file<const S: usize, const N: usize>(
 ) -> Result<[f32; N], DynError> {
     let games = read_games_from_file::<S>(file_name, komi)?;
 
-    let start_time = time::Instant::now();
-    let (positions, results) = positions_and_results_from_games(&games, komi);
-    println!(
-        "Extracted {} positions in {:.1}s",
-        positions.len(),
-        start_time.elapsed().as_secs_f32()
-    );
-
-    let start_time = time::Instant::now();
-    let mut samples = positions
-        .par_iter()
-        .zip(results)
-        .map(|(position, game_result)| {
-            let mut white_features: Value<S> = Value::new(&[]);
-            let mut black_features: Value<S> = Value::new(&[]);
-            position.static_eval_features(&mut white_features, &mut black_features);
-
-            let features = white_features
-                .features
-                .into_iter()
-                .chain(black_features.features)
-                .collect::<Vec<_>>()
-                .try_into()
-                .unwrap();
-
-            let result = match game_result {
-                GameResult::WhiteWin => f16::ONE,
-                GameResult::Draw => f16::ONE / (f16::ONE + f16::ONE),
-                GameResult::BlackWin => f16::ZERO,
-            };
-            TrainingSample {
-                features,
-                offset: 0.0,
-                result,
-            }
-        })
-        .collect::<Vec<_>>();
-
-    println!(
-        "Vectorized {} training samples in {:.1}s",
-        samples.len(),
-        start_time.elapsed().as_secs_f32()
-    );
-
     let mut rng = rand::rngs::StdRng::from_seed(Default::default());
-    let mut initial_params = [0.00; N];
+    let initial_params = array_from_fn(|| rng.gen_range(-0.01..0.01));
 
-    for param in initial_params.iter_mut() {
-        *param = rng.gen_range(-0.01..0.01)
-    }
+    let value_params = tune_value::<S, N>(&games, komi, &initial_params)?;
 
-    samples.shuffle(&mut rng);
-
-    let tuned_parameters = gradient_descent::gradient_descent(
-        &samples,
-        &initial_params,
-        10.0,
-        &mut rng,
-        &value_eval::sigmoid,
-        &value_eval::sigmoid_derived,
-    );
-
-    Ok(tuned_parameters)
+    Ok(value_params)
 }
 
-pub fn tune_value_and_policy<const S: usize, const N: usize, const M: usize>(
+pub fn tune_value<const S: usize, const N: usize>(
     games: &[Game<Position<S>>],
-    move_scoress: &[MoveScoresForGame<S>],
     komi: Komi,
     initial_value_params: &[f32; N],
-    initial_policy_params: &[f32; M],
-) -> Result<([f32; N], [f32; M]), DynError> {
+) -> Result<[f32; N], DynError> {
     let mut rng = rand::rngs::StdRng::from_seed(Default::default());
+
+    println!(
+        "Generating value training samples from {} games",
+        games.len()
+    );
 
     let (positions, results) = positions_and_results_from_games(games, komi);
 
@@ -496,11 +446,34 @@ pub fn tune_value_and_policy<const S: usize, const N: usize, const M: usize>(
             / f32::powf(2.0, 30.0),
     );
 
+    let tuned_value_parameters = gradient_descent::gradient_descent(
+        &value_training_samples,
+        initial_value_params,
+        50.0,
+        &mut rng,
+        &value_eval::sigmoid,
+        &value_eval::sigmoid_derived,
+    );
+    Ok(tuned_value_parameters)
+}
+
+pub fn tune_policy<const S: usize, const N: usize>(
+    games: &[Game<Position<S>>],
+    move_scoress: &[MoveScoresForGame<S>],
+    initial_policy_params: &[f32; N],
+) -> Result<[f32; N], DynError> {
+    println!(
+        "Generating policy training samples from {} games",
+        games.len()
+    );
+
+    let mut rng = rand::rngs::StdRng::from_seed(Default::default());
+
     let number_of_feature_sets = move_scoress.iter().flatten().flatten().count();
 
     let start_time: time::Instant = time::Instant::now();
 
-    let mut policy_training_samples: Vec<TrainingSample<M>> =
+    let mut policy_training_samples: Vec<TrainingSample<N>> =
         Vec::with_capacity(number_of_feature_sets);
 
     policy_training_samples.extend(games.iter().zip(move_scoress.iter()).flat_map(
@@ -552,17 +525,8 @@ pub fn tune_value_and_policy<const S: usize, const N: usize, const M: usize>(
         "Generated {} policy training samples in {:.1}s, {:.2}GiB total",
         policy_training_samples.len(),
         start_time.elapsed().as_secs_f32(),
-        (policy_training_samples.len() * mem::size_of::<TrainingSample<M>>()) as f32
+        (policy_training_samples.len() * mem::size_of::<TrainingSample<N>>()) as f32
             / f32::powf(2.0, 30.0),
-    );
-
-    let tuned_value_parameters = gradient_descent::gradient_descent(
-        &value_training_samples,
-        initial_value_params,
-        50.0,
-        &mut rng,
-        &value_eval::sigmoid,
-        &value_eval::sigmoid_derived,
     );
 
     let tuned_policy_parameters = gradient_descent::gradient_descent(
@@ -574,7 +538,7 @@ pub fn tune_value_and_policy<const S: usize, const N: usize, const M: usize>(
         &policy_eval::sigmoid_derived,
     );
 
-    Ok((tuned_value_parameters, tuned_policy_parameters))
+    Ok(tuned_policy_parameters)
 }
 
 pub fn tune_value_and_policy_from_file<const S: usize, const N: usize, const M: usize>(
@@ -590,13 +554,11 @@ pub fn tune_value_and_policy_from_file<const S: usize, const N: usize, const M: 
 
     let initial_policy_params: [f32; M] = array_from_fn(|| rng.gen_range(-0.01..0.01));
 
-    tune_value_and_policy(
-        &games,
-        &move_scoress,
-        komi,
-        &initial_value_params,
-        &initial_policy_params,
-    )
+    let value_params = tune_value(&games, komi, &initial_value_params)?;
+
+    let policy_params = tune_policy(&games, &move_scoress, &initial_policy_params)?;
+
+    Ok((value_params, policy_params))
 }
 
 type DynError = Box<dyn error::Error + Send + Sync>;
