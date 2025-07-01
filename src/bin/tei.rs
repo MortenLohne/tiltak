@@ -1,3 +1,5 @@
+#![allow(clippy::uninlined_format_args)]
+
 use board_game_traits::{Color, Position as PositionTrait};
 use pgn_traits::PgnPosition;
 use std::io::{BufRead, BufReader};

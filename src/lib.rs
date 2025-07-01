@@ -25,6 +25,7 @@
 //! let (best_move, score) = mcts(position.clone(), 100_000);
 //! println!("Played {} with score {}", position.move_to_san(&best_move), score);
 //! ```
+#![allow(clippy::uninlined_format_args)]
 
 extern crate arrayvec;
 extern crate board_game_traits;

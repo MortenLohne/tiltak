@@ -1,3 +1,5 @@
+#![allow(clippy::uninlined_format_args)]
+
 #[cfg(feature = "constant-tuning")]
 use std::collections::HashSet;
 use std::io::{Read, Write};

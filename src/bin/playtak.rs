@@ -1,3 +1,5 @@
+#![allow(clippy::uninlined_format_args)]
+
 use std::convert::Infallible;
 use std::io::{BufRead, Result, Write};
 use std::net::TcpStream;
