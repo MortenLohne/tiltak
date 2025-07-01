@@ -1,3 +1,4 @@
+use std::array;
 use std::convert::TryFrom;
 use std::io::Read;
 use std::io::Write;
@@ -50,9 +51,9 @@ pub fn train_from_scratch<const S: usize, const N: usize, const M: usize>(
 ) -> Result<(), DynError> {
     let mut rng = rand::rngs::StdRng::from_seed(Default::default());
 
-    let initial_value_params: [f32; N] = array_from_fn(|| rng.gen_range(-0.01..0.01));
+    let initial_value_params: [f32; N] = array::from_fn(|_| rng.gen_range(-0.01..0.01));
 
-    let initial_policy_params: [f32; M] = array_from_fn(|| rng.gen_range(-0.01..0.01));
+    let initial_policy_params: [f32; M] = array::from_fn(|_| rng.gen_range(-0.01..0.01));
 
     train_perpetually::<S, N, M>(
         options,
@@ -385,7 +386,7 @@ pub fn tune_value_from_file<const S: usize, const N: usize>(
     let games = read_games_from_file::<S>(file_name, komi)?;
 
     let mut rng = rand::rngs::StdRng::from_seed(Default::default());
-    let initial_params = array_from_fn(|| rng.gen_range(-0.01..0.01));
+    let initial_params = array::from_fn(|_| rng.gen_range(-0.01..0.01));
 
     let value_params = tune_value::<S, N>(&games, komi, &initial_params)?;
 
@@ -550,9 +551,9 @@ pub fn tune_value_and_policy_from_file<const S: usize, const N: usize, const M: 
         games_and_move_scoress_from_file::<S>(value_file_name, policy_file_name, komi)?;
     let mut rng = rand::rngs::StdRng::from_seed(Default::default());
 
-    let initial_value_params: [f32; N] = array_from_fn(|| rng.gen_range(-0.01..0.01));
+    let initial_value_params: [f32; N] = array::from_fn(|_| rng.gen_range(-0.01..0.01));
 
-    let initial_policy_params: [f32; M] = array_from_fn(|| rng.gen_range(-0.01..0.01));
+    let initial_policy_params: [f32; M] = array::from_fn(|_| rng.gen_range(-0.01..0.01));
 
     let value_params = tune_value(&games, komi, &initial_value_params)?;
 
@@ -697,16 +698,4 @@ pub fn positions_and_results_from_games<const S: usize>(
             output
         })
         .unzip()
-}
-
-fn array_from_fn<F, T, const N: usize>(mut f: F) -> [T; N]
-where
-    F: FnMut() -> T,
-    T: Default + Copy,
-{
-    let mut output = [T::default(); N];
-    for e in output.iter_mut() {
-        *e = f();
-    }
-    output
 }
