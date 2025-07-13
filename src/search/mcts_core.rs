@@ -1,6 +1,7 @@
 use std::f32;
 use std::ops;
 
+use board_game_traits::EvalPosition;
 use board_game_traits::{Color, GameResult, Position as PositionTrait};
 use half::f16;
 use half::slice::HalfFloatSliceExt;
@@ -8,9 +9,13 @@ use rand::Rng;
 use rand_distr::Distribution;
 
 use crate::evaluation::parameters::IncrementalPolicy;
+use crate::position::squares_iterator;
 use crate::position::Move;
 /// This module contains the core of the MCTS search algorithm
 use crate::position::Position;
+use crate::position::Role;
+use crate::search::win_percentage_to_cp;
+use crate::search::HistoryCorrections;
 use crate::search::{cp_to_win_percentage, MctsSetting};
 
 use super::{arena, Arena, Error};
@@ -157,6 +162,7 @@ impl<const S: usize> TreeBridge<S> {
         position: &mut Position<S>,
         settings: &MctsSetting<S>,
         temp_vectors: &mut TempVectors<S>,
+        cap_corrections_history_table: &mut HistoryCorrections<S>,
         arena: &Arena,
         our_visits: u32,
     ) -> Result<f32, Error> {
@@ -177,6 +183,10 @@ impl<const S: usize> TreeBridge<S> {
             .get_slice_mut(&mut self.visitss)
             .get_mut(best_child_node_index)
             .unwrap();
+        let child_eval = *arena
+            .get_slice_mut(&mut self.mean_action_values)
+            .get_mut(best_child_node_index)
+            .unwrap();
         let child_move = arena
             .get_slice_mut(&mut self.moves)
             .get_mut(best_child_node_index)
@@ -190,8 +200,27 @@ impl<const S: usize> TreeBridge<S> {
 
         position.do_move(child_move);
 
-        let result =
-            1.0 - child_edge.select(position, settings, temp_vectors, arena, child_visits)?;
+        // Update corrections history table for the child node,
+        // since this is where we have all the information available
+        // Update every 16 visits
+        if child_visits % 16 == 15 && position.game_result().is_none() {
+            update_corrections_history(
+                position,
+                cap_corrections_history_table,
+                child_visits,
+                child_eval,
+            );
+        }
+
+        let result = 1.0
+            - child_edge.select(
+                position,
+                settings,
+                temp_vectors,
+                cap_corrections_history_table,
+                arena,
+                child_visits,
+            )?;
 
         *arena
             .get_slice_mut(&mut self.visitss)
@@ -231,12 +260,44 @@ impl<const S: usize> TreeBridge<S> {
     }
 }
 
+pub fn update_corrections_history<const S: usize>(
+    position: &Position<S>,
+    cap_corrections_history_table: &mut HistoryCorrections<S>,
+    visits: u32,
+    eval: f32,
+) {
+    // Centipawn score is always from white's perspective
+    let centipawn_static_eval = position.static_eval();
+    let centipawn_eval = win_percentage_to_cp(if position.side_to_move() == Color::White {
+        eval
+    } else {
+        1.0 - eval
+    });
+    let centipawn_delta = centipawn_eval - centipawn_static_eval;
+
+    for square in squares_iterator::<S>() {
+        let Some(top_stone) = position.top_stones()[square] else {
+            continue;
+        };
+        if top_stone.role() != Role::Cap {
+            continue;
+        }
+        let color_id = top_stone.color().disc();
+
+        let strength_factor = 0.1 * f32::log2((visits + 1) as f32).powi(2) / (visits + 1) as f32;
+
+        cap_corrections_history_table[color_id][square] = strength_factor * centipawn_delta
+            + (1.0 - strength_factor) * cap_corrections_history_table[color_id][square];
+    }
+}
+
 impl<const S: usize> TreeEdge<S> {
     pub fn select(
         &mut self,
         position: &mut Position<S>,
         settings: &MctsSetting<S>,
         temp_vectors: &mut TempVectors<S>,
+        cap_corrections_history_table: &mut HistoryCorrections<S>,
         arena: &Arena,
         parent_visits: u32,
     ) -> Result<f32, Error> {
@@ -245,13 +306,19 @@ impl<const S: usize> TreeEdge<S> {
                 position,
                 settings,
                 temp_vectors,
+                cap_corrections_history_table,
                 arena,
                 parent_visits,
             );
         }
 
-        let (result, game_result) =
-            rollout(position, settings, settings.rollout_depth, temp_vectors);
+        let (result, game_result) = rollout(
+            position,
+            settings,
+            settings.rollout_depth,
+            temp_vectors,
+            cap_corrections_history_table,
+        );
         self.child = Some(
             arena
                 .add(Tree {
@@ -277,6 +344,7 @@ impl<const S: usize> Tree<S> {
         position: &mut Position<S>,
         settings: &MctsSetting<S>,
         temp_vectors: &mut TempVectors<S>,
+        cap_corrections_history_table: &mut HistoryCorrections<S>,
         arena: &Arena,
         parent_visits: u32,
     ) -> Result<f32, Error> {
@@ -287,7 +355,13 @@ impl<const S: usize> Tree<S> {
             return Ok(result);
         }
         let Some(children) = self.children.as_mut() else {
-            let result = self.expand_child(position, settings, temp_vectors, arena)?;
+            let result = self.expand_child(
+                position,
+                settings,
+                temp_vectors,
+                cap_corrections_history_table,
+                arena,
+            )?;
             self.total_action_value += result as f64;
             return Ok(result);
         };
@@ -296,6 +370,7 @@ impl<const S: usize> Tree<S> {
             position,
             settings,
             temp_vectors,
+            cap_corrections_history_table,
             arena,
             parent_visits,
         )?;
@@ -311,6 +386,7 @@ impl<const S: usize> Tree<S> {
         position: &mut Position<S>,
         settings: &MctsSetting<S>,
         temp_vectors: &mut TempVectors<S>,
+        cap_corrections_history_table: &mut HistoryCorrections<S>,
         arena: &Arena,
     ) -> Result<f32, Error> {
         assert!(self.children.is_none());
@@ -364,7 +440,14 @@ impl<const S: usize> Tree<S> {
         temp_vectors.moves.clear();
 
         // Select child edge before writing the child node into the tree, in case we OOM inside this call
-        let result = tree_edge.select(position, settings, temp_vectors, arena, 1)?;
+        let result = tree_edge.select(
+            position,
+            settings,
+            temp_vectors,
+            cap_corrections_history_table,
+            arena,
+            1,
+        )?;
 
         self.children = Some(arena.add(tree_edge).ok_or(Error::OOM)?);
 
@@ -424,6 +507,7 @@ pub fn rollout<const S: usize>(
     settings: &MctsSetting<S>,
     depth: u16,
     temp_vectors: &mut TempVectors<S>,
+    cap_corrections_history_table: &mut HistoryCorrections<S>,
 ) -> (f32, Option<GameResultForUs>) {
     let group_data = position.group_data();
 
@@ -438,21 +522,31 @@ pub fn rollout<const S: usize>(
 
         (game_result_for_us.score(), Some(game_result_for_us))
     } else if depth == 0 {
-        let centipawn_score = position.static_eval_with_params_and_data(
+        let mut centipawn_score = position.static_eval_with_params_and_data(
             &group_data,
             match settings.value_params.as_ref() {
                 Some(params) => params,
                 None => <Position<S>>::value_params(position.komi()),
             },
         );
-        let static_eval = if let Some(static_eval_variance) = settings.static_eval_variance {
+        if let Some(static_eval_variance) = settings.static_eval_variance {
             let mut rng = rand::thread_rng();
-            cp_to_win_percentage(
-                centipawn_score + rng.gen_range((-static_eval_variance)..static_eval_variance),
-            )
-        } else {
-            cp_to_win_percentage(centipawn_score)
-        };
+            centipawn_score += rng.gen_range((-static_eval_variance)..static_eval_variance)
+        }
+
+        for square in squares_iterator::<S>() {
+            let Some(top_stone) = position.top_stones()[square] else {
+                continue;
+            };
+            if top_stone.role() != Role::Cap {
+                continue;
+            }
+            let color_id = top_stone.color().disc();
+            centipawn_score += cap_corrections_history_table[color_id][square] / 16.0;
+        }
+
+        let static_eval = cp_to_win_percentage(centipawn_score);
+
         match position.side_to_move() {
             Color::White => (static_eval, None),
             Color::Black => (1.0 - static_eval, None),
@@ -476,7 +570,13 @@ pub fn rollout<const S: usize>(
         position.do_move(best_move);
 
         temp_vectors.moves.clear();
-        let (score, _) = rollout(position, settings, depth - 1, temp_vectors);
+        let (score, _) = rollout(
+            position,
+            settings,
+            depth - 1,
+            temp_vectors,
+            cap_corrections_history_table,
+        );
         (1.0 - score, None)
     }
 }

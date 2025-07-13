@@ -10,10 +10,10 @@ use std::fmt::Display;
 use std::{mem, time};
 use std::{process, sync};
 
-use crate::position::Move;
 use crate::position::Position;
+use crate::position::{AbstractBoard, Move};
 pub use crate::search::mcts_core::best_move;
-use crate::search::mcts_core::{TempVectors, Tree, TreeEdge};
+use crate::search::mcts_core::{update_corrections_history, TempVectors, Tree, TreeEdge};
 
 use self::arena::ArenaError;
 use self::mcts_core::Pv;
@@ -167,6 +167,8 @@ impl Display for Error {
 
 impl std::error::Error for Error {}
 
+type HistoryCorrections<const S: usize> = [AbstractBoard<f32, S>; 2];
+
 pub struct MonteCarloTree<const S: usize> {
     tree: TreeEdge<S>, // Fake edge to the root node
     visits: u32,
@@ -174,6 +176,7 @@ pub struct MonteCarloTree<const S: usize> {
     temp_position: Position<S>,
     settings: MctsSetting<S>,
     temp_vectors: TempVectors<S>,
+    cap_corrections_history_table: HistoryCorrections<S>,
     arena: Arena,
 }
 
@@ -224,6 +227,7 @@ impl<const S: usize> MonteCarloTree<S> {
 
         let mut tree = TreeEdge { child: None };
         let mut temp_vectors = TempVectors::default();
+        let mut cap_corrections_history_table = HistoryCorrections::default();
 
         // Applying dirichlet noise or excluding moves can only be done once the child edges of the root are initialized,
         // which is done on the 2nd select
@@ -231,6 +235,7 @@ impl<const S: usize> MonteCarloTree<S> {
             &mut position.clone(),
             &settings,
             &mut temp_vectors,
+            &mut cap_corrections_history_table,
             &arena,
             0,
         )
@@ -239,6 +244,7 @@ impl<const S: usize> MonteCarloTree<S> {
             &mut position.clone(),
             &settings,
             &mut temp_vectors,
+            &mut cap_corrections_history_table,
             &arena,
             1,
         )
@@ -285,6 +291,7 @@ impl<const S: usize> MonteCarloTree<S> {
             temp_position: position,
             settings,
             temp_vectors,
+            cap_corrections_history_table,
             arena,
         }
     }
@@ -422,11 +429,26 @@ impl<const S: usize> MonteCarloTree<S> {
         if self.visits == u32::MAX {
             return Err(Error::MaxVisits);
         }
+
+        // Update corrections history table based on the root node
+        // Update every 16 visits
+        if self.visits() % 16 == 15 {
+            let visits = self.visits();
+            let eval = self.mean_action_value();
+            update_corrections_history(
+                &self.position,
+                &mut self.cap_corrections_history_table,
+                visits,
+                eval,
+            );
+        }
+
         self.temp_position.clone_from(&self.position);
         let result = self.tree.select(
             &mut self.temp_position,
             &self.settings,
             &mut self.temp_vectors,
+            &mut self.cap_corrections_history_table,
             &self.arena,
             self.visits,
         )?;
@@ -554,6 +576,12 @@ pub fn mcts_training<const S: usize>(
 /// Convert a static evaluation in centipawns to a winning probability between 0.0 and 1.0.
 pub fn cp_to_win_percentage(cp: f32) -> f32 {
     0.5 + f32::atan(cp) / PI
+}
+
+pub fn win_percentage_to_cp(win_percentage: f32) -> f32 {
+    // Convert a winning percentage between 0.0 and 1.0 to a static evaluation in centipawns
+    // The inverse of cp_to_win_percentage
+    f32::tan(PI * (win_percentage - 0.5))
 }
 
 // Utility for testing
