@@ -2,7 +2,9 @@
 //!
 //! This implementation does not use full Monte Carlo rollouts, relying on a heuristic evaluation when expanding new nodes instead.
 
+use board_game_traits::{Color, EvalPosition as _, Position as _};
 use half::f16;
+use pgn_traits::PgnPosition;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 use std::f32::consts::PI;
@@ -10,10 +12,10 @@ use std::fmt::Display;
 use std::{mem, time};
 use std::{process, sync};
 
-use crate::position::Position;
+use crate::position::{squares_iterator, Position, Role};
 use crate::position::{AbstractBoard, Move};
 pub use crate::search::mcts_core::best_move;
-use crate::search::mcts_core::{update_corrections_history, TempVectors, Tree, TreeEdge};
+use crate::search::mcts_core::{TempVectors, Tree, TreeEdge};
 
 use self::arena::ArenaError;
 use self::mcts_core::Pv;
@@ -167,7 +169,66 @@ impl Display for Error {
 
 impl std::error::Error for Error {}
 
-type HistoryCorrections<const S: usize> = [AbstractBoard<f32, S>; 2];
+#[derive(Default)]
+struct HistoryCorrections<const S: usize> {
+    pub cap_table: [[AbstractBoard<f32, S>; 2]; 32], // Indexed by the last 5 bits of the square's hash
+}
+
+impl<const S: usize> HistoryCorrections<S> {
+    pub fn update(&mut self, position: &Position<S>, visits: u32, eval: f32) {
+        // Centipawn score is always from white's perspective
+        let centipawn_static_eval = position.static_eval();
+        let centipawn_eval = win_percentage_to_cp(if position.side_to_move() == Color::White {
+            eval
+        } else {
+            1.0 - eval
+        });
+        let centipawn_delta = centipawn_eval - centipawn_static_eval;
+
+        for square in squares_iterator::<S>() {
+            let Some(top_stone) = position.top_stones()[square] else {
+                continue;
+            };
+            if top_stone.role() != Role::Cap {
+                continue;
+            }
+            let color_id = top_stone.color().disc();
+            let hash = position.zobrist_hash_for_square(square);
+            let hash_index = hash as usize & 31; // Last 5 bits of the hash
+
+            let strength_factor =
+                0.1 * f32::log2((visits + 1) as f32).powi(2) / (visits + 1) as f32;
+
+            self.cap_table[hash_index][color_id][square] = (strength_factor * centipawn_delta
+                + (1.0 - strength_factor) * self.cap_table[hash_index][color_id][square])
+                .clamp(-5.0, 5.0);
+        }
+    }
+
+    pub fn query(&self, position: &Position<S>) -> f32 {
+        let mut correction = 0.0;
+        for square in squares_iterator::<S>() {
+            let Some(top_stone) = position.top_stones()[square] else {
+                continue;
+            };
+            if top_stone.role() != Role::Cap {
+                continue;
+            }
+            let color_id = top_stone.color().disc();
+            let hash = position.zobrist_hash_for_square(square);
+            let hash_index = hash as usize & 31; // Last 5 bits of the hash
+
+            correction += self.cap_table[hash_index][color_id][square] / 16.0;
+            if correction.abs() > 0.1 {
+                println!(
+                    "Correction after square {square} is {correction:.3}, position: {}",
+                    position.to_fen()
+                );
+            }
+        }
+        correction
+    }
+}
 
 pub struct MonteCarloTree<const S: usize> {
     tree: TreeEdge<S>, // Fake edge to the root node
@@ -176,7 +237,7 @@ pub struct MonteCarloTree<const S: usize> {
     temp_position: Position<S>,
     settings: MctsSetting<S>,
     temp_vectors: TempVectors<S>,
-    cap_corrections_history_table: HistoryCorrections<S>,
+    corrections_history_table: HistoryCorrections<S>,
     arena: Arena,
 }
 
@@ -291,7 +352,7 @@ impl<const S: usize> MonteCarloTree<S> {
             temp_position: position,
             settings,
             temp_vectors,
-            cap_corrections_history_table,
+            corrections_history_table: cap_corrections_history_table,
             arena,
         }
     }
@@ -431,16 +492,12 @@ impl<const S: usize> MonteCarloTree<S> {
         }
 
         // Update corrections history table based on the root node
-        // Update every 16 visits
-        if self.visits() % 16 == 15 {
+        // Update every 256 visits
+        if self.visits() % 256 == 255 {
             let visits = self.visits();
             let eval = self.mean_action_value();
-            update_corrections_history(
-                &self.position,
-                &mut self.cap_corrections_history_table,
-                visits,
-                eval,
-            );
+            self.corrections_history_table
+                .update(&self.position, visits, eval);
         }
 
         self.temp_position.clone_from(&self.position);
@@ -448,7 +505,7 @@ impl<const S: usize> MonteCarloTree<S> {
             &mut self.temp_position,
             &self.settings,
             &mut self.temp_vectors,
-            &mut self.cap_corrections_history_table,
+            &mut self.corrections_history_table,
             &self.arena,
             self.visits,
         )?;

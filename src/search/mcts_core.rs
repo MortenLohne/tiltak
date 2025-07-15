@@ -1,20 +1,17 @@
 use std::f32;
 use std::ops;
 
-use board_game_traits::EvalPosition;
 use board_game_traits::{Color, GameResult, Position as PositionTrait};
 use half::f16;
 use half::slice::HalfFloatSliceExt;
+use pgn_traits::PgnPosition;
 use rand::Rng;
 use rand_distr::Distribution;
 
 use crate::evaluation::parameters::IncrementalPolicy;
-use crate::position::squares_iterator;
 use crate::position::Move;
 /// This module contains the core of the MCTS search algorithm
 use crate::position::Position;
-use crate::position::Role;
-use crate::search::win_percentage_to_cp;
 use crate::search::HistoryCorrections;
 use crate::search::{cp_to_win_percentage, MctsSetting};
 
@@ -162,7 +159,7 @@ impl<const S: usize> TreeBridge<S> {
         position: &mut Position<S>,
         settings: &MctsSetting<S>,
         temp_vectors: &mut TempVectors<S>,
-        cap_corrections_history_table: &mut HistoryCorrections<S>,
+        corrections_history_table: &mut HistoryCorrections<S>,
         arena: &Arena,
         our_visits: u32,
     ) -> Result<f32, Error> {
@@ -202,14 +199,9 @@ impl<const S: usize> TreeBridge<S> {
 
         // Update corrections history table for the child node,
         // since this is where we have all the information available
-        // Update every 16 visits
-        if child_visits % 16 == 15 && position.game_result().is_none() {
-            update_corrections_history(
-                position,
-                cap_corrections_history_table,
-                child_visits,
-                child_eval,
-            );
+        // Update every 256 visits
+        if child_visits % 256 == 255 && position.game_result().is_none() {
+            corrections_history_table.update(position, child_visits, child_eval);
         }
 
         let result = 1.0
@@ -217,7 +209,7 @@ impl<const S: usize> TreeBridge<S> {
                 position,
                 settings,
                 temp_vectors,
-                cap_corrections_history_table,
+                corrections_history_table,
                 arena,
                 child_visits,
             )?;
@@ -257,37 +249,6 @@ impl<const S: usize> TreeBridge<S> {
         {
             *child_prior = f16::from_f32(child_prior.to_f32() * (1.0 - epsilon) + epsilon * eta);
         }
-    }
-}
-
-pub fn update_corrections_history<const S: usize>(
-    position: &Position<S>,
-    cap_corrections_history_table: &mut HistoryCorrections<S>,
-    visits: u32,
-    eval: f32,
-) {
-    // Centipawn score is always from white's perspective
-    let centipawn_static_eval = position.static_eval();
-    let centipawn_eval = win_percentage_to_cp(if position.side_to_move() == Color::White {
-        eval
-    } else {
-        1.0 - eval
-    });
-    let centipawn_delta = centipawn_eval - centipawn_static_eval;
-
-    for square in squares_iterator::<S>() {
-        let Some(top_stone) = position.top_stones()[square] else {
-            continue;
-        };
-        if top_stone.role() != Role::Cap {
-            continue;
-        }
-        let color_id = top_stone.color().disc();
-
-        let strength_factor = 0.1 * f32::log2((visits + 1) as f32).powi(2) / (visits + 1) as f32;
-
-        cap_corrections_history_table[color_id][square] = strength_factor * centipawn_delta
-            + (1.0 - strength_factor) * cap_corrections_history_table[color_id][square];
     }
 }
 
@@ -344,7 +305,7 @@ impl<const S: usize> Tree<S> {
         position: &mut Position<S>,
         settings: &MctsSetting<S>,
         temp_vectors: &mut TempVectors<S>,
-        cap_corrections_history_table: &mut HistoryCorrections<S>,
+        corrections_history_table: &mut HistoryCorrections<S>,
         arena: &Arena,
         parent_visits: u32,
     ) -> Result<f32, Error> {
@@ -359,7 +320,7 @@ impl<const S: usize> Tree<S> {
                 position,
                 settings,
                 temp_vectors,
-                cap_corrections_history_table,
+                corrections_history_table,
                 arena,
             )?;
             self.total_action_value += result as f64;
@@ -370,7 +331,7 @@ impl<const S: usize> Tree<S> {
             position,
             settings,
             temp_vectors,
-            cap_corrections_history_table,
+            corrections_history_table,
             arena,
             parent_visits,
         )?;
@@ -386,7 +347,7 @@ impl<const S: usize> Tree<S> {
         position: &mut Position<S>,
         settings: &MctsSetting<S>,
         temp_vectors: &mut TempVectors<S>,
-        cap_corrections_history_table: &mut HistoryCorrections<S>,
+        corrections_history_table: &mut HistoryCorrections<S>,
         arena: &Arena,
     ) -> Result<f32, Error> {
         assert!(self.children.is_none());
@@ -444,7 +405,7 @@ impl<const S: usize> Tree<S> {
             position,
             settings,
             temp_vectors,
-            cap_corrections_history_table,
+            corrections_history_table,
             arena,
             1,
         )?;
@@ -507,7 +468,7 @@ pub fn rollout<const S: usize>(
     settings: &MctsSetting<S>,
     depth: u16,
     temp_vectors: &mut TempVectors<S>,
-    cap_corrections_history_table: &mut HistoryCorrections<S>,
+    corrections_history_table: &mut HistoryCorrections<S>,
 ) -> (f32, Option<GameResultForUs>) {
     let group_data = position.group_data();
 
@@ -534,18 +495,17 @@ pub fn rollout<const S: usize>(
             centipawn_score += rng.gen_range((-static_eval_variance)..static_eval_variance)
         }
 
-        for square in squares_iterator::<S>() {
-            let Some(top_stone) = position.top_stones()[square] else {
-                continue;
-            };
-            if top_stone.role() != Role::Cap {
-                continue;
-            }
-            let color_id = top_stone.color().disc();
-            centipawn_score += cap_corrections_history_table[color_id][square] / 16.0;
-        }
+        let old_centipawn_score = centipawn_score;
+
+        centipawn_score += corrections_history_table.query(&position);
 
         let static_eval = cp_to_win_percentage(centipawn_score);
+
+        let old_static_eval = cp_to_win_percentage(old_centipawn_score);
+
+        if (centipawn_score - old_centipawn_score).abs() > 0.1 {
+            println!("Updated centipawn score from {old_centipawn_score:.3} to {centipawn_score:.3}, {:.2}% to {:.2}% win chance, TPS {}", old_static_eval * 100.0, static_eval * 100.0, position.to_fen());
+        }
 
         match position.side_to_move() {
             Color::White => (static_eval, None),
@@ -575,7 +535,7 @@ pub fn rollout<const S: usize>(
             settings,
             depth - 1,
             temp_vectors,
-            cap_corrections_history_table,
+            corrections_history_table,
         );
         (1.0 - score, None)
     }
