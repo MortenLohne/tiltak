@@ -388,7 +388,7 @@ impl<const S: usize> MonteCarloTree<S> {
                             visits: *visits,
                             mv: (*mv)?,
                             mean_action_value,
-                            child: Some(initialized_child.as_ref()),
+                            child: Some(initialized_child),
                             policy: *policy,
                         })
                     })
@@ -411,7 +411,7 @@ impl<const S: usize> MonteCarloTree<S> {
                             visits: *visits,
                             mv: (*mv)?,
                             mean_action_value: *score,
-                            child: child.child.as_ref().map(|c| c.as_ref()),
+                            child: child.child.as_ref(),
                             policy: *policy,
                         })
                     })

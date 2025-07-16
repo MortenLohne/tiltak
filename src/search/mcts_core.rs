@@ -36,7 +36,7 @@ pub enum TreeChild<const S: usize> {
 pub struct SmallBridge<const S: usize> {
     pub moves: Box<[Option<Move<S>>]>,
     pub heuristic_scores: Box<[f16]>,
-    pub children: ArrayVec<(Box<Tree<S>>, Move<S>, u32), 4>,
+    pub children: ArrayVec<(Tree<S>, Move<S>, u32), 4>,
 }
 
 impl<const S: usize> SizeOf for SmallBridge<S> {
@@ -73,7 +73,7 @@ impl<const S: usize> SizeOf for TreeBridge<S> {
 
 #[derive(PartialEq, Debug, SizeOf)]
 pub struct TreeEdge<const S: usize> {
-    pub child: Option<Box<Tree<S>>>,
+    pub child: Option<Tree<S>>,
 }
 
 /// Temporary vectors that are continually re-used during search to avoid unnecessary allocations
@@ -308,12 +308,11 @@ impl<const S: usize> SmallBridge<S> {
             let (result, game_result) =
                 rollout(position, settings, settings.rollout_depth, temp_vectors);
             self.children.push((
-                Box::new(Tree {
-                    // TODO: OOM handling
+                Tree {
                     total_action_value: result as f64,
                     game_result,
                     children: None,
-                }),
+                },
                 child_move,
                 1, // Initialize with 1 visit,
             ));
@@ -465,12 +464,11 @@ impl<const S: usize> TreeEdge<S> {
 
         let (result, game_result) =
             rollout(position, settings, settings.rollout_depth, temp_vectors);
-        self.child = Some(Box::new(Tree {
-            // TODO: OOM handling
+        self.child = Some(Tree {
             total_action_value: result as f64,
             game_result,
             children: None,
-        }));
+        });
 
         Ok(result)
     }
