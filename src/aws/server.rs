@@ -92,7 +92,7 @@ pub fn handle_aws_event_generic<const S: usize>(e: Event) -> Result<Output, Erro
                 pv,
                 score,
                 nodes: tree.visits(),
-                mem_usage: tree.mem_usage() as u64,
+                mem_usage: tree.mem_usage().total_bytes() as u64,
                 time_taken: start_time.elapsed(),
             })
         }
@@ -110,7 +110,7 @@ pub fn handle_aws_event_generic<const S: usize>(e: Event) -> Result<Output, Erro
                 pv,
                 score,
                 nodes: tree.visits(),
-                mem_usage: tree.mem_usage() as u64,
+                mem_usage: tree.mem_usage().total_bytes() as u64,
                 time_taken: start_time.elapsed(),
             })
         }

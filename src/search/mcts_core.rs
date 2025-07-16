@@ -117,16 +117,6 @@ fn fast_ln(f: f32) -> f32 {
 }
 
 impl<const S: usize> TreeChild<S> {
-    pub fn must_grow(&self, settings: &MctsSetting<S>, our_visits: u32) -> bool {
-        match self {
-            TreeChild::Small(small_bridge) => {
-                let (_, is_initialized) = small_bridge.best_child(settings, our_visits);
-                !is_initialized && small_bridge.children.remaining_capacity() == 0
-            }
-            TreeChild::Large(_) => false,
-        }
-    }
-
     pub fn small_bridge(&mut self) -> Option<&mut SmallBridge<S>> {
         match self {
             TreeChild::Small(small_bridge) => Some(small_bridge),
@@ -141,36 +131,38 @@ impl<const S: usize> TreeChild<S> {
         temp_vectors: &mut TempVectors<S>,
         our_visits: u32,
     ) -> Result<f32, Error> {
-        // TODO: This is a very roudnabout way to check if we need to expand the bridge into a large one
-        // It wastes a lot of work that gets re-done in the selection
-        if self.must_grow(settings, our_visits) {
-            let num_child_nodes = self.small_bridge().unwrap().moves.len();
-            let mut tree_edge = TreeBridge {
-                children: (0..num_child_nodes)
-                    .map(|_| TreeEdge { child: None })
-                    .collect::<Box<_>>(), // TODO: OOM handling
-                moves: mem::take(&mut self.small_bridge().unwrap().moves),
-                mean_action_values: (0..num_child_nodes)
-                    .map(|_| settings.initial_mean_action_value())
-                    .collect::<Box<_>>(), // TODO: OOM handling
-                visitss: (0..num_child_nodes).map(|_| 0).collect(), // TODO: OOM handling
-                heuristic_scores: mem::take(&mut self.small_bridge().unwrap().heuristic_scores),
-            };
-
-            for (child, mv, visits) in mem::take(&mut self.small_bridge().unwrap().children) {
-                let index = tree_edge.moves.iter().position(|m| m == &Some(mv)).unwrap();
-                tree_edge.mean_action_values[index] =
-                    child.total_action_value as f32 / visits as f32;
-                tree_edge.children[index] = TreeEdge { child: Some(child) };
-                tree_edge.visitss[index] = visits;
-            }
-
-            *self = TreeChild::Large(tree_edge);
-            return self.select(position, settings, temp_vectors, our_visits);
-        }
         match self {
             TreeChild::Small(small_bridge) => {
-                small_bridge.select(position, settings, temp_vectors, our_visits)
+                // If this select returns None, it failed, and we need to grow the bridge into a full one
+                let result = small_bridge.select(position, settings, temp_vectors, our_visits)?;
+                if let Some(result) = result {
+                    return Ok(result);
+                }
+
+                let num_child_nodes = self.small_bridge().unwrap().moves.len();
+                let mut tree_edge = TreeBridge {
+                    children: (0..num_child_nodes)
+                        .map(|_| TreeEdge { child: None })
+                        .collect::<Box<_>>(), // TODO: OOM handling
+                    moves: mem::take(&mut self.small_bridge().unwrap().moves),
+                    mean_action_values: (0..num_child_nodes)
+                        .map(|_| settings.initial_mean_action_value())
+                        .collect::<Box<_>>(), // TODO: OOM handling
+                    visitss: (0..num_child_nodes).map(|_| 0).collect(), // TODO: OOM handling
+                    heuristic_scores: mem::take(&mut self.small_bridge().unwrap().heuristic_scores),
+                };
+
+                for (child, mv, visits) in mem::take(&mut self.small_bridge().unwrap().children) {
+                    let index = tree_edge.moves.iter().position(|m| m == &Some(mv)).unwrap();
+                    tree_edge.mean_action_values[index] =
+                        child.total_action_value as f32 / visits as f32;
+                    tree_edge.children[index] = TreeEdge { child: Some(child) };
+                    tree_edge.visitss[index] = visits;
+                }
+
+                *self = TreeChild::Large(tree_edge);
+
+                self.select(position, settings, temp_vectors, our_visits)
             }
             TreeChild::Large(tree_bridge) => {
                 tree_bridge.select(position, settings, temp_vectors, our_visits)
@@ -301,13 +293,15 @@ impl<const S: usize> SmallBridge<S> {
         settings: &MctsSetting<S>,
         temp_vectors: &mut TempVectors<S>,
         our_visits: u32,
-    ) -> Result<f32, Error> {
+    ) -> Result<Option<f32>, Error> {
         let (best_child_node_index, is_initialized) = self.best_child(settings, our_visits);
 
         let child_move = self.moves[best_child_node_index].unwrap();
 
         if !is_initialized {
-            assert_ne!(self.children.remaining_capacity(), 0);
+            if self.children.remaining_capacity() == 0 {
+                return Ok(None);
+            }
 
             position.do_move(child_move);
 
@@ -323,7 +317,7 @@ impl<const S: usize> SmallBridge<S> {
                 child_move,
                 1, // Initialize with 1 visit,
             ));
-            return Ok(1.0 - result);
+            return Ok(Some(1.0 - result));
         }
 
         let (child_tree, _, child_visits) = self
@@ -334,34 +328,11 @@ impl<const S: usize> SmallBridge<S> {
 
         position.do_move(child_move);
 
-        let result = 1.0 - child_tree.select(position, settings, temp_vectors, *child_visits)?;
+        let result = child_tree.select(position, settings, temp_vectors, *child_visits)?;
 
         *child_visits += 1;
 
-        Ok(result)
-    }
-
-    pub fn grow(self, settings: &MctsSetting<S>) -> TreeBridge<S> {
-        let mut tree_edge = TreeBridge {
-            children: (0..self.children.len())
-                .map(|_| TreeEdge { child: None })
-                .collect::<Box<_>>(), // TODO: OOM handling
-            moves: self.moves,
-            mean_action_values: (0..self.children.len())
-                .map(|_| settings.initial_mean_action_value())
-                .collect::<Box<_>>(), // TODO: OOM handling
-            visitss: (0..self.children.len()).map(|_| 0).collect(), // TODO: OOM handling
-            heuristic_scores: self.heuristic_scores,
-        };
-
-        for (child, mv, visits) in self.children {
-            let index = tree_edge.moves.iter().position(|m| m == &Some(mv)).unwrap();
-            tree_edge.mean_action_values[index] = child.total_action_value as f32 / visits as f32;
-            tree_edge.children[index] = TreeEdge { child: Some(child) };
-            tree_edge.visitss[index] = visits;
-        }
-
-        tree_edge
+        Ok(Some(1.0 - result))
     }
 }
 
@@ -478,19 +449,6 @@ impl<const S: usize> TreeBridge<S> {
             / *self.visitss.get_mut(best_child_node_index).unwrap() as f32;
         Ok(result)
     }
-
-    /// Apply Dirichlet noise to the heuristic scores of the child node
-    /// The noise is given `epsilon` weight.
-    /// `alpha` is used to generate the noise, lower values generate more varied noise.
-    /// Values above 1 are less noisy, and tend towards uniform outputs
-    pub fn apply_dirichlet(&mut self, epsilon: f32, alpha: f32) {
-        let mut rng = rand::thread_rng();
-        let dirichlet = rand_distr::Dirichlet::new_with_size(alpha, self.children.len()).unwrap();
-        let noise_vec = dirichlet.sample(&mut rng);
-        for (child_prior, eta) in self.heuristic_scores.iter_mut().zip(noise_vec) {
-            *child_prior = f16::from_f32(child_prior.to_f32() * (1.0 - epsilon) + epsilon * eta);
-        }
-    }
 }
 
 impl<const S: usize> TreeEdge<S> {
@@ -560,7 +518,9 @@ impl<const S: usize> Tree<S> {
         let mut small_bridge = SmallBridge::new(position, settings, temp_vectors)?;
 
         // Select child edge before writing the child node into the tree, in case we OOM inside this call
-        let result = small_bridge.select(position, settings, temp_vectors, 1)?;
+        let result = small_bridge
+            .select(position, settings, temp_vectors, 1)?
+            .unwrap();
 
         self.children = Some(Box::new(TreeChild::Small(small_bridge))); // TODO: OOM handling
 
