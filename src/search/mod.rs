@@ -197,7 +197,7 @@ impl<const S: usize> MonteCarloTree<S> {
         if !settings.excluded_moves.is_empty() {
             let bridge = tree.child.as_mut().unwrap().children.as_mut().unwrap();
             for excluded_move in settings.excluded_moves.iter() {
-                let TreeChild::Small(ref mut small_bridge) = bridge.as_mut() else {
+                let TreeChild::Small(ref mut small_bridge) = **bridge else {
                     panic!()
                 };
                 let index = small_bridge
@@ -367,11 +367,11 @@ impl<const S: usize> MonteCarloTree<S> {
     pub fn shallow_edges(&self) -> Option<Vec<ShallowEdge<'_, S>>> {
         let child = self.tree.child.as_ref()?.children.as_ref()?;
 
-        match (*child).as_ref() {
+        match **child {
             TreeChild::Small(_) => {
                 todo!()
             }
-            TreeChild::Large(child) => Some(
+            TreeChild::Large(ref child) => Some(
                 child
                     .visitss
                     .iter()

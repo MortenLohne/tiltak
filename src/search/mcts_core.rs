@@ -160,7 +160,7 @@ impl<const S: usize> TreeChild<S> {
                     tree_edge.visitss[index] = visits;
                 }
 
-                *self = TreeChild::Large(tree_edge);
+                *self = TreeChild::Large(tree_edge); // TODO: OOM handling
 
                 self.select(position, settings, temp_vectors, our_visits)
             }
