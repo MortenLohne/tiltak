@@ -243,7 +243,7 @@ impl<const S: usize> SmallBridge<S> {
         Ok(small_edge)
     }
 
-    #[inline(always)]
+    #[inline(never)]
     pub fn best_child(&self, settings: &MctsSetting<S>, our_visits: u32) -> (usize, bool) {
         let visits_sqrt = (our_visits as f32).sqrt();
         let dynamic_cpuct = settings.c_puct_init()
@@ -366,7 +366,7 @@ impl<const S: usize> SmallBridge<S> {
 }
 
 impl<const S: usize> TreeBridge<S> {
-    #[inline(always)]
+    #[inline(never)]
     pub fn best_child(
         &mut self,
         settings: &MctsSetting<S>,
