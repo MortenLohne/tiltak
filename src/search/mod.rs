@@ -317,7 +317,8 @@ impl<const S: usize> MonteCarloTree<S> {
     }
 
     pub fn pv(&self) -> impl Iterator<Item = Move<S>> + '_ {
-        Pv::new(&self.tree)
+        Pv::new(self.tree.child.as_ref().unwrap().children.as_ref().unwrap())
+            .map(|mv| mv.to_owned())
     }
 
     /// Print human-readable information of the search's progress.
@@ -341,10 +342,13 @@ impl<const S: usize> MonteCarloTree<S> {
                 edge.mean_action_value * 100.0,
                 edge.policy.to_f32() * 100.0,
                 1.0 + edge.exploration_value((self.visits() as f32).sqrt(), dynamic_cpuct), // The +1.0 doesn't matter, but positive numbers are easier to read
-                Pv::new(edge.child)
+                if let Some(child) = edge.child { Pv::new(child.children.as_ref().unwrap())
                     .map(|mv| mv.to_string())
                     .collect::<Vec<_>>()
                     .join(" ")
+                } else {
+                    "".to_string()
+                }
             )
         });
     }
@@ -368,19 +372,38 @@ impl<const S: usize> MonteCarloTree<S> {
         let child = self.tree.child.as_ref()?.children.as_ref()?;
 
         match **child {
-            TreeChild::Small(_) => {
-                todo!()
-            }
-            TreeChild::Large(ref child) => Some(
-                child
+            TreeChild::Small(ref bridge) => Some(
+                bridge
+                    .moves
+                    .iter()
+                    .zip(&bridge.heuristic_scores)
+                    .filter_map(|(mv, policy)| {
+                        let (initialized_child, _, visits) = bridge
+                            .children
+                            .iter()
+                            .find(|(_, child_move, _)| Some(*child_move) == *mv)?;
+                        let mean_action_value =
+                            initialized_child.total_action_value as f32 / *visits as f32;
+                        Some(ShallowEdge {
+                            visits: *visits,
+                            mv: (*mv)?,
+                            mean_action_value,
+                            child: Some(initialized_child.as_ref()),
+                            policy: *policy,
+                        })
+                    })
+                    .collect(),
+            ),
+            TreeChild::Large(ref bridge) => Some(
+                bridge
                     .visitss
                     .iter()
                     .zip(
-                        child.moves.iter().zip(
-                            child
+                        bridge.moves.iter().zip(
+                            bridge
                                 .mean_action_values
                                 .iter()
-                                .zip(child.children.iter().zip(&child.heuristic_scores)),
+                                .zip(bridge.children.iter().zip(&bridge.heuristic_scores)),
                         ),
                     )
                     .filter_map(|(visits, (mv, (score, (child, policy))))| {
@@ -388,7 +411,7 @@ impl<const S: usize> MonteCarloTree<S> {
                             visits: *visits,
                             mv: (*mv)?,
                             mean_action_value: *score,
-                            child,
+                            child: child.child.as_ref().map(|c| c.as_ref()),
                             policy: *policy,
                         })
                     })
@@ -402,7 +425,7 @@ pub struct ShallowEdge<'a, const S: usize> {
     visits: u32,
     mv: Move<S>,
     mean_action_value: f32,
-    child: &'a TreeEdge<S>,
+    child: Option<&'a Tree<S>>,
     policy: f16,
 }
 

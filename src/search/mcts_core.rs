@@ -529,12 +529,12 @@ impl<const S: usize> Tree<S> {
 }
 
 pub struct Pv<'a, const S: usize> {
-    edge: &'a TreeEdge<S>,
+    tree: Option<&'a TreeChild<S>>,
 }
 
 impl<'a, const S: usize> Pv<'a, S> {
-    pub fn new(edge: &'a TreeEdge<S>) -> Pv<'a, S> {
-        Pv { edge }
+    pub fn new(tree: &'a TreeChild<S>) -> Pv<'a, S> {
+        Pv { tree: Some(tree) }
     }
 }
 
@@ -542,38 +542,35 @@ impl<const S: usize> Iterator for Pv<'_, S> {
     type Item = Move<S>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.edge
-            .child
-            .as_ref()
-            .and_then(|child_index| {
-                let child = child_index;
-                child.children.as_ref()
-            })
-            .and_then(|index| {
-                let TreeChild::Large(ref bridge) = **index else {
-                    //TreeChild::Small(small_bridge) => {
-                    // if let Some((child, mv, _)) = small_bridge
-                    //     .children
-                    //     .iter()
-                    //     .max_by_key(|(_, _, visits)| *visits)
-                    // {
-                    //     self.edge = TreeEdge { child: Some(child) };
-                    // } else {
-                    //     return None;
-                    // }
-                    //}
-                    return None;
-                };
-
-                let (_, (mv, child)) = bridge
+        match self.tree {
+            None => None,
+            Some(TreeChild::Small(small_bridge)) => {
+                if let Some((child, mv, _)) = small_bridge
+                    .children
+                    .iter()
+                    .max_by_key(|(_, _, visits)| *visits)
+                {
+                    self.tree = child.children.as_ref().map(|bx| bx.as_ref());
+                    Some(*mv)
+                } else {
+                    None
+                }
+            }
+            Some(TreeChild::Large(tree_bridge)) => {
+                let (_, (mv, child)) = tree_bridge
                     .visitss
                     .iter()
-                    .zip(bridge.moves.iter().zip(&bridge.children))
+                    .zip(tree_bridge.moves.iter().zip(&tree_bridge.children))
                     .filter(|(_, (mv, _))| mv.is_some())
                     .max_by_key(|(visits, _)| **visits)?;
-                self.edge = child;
+                self.tree = child
+                    .child
+                    .as_ref()
+                    .and_then(|bx| bx.children.as_ref())
+                    .map(|bx| bx.as_ref());
                 *mv
-            })
+            }
+        }
     }
 }
 
