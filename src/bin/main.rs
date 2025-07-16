@@ -997,13 +997,14 @@ fn bench_position<const S: usize>(position: Position<S>, nodes: u32) {
     let mem_usage = tree.mem_usage();
 
     println!(
-        "{}: {:.2}%, {:.2}s, {:.1} knps, {}MiB used, {:.2}GB used",
+        "{}: {:.2}%, {:.2}s, {:.1} knps, {}MiB used, {:.2}GB used, {} allocations",
         mv,
         score * 100.0,
         elapsed.as_secs_f32(),
         knps,
-        mem_usage / (1024 * 1024),
-        mem_usage as f64 / (1000.0 * 1000.0 * 1000.0),
+        mem_usage.total_bytes() / (1024 * 1024),
+        mem_usage.total_bytes() as f64 / (1000.0 * 1000.0 * 1000.0),
+        mem_usage.distinct_allocations()
     );
 }
 
@@ -1060,6 +1061,16 @@ fn mem_usage<const S: usize>() {
     println!("Tak move: {} bytes", mem::size_of::<Move<S>>());
     println!("MCTS edge {}s: {} bytes", S, search::edge_mem_usage::<S>());
     println!("MCTS node {}s: {} bytes", S, search::node_mem_usage::<S>());
+    println!(
+        "MCTS node bridge {}s: {} bytes",
+        S,
+        search::large_bridge_mem_usage::<S>()
+    );
+    println!(
+        "MCTS small bridge {}s: {} bytes",
+        S,
+        search::small_bridge_mem_usage::<S>()
+    );
     println!("f16: {} bytes", mem::size_of::<f16>());
     println!(
         "Zobrist keys 5s: {} bytes",

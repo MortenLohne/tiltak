@@ -14,7 +14,7 @@ use self::mcts_core::Pv;
 use crate::position::Move;
 use crate::position::Position;
 pub use crate::search::mcts_core::best_move;
-use crate::search::mcts_core::{TempVectors, Tree, TreeEdge};
+use crate::search::mcts_core::{SmallBridge, TempVectors, Tree, TreeBridge, TreeChild, TreeEdge};
 
 /// This module contains the public-facing convenience API for the search.
 /// The implementation itself in in mcts_core.
@@ -197,15 +197,22 @@ impl<const S: usize> MonteCarloTree<S> {
         if !settings.excluded_moves.is_empty() {
             let bridge = tree.child.as_mut().unwrap().children.as_mut().unwrap();
             for excluded_move in settings.excluded_moves.iter() {
-                let index = bridge
+                let TreeChild::Small(ref mut small_bridge) = bridge.as_mut() else {
+                    panic!()
+                };
+                let index = small_bridge
                     .moves
                     .iter()
                     .enumerate()
                     .find(|(_, mv)| **mv == Some(*excluded_move))
                     .unwrap()
                     .0;
-                let moves = &mut bridge.moves;
-                let heuristic_scores = &mut bridge.heuristic_scores;
+                let moves = &mut small_bridge.moves;
+                let heuristic_scores = &mut small_bridge.heuristic_scores;
+
+                small_bridge
+                    .children
+                    .retain(|(_, mv, _)| *mv != *excluded_move);
 
                 moves[index] = None;
                 heuristic_scores[index] = f16::NEG_INFINITY; // TODO: Also set infinite visitss?
@@ -289,8 +296,8 @@ impl<const S: usize> MonteCarloTree<S> {
         self.visits
     }
 
-    pub fn mem_usage(&self) -> usize {
-        self.tree.size_of().total_bytes()
+    pub fn mem_usage(&self) -> size_of::TotalSize {
+        self.tree.size_of()
     }
 
     pub fn mean_action_value(&self) -> f32 {
@@ -360,29 +367,34 @@ impl<const S: usize> MonteCarloTree<S> {
     pub fn shallow_edges(&self) -> Option<Vec<ShallowEdge<'_, S>>> {
         let child = self.tree.child.as_ref()?.children.as_ref()?;
 
-        Some(
-            child
-                .visitss
-                .iter()
-                .zip(
-                    child.moves.iter().zip(
-                        child
-                            .mean_action_values
-                            .iter()
-                            .zip(child.children.iter().zip(&child.heuristic_scores)),
-                    ),
-                )
-                .filter_map(|(visits, (mv, (score, (child, policy))))| {
-                    Some(ShallowEdge {
-                        visits: *visits,
-                        mv: (*mv)?,
-                        mean_action_value: *score,
-                        child,
-                        policy: *policy,
+        match (*child).as_ref() {
+            TreeChild::Small(_) => {
+                todo!()
+            }
+            TreeChild::Large(child) => Some(
+                child
+                    .visitss
+                    .iter()
+                    .zip(
+                        child.moves.iter().zip(
+                            child
+                                .mean_action_values
+                                .iter()
+                                .zip(child.children.iter().zip(&child.heuristic_scores)),
+                        ),
+                    )
+                    .filter_map(|(visits, (mv, (score, (child, policy))))| {
+                        Some(ShallowEdge {
+                            visits: *visits,
+                            mv: (*mv)?,
+                            mean_action_value: *score,
+                            child,
+                            policy: *policy,
+                        })
                     })
-                })
-                .collect(),
-        )
+                    .collect(),
+            ),
+        }
     }
 }
 // More convenient edge representation, allowing them to be stored as array-of-structs rather than struct-of-arrays
@@ -480,4 +492,19 @@ pub fn edge_mem_usage<const S: usize>() -> usize {
 // Utility for testing
 pub fn node_mem_usage<const S: usize>() -> usize {
     mem::size_of::<Tree<S>>()
+}
+
+// Utility for testing
+pub fn tree_child_mem_usage<const S: usize>() -> usize {
+    mem::size_of::<TreeChild<S>>()
+}
+
+// Utility for testing
+pub fn large_bridge_mem_usage<const S: usize>() -> usize {
+    mem::size_of::<TreeBridge<S>>()
+}
+
+// Utility for testing
+pub fn small_bridge_mem_usage<const S: usize>() -> usize {
+    mem::size_of::<SmallBridge<S>>()
 }

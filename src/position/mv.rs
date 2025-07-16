@@ -5,6 +5,7 @@ use std::str::FromStr;
 use arrayvec::ArrayVec;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
+use size_of::SizeOf;
 
 use crate::position::utils::Direction::{East, North, South, West};
 use crate::position::utils::Role::{Cap, Flat, Wall};
@@ -22,7 +23,7 @@ pub enum ExpMove<const S: usize> {
 }
 
 /// A legal move for a position.
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug, SizeOf)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Move<const S: usize> {
     inner: u16,

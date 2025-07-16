@@ -2,6 +2,7 @@ use std::f32;
 use std::mem;
 use std::ops;
 
+use arrayvec::ArrayVec;
 use board_game_traits::{Color, GameResult, Position as PositionTrait};
 use half::f16;
 use half::slice::HalfFloatSliceExt;
@@ -22,7 +23,31 @@ use super::Error;
 pub struct Tree<const S: usize> {
     pub total_action_value: f64,
     pub game_result: Option<GameResultForUs>,
-    pub children: Option<Box<TreeBridge<S>>>,
+    pub children: Option<Box<TreeChild<S>>>,
+}
+
+#[derive(PartialEq, Debug, SizeOf)]
+pub enum TreeChild<const S: usize> {
+    Small(SmallBridge<S>),
+    Large(TreeBridge<S>),
+}
+
+#[derive(PartialEq, Debug)]
+pub struct SmallBridge<const S: usize> {
+    pub moves: Box<[Option<Move<S>>]>,
+    pub heuristic_scores: Box<[f16]>,
+    pub children: ArrayVec<(Box<Tree<S>>, Move<S>, u32), 4>,
+}
+
+impl<const S: usize> SizeOf for SmallBridge<S> {
+    fn size_of_children(&self, context: &mut size_of::Context) {
+        context.add_arraylike(self.moves.len(), mem::size_of::<Option<Move<S>>>());
+        context.add_arraylike(self.heuristic_scores.len(), mem::size_of::<f16>());
+
+        for child in self.children.iter() {
+            child.size_of_with_context(context);
+        }
+    }
 }
 
 #[derive(PartialEq, Debug)]
@@ -37,10 +62,9 @@ pub struct TreeBridge<const S: usize> {
 impl<const S: usize> SizeOf for TreeBridge<S> {
     fn size_of_children(&self, context: &mut size_of::Context) {
         context.add_arraylike(self.moves.len(), mem::size_of::<Option<Move<S>>>());
+        context.add_arraylike(self.heuristic_scores.len(), mem::size_of::<f16>());
         context.add_arraylike(self.mean_action_values.len(), mem::size_of::<f32>());
         context.add_arraylike(self.visitss.len(), mem::size_of::<u32>());
-        context.add_arraylike(self.heuristic_scores.len(), mem::size_of::<f16>());
-
         for child in self.children.iter() {
             child.size_of_with_context(context);
         }
@@ -90,6 +114,255 @@ fn fast_ln(f: f32) -> f32 {
     assert!(f > 0.0);
     let result = f.to_bits() as f32 * 1.192_092_9e-7;
     (result - 127.0) * f32::consts::LN_2
+}
+
+impl<const S: usize> TreeChild<S> {
+    pub fn must_grow(&self, settings: &MctsSetting<S>, our_visits: u32) -> bool {
+        match self {
+            TreeChild::Small(small_bridge) => {
+                let (_, is_initialized) = small_bridge.best_child(settings, our_visits);
+                !is_initialized && small_bridge.children.remaining_capacity() == 0
+            }
+            TreeChild::Large(_) => false,
+        }
+    }
+
+    pub fn small_bridge(&mut self) -> Option<&mut SmallBridge<S>> {
+        match self {
+            TreeChild::Small(small_bridge) => Some(small_bridge),
+            TreeChild::Large(_) => None,
+        }
+    }
+
+    pub fn select(
+        &mut self,
+        position: &mut Position<S>,
+        settings: &MctsSetting<S>,
+        temp_vectors: &mut TempVectors<S>,
+        our_visits: u32,
+    ) -> Result<f32, Error> {
+        // TODO: This is a very roudnabout way to check if we need to expand the bridge into a large one
+        // It wastes a lot of work that gets re-done in the selection
+        if self.must_grow(settings, our_visits) {
+            let num_child_nodes = self.small_bridge().unwrap().moves.len();
+            let mut tree_edge = TreeBridge {
+                children: (0..num_child_nodes)
+                    .map(|_| TreeEdge { child: None })
+                    .collect::<Box<_>>(), // TODO: OOM handling
+                moves: mem::take(&mut self.small_bridge().unwrap().moves),
+                mean_action_values: (0..num_child_nodes)
+                    .map(|_| settings.initial_mean_action_value())
+                    .collect::<Box<_>>(), // TODO: OOM handling
+                visitss: (0..num_child_nodes).map(|_| 0).collect(), // TODO: OOM handling
+                heuristic_scores: mem::take(&mut self.small_bridge().unwrap().heuristic_scores),
+            };
+
+            for (child, mv, visits) in mem::take(&mut self.small_bridge().unwrap().children) {
+                let index = tree_edge.moves.iter().position(|m| m == &Some(mv)).unwrap();
+                tree_edge.mean_action_values[index] =
+                    child.total_action_value as f32 / visits as f32;
+                tree_edge.children[index] = TreeEdge { child: Some(child) };
+                tree_edge.visitss[index] = visits;
+            }
+
+            *self = TreeChild::Large(tree_edge);
+            return self.select(position, settings, temp_vectors, our_visits);
+        }
+        match self {
+            TreeChild::Small(small_bridge) => {
+                small_bridge.select(position, settings, temp_vectors, our_visits)
+            }
+            TreeChild::Large(tree_bridge) => {
+                tree_bridge.select(position, settings, temp_vectors, our_visits)
+            }
+        }
+    }
+
+    /// Apply Dirichlet noise to the heuristic scores of the child node
+    /// The noise is given `epsilon` weight.
+    /// `alpha` is used to generate the noise, lower values generate more varied noise.
+    /// Values above 1 are less noisy, and tend towards uniform outputs
+    pub fn apply_dirichlet(&mut self, epsilon: f32, alpha: f32) {
+        let mut rng = rand::thread_rng();
+        let heuristic_scores = match self {
+            TreeChild::Small(small_bridge) => &mut small_bridge.heuristic_scores,
+            TreeChild::Large(tree_bridge) => &mut tree_bridge.heuristic_scores,
+        };
+        let dirichlet =
+            rand_distr::Dirichlet::new_with_size(alpha, heuristic_scores.len()).unwrap();
+        let noise_vec = dirichlet.sample(&mut rng);
+        for (child_prior, eta) in heuristic_scores.iter_mut().zip(noise_vec) {
+            *child_prior = f16::from_f32(child_prior.to_f32() * (1.0 - epsilon) + epsilon * eta);
+        }
+    }
+}
+
+impl<const S: usize> SmallBridge<S> {
+    pub fn new(
+        position: &mut Position<S>,
+        settings: &MctsSetting<S>,
+        temp_vectors: &mut TempVectors<S>,
+    ) -> Result<Self, Error> {
+        let group_data = position.group_data();
+        assert!(temp_vectors.simple_moves.is_empty());
+        assert!(temp_vectors.moves.is_empty());
+        assert!(temp_vectors.fcd_per_move.is_empty());
+        position.generate_moves_with_params(
+            match settings.policy_params.as_ref() {
+                Some(params) => params,
+                None => <Position<S>>::policy_params(position.komi()),
+            },
+            &group_data,
+            &mut temp_vectors.simple_moves,
+            &mut temp_vectors.moves,
+            &mut temp_vectors.fcd_per_move,
+            &mut temp_vectors.policy_feature_sets,
+        );
+
+        let num_children = temp_vectors.moves.len();
+        let padding = (SIMD_WIDTH - (num_children % SIMD_WIDTH)) % SIMD_WIDTH;
+
+        let small_edge = SmallBridge {
+            moves: (0..(num_children + padding))
+                .map(|i| temp_vectors.moves.get(i).map(|(mv, _)| *mv))
+                .collect(),
+            // TODO: OOM handling
+            heuristic_scores: (0..(num_children + padding))
+                .map(|i| {
+                    temp_vectors
+                        .moves
+                        .get(i)
+                        .map(|(_, score)| *score)
+                        .unwrap_or(f16::NEG_INFINITY) // Ensure that this move never actually gets selected
+                })
+                .collect(), // TODO: OOM handling
+            children: ArrayVec::new(),
+        };
+        temp_vectors.moves.clear();
+
+        Ok(small_edge)
+    }
+
+    #[inline(always)]
+    pub fn best_child(&self, settings: &MctsSetting<S>, our_visits: u32) -> (usize, bool) {
+        let visits_sqrt = (our_visits as f32).sqrt();
+        let dynamic_cpuct = settings.c_puct_init()
+            + fast_ln((1.0 + our_visits as f32 + settings.c_puct_base()) / settings.c_puct_base());
+
+        let mut best_child_node_index = 0;
+        let mut best_score = f32::NEG_INFINITY;
+        let mut best_is_initialized = false;
+
+        for (i, (mv, heuristic_score)) in self
+            .moves
+            .iter()
+            .flatten()
+            .zip(&self.heuristic_scores)
+            .enumerate()
+        {
+            if let Some((edge, _, visits)) =
+                self.children.iter().find(|(_, child_mv, _)| child_mv == mv)
+            {
+                let mean_action_value = edge.total_action_value as f32 / *visits as f32;
+                let score = exploration_value(
+                    mean_action_value,
+                    heuristic_score.to_f32(),
+                    *visits,
+                    visits_sqrt,
+                    dynamic_cpuct,
+                );
+                if score > best_score {
+                    best_score = score;
+                    best_child_node_index = i;
+                    best_is_initialized = true;
+                }
+            } else {
+                let score = exploration_value(
+                    settings.initial_mean_action_value(),
+                    heuristic_score.to_f32(),
+                    0,
+                    visits_sqrt,
+                    dynamic_cpuct,
+                );
+                if score > best_score {
+                    best_score = score;
+                    best_child_node_index = i;
+                    best_is_initialized = false;
+                }
+            }
+        }
+
+        (best_child_node_index, best_is_initialized)
+    }
+
+    pub fn select(
+        &mut self,
+        position: &mut Position<S>,
+        settings: &MctsSetting<S>,
+        temp_vectors: &mut TempVectors<S>,
+        our_visits: u32,
+    ) -> Result<f32, Error> {
+        let (best_child_node_index, is_initialized) = self.best_child(settings, our_visits);
+
+        let child_move = self.moves[best_child_node_index].unwrap();
+
+        if !is_initialized {
+            assert_ne!(self.children.remaining_capacity(), 0);
+
+            position.do_move(child_move);
+
+            let (result, game_result) =
+                rollout(position, settings, settings.rollout_depth, temp_vectors);
+            self.children.push((
+                Box::new(Tree {
+                    // TODO: OOM handling
+                    total_action_value: result as f64,
+                    game_result,
+                    children: None,
+                }),
+                child_move,
+                1, // Initialize with 1 visit,
+            ));
+            return Ok(1.0 - result);
+        }
+
+        let (child_tree, _, child_visits) = self
+            .children
+            .iter_mut()
+            .find(|(_, mv, _)| mv == &child_move)
+            .unwrap();
+
+        position.do_move(child_move);
+
+        let result = 1.0 - child_tree.select(position, settings, temp_vectors, *child_visits)?;
+
+        *child_visits += 1;
+
+        Ok(result)
+    }
+
+    pub fn grow(self, settings: &MctsSetting<S>) -> TreeBridge<S> {
+        let mut tree_edge = TreeBridge {
+            children: (0..self.children.len())
+                .map(|_| TreeEdge { child: None })
+                .collect::<Box<_>>(), // TODO: OOM handling
+            moves: self.moves,
+            mean_action_values: (0..self.children.len())
+                .map(|_| settings.initial_mean_action_value())
+                .collect::<Box<_>>(), // TODO: OOM handling
+            visitss: (0..self.children.len()).map(|_| 0).collect(), // TODO: OOM handling
+            heuristic_scores: self.heuristic_scores,
+        };
+
+        for (child, mv, visits) in self.children {
+            let index = tree_edge.moves.iter().position(|m| m == &Some(mv)).unwrap();
+            tree_edge.mean_action_values[index] = child.total_action_value as f32 / visits as f32;
+            tree_edge.children[index] = TreeEdge { child: Some(child) };
+            tree_edge.visitss[index] = visits;
+        }
+
+        tree_edge
+    }
 }
 
 impl<const S: usize> TreeBridge<S> {
@@ -284,56 +557,12 @@ impl<const S: usize> Tree<S> {
         settings: &MctsSetting<S>,
         temp_vectors: &mut TempVectors<S>,
     ) -> Result<f32, Error> {
-        assert!(self.children.is_none());
-        let group_data = position.group_data();
-        assert!(temp_vectors.simple_moves.is_empty());
-        assert!(temp_vectors.moves.is_empty());
-        assert!(temp_vectors.fcd_per_move.is_empty());
-        position.generate_moves_with_params(
-            match settings.policy_params.as_ref() {
-                Some(params) => params,
-                None => <Position<S>>::policy_params(position.komi()),
-            },
-            &group_data,
-            &mut temp_vectors.simple_moves,
-            &mut temp_vectors.moves,
-            &mut temp_vectors.fcd_per_move,
-            &mut temp_vectors.policy_feature_sets,
-        );
-
-        let num_children = temp_vectors.moves.len();
-        let padding = (SIMD_WIDTH - (num_children % SIMD_WIDTH)) % SIMD_WIDTH;
-
-        let mut tree_edge = TreeBridge {
-            children: (0..(num_children + padding))
-                .map(|_| TreeEdge { child: None })
-                .collect::<Box<_>>(), // TODO: OOM handling
-            moves: (0..(num_children + padding))
-                .map(|i| temp_vectors.moves.get(i).map(|(mv, _)| *mv))
-                .collect(),
-            // TODO: OOM handling
-            mean_action_values: (0..(num_children + padding))
-                .map(|_| settings.initial_mean_action_value())
-                .collect(),
-            // TODO: OOM handling
-            visitss: (0..(num_children + padding)).map(|_| 0).collect(), // TODO: OOM handling
-
-            heuristic_scores: (0..(num_children + padding))
-                .map(|i| {
-                    temp_vectors
-                        .moves
-                        .get(i)
-                        .map(|(_, score)| *score)
-                        .unwrap_or(f16::NEG_INFINITY) // Ensure that this move never actually gets selected
-                })
-                .collect(), // TODO: OOM handling
-        };
-        temp_vectors.moves.clear();
+        let mut small_bridge = SmallBridge::new(position, settings, temp_vectors)?;
 
         // Select child edge before writing the child node into the tree, in case we OOM inside this call
-        let result = tree_edge.select(position, settings, temp_vectors, 1)?;
+        let result = small_bridge.select(position, settings, temp_vectors, 1)?;
 
-        self.children = Some(Box::new(tree_edge)); // TODO: OOM handling
+        self.children = Some(Box::new(TreeChild::Small(small_bridge))); // TODO: OOM handling
 
         Ok(result)
     }
@@ -361,7 +590,21 @@ impl<const S: usize> Iterator for Pv<'_, S> {
                 child.children.as_ref()
             })
             .and_then(|index| {
-                let bridge = index;
+                let TreeChild::Large(ref bridge) = **index else {
+                    //TreeChild::Small(small_bridge) => {
+                    // if let Some((child, mv, _)) = small_bridge
+                    //     .children
+                    //     .iter()
+                    //     .max_by_key(|(_, _, visits)| *visits)
+                    // {
+                    //     self.edge = TreeEdge { child: Some(child) };
+                    // } else {
+                    //     return None;
+                    // }
+                    //}
+                    return None;
+                };
+
                 let (_, (mv, child)) = bridge
                     .visitss
                     .iter()
