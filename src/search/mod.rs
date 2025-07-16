@@ -227,51 +227,33 @@ impl<const S: usize> MonteCarloTree<S> {
 
         // Applying dirichlet noise or excluding moves can only be done once the child edges of the root are initialized,
         // which is done on the 2nd select
-        tree.select(
-            &mut position.clone(),
-            &settings,
-            &mut temp_vectors,
-            &arena,
-            0,
-        )
-        .unwrap();
-        tree.select(
-            &mut position.clone(),
-            &settings,
-            &mut temp_vectors,
-            &arena,
-            1,
-        )
-        .unwrap();
+        tree.select(&mut position.clone(), &settings, &mut temp_vectors, 0)
+            .unwrap();
+        tree.select(&mut position.clone(), &settings, &mut temp_vectors, 1)
+            .unwrap();
 
         if let Some(alpha) = settings.dirichlet {
-            arena
-                .get_mut(
-                    (arena.get_mut(tree.child.as_mut().unwrap()))
-                        .children
-                        .as_mut()
-                        .unwrap(),
-                )
-                .apply_dirichlet(&arena, 0.25, alpha);
+            tree.child
+                .as_mut()
+                .unwrap()
+                .children
+                .as_mut()
+                .unwrap()
+                .apply_dirichlet(0.25, alpha);
         }
 
         if !settings.excluded_moves.is_empty() {
-            let bridge = arena.get_mut(
-                (arena.get_mut(tree.child.as_mut().unwrap()))
-                    .children
-                    .as_mut()
-                    .unwrap(),
-            );
+            let bridge = tree.child.as_mut().unwrap().children.as_mut().unwrap();
             for excluded_move in settings.excluded_moves.iter() {
-                let index = arena
-                    .get_slice(&bridge.moves)
+                let index = bridge
+                    .moves
                     .iter()
                     .enumerate()
                     .find(|(_, mv)| **mv == Some(*excluded_move))
                     .unwrap()
                     .0;
-                let moves = arena.get_slice_mut(&mut bridge.moves);
-                let heuristic_scores = arena.get_slice_mut(&mut bridge.heuristic_scores);
+                let moves = &mut bridge.moves;
+                let heuristic_scores = &mut bridge.heuristic_scores;
 
                 moves[index] = None;
                 heuristic_scores[index] = f16::NEG_INFINITY; // TODO: Also set infinite visitss?
@@ -364,7 +346,7 @@ impl<const S: usize> MonteCarloTree<S> {
         self.tree
             .child
             .as_ref()
-            .map(|index| self.arena.get(index).total_action_value as f32 / self.visits as f32)
+            .map(|index| index.total_action_value as f32 / self.visits as f32)
             .unwrap_or(self.settings.initial_mean_action_value())
     }
 
@@ -377,7 +359,7 @@ impl<const S: usize> MonteCarloTree<S> {
     }
 
     pub fn pv(&self) -> impl Iterator<Item = Move<S>> + '_ {
-        Pv::new(&self.tree, &self.arena)
+        Pv::new(&self.tree)
     }
 
     /// Print human-readable information of the search's progress.
@@ -410,7 +392,7 @@ impl<const S: usize> MonteCarloTree<S> {
                 edge.mean_action_value * 100.0,
                 edge.policy.to_f32() * 100.0,
                 1.0 + edge.exploration_value((self.visits() as f32).sqrt(), dynamic_cpuct), // The +1.0 doesn't matter, but positive numbers are easier to read
-                Pv::new(edge.child, &self.arena)
+                Pv::new(edge.child)
                     .map(|mv| mv.to_string())
                     .collect::<Vec<_>>()
                     .join(" ")
@@ -427,7 +409,6 @@ impl<const S: usize> MonteCarloTree<S> {
             &mut self.temp_position,
             &self.settings,
             &mut self.temp_vectors,
-            &self.arena,
             self.visits,
         )?;
         self.visits += 1;
@@ -435,25 +416,18 @@ impl<const S: usize> MonteCarloTree<S> {
     }
 
     pub fn shallow_edges(&self) -> Option<Vec<ShallowEdge<'_, S>>> {
-        let child = self.arena.get(
-            self.arena
-                .get(self.tree.child.as_ref()?)
-                .children
-                .as_ref()?,
-        );
+        let child = self.tree.child.as_ref()?.children.as_ref()?;
 
         Some(
-            self.arena
-                .get_slice(&child.visitss)
+            child
+                .visitss
                 .iter()
                 .zip(
-                    self.arena.get_slice(&child.moves).iter().zip(
-                        self.arena.get_slice(&child.mean_action_values).iter().zip(
-                            self.arena
-                                .get_slice(&child.children)
-                                .iter()
-                                .zip(self.arena.get_slice(&child.heuristic_scores)),
-                        ),
+                    child.moves.iter().zip(
+                        child
+                            .mean_action_values
+                            .iter()
+                            .zip(child.children.iter().zip(&child.heuristic_scores)),
                     ),
                 )
                 .filter_map(|(visits, (mv, (score, (child, policy))))| {

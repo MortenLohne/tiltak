@@ -13,28 +13,28 @@ use crate::position::Move;
 use crate::position::Position;
 use crate::search::{cp_to_win_percentage, MctsSetting};
 
-use super::{arena, Arena, Error};
+use super::Error;
 
 /// A Monte Carlo Search Tree, containing every node that has been seen in search.
 #[derive(PartialEq, Debug)]
 pub struct Tree<const S: usize> {
     pub total_action_value: f64,
     pub game_result: Option<GameResultForUs>,
-    pub children: Option<arena::Index<TreeBridge<S>>>,
+    pub children: Option<Box<TreeBridge<S>>>,
 }
 
 #[derive(PartialEq, Debug)]
 pub struct TreeBridge<const S: usize> {
-    pub children: arena::SliceIndex<TreeEdge<S>>,
-    pub moves: arena::SliceIndex<Option<Move<S>>>,
-    pub mean_action_values: arena::SliceIndex<f32>,
-    pub visitss: arena::SliceIndex<u32>,
-    pub heuristic_scores: arena::SliceIndex<f16>,
+    pub children: Box<[TreeEdge<S>]>,
+    pub moves: Box<[Option<Move<S>>]>,
+    pub mean_action_values: Box<[f32]>,
+    pub visitss: Box<[u32]>,
+    pub heuristic_scores: Box<[f16]>,
 }
 
 #[derive(PartialEq, Debug)]
 pub struct TreeEdge<const S: usize> {
-    pub child: Option<arena::Index<Tree<S>>>,
+    pub child: Option<Box<Tree<S>>>,
 }
 
 /// Temporary vectors that are continually re-used during search to avoid unnecessary allocations
@@ -83,30 +83,26 @@ impl<const S: usize> TreeBridge<S> {
         &mut self,
         settings: &MctsSetting<S>,
         temp_vectors: &mut TempVectors<S>,
-        arena: &Arena,
         our_visits: u32,
     ) -> usize {
         let visits_sqrt = (our_visits as f32).sqrt();
         let dynamic_cpuct = settings.c_puct_init()
             + fast_ln((1.0 + our_visits as f32 + settings.c_puct_base()) / settings.c_puct_base());
 
-        let heuristic_scores = arena.get_slice(&self.heuristic_scores);
-        let mean_action_values = arena.get_slice(&self.mean_action_values);
-        let visitss = arena.get_slice(&self.visitss);
-
         let unpacked_heuristic_scores =
-            &mut temp_vectors.unpacked_heuristic_scores[0..heuristic_scores.len()];
-        heuristic_scores.convert_to_f32_slice(unpacked_heuristic_scores);
+            &mut temp_vectors.unpacked_heuristic_scores[0..self.heuristic_scores.len()];
+        self.heuristic_scores
+            .convert_to_f32_slice(unpacked_heuristic_scores);
         let heuristic_scores = unpacked_heuristic_scores;
 
         assert_eq!(heuristic_scores.len() % SIMD_WIDTH, 0);
-        assert_eq!(heuristic_scores.len(), mean_action_values.len());
-        assert_eq!(heuristic_scores.len(), visitss.len());
+        assert_eq!(heuristic_scores.len(), self.mean_action_values.len());
+        assert_eq!(heuristic_scores.len(), self.visitss.len());
 
         for i in 0..heuristic_scores.len() {
             let heuristic_score = &mut heuristic_scores[i];
-            let mean_action_value = &mean_action_values[i];
-            let child_visits = &visitss[i];
+            let mean_action_value = &self.mean_action_values[i];
+            let child_visits = &self.visitss[i];
 
             *heuristic_score = exploration_value(
                 *mean_action_value,
@@ -157,28 +153,21 @@ impl<const S: usize> TreeBridge<S> {
         position: &mut Position<S>,
         settings: &MctsSetting<S>,
         temp_vectors: &mut TempVectors<S>,
-        arena: &Arena,
         our_visits: u32,
     ) -> Result<f32, Error> {
         assert_ne!(
-            arena.get_slice(&self.children).len(),
+            self.children.len(),
             0,
             "No legal moves in position\n{:?}",
             position
         );
 
-        let best_child_node_index = self.best_child(settings, temp_vectors, arena, our_visits);
+        let best_child_node_index = self.best_child(settings, temp_vectors, our_visits);
 
-        let child_edge = arena
-            .get_slice_mut(&mut self.children)
-            .get_mut(best_child_node_index)
-            .unwrap();
-        let child_visits = *arena
-            .get_slice_mut(&mut self.visitss)
-            .get_mut(best_child_node_index)
-            .unwrap();
-        let child_move = arena
-            .get_slice_mut(&mut self.moves)
+        let child_edge = self.children.get_mut(best_child_node_index).unwrap();
+        let child_visits = self.visitss.get_mut(best_child_node_index).unwrap();
+        let child_move = self
+            .moves
             .get_mut(best_child_node_index)
             .unwrap()
             .unwrap_or_else(|| {
@@ -190,24 +179,15 @@ impl<const S: usize> TreeBridge<S> {
 
         position.do_move(child_move);
 
-        let result =
-            1.0 - child_edge.select(position, settings, temp_vectors, arena, child_visits)?;
+        let result = 1.0 - child_edge.select(position, settings, temp_vectors, *child_visits)?;
 
-        *arena
-            .get_slice_mut(&mut self.visitss)
-            .get_mut(best_child_node_index)
-            .unwrap() += 1;
+        *self.visitss.get_mut(best_child_node_index).unwrap() += 1;
 
-        *arena
-            .get_slice_mut(&mut self.mean_action_values)
+        *self
+            .mean_action_values
             .get_mut(best_child_node_index)
-            .unwrap() = arena
-            .get(child_edge.child.as_ref().unwrap())
-            .total_action_value as f32
-            / *arena
-                .get_slice_mut(&mut self.visitss)
-                .get_mut(best_child_node_index)
-                .unwrap() as f32;
+            .unwrap() = child_edge.child.as_ref().unwrap().total_action_value as f32
+            / *self.visitss.get_mut(best_child_node_index).unwrap() as f32;
         Ok(result)
     }
 
@@ -215,17 +195,11 @@ impl<const S: usize> TreeBridge<S> {
     /// The noise is given `epsilon` weight.
     /// `alpha` is used to generate the noise, lower values generate more varied noise.
     /// Values above 1 are less noisy, and tend towards uniform outputs
-    pub fn apply_dirichlet(&mut self, arena: &Arena, epsilon: f32, alpha: f32) {
+    pub fn apply_dirichlet(&mut self, epsilon: f32, alpha: f32) {
         let mut rng = rand::thread_rng();
-        let dirichlet =
-            rand_distr::Dirichlet::new_with_size(alpha, arena.get_slice(&self.children).len())
-                .unwrap();
+        let dirichlet = rand_distr::Dirichlet::new_with_size(alpha, self.children.len()).unwrap();
         let noise_vec = dirichlet.sample(&mut rng);
-        for (child_prior, eta) in arena
-            .get_slice_mut(&mut self.heuristic_scores)
-            .iter_mut()
-            .zip(noise_vec)
-        {
+        for (child_prior, eta) in self.heuristic_scores.iter_mut().zip(noise_vec) {
             *child_prior = f16::from_f32(child_prior.to_f32() * (1.0 - epsilon) + epsilon * eta);
         }
     }
@@ -237,30 +211,20 @@ impl<const S: usize> TreeEdge<S> {
         position: &mut Position<S>,
         settings: &MctsSetting<S>,
         temp_vectors: &mut TempVectors<S>,
-        arena: &Arena,
         parent_visits: u32,
     ) -> Result<f32, Error> {
         if let Some(child) = self.child.as_mut() {
-            return arena.get_mut(child).select(
-                position,
-                settings,
-                temp_vectors,
-                arena,
-                parent_visits,
-            );
+            return child.select(position, settings, temp_vectors, parent_visits);
         }
 
         let (result, game_result) =
             rollout(position, settings, settings.rollout_depth, temp_vectors);
-        self.child = Some(
-            arena
-                .add(Tree {
-                    total_action_value: result as f64,
-                    game_result,
-                    children: None,
-                })
-                .ok_or(Error::OOM)?,
-        );
+        self.child = Some(Box::new(Tree {
+            // TODO: OOM handling
+            total_action_value: result as f64,
+            game_result,
+            children: None,
+        }));
 
         Ok(result)
     }
@@ -277,7 +241,6 @@ impl<const S: usize> Tree<S> {
         position: &mut Position<S>,
         settings: &MctsSetting<S>,
         temp_vectors: &mut TempVectors<S>,
-        arena: &Arena,
         parent_visits: u32,
     ) -> Result<f32, Error> {
         // TODO: Assume node has already had 1 visit before?
@@ -287,18 +250,12 @@ impl<const S: usize> Tree<S> {
             return Ok(result);
         }
         let Some(children) = self.children.as_mut() else {
-            let result = self.expand_child(position, settings, temp_vectors, arena)?;
+            let result = self.expand_child(position, settings, temp_vectors)?;
             self.total_action_value += result as f64;
             return Ok(result);
         };
 
-        let result = arena.get_mut(children).select(
-            position,
-            settings,
-            temp_vectors,
-            arena,
-            parent_visits,
-        )?;
+        let result = children.select(position, settings, temp_vectors, parent_visits)?;
         self.total_action_value += result as f64;
         Ok(result)
     }
@@ -311,7 +268,6 @@ impl<const S: usize> Tree<S> {
         position: &mut Position<S>,
         settings: &MctsSetting<S>,
         temp_vectors: &mut TempVectors<S>,
-        arena: &Arena,
     ) -> Result<f32, Error> {
         assert!(self.children.is_none());
         let group_data = position.group_data();
@@ -334,52 +290,47 @@ impl<const S: usize> Tree<S> {
         let padding = (SIMD_WIDTH - (num_children % SIMD_WIDTH)) % SIMD_WIDTH;
 
         let mut tree_edge = TreeBridge {
-            children: arena
-                .add_slice((0..(num_children + padding)).map(|_| TreeEdge { child: None }))
-                .ok_or(Error::OOM)?,
-            moves: arena
-                .add_slice(
-                    (0..(num_children + padding))
-                        .map(|i| temp_vectors.moves.get(i).map(|(mv, _)| *mv)),
-                )
-                .ok_or(Error::OOM)?,
-            mean_action_values: arena
-                .add_slice(
-                    (0..(num_children + padding)).map(|_| settings.initial_mean_action_value()),
-                )
-                .ok_or(Error::OOM)?,
-            visitss: arena
-                .add_slice((0..(num_children + padding)).map(|_| 0))
-                .ok_or(Error::OOM)?,
-            heuristic_scores: arena
-                .add_slice((0..(num_children + padding)).map(|i| {
+            children: (0..(num_children + padding))
+                .map(|_| TreeEdge { child: None })
+                .collect::<Box<_>>(), // TODO: OOM handling
+            moves: (0..(num_children + padding))
+                .map(|i| temp_vectors.moves.get(i).map(|(mv, _)| *mv))
+                .collect(),
+            // TODO: OOM handling
+            mean_action_values: (0..(num_children + padding))
+                .map(|_| settings.initial_mean_action_value())
+                .collect(),
+            // TODO: OOM handling
+            visitss: (0..(num_children + padding)).map(|_| 0).collect(), // TODO: OOM handling
+
+            heuristic_scores: (0..(num_children + padding))
+                .map(|i| {
                     temp_vectors
                         .moves
                         .get(i)
                         .map(|(_, score)| *score)
                         .unwrap_or(f16::NEG_INFINITY) // Ensure that this move never actually gets selected
-                }))
-                .ok_or(Error::OOM)?,
+                })
+                .collect(), // TODO: OOM handling
         };
         temp_vectors.moves.clear();
 
         // Select child edge before writing the child node into the tree, in case we OOM inside this call
-        let result = tree_edge.select(position, settings, temp_vectors, arena, 1)?;
+        let result = tree_edge.select(position, settings, temp_vectors, 1)?;
 
-        self.children = Some(arena.add(tree_edge).ok_or(Error::OOM)?);
+        self.children = Some(Box::new(tree_edge)); // TODO: OOM handling
 
         Ok(result)
     }
 }
 
 pub struct Pv<'a, const S: usize> {
-    arena: &'a Arena,
     edge: &'a TreeEdge<S>,
 }
 
 impl<'a, const S: usize> Pv<'a, S> {
-    pub fn new(edge: &'a TreeEdge<S>, arena: &'a Arena) -> Pv<'a, S> {
-        Pv { edge, arena }
+    pub fn new(edge: &'a TreeEdge<S>) -> Pv<'a, S> {
+        Pv { edge }
     }
 }
 
@@ -391,21 +342,15 @@ impl<const S: usize> Iterator for Pv<'_, S> {
             .child
             .as_ref()
             .and_then(|child_index| {
-                let child = self.arena.get(child_index);
+                let child = child_index;
                 child.children.as_ref()
             })
             .and_then(|index| {
-                let bridge = self.arena.get(index);
-                let (_, (mv, child)) = self
-                    .arena
-                    .get_slice(&bridge.visitss)
+                let bridge = index;
+                let (_, (mv, child)) = bridge
+                    .visitss
                     .iter()
-                    .zip(
-                        self.arena
-                            .get_slice(&bridge.moves)
-                            .iter()
-                            .zip(self.arena.get_slice(&bridge.children)),
-                    )
+                    .zip(bridge.moves.iter().zip(&bridge.children))
                     .filter(|(_, (mv, _))| mv.is_some())
                     .max_by_key(|(visits, _)| **visits)?;
                 self.edge = child;
