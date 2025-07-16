@@ -5,6 +5,7 @@
 use half::f16;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
+use size_of::SizeOf;
 use std::f32::consts::PI;
 use std::fmt::Display;
 use std::{mem, time};
@@ -339,7 +340,7 @@ impl<const S: usize> MonteCarloTree<S> {
     }
 
     pub fn mem_usage(&self) -> usize {
-        self.arena.slots_used() as usize * ARENA_ELEMENT_SIZE
+        self.tree.size_of().total_bytes()
     }
 
     pub fn mean_action_value(&self) -> f32 {

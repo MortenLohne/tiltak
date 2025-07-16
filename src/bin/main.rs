@@ -1,12 +1,17 @@
 #![allow(clippy::uninlined_format_args)]
 
+use mimalloc::MiMalloc;
+
+#[global_allocator]
+static GLOBAL: MiMalloc = MiMalloc;
+
 #[cfg(feature = "constant-tuning")]
 use std::collections::HashSet;
 use std::io::{Read, Write};
 use std::str::FromStr;
 #[cfg(feature = "constant-tuning")]
 use std::sync::atomic::{self, AtomicU64};
-use std::{fs, io, time};
+use std::{fs, io, thread, time};
 
 use board_game_traits::Position as PositionTrait;
 use board_game_traits::{Color, GameResult};
@@ -976,11 +981,10 @@ fn bench_position<const S: usize>(position: Position<S>, nodes: u32) {
             let knps = nodes as f32 / (last_iteration_start_time.elapsed().as_secs_f32() * 10000.0);
             last_iteration_start_time = time::Instant::now();
             println!(
-                "n={}, {:.2}s, {:.1} knps, {:.1}MiB used",
+                "n={}, {:.2}s, {:.1} knps",
                 n,
                 start_time.elapsed().as_secs_f32(),
                 knps,
-                tree.mem_usage() as f64 / (1024.0 * 1024.0)
             );
         }
     }
@@ -988,13 +992,18 @@ fn bench_position<const S: usize>(position: Position<S>, nodes: u32) {
     let (mv, score) = tree.best_move().unwrap();
     let knps = nodes as f32 / (start_time.elapsed().as_secs_f32() * 1000.0);
 
+    // Stop timer before computing memory usage, since that takes some time
+    let elapsed = start_time.elapsed();
+    let mem_usage = tree.mem_usage();
+
     println!(
-        "{}: {:.2}%, {:.2}s, {:.1} knps, {}MiB used",
+        "{}: {:.2}%, {:.2}s, {:.1} knps, {}MiB used, {:.2}GB used",
         mv,
         score * 100.0,
-        start_time.elapsed().as_secs_f32(),
+        elapsed.as_secs_f32(),
         knps,
-        tree.mem_usage() / (1024 * 1024)
+        mem_usage / (1024 * 1024),
+        mem_usage as f64 / (1000.0 * 1000.0 * 1000.0),
     );
 }
 
