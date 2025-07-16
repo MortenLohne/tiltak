@@ -11,7 +11,7 @@ use std::io::{Read, Write};
 use std::str::FromStr;
 #[cfg(feature = "constant-tuning")]
 use std::sync::atomic::{self, AtomicU64};
-use std::{fs, io, thread, time};
+use std::{fs, io, time};
 
 use board_game_traits::Position as PositionTrait;
 use board_game_traits::{Color, GameResult};

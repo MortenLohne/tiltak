@@ -9,21 +9,16 @@ use size_of::SizeOf;
 use std::f32::consts::PI;
 use std::fmt::Display;
 use std::{mem, time};
-use std::{process, sync};
 
+use self::mcts_core::Pv;
 use crate::position::Move;
 use crate::position::Position;
 pub use crate::search::mcts_core::best_move;
 use crate::search::mcts_core::{TempVectors, Tree, TreeEdge};
 
-use self::arena::ArenaError;
-use self::mcts_core::Pv;
-
-mod arena;
 /// This module contains the public-facing convenience API for the search.
 /// The implementation itself in in mcts_core.
 mod mcts_core;
-pub use arena::Arena;
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug, PartialEq, Clone)]
@@ -175,54 +170,10 @@ pub struct MonteCarloTree<const S: usize> {
     temp_position: Position<S>,
     settings: MctsSetting<S>,
     temp_vectors: TempVectors<S>,
-    arena: Arena,
 }
 
 impl<const S: usize> MonteCarloTree<S> {
     pub fn new(position: Position<S>, settings: MctsSetting<S>) -> MonteCarloTree<S> {
-        let arena = match Arena::new(settings.arena_size) {
-            Ok(arena) => arena,
-            Err(ArenaError::AllocationFailed(num_bytes)) if !sysinfo::IS_SUPPORTED_SYSTEM => {
-                panic!(
-                    "Fatal error: failed to allocate {}MB memory for search tree. Could not detect total system memory.",
-                    num_bytes
-                )
-            }
-            Err(ArenaError::AllocationFailed(num_bytes)) => {
-                // The allocation may have failed because the system doesn't have enough memory
-                // Check the system's max memory, and try again
-
-                let mut sys = sysinfo::System::new_all();
-                sys.refresh_all();
-
-                if sys.total_memory() < num_bytes as u64 {
-                    // Note: The actual memory allocation is two slots larger, to ensure correct alignment
-                    let Some(max_num_slots) =
-                        ((sys.total_memory() / 16).min(u32::MAX as u64) as u32).checked_sub(2)
-                    else {
-                        panic!(
-                            "Failed to allocated arena, system reports {} bytes total memory",
-                            sys.total_memory()
-                        );
-                    };
-                    eprintln!("Warning: failed to allocate {}MB memory for the search tree. Trying again with {}MB.", num_bytes / (1024 * 1024), sys.total_memory() / (1024 * 1024));
-
-                    match <Arena<16>>::new(max_num_slots) {
-                        Ok(arena) => arena,
-                        Err(ArenaError::AllocationFailed(num_bytes)) => {
-                            eprintln!("Fatal error: failed to allocate {}MB memory for search tree. Try reducing the search time.", num_bytes / (1024 * 1024));
-                            process::exit(1)
-                        }
-                        Err(err) => panic!("{}", err),
-                    }
-                } else {
-                    eprintln!("Fatal error: failed to allocate {}MB memory for search tree. Try reducing the search time.", num_bytes / (1024 * 1024));
-                    process::exit(1)
-                }
-            }
-            Err(err) => panic!("{}", err),
-        };
-
         let mut tree = TreeEdge { child: None };
         let mut temp_vectors = TempVectors::default();
 
@@ -268,7 +219,6 @@ impl<const S: usize> MonteCarloTree<S> {
             temp_position: position,
             settings,
             temp_vectors,
-            arena,
         }
     }
 
@@ -369,15 +319,6 @@ impl<const S: usize> MonteCarloTree<S> {
 
         best_children.sort_by_key(|edge| edge.visits);
         best_children.reverse();
-
-        use sync::atomic::Ordering::*;
-        println!(
-            "Arena stats: {}MiB allocated, {}MiB structs, {}MiB slices, {}MiB wasted",
-            self.arena.stats.bytes_allocated.load(SeqCst) / (1024 * 1024),
-            self.arena.stats.bytes_structs.load(SeqCst) / (1024 * 1024),
-            self.arena.stats.bytes_slices.load(SeqCst) / (1024 * 1024),
-            self.arena.stats.padding_bytes.load(SeqCst) / (1024 * 1024),
-        );
 
         let dynamic_cpuct = self.settings.c_puct_init()
             + f32::ln(
