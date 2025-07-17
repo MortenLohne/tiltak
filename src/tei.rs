@@ -19,8 +19,8 @@ pub async fn tei_game<'a, const S: usize, Out, YieldF, Fut>(
     komi: Komi,
 ) where
     Out: Fn(&str),
-    Fut: std::future::Future + Send,
-    YieldF: Fn() -> Fut + Send,
+    Fut: std::future::Future,
+    YieldF: Fn() -> Fut,
 {
     let mut position: Option<SearchPosition<S>> = None;
 
@@ -104,8 +104,8 @@ pub async fn tei<Out, YieldF, Fut>(
     yield_fn: &YieldF,
 ) where
     Out: Fn(&str),
-    Fut: std::future::Future + Send,
-    YieldF: Fn() -> Fut + Send,
+    Fut: std::future::Future,
+    YieldF: Fn() -> Fut,
 {
     loop {
         let Ok(input) = input.recv().await else {
@@ -310,8 +310,8 @@ async fn parse_go_string<'a, const S: usize, Out, YieldF, Fut>(
     tree: &mut MonteCarloTree<S>,
 ) where
     Out: Fn(&str),
-    Fut: std::future::Future + Send,
-    YieldF: Fn() -> Fut + Send,
+    Fut: std::future::Future,
+    YieldF: Fn() -> Fut,
 {
     let mut words = line.split_whitespace();
     words.next(); // go
