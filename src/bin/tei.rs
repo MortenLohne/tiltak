@@ -186,9 +186,17 @@ pub fn main() {
                     panic!("Invalid setoption string \"{}\"", line);
                 }
             }
+            "quit" => {
+                process::exit(0);
+            }
             s => {
                 let Some(sender) = sender.as_ref() else {
-                    panic!("Unknown command \"{}\"", s)
+                    if s == "isready" {
+                        println!("readyok");
+                        continue;
+                    } else {
+                        panic!("Unknown command \"{}\"", s);
+                    }
                 };
                 sender.send(line.trim().to_string()).unwrap()
             }
