@@ -2,6 +2,7 @@
 //!
 //! This implementation does not use full Monte Carlo rollouts, relying on a heuristic evaluation when expanding new nodes instead.
 
+use board_game_traits::Position as _;
 use half::f16;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
@@ -173,6 +174,35 @@ pub struct MonteCarloTree<const S: usize> {
 }
 
 impl<const S: usize> MonteCarloTree<S> {
+    pub fn reroot(self, moves: &[Move<S>]) -> Option<Self> {
+        let mut new_edge = self.tree;
+        let mut new_visits = self.visits;
+        let mut position = self.position.clone();
+        for mv in moves {
+            let child = new_edge.child?.children?;
+            let TreeChild::Large(mut bridge) = *child else {
+                return None;
+            };
+
+            let index = bridge.moves.iter().position(|m| *m == Some(*mv))?;
+
+            new_edge = TreeEdge {
+                child: bridge.children[index].child.take(),
+            };
+            new_visits = bridge.visitss[index];
+            position.do_move(*mv);
+        }
+
+        Some(Self {
+            tree: new_edge,
+            visits: new_visits,
+            position: position.clone(),
+            temp_position: position,
+            settings: self.settings,
+            temp_vectors: self.temp_vectors,
+        })
+    }
+
     pub fn new(position: Position<S>, settings: MctsSetting<S>) -> MonteCarloTree<S> {
         let mut tree = TreeEdge { child: None };
         let mut temp_vectors = TempVectors::default();
@@ -227,6 +257,10 @@ impl<const S: usize> MonteCarloTree<S> {
             settings,
             temp_vectors,
         }
+    }
+
+    pub fn position(&self) -> Position<S> {
+        self.position.clone()
     }
 
     pub fn search_for_time<F>(&mut self, max_time: time::Duration, callback: F)

@@ -8,6 +8,62 @@ use pgn_traits::PgnPosition;
 use std::time::Duration;
 
 #[test]
+fn tree_reuse_test() {
+    let mut position = <Position<6>>::start_position();
+    let settings = MctsSetting::default().arena_size_for_nodes(10000);
+    let mut tree = MonteCarloTree::new(position.clone(), settings);
+
+    for _ in 0..10_000 {
+        tree.select().unwrap();
+    }
+    let (best_move, _score) = tree.best_move().unwrap();
+
+    tree = tree.reroot(&[best_move]).unwrap();
+
+    position.do_move(best_move);
+    assert_eq!(position, tree.position());
+
+    assert!(tree.visits() > 0 && tree.visits() < 10_000);
+    for _ in 0..10_000 {
+        tree.select().unwrap();
+    }
+    assert!(tree.best_move().unwrap().0 != best_move);
+    assert!(tree.reroot(&[best_move]).is_none());
+}
+
+#[test]
+fn tree_reuse_two_ply_test() {
+    let mut position = <Position<6>>::from_fen("x5,1/x6/x6/x6/x6/x5,2 1 2").unwrap();
+    let settings = MctsSetting::default().arena_size_for_nodes(10000);
+    let mut tree = MonteCarloTree::new(position.clone(), settings);
+
+    for _ in 0..100_000 {
+        tree.select().unwrap();
+    }
+    let (_, _score) = tree.best_move().unwrap();
+
+    let a5 = Move::from_string("a5").unwrap();
+    let b5 = Move::from_string("b5").unwrap();
+
+    tree = tree.reroot(&[a5, b5]).unwrap();
+
+    position.do_move(a5);
+    position.do_move(b5);
+    assert_eq!(position, tree.position());
+
+    assert!(tree.visits() > 0 && tree.visits() < 100_000);
+    for _ in 0..10_000 {
+        tree.select().unwrap();
+    }
+
+    let (best_2nd_move, _) = tree.best_move().unwrap();
+    assert!(best_2nd_move != a5);
+    assert!(best_2nd_move != b5);
+
+    assert!(tree.reroot(&[best_2nd_move]).is_some());
+}
+
+#[test]
 fn exclude_moves_test() {
     let excluded_moves: Vec<Move<6>> = ["a1", "a6", "f1", "f6"]
         .iter()
