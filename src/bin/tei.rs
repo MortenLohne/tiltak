@@ -1,11 +1,28 @@
 use std::{
     env,
     io::{self, BufRead},
-    thread,
-    time::Duration,
+    thread, time,
 };
 
 use tiltak::tei;
+
+struct SmolPlatform;
+
+impl tei::Platform for SmolPlatform {
+    type Instant = time::Instant;
+
+    fn yield_fn() -> impl std::future::Future {
+        smol::future::yield_now()
+    }
+
+    fn current_time() -> Self::Instant {
+        time::Instant::now()
+    }
+
+    fn elapsed_time(start: &Self::Instant) -> time::Duration {
+        start.elapsed()
+    }
+}
 
 pub fn main() {
     let is_slatebot = env::args().any(|arg| arg == "--slatebot");
@@ -15,12 +32,11 @@ pub fn main() {
 
     let executor = smol::LocalExecutor::new();
 
-    let _task = executor.spawn(tei::tei(
+    let _task = executor.spawn(tei::tei::<_, SmolPlatform>(
         is_slatebot,
         is_cobblebot,
         receiver,
         &output_callback,
-        &smol::future::yield_now,
     ));
 
     thread::spawn(move || {
@@ -33,7 +49,7 @@ pub fn main() {
 
     loop {
         while executor.try_tick() {}
-        thread::sleep(Duration::from_millis(1));
+        thread::sleep(time::Duration::from_millis(1));
     }
 }
 

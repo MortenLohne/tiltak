@@ -6,22 +6,24 @@ use board_game_traits::{Color, Position as PositionTrait};
 use pgn_traits::PgnPosition;
 use std::cell::RefCell;
 use std::str::FromStr;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 use std::{mem, process};
 
 use crate::search::{MctsSetting, MonteCarloTree};
 
-pub async fn tei_game<'a, const S: usize, Out, YieldF, Fut>(
+pub trait Platform {
+    type Instant;
+    fn yield_fn() -> impl std::future::Future;
+    fn current_time() -> Self::Instant;
+    fn elapsed_time(start: &Self::Instant) -> Duration;
+}
+
+pub async fn tei_game<'a, const S: usize, Out: Fn(&str), P: Platform>(
     input: async_channel::Receiver<String>,
     output: &Out,
-    yield_fn: &YieldF,
     mcts_settings: MctsSetting<S>,
     komi: Komi,
-) where
-    Out: Fn(&str),
-    Fut: std::future::Future,
-    YieldF: Fn() -> Fut,
-{
+) -> Result<usize, ()> {
     let mut position: Option<SearchPosition<S>> = None;
 
     let last_position_searched: RefCell<SearchPosition<S>> =
@@ -41,7 +43,12 @@ pub async fn tei_game<'a, const S: usize, Out, YieldF, Fut>(
                 eprintln!("Got stop when not searching")
             }
             "isready" => output("readyok"),
-            "setoption" | "teinewgame" => {
+            "teinewgame" => {
+                let size_string = words.next();
+                let size: usize = size_string.and_then(|s| usize::from_str(s).ok()).unwrap();
+                return Ok(size);
+            }
+            "setoption" => {
                 unreachable!() // This should be handled by the main loop
             }
             "position" => {
@@ -76,10 +83,9 @@ pub async fn tei_game<'a, const S: usize, Out, YieldF, Fut>(
 
                 *last_position_searched = current_position.clone();
 
-                parse_go_string::<S, _, _, _>(
+                parse_go_string::<S, _, P>(
                     &input,
                     output,
-                    yield_fn,
                     &line,
                     current_position.clone(),
                     &mut tree,
@@ -92,21 +98,14 @@ pub async fn tei_game<'a, const S: usize, Out, YieldF, Fut>(
             }
         }
     }
-    // if let Some(task) = calculating_task.take() {
-    //     assert!(task.is_finished());
-    // }
+    Err(())
 }
-pub async fn tei<Out, YieldF, Fut>(
+pub async fn tei<Out: Fn(&str), P: Platform>(
     is_slatebot: bool,
     is_cobblebot: bool,
     input: async_channel::Receiver<String>,
     output: &Out,
-    yield_fn: &YieldF,
-) where
-    Out: Fn(&str),
-    Fut: std::future::Future,
-    YieldF: Fn() -> Fut,
-{
+) {
     loop {
         let Ok(input) = input.recv().await else {
             return;
@@ -127,41 +126,37 @@ pub async fn tei<Out, YieldF, Fut>(
         match words.next().unwrap() {
             "teinewgame" => {
                 let size_string = words.next();
-                let size: usize = size_string.and_then(|s| usize::from_str(s).ok()).unwrap();
+                let mut size: usize = size_string.and_then(|s| usize::from_str(s).ok()).unwrap();
 
-                match size {
-                    4 => {
-                        tei_game::<4, _, _, _>(
+                loop {
+                    size = match size {
+                        4 => tei_game::<4, _, P>(
                             input.clone(),
                             output,
-                            yield_fn,
                             mcts_settings(is_slatebot, is_cobblebot),
                             komi,
                         )
                         .await
-                    }
-                    5 => {
-                        tei_game::<5, _, _, _>(
+                        .unwrap(),
+                        5 => tei_game::<5, _, P>(
                             input.clone(),
                             output,
-                            yield_fn,
                             mcts_settings(is_slatebot, is_cobblebot),
                             komi,
                         )
                         .await
-                    }
-                    6 => {
-                        tei_game::<6, _, _, _>(
+                        .unwrap(),
+                        6 => tei_game::<6, _, P>(
                             input.clone(),
                             output,
-                            yield_fn,
                             mcts_settings(is_slatebot, is_cobblebot),
                             komi,
                         )
                         .await
-                    }
-                    _ => panic!("Error: Unsupported size {}", size),
-                };
+                        .unwrap(),
+                        _ => panic!("Error: Unsupported size {}", size),
+                    };
+                }
             }
             "setoption" => {
                 if [
@@ -301,18 +296,13 @@ fn mcts_settings<const S: usize>(is_slatebot: bool, is_cobblebot: bool) -> MctsS
     }
 }
 
-async fn parse_go_string<'a, const S: usize, Out, YieldF, Fut>(
+async fn parse_go_string<'a, const S: usize, Out: Fn(&str), P: Platform>(
     input: &async_channel::Receiver<String>,
     output: &Out,
-    yield_fn: &YieldF,
     line: &str,
     position: SearchPosition<S>,
     tree: &mut MonteCarloTree<S>,
-) where
-    Out: Fn(&str),
-    Fut: std::future::Future,
-    YieldF: Fn() -> Fut,
-{
+) {
     let mut words = line.split_whitespace();
     words.next(); // go
 
@@ -323,7 +313,7 @@ async fn parse_go_string<'a, const S: usize, Out, YieldF, Fut>(
             } else {
                 Duration::MAX // 'go infinite' is just movetime with a very long duration
             };
-            let start_time = Instant::now();
+            let start_time = P::current_time();
 
             for i in 0.. {
                 let nodes_to_search = (200.0 * f64::powf(1.26, i as f64)) as u64;
@@ -331,7 +321,7 @@ async fn parse_go_string<'a, const S: usize, Out, YieldF, Fut>(
                 let mut should_stop = false;
                 for n in 0..nodes_to_search {
                     if n % 100 == 0 {
-                        yield_fn().await;
+                        P::yield_fn().await;
                         match input.try_recv() {
                             Ok(line) => match line.trim() {
                                 "stop" => {
@@ -362,23 +352,23 @@ async fn parse_go_string<'a, const S: usize, Out, YieldF, Fut>(
                 }
                 let (best_move, best_score) = tree.best_move().unwrap();
                 let pv: Vec<_> = tree.pv().collect();
+
+                let elapsed = P::elapsed_time(&start_time);
+
                 output(&format!(
                     "info depth {} seldepth {} nodes {} score cp {} time {} nps {:.0} pv {}",
                     ((tree.visits() as f64 / 10.0).log2()) as u64,
                     pv.len(),
                     tree.visits(),
                     (best_score * 200.0 - 100.0) as i64,
-                    start_time.elapsed().as_millis(),
-                    tree.visits() as f32 / start_time.elapsed().as_secs_f32(),
+                    elapsed.as_millis(),
+                    tree.visits() as f32 / elapsed.as_secs_f32(),
                     pv.iter()
                         .map(|mv| mv.to_string())
                         .collect::<Vec<String>>()
                         .join(" ")
                 ));
-                if oom
-                    || should_stop
-                    || start_time.elapsed().as_secs_f64() > movetime.as_secs_f64() * 0.7
-                {
+                if oom || should_stop || elapsed.as_secs_f64() > movetime.as_secs_f64() * 0.7 {
                     output(&format!("bestmove {}", best_move.to_string()));
                     break;
                 }
@@ -412,19 +402,21 @@ async fn parse_go_string<'a, const S: usize, Out, YieldF, Fut>(
                 Color::Black => black_time / 5 + black_inc / 2,
             };
 
-            let start_time = Instant::now();
+            let start_time = P::current_time();
 
             tree.search_for_time(max_time, |tree| {
                 let best_score = tree.best_move().unwrap().1;
                 let pv: Vec<_> = tree.pv().collect();
+                let elapsed = P::elapsed_time(&start_time);
+
                 output(&format!(
                     "info depth {} seldepth {} nodes {} score cp {} time {} nps {:.0} pv {}",
                     ((tree.visits() as f64 / 10.0).log2()) as u64,
                     pv.len(),
                     tree.visits(),
                     (best_score * 200.0 - 100.0) as i64,
-                    start_time.elapsed().as_millis(),
-                    tree.visits() as f32 / start_time.elapsed().as_secs_f32(),
+                    elapsed.as_millis(),
+                    tree.visits() as f32 / elapsed.as_secs_f32(),
                     pv.iter()
                         .map(|mv| mv.to_string())
                         .collect::<Vec<String>>()
