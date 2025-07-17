@@ -58,4 +58,6 @@ half = { version = "2.3.1", features = ["num-traits"] }
 sysinfo = { version = "0.33.1", default-features = false, features = ["system"] }
 num-traits = "0.2.18"
 size-of = "0.1.5"
+smol = { version = "2.0.2", optional = true }
+async-channel = "2.5.0"
 mimalloc = "0.1.47"
