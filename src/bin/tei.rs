@@ -5,14 +5,96 @@ use pgn_traits::PgnPosition;
 use std::io::{BufRead, BufReader};
 use std::str::FromStr;
 use std::sync::atomic::{self, AtomicBool};
-use std::sync::Arc;
+use std::sync::{mpsc, Arc};
 use std::thread::{self, JoinHandle};
 use std::time::{Duration, Instant};
-use std::{env, io};
+use std::{env, io, mem, process};
 use tiltak::position::{Komi, Move, Position};
 
-use std::any::Any;
 use tiltak::search::{MctsSetting, MonteCarloTree};
+
+pub fn tei_game<const S: usize>(
+    input: mpsc::Receiver<String>,
+    mcts_settings: MctsSetting<S>,
+    komi: Komi,
+) {
+    let mut position: Option<SearchPosition<S>> = None;
+
+    let mut last_position_searched: Option<SearchPosition<S>> = None;
+    let mut search_tree: Option<MonteCarloTree<S>> = None;
+
+    let should_stop: Arc<AtomicBool> = Arc::new(AtomicBool::new(false));
+    let mut calculating_handle: Option<JoinHandle<MonteCarloTree<S>>> = None;
+
+    while let Ok(line) = input.recv() {
+        let mut words = line.split_whitespace();
+        match words.next().unwrap() {
+            "quit" => {
+                should_stop.store(true, atomic::Ordering::Relaxed);
+                process::exit(0);
+            }
+            "stop" => {
+                should_stop.store(true, atomic::Ordering::Relaxed);
+                if let Some(handle) = calculating_handle.take() {
+                    search_tree = Some(handle.join().unwrap());
+                }
+                should_stop.store(false, atomic::Ordering::Relaxed);
+            }
+            "isready" => println!("readyok"),
+            "setoption" | "teinewgame" => {
+                unreachable!() // This should be handled by the main loop
+            }
+            "position" => {
+                position = Some(parse_position_string::<S>(&line, komi));
+            }
+            "go" => {
+                let should_stop_clone = should_stop.clone();
+
+                if let Some(handle) = calculating_handle.take() {
+                    assert!(handle.is_finished());
+                    search_tree = Some(handle.join().unwrap());
+                }
+
+                calculating_handle = {
+                    let Some(current_position) = position.clone() else {
+                        eprintln!("Error: Received go without receiving position string");
+                        process::exit(1);
+                    };
+
+                    let tree = if let Some(old_position) = last_position_searched.as_ref() {
+                        // eprintln!("Found previous position, updating search tree from it");
+                        update_search_tree(
+                            old_position,
+                            &current_position,
+                            search_tree.take(),
+                            mcts_settings.clone(),
+                        )
+                    } else {
+                        MonteCarloTree::new(current_position.position(), mcts_settings.clone())
+                    };
+
+                    last_position_searched = Some(current_position.clone());
+
+                    Some(thread::spawn(move || {
+                        parse_go_string::<S>(
+                            &line,
+                            current_position.clone(),
+                            tree,
+                            should_stop_clone,
+                        )
+                    }))
+                }
+            }
+            s => {
+                eprintln!("Unknown command \"{}\"", s);
+                process::exit(1);
+            }
+        }
+    }
+    if let Some(handle) = calculating_handle.take() {
+        assert!(handle.is_finished());
+    }
+}
 
 pub fn main() {
     let is_slatebot = env::args().any(|arg| arg == "--slatebot");
@@ -31,36 +113,58 @@ pub fn main() {
     println!("option name HalfKomi type spin default 0 min -10 max 10");
     println!("teiok");
 
-    // Position stored in a `dyn Any` variable, because it can be any size
-    let mut position: Option<Box<dyn Any + Send>> = None;
+    let mut sender = None;
 
-    let mut last_position_searched: Option<Box<dyn Any>> = None;
-    let mut search_tree: Option<Box<dyn Any + Send>> = None;
-
-    let mut size: Option<usize> = None;
+    let mut game_thread: Option<JoinHandle<()>> = None;
     let mut komi = Komi::default();
-    let mut calculating_handle: Option<JoinHandle<Box<dyn Any + Send>>> = None;
-    let should_stop: Arc<AtomicBool> = Arc::new(AtomicBool::new(false));
 
     for line in BufReader::new(io::stdin()).lines().map(Result::unwrap) {
         let mut words = line.split_whitespace();
         match words.next().unwrap() {
-            "quit" => {
-                should_stop.store(true, atomic::Ordering::Relaxed);
-                if let Some(handle) = calculating_handle.take() {
-                    search_tree = Some(handle.join().unwrap());
+            "teinewgame" => {
+                let size_string = words.next();
+                let size: usize = size_string.and_then(|s| usize::from_str(s).ok()).unwrap();
+
+                // Close the existing channel if it exists
+                if let Some(sender) = sender.take() {
+                    mem::drop(sender);
                 }
-                break;
-            }
-            "stop" => {
-                should_stop.store(true, atomic::Ordering::Relaxed);
-                if let Some(handle) = calculating_handle.take() {
-                    search_tree = Some(handle.join().unwrap());
+
+                if let Some(handle) = game_thread.take() {
+                    handle.join().unwrap();
                 }
-                should_stop.store(false, atomic::Ordering::Relaxed);
+
+                let (snd, receiver) = mpsc::channel();
+                sender = Some(snd);
+
+                match size {
+                    4 => {
+                        game_thread = Some(thread::spawn(move || {
+                            tei_game::<4>(receiver, mcts_settings(is_slatebot, is_cobblebot), komi);
+                        }))
+                    }
+                    5 => {
+                        game_thread = Some(thread::spawn(move || {
+                            tei_game::<5>(receiver, mcts_settings(is_slatebot, is_cobblebot), komi);
+                        }))
+                    }
+                    6 => {
+                        game_thread = Some(thread::spawn(move || {
+                            tei_game::<6>(receiver, mcts_settings(is_slatebot, is_cobblebot), komi);
+                        }))
+                    }
+                    _ => panic!("Error: Unsupported size {}", size),
+                }
             }
-            "isready" => println!("readyok"),
             "setoption" => {
+                if game_thread
+                    .as_ref()
+                    .is_some_and(|handle| !handle.is_finished())
+                {
+                    eprintln!(
+                        "Warning: Changes to komi need a 'teinewgame' command to take effect."
+                    );
+                }
                 if [
                     words.next().unwrap_or_default(),
                     words.next().unwrap_or_default(),
@@ -75,7 +179,6 @@ pub fn main() {
                         .and_then(Komi::from_half_komi)
                     {
                         komi = k;
-                        search_tree = None; // Reset search tree when komi changes
                     } else {
                         panic!("Invalid komi setting \"{}\"", line);
                     }
@@ -83,149 +186,12 @@ pub fn main() {
                     panic!("Invalid setoption string \"{}\"", line);
                 }
             }
-            "teinewgame" => {
-                let size_string = words.next();
-                size = size_string.and_then(|s| usize::from_str(s).ok());
-                position = None;
-                if let Some(handle) = calculating_handle.take() {
-                    assert!(handle.is_finished());
-                }
-                search_tree = None;
-
-                match size {
-                    Some(4) | Some(5) | Some(6) => (),
-                    _ => panic!("Error: Unsupported size {}", size.unwrap_or_default()),
-                }
-            }
-            "position" => {
-                position = match size {
-                    None => panic!("Received position without receiving teinewgame string"),
-                    Some(4) => Some(Box::new(parse_position_string::<4>(&line, komi))),
-                    Some(5) => Some(Box::new(parse_position_string::<5>(&line, komi))),
-                    Some(6) => Some(Box::new(parse_position_string::<6>(&line, komi))),
-                    Some(s) => panic!("Unsupported size {}", s),
-                }
-            }
-            "go" => {
-                let should_stop_clone = should_stop.clone();
-
-                if let Some(handle) = calculating_handle.take() {
-                    assert!(handle.is_finished());
-                    search_tree = Some(handle.join().unwrap());
-                }
-
-                calculating_handle = match size {
-                    Some(4) => {
-                        let position: SearchPosition<4> = position
-                            .as_ref()
-                            .and_then(|p| p.downcast_ref::<SearchPosition<4>>())
-                            .unwrap()
-                            .clone();
-
-                        let settings = mcts_settings(is_slatebot, is_cobblebot);
-
-                        let tree = if let Some(old_position) = last_position_searched
-                            .as_ref()
-                            .and_then(|p| p.downcast_ref::<SearchPosition<4>>())
-                        {
-                            // eprintln!("Found previous position, updating search tree from it");
-                            update_search_tree(
-                                old_position,
-                                &position,
-                                search_tree.take(),
-                                settings,
-                            )
-                        } else {
-                            MonteCarloTree::new(position.position(), settings)
-                        };
-
-                        last_position_searched = Some(Box::new(position.clone()));
-
-                        Some(thread::spawn(move || {
-                            let new_tree = parse_go_string::<4>(
-                                &line,
-                                position.clone(),
-                                tree,
-                                should_stop_clone,
-                            );
-                            Box::new(new_tree) as Box<dyn Any + Send>
-                        }))
-                    }
-                    Some(5) => {
-                        let position: SearchPosition<5> = position
-                            .as_ref()
-                            .and_then(|p| p.downcast_ref::<SearchPosition<5>>())
-                            .unwrap()
-                            .clone();
-
-                        let settings = mcts_settings(is_slatebot, is_cobblebot);
-
-                        let tree = if let Some(old_position) = last_position_searched
-                            .as_ref()
-                            .and_then(|p| p.downcast_ref::<SearchPosition<5>>())
-                        {
-                            update_search_tree(
-                                old_position,
-                                &position,
-                                search_tree.take(),
-                                settings,
-                            )
-                        } else {
-                            MonteCarloTree::new(position.position(), settings)
-                        };
-
-                        last_position_searched = Some(Box::new(position.clone()));
-
-                        Some(thread::spawn(move || {
-                            let new_tree = parse_go_string::<5>(
-                                &line,
-                                position.clone(),
-                                tree,
-                                should_stop_clone,
-                            );
-                            Box::new(new_tree) as Box<dyn Any + Send>
-                        }))
-                    }
-                    Some(6) => {
-                        let position: SearchPosition<6> = position
-                            .as_ref()
-                            .and_then(|p| p.downcast_ref::<SearchPosition<6>>())
-                            .unwrap()
-                            .clone();
-
-                        let settings = mcts_settings(is_slatebot, is_cobblebot);
-
-                        let tree = if let Some(old_position) = last_position_searched
-                            .as_ref()
-                            .and_then(|p| p.downcast_ref::<SearchPosition<6>>())
-                        {
-                            update_search_tree(
-                                old_position,
-                                &position,
-                                search_tree.take(),
-                                settings,
-                            )
-                        } else {
-                            MonteCarloTree::new(position.position(), settings)
-                        };
-
-                        last_position_searched = Some(Box::new(position.clone()));
-
-                        Some(thread::spawn(move || {
-                            let new_tree = parse_go_string::<6>(
-                                &line,
-                                position.clone(),
-                                tree,
-                                should_stop_clone,
-                            );
-                            Box::new(new_tree) as Box<dyn Any + Send>
-                        }))
-                    }
-                    Some(s) => panic!("Error: Unsupported size {}", s),
-                    None => panic!("Error: Received go without receiving teinewgame string"),
+            s => {
+                let Some(sender) = sender.as_ref() else {
+                    panic!("Unknown command \"{}\"", s)
                 };
+                sender.send(line.trim().to_string()).unwrap()
             }
-            s => panic!("Unknown command \"{}\"", s),
         }
     }
 }
@@ -295,18 +261,13 @@ impl<const S: usize> SearchPosition<S> {
 fn update_search_tree<const S: usize>(
     old_position: &SearchPosition<S>,
     new_position: &SearchPosition<S>,
-    search_tree: Option<Box<dyn Any + Send>>,
+    search_tree: Option<MonteCarloTree<S>>,
     mcts_settings: MctsSetting<S>,
 ) -> MonteCarloTree<S> {
-    let tree = if let Some(tree) = search_tree {
-        let type_id = tree.type_id();
-        let Ok(mcts_tree) = tree.downcast::<MonteCarloTree<S>>() else {
-            panic!("Failed to downcast search tree, had type {:?}", type_id);
-        };
-        *mcts_tree
-    } else {
-        MonteCarloTree::new(new_position.position(), mcts_settings.clone())
-    };
+    let tree = search_tree.unwrap_or(MonteCarloTree::new(
+        new_position.position(),
+        mcts_settings.clone(),
+    ));
 
     if let Some(move_difference) = old_position.move_difference(new_position) {
         let tree_position = tree.position();
