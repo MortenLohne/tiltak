@@ -13,6 +13,7 @@ debug = true
 lto = true
 
 [features]
+default = ["mimalloc"]
 constant-tuning = ["rayon"]
 aws-lambda-runtime = ["lambda_runtime", "serde", "serde_json", "arrayvec/serde", "tokio"]
 sqlite = ["rusqlite", "rayon"]
@@ -23,7 +24,7 @@ required-features = []
 
 [[bin]]
 name = "tei"
-required-features = []
+required-features = ["smol"]
 
 [[bin]]
 name = "playtak"
@@ -60,4 +61,4 @@ num-traits = "0.2.18"
 size-of = "0.1.5"
 smol = { version = "2.0.2", optional = true }
 async-channel = "2.5.0"
-mimalloc = "0.1.47"
+mimalloc = {version = "0.1.47", optional = true, default = true }
