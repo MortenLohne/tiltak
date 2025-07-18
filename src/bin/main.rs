@@ -1061,6 +1061,10 @@ fn mem_usage<const S: usize>() {
     );
     println!("Tak board cell: {} bytes", mem::size_of::<Stack>());
     println!("Tak move: {} bytes", mem::size_of::<Move<S>>());
+    println!(
+        "Option tak move: {} bytes",
+        mem::size_of::<Option<Move<S>>>()
+    );
     println!("MCTS edge {}s: {} bytes", S, search::edge_mem_usage::<S>());
     println!("MCTS node {}s: {} bytes", S, search::node_mem_usage::<S>());
     println!(
@@ -1072,6 +1076,11 @@ fn mem_usage<const S: usize>() {
         "MCTS small bridge {}s: {} bytes",
         S,
         search::small_bridge_mem_usage::<S>()
+    );
+    println!(
+        "MCTS tree child {}s: {} bytes",
+        S,
+        search::tree_child_mem_usage::<S>()
     );
     println!("f16: {} bytes", mem::size_of::<f16>());
     println!(
