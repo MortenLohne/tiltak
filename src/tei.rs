@@ -22,13 +22,13 @@ pub async fn tei_game<'a, const S: usize, Out: Fn(&str), P: Platform>(
     input: &async_channel::Receiver<String>,
     output: &Out,
     mcts_settings: MctsSetting<S>,
-    komi: Komi,
+    komi: &mut Komi,
 ) -> Result<usize, ()> {
     let mut position: Option<SearchPosition<S>> = None;
 
-    let mut last_position_searched: SearchPosition<S> = SearchPosition::new(komi);
+    let mut last_position_searched: SearchPosition<S> = SearchPosition::new(*komi);
     let mut search_tree: MonteCarloTree<S> = MonteCarloTree::new(
-        Position::<S>::start_position_with_komi(komi),
+        Position::<S>::start_position_with_komi(*komi),
         mcts_settings.clone(),
     );
 
@@ -48,10 +48,38 @@ pub async fn tei_game<'a, const S: usize, Out: Fn(&str), P: Platform>(
                 return Ok(size);
             }
             "setoption" => {
-                unreachable!() // This should be handled by the main loop
+                if [
+                    words.next().unwrap_or_default(),
+                    words.next().unwrap_or_default(),
+                    words.next().unwrap_or_default(),
+                ]
+                .join(" ")
+                    == "name HalfKomi value"
+                {
+                    if let Some(k) = words
+                        .next()
+                        .and_then(|komi_string| komi_string.parse::<i8>().ok())
+                        .and_then(Komi::from_half_komi)
+                    {
+                        *komi = k;
+                    } else {
+                        panic!("Invalid komi setting \"{}\"", line);
+                    }
+                } else {
+                    panic!("Invalid setoption string \"{}\"", line);
+                }
+                position.as_mut().map(|p| {
+                    p.root_position.set_komi(*komi);
+                });
+                // If we receive a new komi, previous search is invalid
+                last_position_searched = SearchPosition::new(*komi);
+                search_tree = MonteCarloTree::new(
+                    Position::<S>::start_position_with_komi(*komi),
+                    mcts_settings.clone(),
+                );
             }
             "position" => {
-                position = Some(parse_position_string::<S>(&line, komi));
+                position = Some(parse_position_string::<S>(&line, *komi));
             }
             "go" => {
                 let Some(current_position) = position.as_ref() else {
@@ -120,7 +148,7 @@ pub async fn tei<Out: Fn(&str), P: Platform>(
                                 &input,
                                 output,
                                 mcts_settings(is_slatebot, is_cobblebot),
-                                komi,
+                                &mut komi,
                             )
                             .await?
                         }
@@ -129,7 +157,7 @@ pub async fn tei<Out: Fn(&str), P: Platform>(
                                 &input,
                                 output,
                                 mcts_settings(is_slatebot, is_cobblebot),
-                                komi,
+                                &mut komi,
                             )
                             .await?
                         }
@@ -138,7 +166,7 @@ pub async fn tei<Out: Fn(&str), P: Platform>(
                                 &input,
                                 output,
                                 mcts_settings(is_slatebot, is_cobblebot),
-                                komi,
+                                &mut komi,
                             )
                             .await?
                         }
