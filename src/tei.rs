@@ -54,11 +54,6 @@ pub async fn tei_game<'a, const S: usize, Out: Fn(&str), P: Platform>(
                 position = Some(parse_position_string::<S>(&line, komi));
             }
             "go" => {
-                // if let Some(task) = calculating_task.take() {
-                //     assert!(task.is_finished()); // Should not receive another 'go' while calculating
-                //     task.await;
-                // }
-
                 let Some(current_position) = position.as_ref() else {
                     eprintln!("Error: Received go without receiving position string");
                     process::exit(1);
@@ -188,7 +183,7 @@ pub async fn tei<Out: Fn(&str), P: Platform>(
 
 fn parse_position_string<const S: usize>(line: &str, komi: Komi) -> SearchPosition<S> {
     let mut words_iter = line.split_whitespace();
-    words_iter.next(); // position
+    words_iter.next();
     let position = match words_iter.next() {
         Some("startpos") => Position::start_position_with_komi(komi),
         Some("tps") => {
