@@ -549,7 +549,7 @@ fn analyze_openings<const S: usize>(komi: Komi, nodes: u32) {
                 position.do_move(mv);
             }
             let start_time = time::Instant::now();
-            let settings = search::MctsSetting::default().arena_size_for_nodes(nodes);
+            let settings = search::MctsSetting::default();
             let mut tree = search::MonteCarloTree::new(position.clone(), settings);
             for _ in 0..nodes {
                 match tree.select() {
@@ -788,7 +788,6 @@ fn analyze_position<const S: usize>(position: &Position<S>, excluded_moves: Vec<
     moves.sort_by(|(_mv, score1), (_, score2)| score1.partial_cmp(score2).unwrap().reverse());
 
     let settings: MctsSetting<S> = search::MctsSetting::default()
-        .arena_size(2_u32.pow(30) * 3)
         .add_policy_params(<Position<S>>::policy_params(eval_komi))
         .add_value_params(<Position<S>>::value_params(eval_komi))
         // .add_rollout_depth(1000)
@@ -981,7 +980,7 @@ fn bench_position<const S: usize>(position: Position<S>, nodes: u32) {
     println!("Starting benchmark");
     let start_time = time::Instant::now();
 
-    let settings = search::MctsSetting::default().arena_size_for_nodes(nodes);
+    let settings = search::MctsSetting::default();
     let mut tree = search::MonteCarloTree::new(position, settings);
     let mut last_iteration_start_time = time::Instant::now();
     for n in 1..=nodes {

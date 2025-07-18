@@ -10,7 +10,7 @@ use std::time::Duration;
 #[test]
 fn tree_reuse_test() {
     let mut position = <Position<6>>::start_position();
-    let settings = MctsSetting::default().arena_size_for_nodes(10000);
+    let settings = MctsSetting::default();
     let mut tree = MonteCarloTree::new(position.clone(), settings);
 
     for _ in 0..10_000 {
@@ -34,7 +34,7 @@ fn tree_reuse_test() {
 #[test]
 fn tree_reuse_two_ply_test() {
     let mut position = <Position<6>>::from_fen("x5,1/x6/x6/x6/x6/x5,2 1 2").unwrap();
-    let settings = MctsSetting::default().arena_size_for_nodes(10000);
+    let settings = MctsSetting::default();
     let mut tree = MonteCarloTree::new(position.clone(), settings);
 
     for _ in 0..100_000 {
@@ -69,9 +69,7 @@ fn exclude_moves_test() {
         .iter()
         .map(|move_string| Move::from_string(move_string).unwrap())
         .collect::<Vec<Move<6>>>();
-    let settings = MctsSetting::default()
-        .arena_size_for_nodes(1000)
-        .exclude_moves(excluded_moves.clone());
+    let settings = MctsSetting::default().exclude_moves(excluded_moves.clone());
     let mut tree = MonteCarloTree::new(<Position<6>>::start_position(), settings);
 
     for _ in 0..1000 {
