@@ -346,11 +346,35 @@ impl<const S: usize> MonteCarloTree<S> {
     }
 
     pub fn best_move(&self) -> Option<(Move<S>, f32)> {
-        let best_edge = self
-            .shallow_edges()?
-            .into_iter()
-            .max_by_key(|edge| edge.visits)?;
-        Some((best_edge.mv, 1.0 - best_edge.mean_action_value))
+        let root_child = self.tree.child.as_ref()?.children.as_ref()?;
+
+        match **root_child {
+            TreeChild::Small(ref small_bridge) => {
+                let (grandchild, mv, visits) = small_bridge
+                    .children
+                    .iter()
+                    .filter(|(_, _, visits)| *visits > 0)
+                    .max_by_key(|(_, _, visits)| *visits)?;
+
+                Some((
+                    *mv,
+                    1.0 - grandchild.total_action_value as f32 / *visits as f32,
+                ))
+            }
+            TreeChild::Large(ref tree_bridge) => {
+                let (best_index, _) = tree_bridge
+                    .visitss
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, visits)| **visits > 0)
+                    .max_by_key(|(_, visits)| *visits)?;
+
+                Some((
+                    tree_bridge.moves[best_index]?,
+                    1.0 - tree_bridge.mean_action_values[best_index],
+                ))
+            }
+        }
     }
 
     pub fn pv(&self) -> impl Iterator<Item = Move<S>> + '_ {
