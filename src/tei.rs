@@ -4,10 +4,9 @@ use crate::position::{Komi, Move, Position};
 use async_channel::TryRecvError;
 use board_game_traits::{Color, Position as PositionTrait};
 use pgn_traits::PgnPosition;
-use std::cell::RefCell;
+use std::process;
 use std::str::FromStr;
 use std::time::Duration;
-use std::{mem, process};
 
 use crate::search::{MctsSetting, MonteCarloTree};
 
@@ -26,12 +25,11 @@ pub async fn tei_game<'a, const S: usize, Out: Fn(&str), P: Platform>(
 ) -> Result<usize, ()> {
     let mut position: Option<SearchPosition<S>> = None;
 
-    let last_position_searched: RefCell<SearchPosition<S>> =
-        RefCell::new(SearchPosition::new(komi));
-    let search_tree: RefCell<MonteCarloTree<S>> = RefCell::new(MonteCarloTree::new(
+    let mut last_position_searched: SearchPosition<S> = SearchPosition::new(komi);
+    let mut search_tree: MonteCarloTree<S> = MonteCarloTree::new(
         Position::<S>::start_position_with_komi(komi),
         mcts_settings.clone(),
-    ));
+    );
 
     while let Ok(line) = input.recv().await {
         let mut words = line.split_whitespace();
@@ -60,35 +58,26 @@ pub async fn tei_game<'a, const S: usize, Out: Fn(&str), P: Platform>(
                 //     task.await;
                 // }
 
-                let Some(current_position) = position.clone() else {
+                let Some(current_position) = position.as_ref() else {
                     eprintln!("Error: Received go without receiving position string");
                     process::exit(1);
                 };
 
-                let mut last_position_searched = last_position_searched.borrow_mut();
-
-                let mut tree = search_tree.borrow_mut();
-
-                // eprintln!("Found previous position, updating search tree from it");
-                let taken_tree = mem::replace(
-                    &mut *tree,
-                    MonteCarloTree::new(current_position.position(), mcts_settings.clone()),
-                );
-                *tree = update_search_tree(
+                search_tree = update_search_tree(
                     &last_position_searched,
                     &current_position,
-                    taken_tree,
+                    search_tree,
                     mcts_settings.clone(),
                 );
 
-                *last_position_searched = current_position.clone();
+                last_position_searched.clone_from(&current_position);
 
                 parse_go_string::<S, _, P>(
                     &input,
                     output,
                     &line,
-                    current_position.clone(),
-                    &mut tree,
+                    &current_position,
+                    &mut search_tree,
                 )
                 .await
             }
@@ -299,7 +288,7 @@ async fn parse_go_string<'a, const S: usize, Out: Fn(&str), P: Platform>(
     input: &async_channel::Receiver<String>,
     output: &Out,
     line: &str,
-    position: SearchPosition<S>,
+    position: &SearchPosition<S>,
     tree: &mut MonteCarloTree<S>,
 ) {
     let mut words = line.split_whitespace();
