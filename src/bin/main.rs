@@ -1,11 +1,15 @@
 #![allow(clippy::uninlined_format_args)]
 
-#[cfg(feature = "mimalloc")]
+#[cfg(all(feature = "mimalloc", not(feature = "dhat-heap")))]
 use mimalloc::MiMalloc;
 
-#[cfg(feature = "mimalloc")]
+#[cfg(all(feature = "mimalloc", not(feature = "dhat-heap")))]
 #[global_allocator]
 static GLOBAL: MiMalloc = MiMalloc;
+
+#[cfg(feature = "dhat-heap")]
+#[global_allocator]
+static ALLOC: dhat::Alloc = dhat::Alloc;
 
 #[cfg(feature = "constant-tuning")]
 use std::collections::HashSet;
@@ -41,6 +45,9 @@ use tiltak::{position, search};
 mod tests;
 
 fn main() {
+    #[cfg(feature = "dhat-heap")]
+    let _profiler = dhat::Profiler::new_heap();
+
     println!("play: Play against the engine through the command line");
     println!("aimatch: Watch the engine play against a very simple minmax implementation");
     println!("analyze <size>: Analyze a given position, provided from a PTN or a simple move list");
