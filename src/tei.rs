@@ -105,10 +105,10 @@ pub async fn tei<Out: Fn(&str), P: Platform>(
     is_cobblebot: bool,
     input: async_channel::Receiver<String>,
     output: &Out,
-) {
+) -> Result<(), ()> {
     loop {
         let Ok(input) = input.recv().await else {
-            return;
+            return Ok(());
         };
         if input.trim() == "tei" {
             break;
@@ -130,30 +130,33 @@ pub async fn tei<Out: Fn(&str), P: Platform>(
 
                 loop {
                     size = match size {
-                        4 => tei_game::<4, _, P>(
-                            input.clone(),
-                            output,
-                            mcts_settings(is_slatebot, is_cobblebot),
-                            komi,
-                        )
-                        .await
-                        .unwrap(),
-                        5 => tei_game::<5, _, P>(
-                            input.clone(),
-                            output,
-                            mcts_settings(is_slatebot, is_cobblebot),
-                            komi,
-                        )
-                        .await
-                        .unwrap(),
-                        6 => tei_game::<6, _, P>(
-                            input.clone(),
-                            output,
-                            mcts_settings(is_slatebot, is_cobblebot),
-                            komi,
-                        )
-                        .await
-                        .unwrap(),
+                        4 => {
+                            tei_game::<4, _, P>(
+                                input.clone(),
+                                output,
+                                mcts_settings(is_slatebot, is_cobblebot),
+                                komi,
+                            )
+                            .await?
+                        }
+                        5 => {
+                            tei_game::<5, _, P>(
+                                input.clone(),
+                                output,
+                                mcts_settings(is_slatebot, is_cobblebot),
+                                komi,
+                            )
+                            .await?
+                        }
+                        6 => {
+                            tei_game::<6, _, P>(
+                                input.clone(),
+                                output,
+                                mcts_settings(is_slatebot, is_cobblebot),
+                                komi,
+                            )
+                            .await?
+                        }
                         _ => panic!("Error: Unsupported size {}", size),
                     };
                 }
@@ -190,6 +193,7 @@ pub async fn tei<Out: Fn(&str), P: Platform>(
             }
         }
     }
+    Ok(())
 }
 
 fn parse_position_string<const S: usize>(line: &str, komi: Komi) -> SearchPosition<S> {
@@ -424,6 +428,36 @@ async fn parse_go_string<'a, const S: usize, Out: Fn(&str), P: Platform>(
                 ));
             });
             let best_move = tree.best_move().unwrap().0;
+
+            output(&format!("bestmove {}", best_move.to_string()));
+        }
+        Some("nodes") => {
+            let nodes = words.next().unwrap().parse::<u32>().unwrap();
+
+            let start_time = P::current_time();
+
+            while tree.visits() < nodes {
+                tree.select().unwrap();
+            }
+
+            let (best_move, best_score) = tree.best_move().unwrap();
+            let pv: Vec<_> = tree.pv().collect();
+
+            let elapsed = P::elapsed_time(&start_time);
+
+            output(&format!(
+                "info depth {} seldepth {} nodes {} score cp {} time {} nps {:.0} pv {}",
+                ((tree.visits() as f64 / 10.0).log2()) as u64,
+                pv.len(),
+                tree.visits(),
+                (best_score * 200.0 - 100.0) as i64,
+                elapsed.as_millis(),
+                tree.visits() as f32 / elapsed.as_secs_f32(),
+                pv.iter()
+                    .map(|mv| mv.to_string())
+                    .collect::<Vec<String>>()
+                    .join(" ")
+            ));
 
             output(&format!("bestmove {}", best_move.to_string()));
         }
