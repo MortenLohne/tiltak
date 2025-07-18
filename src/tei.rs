@@ -4,6 +4,7 @@ use crate::position::{Komi, Move, Position};
 use async_channel::TryRecvError;
 use board_game_traits::{Color, Position as PositionTrait};
 use pgn_traits::PgnPosition;
+use std::fmt::Write;
 use std::process;
 use std::str::FromStr;
 use std::time::Duration;
@@ -348,26 +349,16 @@ async fn parse_go_string<'a, const S: usize, Out: Fn(&str), P: Platform>(
                         break;
                     }
                 }
-                let (best_move, best_score) = tree.best_move().unwrap();
-                let pv: Vec<_> = tree.pv().collect();
 
                 let elapsed = P::elapsed_time(&start_time);
 
-                output(&format!(
-                    "info depth {} seldepth {} nodes {} score cp {} time {} nps {:.0} pv {}",
-                    ((tree.visits() as f64 / 10.0).log2()) as u64,
-                    pv.len(),
-                    tree.visits(),
-                    (best_score * 200.0 - 100.0) as i64,
-                    elapsed.as_millis(),
-                    tree.visits() as f32 / elapsed.as_secs_f32(),
-                    pv.iter()
-                        .map(|mv| mv.to_string())
-                        .collect::<Vec<String>>()
-                        .join(" ")
-                ));
+                let info_string = info_string::<S, P>(&start_time, tree);
+
+                output(&info_string);
+
                 if oom || should_stop || elapsed.as_secs_f64() > movetime.as_secs_f64() * 0.7 {
-                    output(&format!("bestmove {}", best_move.to_string()));
+                    let (best_move, _) = tree.best_move().unwrap();
+                    output(&format!("bestmove {}", best_move));
                     break;
                 }
             }
@@ -404,27 +395,13 @@ async fn parse_go_string<'a, const S: usize, Out: Fn(&str), P: Platform>(
             let start_time = P::current_time();
 
             tree.search_for_time(max_time, |tree| {
-                let best_score = tree.best_move().unwrap().1;
-                let pv: Vec<_> = tree.pv().collect();
-                let elapsed = P::elapsed_time(&start_time);
+                let info_string = info_string::<S, P>(&start_time, tree);
 
-                output(&format!(
-                    "info depth {} seldepth {} nodes {} score cp {} time {} nps {:.0} pv {}",
-                    ((tree.visits() as f64 / 10.0).log2()) as u64,
-                    pv.len(),
-                    tree.visits(),
-                    (best_score * 200.0 - 100.0) as i64,
-                    elapsed.as_millis(),
-                    tree.visits() as f32 / elapsed.as_secs_f32(),
-                    pv.iter()
-                        .map(|mv| mv.to_string())
-                        .collect::<Vec<String>>()
-                        .join(" ")
-                ));
+                output(&info_string);
             });
             let best_move = tree.best_move().unwrap().0;
 
-            output(&format!("bestmove {}", best_move.to_string()));
+            output(&format!("bestmove {}", best_move));
         }
         Some("nodes") => {
             let nodes = words.next().unwrap().parse::<u32>().unwrap();
@@ -435,29 +412,46 @@ async fn parse_go_string<'a, const S: usize, Out: Fn(&str), P: Platform>(
                 tree.select().unwrap();
             }
 
-            let (best_move, best_score) = tree.best_move().unwrap();
-            let pv: Vec<_> = tree.pv().collect();
+            let info_string = info_string::<S, P>(&start_time, tree);
 
-            let elapsed = P::elapsed_time(&start_time);
+            output(&info_string);
 
-            output(&format!(
-                "info depth {} seldepth {} nodes {} score cp {} time {} nps {:.0} pv {}",
-                ((tree.visits() as f64 / 10.0).log2()) as u64,
-                pv.len(),
-                tree.visits(),
-                (best_score * 200.0 - 100.0) as i64,
-                elapsed.as_millis(),
-                tree.visits() as f32 / elapsed.as_secs_f32(),
-                pv.iter()
-                    .map(|mv| mv.to_string())
-                    .collect::<Vec<String>>()
-                    .join(" ")
-            ));
+            let (best_move, _) = tree.best_move().unwrap();
 
-            output(&format!("bestmove {}", best_move.to_string()));
+            output(&format!("bestmove {}", best_move));
         }
         Some(_) | None => {
             panic!("Invalid go command \"{}\"", line);
         }
     }
+}
+
+pub fn info_string<const S: usize, P: Platform>(
+    start_time: &P::Instant,
+    tree: &MonteCarloTree<S>,
+) -> String {
+    let (_, best_score) = tree.best_move().unwrap();
+
+    let elapsed = P::elapsed_time(&start_time);
+
+    let pv_length = tree.pv().count();
+
+    let mut info_string = String::with_capacity(100 + 6 * pv_length);
+
+    write!(
+        info_string,
+        "info depth {} seldepth {} nodes {} score cp {} time {} nps {:.0} pv",
+        ((tree.visits() as f64 / 10.0).log2()) as u64,
+        pv_length,
+        tree.visits(),
+        (best_score * 200.0 - 100.0) as i64,
+        elapsed.as_millis(),
+        tree.visits() as f32 / elapsed.as_secs_f32(),
+    )
+    .unwrap();
+
+    for mv in tree.pv() {
+        write!(info_string, " {}", mv).unwrap();
+    }
+    info_string
 }
