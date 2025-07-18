@@ -18,7 +18,7 @@ pub trait Platform {
 }
 
 pub async fn tei_game<'a, const S: usize, Out: Fn(&str), P: Platform>(
-    input: async_channel::Receiver<String>,
+    input: &async_channel::Receiver<String>,
     output: &Out,
     mcts_settings: MctsSetting<S>,
     komi: Komi,
@@ -67,7 +67,7 @@ pub async fn tei_game<'a, const S: usize, Out: Fn(&str), P: Platform>(
                     &last_position_searched,
                     &current_position,
                     search_tree,
-                    mcts_settings.clone(),
+                    &mcts_settings,
                 );
 
                 last_position_searched.clone_from(&current_position);
@@ -121,7 +121,7 @@ pub async fn tei<Out: Fn(&str), P: Platform>(
                     size = match size {
                         4 => {
                             tei_game::<4, _, P>(
-                                input.clone(),
+                                &input,
                                 output,
                                 mcts_settings(is_slatebot, is_cobblebot),
                                 komi,
@@ -130,7 +130,7 @@ pub async fn tei<Out: Fn(&str), P: Platform>(
                         }
                         5 => {
                             tei_game::<5, _, P>(
-                                input.clone(),
+                                &input,
                                 output,
                                 mcts_settings(is_slatebot, is_cobblebot),
                                 komi,
@@ -139,7 +139,7 @@ pub async fn tei<Out: Fn(&str), P: Platform>(
                         }
                         6 => {
                             tei_game::<6, _, P>(
-                                input.clone(),
+                                &input,
                                 output,
                                 mcts_settings(is_slatebot, is_cobblebot),
                                 komi,
@@ -236,6 +236,15 @@ impl<const S: usize> SearchPosition<S> {
         position
     }
 
+    fn side_to_move(&self) -> Color {
+        let root_side_to_move = self.root_position.side_to_move();
+        if self.moves.len() % 2 == 0 {
+            root_side_to_move
+        } else {
+            !root_side_to_move
+        }
+    }
+
     fn move_difference<'a>(&self, new_position: &'a SearchPosition<S>) -> Option<&'a [Move<S>]> {
         if self.root_position != new_position.root_position {
             return None;
@@ -257,15 +266,16 @@ fn update_search_tree<const S: usize>(
     old_position: &SearchPosition<S>,
     new_position: &SearchPosition<S>,
     search_tree: MonteCarloTree<S>,
-    mcts_settings: MctsSetting<S>,
+    mcts_settings: &MctsSetting<S>,
 ) -> MonteCarloTree<S> {
     if let Some(move_difference) = old_position.move_difference(new_position) {
         search_tree.reroot(&move_difference).unwrap_or_else(|| {
             eprintln!("Failed to reroot tree, creating new tree");
-            MonteCarloTree::new(new_position.position(), mcts_settings)
+            MonteCarloTree::new(new_position.position(), mcts_settings.clone())
         })
     } else {
-        MonteCarloTree::new(new_position.position(), mcts_settings)
+        eprintln!("Failed to find move difference, creating new tree");
+        MonteCarloTree::new(new_position.position(), mcts_settings.clone())
     }
 }
 
@@ -385,7 +395,8 @@ async fn parse_go_string<'a, const S: usize, Out: Fn(&str), P: Platform>(
                 }
             }
 
-            let max_time = match position.position().side_to_move() {
+            assert_eq!(position.side_to_move(), position.position().side_to_move());
+            let max_time = match position.side_to_move() {
                 Color::White => white_time / 5 + white_inc / 2,
                 Color::Black => black_time / 5 + black_inc / 2,
             };
