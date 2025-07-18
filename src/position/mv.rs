@@ -143,11 +143,11 @@ impl<const S: usize> Move<S> {
                 }
                 let mut pieces_held = pieces_taken;
 
-                let mut amounts_to_drop: Vec<u8> = input
+                let mut amounts_to_drop: ArrayVec<u8, 8> = input
                     .chars()
                     .skip(4)
                     .map(|ch| ch.to_digit(10).map(|i| i as u8))
-                    .collect::<Option<Vec<u8>>>()
+                    .collect::<Option<ArrayVec<u8, 8>>>()
                     .ok_or_else(|| {
                         pgn_traits::Error::new_parse_error(
                             format!("Couldn't parse move \"{}\": found non-integer when expecting number of pieces to drop", input
