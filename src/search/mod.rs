@@ -177,7 +177,7 @@ impl<const S: usize> MonteCarloTree<S> {
     pub fn reroot(self, moves: &[Move<S>]) -> Option<Self> {
         let mut new_edge = self.tree;
         let mut new_visits = self.visits;
-        let mut position = self.position.clone();
+        let mut position = self.position;
         for mv in moves {
             let child = new_edge.child?.children?;
             let TreeChild::Large(mut bridge) = *child else {
@@ -193,11 +193,14 @@ impl<const S: usize> MonteCarloTree<S> {
             position.do_move(*mv);
         }
 
+        let mut new_temp_position = self.temp_position;
+        new_temp_position.clone_from(&position);
+
         Some(Self {
             tree: new_edge,
             visits: new_visits,
-            position: position.clone(),
-            temp_position: position,
+            position: position,
+            temp_position: new_temp_position,
             settings: self.settings,
             temp_vectors: self.temp_vectors,
         })
@@ -259,8 +262,8 @@ impl<const S: usize> MonteCarloTree<S> {
         }
     }
 
-    pub fn position(&self) -> Position<S> {
-        self.position.clone()
+    pub fn position(&self) -> &Position<S> {
+        &self.position
     }
 
     pub fn search_for_time<F>(&mut self, max_time: time::Duration, callback: F)

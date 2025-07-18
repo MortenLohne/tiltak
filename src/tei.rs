@@ -271,12 +271,8 @@ fn update_search_tree<const S: usize>(
     mcts_settings: MctsSetting<S>,
 ) -> MonteCarloTree<S> {
     if let Some(move_difference) = old_position.move_difference(new_position) {
-        let tree_position = search_tree.position();
         search_tree.reroot(&move_difference).unwrap_or_else(|| {
-            eprintln!(
-                "Failed to reroot tree, creating new tree. Old tree was at {}",
-                tree_position.to_fen()
-            );
+            eprintln!("Failed to reroot tree, creating new tree");
             MonteCarloTree::new(new_position.position(), mcts_settings)
         })
     } else {

@@ -21,7 +21,7 @@ fn tree_reuse_test() {
     tree = tree.reroot(&[best_move]).unwrap();
 
     position.do_move(best_move);
-    assert_eq!(position, tree.position());
+    assert_eq!(position, *tree.position());
 
     assert!(tree.visits() > 0 && tree.visits() < 10_000);
     for _ in 0..10_000 {
@@ -49,7 +49,7 @@ fn tree_reuse_two_ply_test() {
 
     position.do_move(a5);
     position.do_move(b5);
-    assert_eq!(position, tree.position());
+    assert_eq!(position, *tree.position());
 
     assert!(tree.visits() > 0 && tree.visits() < 100_000);
     for _ in 0..10_000 {
