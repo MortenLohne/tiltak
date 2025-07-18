@@ -24,6 +24,17 @@ use tiltak::ptn::{Game, PtnMove};
 use tiltak::search;
 use tiltak::search::MctsSetting;
 
+#[cfg(all(feature = "mimalloc", not(feature = "dhat-heap")))]
+use mimalloc::MiMalloc;
+
+#[cfg(all(feature = "mimalloc", not(feature = "dhat-heap")))]
+#[global_allocator]
+static GLOBAL: MiMalloc = MiMalloc;
+
+#[cfg(feature = "dhat-heap")]
+#[global_allocator]
+static ALLOC: dhat::Alloc = dhat::Alloc;
+
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub struct PlaytakSettings {
     default_seek_size: usize,
@@ -827,6 +838,10 @@ impl PlaytakSession {
         let mut next_seek_size = playtak_settings.default_seek_size;
         let mut next_seek_color = playtak_settings.default_seek_color;
         let mut position = <Position<S>>::start_position_with_komi(game.komi);
+
+        let settings = playtak_settings.to_mcts_setting(position.half_moves_played());
+        let mut tree = search::MonteCarloTree::new(position.clone(), settings.clone());
+
         let mut moves = vec![];
         let mut our_time_left = game.time_left;
         'gameloop: loop {
@@ -838,6 +853,10 @@ impl PlaytakSession {
                     break;
                 } else {
                     position = position_without_history;
+                    tree = search::MonteCarloTree::new(
+                        position.clone(),
+                        playtak_settings.to_mcts_setting(position.half_moves_played()),
+                    );
                 }
             }
             if position.side_to_move() == game.our_color && !restoring_previous_session {
@@ -849,10 +868,7 @@ impl PlaytakSession {
 
                         (*corner_placements.choose(&mut rng).unwrap(), 0.0)
                     } else if let Some(fixed_nodes) = playtak_settings.fixed_nodes {
-                        let settings =
-                            playtak_settings.to_mcts_setting(position.half_moves_played())
-                            .arena_size_for_nodes(fixed_nodes as u32);
-                        let mut tree = search::MonteCarloTree::new(position.clone(), settings);
+
                         for _ in 0..fixed_nodes {
                             if let Err(err) = tree.select() {
                                 eprintln!("Warning: {err}");
@@ -882,23 +898,8 @@ impl PlaytakSession {
                                 our_time_left / 6 + game.increment / 2
                             };
 
-                            // Give enough memory for a CPU calculating at roughly 200K nps.
-                            let max_nodes = (maximum_time.as_secs() as u32).saturating_mul(200_000);
-
-                            // For 6s, the toughest position I've found required 40 elements/node searched
-                            // This formula gives 72, which is hopefully plenty
-                            let max_arena_size = if playtak_settings.rollout_depth < 10 {
-                                max_nodes.saturating_mul((S * S) as u32 * 2)
-                            } else {
-                                // Give SlateBot a smaller tree size, because its nps is much lower
-                                max_nodes.saturating_mul(S as u32 * 2)
-                            };
-
-                            let settings =
-                                playtak_settings.to_mcts_setting(position.half_moves_played())
-                                .arena_size(max_arena_size.min(2_u32.pow(31)));
-
-                            search::play_move_time(position.clone(), maximum_time, settings)
+                            tree.search_for_time(maximum_time, |_| {});
+                            tree.best_move().unwrap()
                         }
                     };
 
@@ -912,6 +913,16 @@ impl PlaytakSession {
                 let output_string =
                     format!("Game#{} {}", game.game_no, best_move.to_string_playtak());
                 self.send_line(&output_string)?;
+
+                if position.game_result().is_none() {
+                    tree = tree
+                        .reroot(&[best_move])
+                        .unwrap_or(search::MonteCarloTree::new(
+                            position.clone(),
+                            settings.clone(),
+                        ));
+                    tree.settings = playtak_settings.to_mcts_setting(position.half_moves_played());
+                }
 
                 // Say "Tak" whenever there is a threat to win
                 // Only do this vs Shigewara
@@ -982,6 +993,18 @@ impl PlaytakSession {
                                     annotations: vec![],
                                     comment: "0.0".to_string(),
                                 });
+
+                                if position.game_result().is_none() {
+                                    tree = tree.reroot(&[move_played]).unwrap_or(
+                                        search::MonteCarloTree::new(
+                                            position.clone(),
+                                            settings.clone(),
+                                        ),
+                                    );
+                                    tree.settings = playtak_settings
+                                        .to_mcts_setting(position.half_moves_played());
+                                }
+
                                 break;
                             }
                             "Time" => {

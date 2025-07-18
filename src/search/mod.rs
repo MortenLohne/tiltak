@@ -169,7 +169,7 @@ pub struct MonteCarloTree<const S: usize> {
     visits: u32,
     position: Position<S>,
     temp_position: Position<S>,
-    settings: MctsSetting<S>,
+    pub settings: MctsSetting<S>,
     temp_vectors: TempVectors<S>,
 }
 
