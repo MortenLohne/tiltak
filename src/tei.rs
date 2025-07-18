@@ -247,21 +247,20 @@ impl<const S: usize> SearchPosition<S> {
         position
     }
 
-    fn move_difference(&self, new_position: &SearchPosition<S>) -> Option<Vec<Move<S>>> {
+    fn move_difference<'a>(&self, new_position: &'a SearchPosition<S>) -> Option<&'a [Move<S>]> {
         if self.root_position != new_position.root_position {
             return None;
         }
-        let mut old_moves_iter = self.moves.iter();
-        let mut new_moves_iter = new_position.moves.iter();
 
-        while let Some(old_move) = old_moves_iter.next() {
-            if old_move != new_moves_iter.next()? {
+        let mut i = 0;
+        while i < self.moves.len() {
+            if self.moves[i] != *new_position.moves.get(i)? {
                 return None;
             }
+            i += 1;
         }
 
-        let difference = new_moves_iter.cloned().collect();
-        Some(difference)
+        Some(&new_position.moves[i..])
     }
 }
 
