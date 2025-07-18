@@ -319,7 +319,7 @@ async fn parse_go_string<'a, const S: usize, Out: Fn(&str), P: Platform>(
                 let mut oom = false;
                 let mut should_stop = false;
                 for n in 0..nodes_to_search {
-                    if n % 100 == 0 {
+                    if n % 1000 == 0 {
                         P::yield_fn().await;
                         match input.try_recv() {
                             Ok(line) => match line.trim() {
