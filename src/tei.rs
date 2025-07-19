@@ -18,12 +18,12 @@ pub trait Platform {
     fn elapsed_time(start: &Self::Instant) -> Duration;
 }
 
-pub async fn tei_game<const S: usize, Out: Fn(&str), P: Platform>(
+async fn tei_game<const S: usize, Out: Fn(&str), P: Platform>(
     input: &async_channel::Receiver<String>,
     output: &Out,
     mcts_settings: MctsSetting<S>,
     komi: &mut Komi,
-) -> Result<usize, ()> {
+) -> TeiResult {
     let mut position: Option<SearchPosition<S>> = None;
 
     let mut last_position_searched: SearchPosition<S> = SearchPosition::new(*komi);
@@ -45,7 +45,7 @@ pub async fn tei_game<const S: usize, Out: Fn(&str), P: Platform>(
             "teinewgame" => {
                 let size_string = words.next();
                 let size: usize = size_string.and_then(|s| usize::from_str(s).ok()).unwrap();
-                return Ok(size);
+                return TeiResult::SwitchSize(size);
             }
             "setoption" => {
                 if [
@@ -96,8 +96,23 @@ pub async fn tei_game<const S: usize, Out: Fn(&str), P: Platform>(
 
                 last_position_searched.clone_from(current_position);
 
-                parse_go_string::<S, _, P>(input, output, &line, current_position, &mut search_tree)
-                    .await
+                match parse_go_string::<S, _, P>(
+                    input,
+                    output,
+                    &line,
+                    current_position,
+                    &mut search_tree,
+                )
+                .await
+                {
+                    // Respond to OOM as if we received 'teinewgame'
+                    // This will drop the whole search tree immediately
+                    Some(TeiResult::Oom) => return TeiResult::SwitchSize(S),
+                    Some(TeiResult::Quit) => return TeiResult::Quit,
+                    Some(TeiResult::NoInput) => return TeiResult::NoInput,
+                    Some(TeiResult::SwitchSize(_)) => unreachable!(),
+                    None => (),
+                }
             }
             s => {
                 eprintln!("Unknown command \"{}\"", s);
@@ -105,7 +120,7 @@ pub async fn tei_game<const S: usize, Out: Fn(&str), P: Platform>(
             }
         }
     }
-    Err(())
+    TeiResult::NoInput
 }
 pub async fn tei<Out: Fn(&str), P: Platform>(
     is_slatebot: bool,
@@ -136,7 +151,7 @@ pub async fn tei<Out: Fn(&str), P: Platform>(
                 let mut size: usize = size_string.and_then(|s| usize::from_str(s).ok()).unwrap();
 
                 loop {
-                    size = match size {
+                    let result = match size {
                         4 => {
                             tei_game::<4, _, P>(
                                 &input,
@@ -144,7 +159,7 @@ pub async fn tei<Out: Fn(&str), P: Platform>(
                                 mcts_settings(is_slatebot, is_cobblebot),
                                 &mut komi,
                             )
-                            .await?
+                            .await
                         }
                         5 => {
                             tei_game::<5, _, P>(
@@ -153,7 +168,7 @@ pub async fn tei<Out: Fn(&str), P: Platform>(
                                 mcts_settings(is_slatebot, is_cobblebot),
                                 &mut komi,
                             )
-                            .await?
+                            .await
                         }
                         6 => {
                             tei_game::<6, _, P>(
@@ -162,10 +177,16 @@ pub async fn tei<Out: Fn(&str), P: Platform>(
                                 mcts_settings(is_slatebot, is_cobblebot),
                                 &mut komi,
                             )
-                            .await?
+                            .await
                         }
                         _ => panic!("Error: Unsupported size {}", size),
                     };
+                    match result {
+                        TeiResult::Quit => return Ok(()),
+                        TeiResult::SwitchSize(new_size) => size = new_size,
+                        TeiResult::NoInput => return Ok(()),
+                        TeiResult::Oom => unreachable!(),
+                    }
                 }
             }
             "setoption" => {
@@ -311,13 +332,20 @@ fn mcts_settings<const S: usize>(is_slatebot: bool, is_cobblebot: bool) -> MctsS
     }
 }
 
+enum TeiResult {
+    Oom,
+    Quit,
+    NoInput,
+    SwitchSize(usize),
+}
+
 async fn parse_go_string<const S: usize, Out: Fn(&str), P: Platform>(
     input: &async_channel::Receiver<String>,
     output: &Out,
     line: &str,
     position: &SearchPosition<S>,
     tree: &mut MonteCarloTree<S>,
-) {
+) -> Option<TeiResult> {
     let mut words = line.split_whitespace();
     words.next(); // go
 
@@ -335,16 +363,20 @@ async fn parse_go_string<const S: usize, Out: Fn(&str), P: Platform>(
                 let nodes_to_search = (200.0 * f64::powf(1.26, i as f64)) as u64;
                 let mut oom = false;
                 let mut should_stop = false;
-                for n in 0..nodes_to_search {
+                'output_loop: for n in 0..nodes_to_search {
                     if n % 1000 == 0 {
+                        if P::elapsed_time(&start_time) > movetime.mul_f32(0.9) {
+                            should_stop = true;
+                            break 'output_loop;
+                        }
                         P::yield_fn().await;
                         match input.try_recv() {
                             Ok(line) => match line.trim() {
                                 "stop" => {
                                     should_stop = true;
-                                    break;
+                                    break 'output_loop;
                                 }
-                                "quit" => process::exit(0),
+                                "quit" => return Some(TeiResult::Quit),
                                 "isready" => output("readyok"),
                                 _ => {
                                     panic!("Warning: Ignoring input \"{}\" during search", line)
@@ -352,13 +384,9 @@ async fn parse_go_string<const S: usize, Out: Fn(&str), P: Platform>(
                             },
                             Err(TryRecvError::Empty) => {}
                             Err(TryRecvError::Closed) => {
-                                eprintln!("Input channel closed, stopping search");
-                                return;
+                                return Some(TeiResult::NoInput);
                             }
                         }
-                    }
-                    if should_stop {
-                        break;
                     }
                     if let Err(err) = tree.select() {
                         eprintln!("Warning: {err}");
@@ -368,16 +396,18 @@ async fn parse_go_string<const S: usize, Out: Fn(&str), P: Platform>(
                     nodes_searched += 1;
                 }
 
-                let elapsed = P::elapsed_time(&start_time);
-
                 let info_string = info_string::<S, P>(&start_time, nodes_searched, tree);
 
                 output(&info_string);
 
-                if oom || should_stop || elapsed.as_secs_f64() > movetime.as_secs_f64() * 0.7 {
+                if oom || should_stop {
                     let (best_move, _) = tree.best_move().unwrap();
                     output(&format!("bestmove {}", best_move));
-                    break;
+                    if oom {
+                        return Some(TeiResult::Oom);
+                    } else {
+                        return None;
+                    }
                 }
             }
         }
@@ -446,6 +476,7 @@ async fn parse_go_string<const S: usize, Out: Fn(&str), P: Platform>(
             panic!("Invalid go command \"{}\"", line);
         }
     }
+    None
 }
 
 pub fn info_string<const S: usize, P: Platform>(
