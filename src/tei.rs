@@ -5,10 +5,10 @@ use arrayvec::ArrayString;
 use async_channel::TryRecvError;
 use board_game_traits::{Color, Position as PositionTrait};
 use pgn_traits::PgnPosition;
-use std::fmt::Write;
 use std::process;
 use std::str::FromStr;
 use std::time::Duration;
+use std::{fmt::Write, mem};
 
 use crate::search::{MctsSetting, MonteCarloTree};
 
@@ -110,6 +110,8 @@ async fn tei_game<const S: usize, Out: Fn(&str), P: Platform>(
                     // This will drop the whole search tree immediately
                     Some(TeiResult::Oom) => {
                         output("info recovering from OOM, search tree will be cleared");
+                        mem::drop(search_tree);
+                        output("info recovered from OOM, search tree has been dropped");
                         return TeiResult::Oom;
                     }
                     Some(TeiResult::Quit) => return TeiResult::Quit,
@@ -194,7 +196,6 @@ pub async fn tei<Out: Fn(&str), P: Platform>(
                         TeiResult::Oom => {
                             // If we faced OOM, this should be fine here, since the search tree has been deallocated
                             output("info recovering from OOM, search tree has been cleared");
-                            break;
                         }
                     }
                 }
