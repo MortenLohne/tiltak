@@ -34,9 +34,13 @@ async fn tei_game<const S: usize, Out: Fn(&str), P: Platform>(
     );
     // Dummy memory that can be de-allocated during OOM
     let dummy_memory = vec![0u8; 1024 * 1024 * 1024];
+    output("info allocated dummy memory 1");
     let dummy_memory2 = vec![0u8; 1024 * 1024 * 1024];
+    output("info allocated dummy memory 2");
     let dummy_memory3 = vec![0u8; 1024 * 1024 * 1024];
-    let dummy_memory4 = vec![0u8; ((1024 * 1024 * 1024) / 4) * 3];
+    output("info allocated dummy memory 3");
+    let dummy_memory4 = vec![0u8; ((1024 * 1024 * 1024) / 4) * 1];
+    output("info allocated dummy memory 4");
 
     while let Ok(line) = input.recv().await {
         let mut words = line.split_whitespace();

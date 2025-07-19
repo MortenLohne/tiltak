@@ -235,6 +235,9 @@ impl<const S: usize> SmallBridge<S> {
         let mut heuristic_scores = vec![];
         heuristic_scores.try_reserve_exact(num_children + padding)?;
 
+        assert_eq!(moves.capacity(), num_children + padding);
+        assert_eq!(heuristic_scores.capacity(), num_children + padding);
+
         for (mv, score) in temp_vectors.moves.drain(..) {
             moves.push(Some(mv));
             heuristic_scores.push(score);
