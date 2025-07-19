@@ -45,7 +45,12 @@ async fn tei_game<const S: usize, Out: Fn(&str), P: Platform>(
                 process::exit(0);
             }
             "stop" => {
-                eprintln!("Got stop when not searching")
+                eprintln!("Got stop when not searching");
+
+                output("info dropping search tree");
+                mem::drop(search_tree);
+                output("info search tree dropped");
+                return TeiResult::Oom;
             }
             "isready" => output("readyok"),
             "teinewgame" => {
