@@ -36,6 +36,7 @@ async fn tei_game<const S: usize, Out: Fn(&str), P: Platform>(
     let dummy_memory = vec![0u8; 1024 * 1024 * 1024];
     let dummy_memory2 = vec![0u8; 1024 * 1024 * 1024];
     let dummy_memory3 = vec![0u8; 1024 * 1024 * 1024];
+    let dummy_memory4 = vec![0u8; ((1024 * 1024 * 1024) / 4) * 3];
 
     while let Ok(line) = input.recv().await {
         let mut words = line.split_whitespace();
@@ -143,6 +144,8 @@ async fn tei_game<const S: usize, Out: Fn(&str), P: Platform>(
                             .unwrap();
                             output(&message);
                         }
+                        mem::drop(dummy_memory4);
+                        output("info dummy memory 4 cleared");
                         mem::drop(search_tree);
                         output("info recovered from OOM, search tree has been dropped");
                         return TeiResult::Oom;
