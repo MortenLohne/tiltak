@@ -108,7 +108,10 @@ async fn tei_game<const S: usize, Out: Fn(&str), P: Platform>(
                 {
                     // Respond to OOM as if we received 'teinewgame'
                     // This will drop the whole search tree immediately
-                    Some(TeiResult::Oom) => return TeiResult::Oom,
+                    Some(TeiResult::Oom) => {
+                        output("info recovering from OOM, search tree will be cleared");
+                        return TeiResult::Oom;
+                    }
                     Some(TeiResult::Quit) => return TeiResult::Quit,
                     Some(TeiResult::NoInput) => return TeiResult::NoInput,
                     Some(TeiResult::SwitchSize(_)) => {
@@ -188,7 +191,11 @@ pub async fn tei<Out: Fn(&str), P: Platform>(
                         TeiResult::Quit => return,
                         TeiResult::SwitchSize(new_size) => size = new_size,
                         TeiResult::NoInput => return,
-                        TeiResult::Oom => (), // If we faced OOM, this should be fine here, since the search tree has been deallocated
+                        TeiResult::Oom => {
+                            // If we faced OOM, this should be fine here, since the search tree has been deallocated
+                            output("info recovering from OOM, search tree has been cleared");
+                            break;
+                        }
                     }
                 }
             }
