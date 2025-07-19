@@ -107,10 +107,12 @@ async fn tei_game<const S: usize, Out: Fn(&str), P: Platform>(
                 {
                     // Respond to OOM as if we received 'teinewgame'
                     // This will drop the whole search tree immediately
-                    Some(TeiResult::Oom) => return TeiResult::SwitchSize(S),
+                    Some(TeiResult::Oom) => return TeiResult::Oom,
                     Some(TeiResult::Quit) => return TeiResult::Quit,
                     Some(TeiResult::NoInput) => return TeiResult::NoInput,
-                    Some(TeiResult::SwitchSize(_)) => unreachable!(),
+                    Some(TeiResult::SwitchSize(_)) => {
+                        unreachable!("Cannot receive teinewgame during search")
+                    }
                     None => (),
                 }
             }
@@ -127,10 +129,10 @@ pub async fn tei<Out: Fn(&str), P: Platform>(
     is_cobblebot: bool,
     input: async_channel::Receiver<String>,
     output: &Out,
-) -> Result<(), ()> {
+) {
     loop {
         let Ok(input) = input.recv().await else {
-            return Ok(());
+            return;
         };
         if input.trim() == "tei" {
             break;
@@ -182,10 +184,10 @@ pub async fn tei<Out: Fn(&str), P: Platform>(
                         _ => panic!("Error: Unsupported size {}", size),
                     };
                     match result {
-                        TeiResult::Quit => return Ok(()),
+                        TeiResult::Quit => return,
                         TeiResult::SwitchSize(new_size) => size = new_size,
-                        TeiResult::NoInput => return Ok(()),
-                        TeiResult::Oom => unreachable!(),
+                        TeiResult::NoInput => return,
+                        TeiResult::Oom => (), // If we faced OOM, this should be fine here, since the search tree has been deallocated
                     }
                 }
             }
@@ -221,7 +223,6 @@ pub async fn tei<Out: Fn(&str), P: Platform>(
             }
         }
     }
-    Ok(())
 }
 
 fn parse_position_string<const S: usize>(line: &str, komi: Komi) -> SearchPosition<S> {
