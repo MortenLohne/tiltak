@@ -115,28 +115,32 @@ async fn tei_game<const S: usize, Out: Fn(&str), P: Platform>(
                     Some(TeiResult::Oom) => {
                         output("info recovering from OOM, search tree will be cleared");
                         mem::drop(dummy_memory);
-                        output("dummy memory 1 cleared");
+                        output("info dummy memory 1 cleared");
                         mem::drop(dummy_memory2);
-                        output("dummy memory 2 cleared");
+                        output("info dummy memory 2 cleared");
                         mem::drop(dummy_memory3);
-                        output("dummy memory 3 cleared");
-                        for i in 0..10 {
-                            let mut message: ArrayString<50> = ArrayString::new();
-                            write!(message, "allocating small dummy memory {}", i).unwrap();
+                        output("info dummy memory 3 cleared");
+                        for i in 0..20 {
+                            let mut message: ArrayString<100> = ArrayString::new();
+                            write!(message, "info allocating small dummy memory {}", i).unwrap();
                             output(&message);
-                            let mut new_memory = vec![0u8; 1024 * 1024];
-                            new_memory.try_reserve_exact(1024 * 1024).unwrap();
+                            let mut new_memory = vec![];
+                            new_memory.try_reserve_exact(512 * 1024 * 1024).unwrap();
                             new_memory.fill(0);
 
                             message.clear();
-                            write!(message, "de-allocating small dummy memory {}", i).unwrap();
+                            write!(message, "info de-allocating small dummy memory {}", i).unwrap();
                             output(&message);
                             assert_eq!(new_memory.iter().sum::<u8>(), 0);
                             mem::drop(new_memory);
 
                             message.clear();
-                            write!(message, "Finished de-allocating small dummy memory {}", i)
-                                .unwrap();
+                            write!(
+                                message,
+                                "info Finished de-allocating small dummy memory {}",
+                                i
+                            )
+                            .unwrap();
                             output(&message);
                         }
                         mem::drop(search_tree);
