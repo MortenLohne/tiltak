@@ -18,7 +18,7 @@ pub trait Platform {
     fn elapsed_time(start: &Self::Instant) -> Duration;
 }
 
-pub async fn tei_game<'a, const S: usize, Out: Fn(&str), P: Platform>(
+pub async fn tei_game<const S: usize, Out: Fn(&str), P: Platform>(
     input: &async_channel::Receiver<String>,
     output: &Out,
     mcts_settings: MctsSetting<S>,
@@ -68,9 +68,9 @@ pub async fn tei_game<'a, const S: usize, Out: Fn(&str), P: Platform>(
                 } else {
                     panic!("Invalid setoption string \"{}\"", line);
                 }
-                position.as_mut().map(|p| {
+                if let Some(p) = position.as_mut() {
                     p.root_position.set_komi(*komi);
-                });
+                }
                 // If we receive a new komi, previous search is invalid
                 last_position_searched = SearchPosition::new(*komi);
                 search_tree = MonteCarloTree::new(
@@ -89,21 +89,15 @@ pub async fn tei_game<'a, const S: usize, Out: Fn(&str), P: Platform>(
 
                 search_tree = update_search_tree(
                     &last_position_searched,
-                    &current_position,
+                    current_position,
                     search_tree,
                     &mcts_settings,
                 );
 
-                last_position_searched.clone_from(&current_position);
+                last_position_searched.clone_from(current_position);
 
-                parse_go_string::<S, _, P>(
-                    &input,
-                    output,
-                    &line,
-                    &current_position,
-                    &mut search_tree,
-                )
-                .await
+                parse_go_string::<S, _, P>(input, output, &line, current_position, &mut search_tree)
+                    .await
             }
             s => {
                 eprintln!("Unknown command \"{}\"", s);
@@ -294,7 +288,7 @@ fn update_search_tree<const S: usize>(
 ) -> MonteCarloTree<S> {
     if let Some(move_difference) = old_position.move_difference(new_position) {
         search_tree
-            .reroot(&move_difference)
+            .reroot(move_difference)
             .unwrap_or_else(|| MonteCarloTree::new(new_position.position(), mcts_settings.clone()))
     } else {
         eprintln!("Failed to find move difference, creating new tree");
@@ -317,7 +311,7 @@ fn mcts_settings<const S: usize>(is_slatebot: bool, is_cobblebot: bool) -> MctsS
     }
 }
 
-async fn parse_go_string<'a, const S: usize, Out: Fn(&str), P: Platform>(
+async fn parse_go_string<const S: usize, Out: Fn(&str), P: Platform>(
     input: &async_channel::Receiver<String>,
     output: &Out,
     line: &str,
@@ -461,7 +455,7 @@ pub fn info_string<const S: usize, P: Platform>(
 ) -> String {
     let (_, best_score) = tree.best_move().unwrap();
 
-    let elapsed = P::elapsed_time(&start_time);
+    let elapsed = P::elapsed_time(start_time);
 
     let pv_length = tree.pv().count();
 

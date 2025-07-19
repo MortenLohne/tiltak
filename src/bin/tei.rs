@@ -152,5 +152,5 @@ pub fn bench() {
 }
 
 fn output_callback(output: &str) {
-    println!("{}", output);
+    println!("{output}");
 }
