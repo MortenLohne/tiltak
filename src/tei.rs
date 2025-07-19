@@ -35,6 +35,7 @@ async fn tei_game<const S: usize, Out: Fn(&str), P: Platform>(
     // Dummy memory that can be de-allocated during OOM
     let dummy_memory = vec![0u8; 1024 * 1024 * 1024];
     let dummy_memory2 = vec![0u8; 1024 * 1024 * 1024];
+    let dummy_memory3 = vec![0u8; 1024 * 1024 * 1024];
 
     while let Ok(line) = input.recv().await {
         let mut words = line.split_whitespace();
@@ -117,6 +118,27 @@ async fn tei_game<const S: usize, Out: Fn(&str), P: Platform>(
                         output("dummy memory 1 cleared");
                         mem::drop(dummy_memory2);
                         output("dummy memory 2 cleared");
+                        mem::drop(dummy_memory3);
+                        output("dummy memory 3 cleared");
+                        for i in 0..10 {
+                            let mut message: ArrayString<50> = ArrayString::new();
+                            write!(message, "allocating small dummy memory {}", i).unwrap();
+                            output(&message);
+                            let mut new_memory = vec![0u8; 1024 * 1024];
+                            new_memory.try_reserve_exact(1024 * 1024).unwrap();
+                            new_memory.fill(0);
+
+                            message.clear();
+                            write!(message, "de-allocating small dummy memory {}", i).unwrap();
+                            output(&message);
+                            assert_eq!(new_memory.iter().sum::<u8>(), 0);
+                            mem::drop(new_memory);
+
+                            message.clear();
+                            write!(message, "Finished de-allocating small dummy memory {}", i)
+                                .unwrap();
+                            output(&message);
+                        }
                         mem::drop(search_tree);
                         output("info recovered from OOM, search tree has been dropped");
                         return TeiResult::Oom;
