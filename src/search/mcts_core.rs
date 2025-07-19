@@ -140,15 +140,30 @@ impl<const S: usize> TreeChild<S> {
                 }
 
                 let num_child_nodes = self.small_bridge().unwrap().moves.len();
+
+                // Allocate the box slices via Vec, so that we can recover from OOM with try_reserve_exact()
+                let mut children: Vec<_> = vec![];
+                children.try_reserve_exact(num_child_nodes)?;
+                let mut mean_action_values: Vec<_> = vec![];
+                mean_action_values.try_reserve_exact(num_child_nodes)?;
+                let mut visitss: Vec<_> = vec![];
+                visitss.try_reserve_exact(num_child_nodes)?;
+
+                assert_eq!(children.capacity(), num_child_nodes);
+                assert_eq!(mean_action_values.capacity(), num_child_nodes);
+                assert_eq!(visitss.capacity(), num_child_nodes);
+
+                for _ in 0..num_child_nodes {
+                    children.push(TreeEdge { child: None });
+                    mean_action_values.push(settings.initial_mean_action_value());
+                    visitss.push(0);
+                }
+
                 let mut tree_edge = TreeBridge {
-                    children: (0..num_child_nodes)
-                        .map(|_| TreeEdge { child: None })
-                        .collect::<Box<_>>(), // TODO: OOM handling
+                    children: children.into_boxed_slice(),
                     moves: mem::take(&mut self.small_bridge().unwrap().moves),
-                    mean_action_values: (0..num_child_nodes)
-                        .map(|_| settings.initial_mean_action_value())
-                        .collect::<Box<_>>(), // TODO: OOM handling
-                    visitss: (0..num_child_nodes).map(|_| 0).collect(), // TODO: OOM handling
+                    mean_action_values: mean_action_values.into_boxed_slice(),
+                    visitss: visitss.into_boxed_slice(),
                     heuristic_scores: mem::take(&mut self.small_bridge().unwrap().heuristic_scores),
                 };
 
@@ -160,7 +175,7 @@ impl<const S: usize> TreeChild<S> {
                     tree_edge.visitss[index] = visits;
                 }
 
-                *self = TreeChild::Large(tree_edge); // TODO: OOM handling
+                *self = TreeChild::Large(tree_edge);
 
                 self.select(position, settings, temp_vectors, our_visits)
             }
@@ -214,23 +229,27 @@ impl<const S: usize> SmallBridge<S> {
         let num_children = temp_vectors.moves.len();
         let padding = (SIMD_WIDTH - (num_children % SIMD_WIDTH)) % SIMD_WIDTH;
 
+        // Allocate the box slices via Vec, so that we can recover from OOM with try_reserve_exact()
+        let mut moves = vec![];
+        moves.try_reserve_exact(num_children + padding)?;
+        let mut heuristic_scores = vec![];
+        heuristic_scores.try_reserve_exact(num_children + padding)?;
+
+        for (mv, score) in temp_vectors.moves.drain(..) {
+            moves.push(Some(mv));
+            heuristic_scores.push(score);
+        }
+        for _ in 0..padding {
+            moves.push(None);
+            heuristic_scores.push(f16::NEG_INFINITY); // Ensure that this move never actually gets selected
+        }
+
         let small_edge = SmallBridge {
-            moves: (0..(num_children + padding))
-                .map(|i| temp_vectors.moves.get(i).map(|(mv, _)| *mv))
-                .collect(),
-            // TODO: OOM handling
-            heuristic_scores: (0..(num_children + padding))
-                .map(|i| {
-                    temp_vectors
-                        .moves
-                        .get(i)
-                        .map(|(_, score)| *score)
-                        .unwrap_or(f16::NEG_INFINITY) // Ensure that this move never actually gets selected
-                })
-                .collect(), // TODO: OOM handling
+            moves: moves.into_boxed_slice(),
+            heuristic_scores: heuristic_scores.into_boxed_slice(),
             children: ArrayVec::new(),
         };
-        temp_vectors.moves.clear();
+        assert!(temp_vectors.moves.is_empty());
 
         Ok(small_edge)
     }
@@ -520,7 +539,7 @@ impl<const S: usize> Tree<S> {
             .select(position, settings, temp_vectors, 1)?
             .unwrap();
 
-        self.children = Some(Box::new(TreeChild::Small(small_bridge))); // TODO: OOM handling
+        self.children = Some(trybox::new(TreeChild::Small(small_bridge))?);
 
         Ok(result)
     }

@@ -7,6 +7,7 @@ use half::f16;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 use size_of::SizeOf;
+use std::collections::TryReserveError;
 use std::f32::consts::PI;
 use std::fmt::Display;
 use std::{mem, time};
@@ -116,6 +117,18 @@ impl<const S: usize> MctsSetting<S> {
 pub enum Error {
     OOM,
     MaxVisits,
+}
+
+impl<T> From<trybox::ErrorWith<T>> for Error {
+    fn from(_: trybox::ErrorWith<T>) -> Self {
+        Error::OOM
+    }
+}
+
+impl From<TryReserveError> for Error {
+    fn from(_: TryReserveError) -> Self {
+        Error::OOM
+    }
 }
 
 impl Display for Error {

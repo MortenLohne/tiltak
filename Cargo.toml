@@ -64,3 +64,4 @@ smol = { version = "2.0.2", optional = true }
 async-channel = "2.5.0"
 mimalloc = {version = "0.1.47", optional = true }
 dhat = { version = "0.3.3", optional = true }
+trybox = "0.1.2"
