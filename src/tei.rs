@@ -335,6 +335,7 @@ async fn parse_go_string<'a, const S: usize, Out: Fn(&str), P: Platform>(
                 Duration::MAX // 'go infinite' is just movetime with a very long duration
             };
             let start_time = P::current_time();
+            let mut nodes_searched = 0;
 
             for i in 0.. {
                 let nodes_to_search = (200.0 * f64::powf(1.26, i as f64)) as u64;
@@ -370,11 +371,12 @@ async fn parse_go_string<'a, const S: usize, Out: Fn(&str), P: Platform>(
                         oom = true;
                         break;
                     }
+                    nodes_searched += 1;
                 }
 
                 let elapsed = P::elapsed_time(&start_time);
 
-                let info_string = info_string::<S, P>(&start_time, tree);
+                let info_string = info_string::<S, P>(&start_time, nodes_searched, tree);
 
                 output(&info_string);
 
@@ -415,9 +417,11 @@ async fn parse_go_string<'a, const S: usize, Out: Fn(&str), P: Platform>(
             };
 
             let start_time = P::current_time();
+            let nodes_searched_previously = tree.visits();
 
             tree.search_for_time(max_time, |tree| {
-                let info_string = info_string::<S, P>(&start_time, tree);
+                let nodes_searched = tree.visits() - nodes_searched_previously;
+                let info_string = info_string::<S, P>(&start_time, nodes_searched, tree);
 
                 output(&info_string);
             });
@@ -427,14 +431,16 @@ async fn parse_go_string<'a, const S: usize, Out: Fn(&str), P: Platform>(
         }
         Some("nodes") => {
             let nodes = words.next().unwrap().parse::<u32>().unwrap();
+            let mut nodes_searched = 0;
 
             let start_time = P::current_time();
 
             while tree.visits() < nodes {
                 tree.select().unwrap();
+                nodes_searched += 1;
             }
 
-            let info_string = info_string::<S, P>(&start_time, tree);
+            let info_string = info_string::<S, P>(&start_time, nodes_searched, tree);
 
             output(&info_string);
 
@@ -450,6 +456,7 @@ async fn parse_go_string<'a, const S: usize, Out: Fn(&str), P: Platform>(
 
 pub fn info_string<const S: usize, P: Platform>(
     start_time: &P::Instant,
+    nodes_searched: u32,
     tree: &MonteCarloTree<S>,
 ) -> String {
     let (_, best_score) = tree.best_move().unwrap();
@@ -468,7 +475,7 @@ pub fn info_string<const S: usize, P: Platform>(
         tree.visits(),
         (best_score * 200.0 - 100.0) as i64,
         elapsed.as_millis(),
-        tree.visits() as f32 / elapsed.as_secs_f32(),
+        nodes_searched as f32 / elapsed.as_secs_f32(),
     )
     .unwrap();
 
