@@ -33,13 +33,13 @@ async fn tei_game<const S: usize, Out: Fn(&str), P: Platform>(
         mcts_settings.clone(),
     );
     // Dummy memory that can be de-allocated during OOM
-    let dummy_memory = vec![0u8; 1024 * 1024 * 1024];
+    let dummy_memory = vec![0u8; 128 * 1024 * 1024];
     output("info allocated dummy memory 1");
-    let dummy_memory2 = vec![0u8; 1024 * 1024 * 1024];
+    let dummy_memory2 = vec![0u8; 128 * 1024 * 1024];
     output("info allocated dummy memory 2");
-    let dummy_memory3 = vec![0u8; 1024 * 1024 * 1024];
+    let dummy_memory3 = vec![0u8; 128 * 1024 * 1024];
     output("info allocated dummy memory 3");
-    let dummy_memory4 = vec![0u8; ((1024 * 1024 * 1024) / 4) * 1];
+    let dummy_memory4 = vec![0u8; 128 * 1024 * 1024];
     output("info allocated dummy memory 4");
 
     while let Ok(line) = input.recv().await {
@@ -135,7 +135,7 @@ async fn tei_game<const S: usize, Out: Fn(&str), P: Platform>(
                             write!(message, "info allocating small dummy memory {}", i).unwrap();
                             output(&message);
                             let mut new_memory = vec![];
-                            new_memory.try_reserve_exact(512 * 1024 * 1024).unwrap();
+                            new_memory.try_reserve_exact(32 * 1024 * 1024).unwrap();
                             new_memory.fill(0);
 
                             message.clear();
