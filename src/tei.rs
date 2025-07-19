@@ -130,7 +130,7 @@ pub async fn tei<Out: Fn(&str), P: Platform>(
 
     output("id name Tiltak");
     output("id author Morten Lohne");
-    output("option name HalfKomi type spin default 0 min -10 max 10");
+    output("option name HalfKomi type combo default 0 var 0 var 4");
     output("teiok");
 
     let mut komi = Komi::default();
@@ -293,10 +293,9 @@ fn update_search_tree<const S: usize>(
     mcts_settings: &MctsSetting<S>,
 ) -> MonteCarloTree<S> {
     if let Some(move_difference) = old_position.move_difference(new_position) {
-        search_tree.reroot(&move_difference).unwrap_or_else(|| {
-            eprintln!("Failed to reroot tree, creating new tree");
-            MonteCarloTree::new(new_position.position(), mcts_settings.clone())
-        })
+        search_tree
+            .reroot(&move_difference)
+            .unwrap_or_else(|| MonteCarloTree::new(new_position.position(), mcts_settings.clone()))
     } else {
         eprintln!("Failed to find move difference, creating new tree");
         MonteCarloTree::new(new_position.position(), mcts_settings.clone())
