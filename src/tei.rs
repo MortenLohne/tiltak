@@ -33,7 +33,8 @@ async fn tei_game<const S: usize, Out: Fn(&str), P: Platform>(
         mcts_settings.clone(),
     );
     // Dummy memory that can be de-allocated during OOM
-    let dummy_memory = vec![0u8; 100 * 1024 * 1024];
+    let dummy_memory = vec![0u8; 1024 * 1024 * 1024];
+    let dummy_memory2 = vec![0u8; 1024 * 1024 * 1024];
 
     while let Ok(line) = input.recv().await {
         let mut words = line.split_whitespace();
@@ -113,7 +114,9 @@ async fn tei_game<const S: usize, Out: Fn(&str), P: Platform>(
                     Some(TeiResult::Oom) => {
                         output("info recovering from OOM, search tree will be cleared");
                         mem::drop(dummy_memory);
-                        output("dummy memory cleared");
+                        output("dummy memory 1 cleared");
+                        mem::drop(dummy_memory2);
+                        output("dummy memory 2 cleared");
                         mem::drop(search_tree);
                         output("info recovered from OOM, search tree has been dropped");
                         return TeiResult::Oom;
