@@ -1,6 +1,7 @@
 #![allow(clippy::uninlined_format_args)]
 
 use crate::position::{Komi, Move, Position};
+use arrayvec::ArrayString;
 use async_channel::TryRecvError;
 use board_game_traits::{Color, Position as PositionTrait};
 use pgn_traits::PgnPosition;
@@ -397,13 +398,17 @@ async fn parse_go_string<const S: usize, Out: Fn(&str), P: Platform>(
                     nodes_searched += 1;
                 }
 
+                // Must not allocate memory here, because we may be in an OOM situation
                 let info_string = info_string::<S, P>(&start_time, nodes_searched, tree);
 
                 output(&info_string);
 
                 if oom || should_stop {
                     let (best_move, _) = tree.best_move().unwrap();
-                    output(&format!("bestmove {}", best_move));
+                    let mut best_move_string: ArrayString<20> =
+                        ArrayString::from_str("bestmove ").unwrap();
+                    write!(best_move_string, "{}", best_move).unwrap();
+                    output(&best_move_string);
                     if oom {
                         return Some(TeiResult::Oom);
                     } else {
@@ -484,14 +489,14 @@ pub fn info_string<const S: usize, P: Platform>(
     start_time: &P::Instant,
     nodes_searched: u32,
     tree: &MonteCarloTree<S>,
-) -> String {
+) -> ArrayString<1024> {
     let (_, best_score) = tree.best_move().unwrap();
 
     let elapsed = P::elapsed_time(start_time);
 
     let pv_length = tree.pv().count();
 
-    let mut info_string = String::with_capacity(100 + 6 * pv_length);
+    let mut info_string = ArrayString::new();
 
     write!(
         info_string,
@@ -506,7 +511,10 @@ pub fn info_string<const S: usize, P: Platform>(
     .unwrap();
 
     for mv in tree.pv() {
-        write!(info_string, " {}", mv).unwrap();
+        if let Err(_) = write!(info_string, " {}", mv) {
+            // If the info string grows too large, truncate the PV and return
+            return info_string;
+        }
     }
     info_string
 }
