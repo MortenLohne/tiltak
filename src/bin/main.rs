@@ -48,6 +48,8 @@ fn main() {
     #[cfg(feature = "dhat-heap")]
     let _profiler = dhat::Profiler::new_heap();
 
+    bench::<6>();
+
     println!("play: Play against the engine through the command line");
     println!("aimatch: Watch the engine play against a very simple minmax implementation");
     println!("analyze <size>: Analyze a given position, provided from a PTN or a simple move list");
@@ -1002,17 +1004,13 @@ fn bench_position<const S: usize>(position: Position<S>, nodes: u32) {
 
     // Stop timer before computing memory usage, since that takes some time
     let elapsed = start_time.elapsed();
-    let mem_usage = tree.mem_usage();
 
     println!(
-        "{}: {:.2}%, {:.2}s, {:.1} knps, {}MiB used, {:.2}GB used, {} allocations",
+        "{}: {:.2}%, {:.2}s, {:.1} knps",
         mv,
         score * 100.0,
         elapsed.as_secs_f32(),
         knps,
-        mem_usage.total_bytes() / (1024 * 1024),
-        mem_usage.total_bytes() as f64 / (1000.0 * 1000.0 * 1000.0),
-        mem_usage.distinct_allocations()
     );
 }
 

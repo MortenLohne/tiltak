@@ -8,7 +8,6 @@ use half::f16;
 use half::slice::HalfFloatSliceExt;
 use rand::Rng;
 use rand_distr::Distribution;
-use size_of::SizeOf;
 
 use crate::evaluation::parameters::IncrementalPolicy;
 use crate::position::Move;
@@ -19,14 +18,14 @@ use crate::search::{cp_to_win_percentage, MctsSetting};
 use super::Error;
 
 /// A Monte Carlo Search Tree, containing every node that has been seen in search.
-#[derive(PartialEq, Debug, SizeOf)]
+#[derive(PartialEq, Debug)]
 pub struct Tree<const S: usize> {
     pub total_action_value: f64,
     pub game_result: Option<GameResultForUs>,
     pub children: Option<Box<TreeChild<S>>>,
 }
 
-#[derive(PartialEq, Debug, SizeOf)]
+#[derive(PartialEq, Debug)]
 pub enum TreeChild<const S: usize> {
     Small(SmallBridge<S>),
     Large(TreeBridge<S>),
@@ -39,17 +38,6 @@ pub struct SmallBridge<const S: usize> {
     pub children: ArrayVec<(Tree<S>, Move<S>, u32), 4>,
 }
 
-impl<const S: usize> SizeOf for SmallBridge<S> {
-    fn size_of_children(&self, context: &mut size_of::Context) {
-        context.add_arraylike(self.moves.len(), mem::size_of::<Option<Move<S>>>());
-        context.add_arraylike(self.heuristic_scores.len(), mem::size_of::<f16>());
-
-        for child in self.children.iter() {
-            child.size_of_with_context(context);
-        }
-    }
-}
-
 #[derive(PartialEq, Debug)]
 pub struct TreeBridge<const S: usize> {
     pub children: Box<[TreeEdge<S>]>,
@@ -59,19 +47,7 @@ pub struct TreeBridge<const S: usize> {
     pub heuristic_scores: Box<[f16]>,
 }
 
-impl<const S: usize> SizeOf for TreeBridge<S> {
-    fn size_of_children(&self, context: &mut size_of::Context) {
-        context.add_arraylike(self.moves.len(), mem::size_of::<Option<Move<S>>>());
-        context.add_arraylike(self.heuristic_scores.len(), mem::size_of::<f16>());
-        context.add_arraylike(self.mean_action_values.len(), mem::size_of::<f32>());
-        context.add_arraylike(self.visitss.len(), mem::size_of::<u32>());
-        for child in self.children.iter() {
-            child.size_of_with_context(context);
-        }
-    }
-}
-
-#[derive(PartialEq, Debug, SizeOf)]
+#[derive(PartialEq, Debug)]
 pub struct TreeEdge<const S: usize> {
     pub child: Option<Tree<S>>,
 }
@@ -659,7 +635,7 @@ pub fn rollout<const S: usize>(
 }
 
 /// A game result from one side's perspective
-#[derive(Clone, Copy, Debug, Eq, PartialEq, SizeOf)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum GameResultForUs {
     Win,
     Loss,

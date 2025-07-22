@@ -6,7 +6,6 @@ use board_game_traits::Position as _;
 use half::f16;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
-use size_of::SizeOf;
 use std::collections::TryReserveError;
 use std::f32::consts::PI;
 use std::fmt::Display;
@@ -313,10 +312,6 @@ impl<const S: usize> MonteCarloTree<S> {
     // TODO: Count up to u64 on root?
     pub fn visits(&self) -> u32 {
         self.visits
-    }
-
-    pub fn mem_usage(&self) -> size_of::TotalSize {
-        self.tree.size_of()
     }
 
     pub fn mean_action_value(&self) -> f32 {
