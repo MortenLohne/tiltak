@@ -511,7 +511,7 @@ pub fn info_string<const S: usize, P: Platform>(
     .unwrap();
 
     for mv in tree.pv() {
-        if let Err(_) = write!(info_string, " {}", mv) {
+        if write!(info_string, " {}", mv).is_err() {
             // If the info string grows too large, truncate the PV and return
             return info_string;
         }
