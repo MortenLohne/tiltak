@@ -187,19 +187,27 @@ impl<const S: usize> MonteCarloTree<S> {
         })
     }
 
-    pub fn new(position: Position<S>, settings: MctsSetting<S>) -> MonteCarloTree<S> {
-        let mut tree = TreeEdge { child: None };
-        let mut temp_vectors = TempVectors::default();
+    /// Resets the tree to a new position and settings,
+    /// re-using allocations from the previous tree
+    pub fn reset_tree(&mut self, position: &Position<S>, settings: MctsSetting<S>) {
+        self.tree.child = None;
+        self.visits = 0;
+        self.settings = settings;
+        self.position.clone_from(&position);
+        self.temp_position.clone_from(&position);
+        self.temp_vectors.clear();
+        self.initialize_tree();
+    }
 
-        // Applying dirichlet noise or excluding moves can only be done once the child edges of the root are initialized,
-        // which is done on the 2nd select
-        tree.select(&mut position.clone(), &settings, &mut temp_vectors, 0)
-            .unwrap();
-        tree.select(&mut position.clone(), &settings, &mut temp_vectors, 1)
-            .unwrap();
+    /// Applies dirichlet noise and excludes moves
+    /// which can only be done once two iterations of mcts have been done
+    fn initialize_tree(&mut self) {
+        self.select().unwrap();
+        self.select().unwrap();
 
-        if let Some(alpha) = settings.dirichlet {
-            tree.child
+        if let Some(alpha) = self.settings.dirichlet {
+            self.tree
+                .child
                 .as_mut()
                 .unwrap()
                 .children
@@ -208,9 +216,9 @@ impl<const S: usize> MonteCarloTree<S> {
                 .apply_dirichlet(0.25, alpha);
         }
 
-        if !settings.excluded_moves.is_empty() {
-            let bridge = tree.child.as_mut().unwrap().children.as_mut().unwrap();
-            for excluded_move in settings.excluded_moves.iter() {
+        if !self.settings.excluded_moves.is_empty() {
+            let bridge = self.tree.child.as_mut().unwrap().children.as_mut().unwrap();
+            for excluded_move in self.settings.excluded_moves.iter() {
                 let TreeChild::Small(ref mut small_bridge) = **bridge else {
                     panic!()
                 };
@@ -232,15 +240,19 @@ impl<const S: usize> MonteCarloTree<S> {
                 heuristic_scores[index] = f16::NEG_INFINITY; // TODO: Also set infinite visitss?
             }
         }
+    }
 
-        MonteCarloTree {
-            tree,
+    pub fn new(position: Position<S>, settings: MctsSetting<S>) -> MonteCarloTree<S> {
+        let mut tree = MonteCarloTree {
+            tree: TreeEdge { child: None },
             visits: 0,
             position: position.clone(),
             temp_position: position,
             settings,
-            temp_vectors,
-        }
+            temp_vectors: TempVectors::default(),
+        };
+        tree.initialize_tree();
+        tree
     }
 
     pub fn position(&self) -> &Position<S> {

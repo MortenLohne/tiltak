@@ -69,8 +69,18 @@ impl<const S: usize> Default for TempVectors<S> {
             moves: vec![],
             fcd_per_move: vec![],
             policy_feature_sets: vec![],
-            unpacked_heuristic_scores: vec![0.; 65536],
+            unpacked_heuristic_scores: vec![0.0; 65536],
         }
+    }
+}
+
+impl<const S: usize> TempVectors<S> {
+    pub fn clear(&mut self) {
+        self.simple_moves.clear();
+        self.moves.clear();
+        self.fcd_per_move.clear();
+        self.policy_feature_sets.clear();
+        self.unpacked_heuristic_scores.fill(0.0);
     }
 }
 
