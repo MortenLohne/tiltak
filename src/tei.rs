@@ -465,13 +465,18 @@ async fn parse_go_string<const S: usize, Out: Fn(&str), P: Platform>(
         }
         Some("nodes") => {
             let nodes = words.next().unwrap().parse::<u32>().unwrap();
-            let mut nodes_searched = 0;
+            let mut nodes_searched: u32 = 0;
 
             let start_time = P::current_time();
 
             while tree.visits() < nodes {
-                tree.select().unwrap();
+                let Ok(_) = tree.select() else {
+                    break;
+                };
                 nodes_searched += 1;
+                if nodes_searched.is_power_of_two() {
+                    output(&info_string::<S, P>(&start_time, nodes_searched, tree));
+                }
             }
 
             let info_string = info_string::<S, P>(&start_time, nodes_searched, tree);
@@ -496,7 +501,8 @@ pub fn info_string<const S: usize, P: Platform>(
 ) -> ArrayString<1024> {
     let (_, best_score) = tree.best_move().unwrap();
 
-    let elapsed = P::elapsed_time(start_time);
+    // Avoid NaN nps
+    let elapsed = P::elapsed_time(start_time).max(Duration::from_micros(1));
 
     let pv_length = tree.pv().count();
 
