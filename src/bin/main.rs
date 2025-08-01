@@ -48,8 +48,6 @@ fn main() {
     #[cfg(feature = "dhat-heap")]
     let _profiler = dhat::Profiler::new_heap();
 
-    bench::<6>();
-
     println!("play: Play against the engine through the command line");
     println!("aimatch: Watch the engine play against a very simple minmax implementation");
     println!("analyze <size>: Analyze a given position, provided from a PTN or a simple move list");
