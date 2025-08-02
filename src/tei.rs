@@ -501,6 +501,8 @@ pub fn info_string<const S: usize, P: Platform>(
 ) -> ArrayString<1024> {
     let (_, best_score) = tree.best_move().unwrap();
 
+    let wdl = [best_score, 0.0, 1.0 - best_score];
+
     // Avoid NaN nps
     let elapsed = P::elapsed_time(start_time).max(Duration::from_micros(1));
 
@@ -510,11 +512,14 @@ pub fn info_string<const S: usize, P: Platform>(
 
     write!(
         info_string,
-        "info depth {} seldepth {} nodes {} score cp {} time {} nps {:.0} pv",
+        "info depth {} seldepth {} nodes {} score cp {} wdl {} {} {} time {} nps {:.0} pv",
         ((tree.visits() as f64 / 10.0).log2()) as u64,
         pv_length,
         tree.visits(),
         (best_score * 200.0 - 100.0) as i64,
+        (wdl[0] * 1000.0).round() as i64,
+        (wdl[1] * 1000.0).round() as i64,
+        (wdl[2] * 1000.0).round() as i64,
         elapsed.as_millis(),
         nodes_searched as f32 / elapsed.as_secs_f32(),
     )
