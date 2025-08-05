@@ -613,7 +613,8 @@ pub fn rollout<const S: usize>(
         let centipawn_score = temp_vectors
             .topaz_evaluator
             .incremental_eval(BoardData::from(position.clone()))
-            as f32;
+            as f32
+            / 250.0;
 
         let static_eval = if let Some(static_eval_variance) = settings.static_eval_variance {
             let mut rng = rand::thread_rng();
@@ -623,10 +624,7 @@ pub fn rollout<const S: usize>(
         } else {
             cp_to_win_percentage(centipawn_score)
         };
-        match position.side_to_move() {
-            Color::White => (static_eval, None),
-            Color::Black => (1.0 - static_eval, None),
-        }
+        (static_eval, None)
     } else {
         position.generate_moves_with_probabilities(
             &group_data,
