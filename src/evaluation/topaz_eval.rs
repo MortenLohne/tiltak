@@ -13,11 +13,6 @@ pub const WHITE_WALL: ValidPiece = ValidPiece(2);
 pub const BLACK_WALL: ValidPiece = ValidPiece(3);
 pub const WHITE_CAP: ValidPiece = ValidPiece(4);
 pub const BLACK_CAP: ValidPiece = ValidPiece(5);
-const _ASS: () = assert!(
-    WHITE_FLAT.flip_color().0 == BLACK_FLAT.0
-        && BLACK_WALL.flip_color().0 == WHITE_WALL.0
-        && BLACK_CAP.flip_color().0 == WHITE_CAP.0
-);
 
 pub static NNUE: Network = unsafe {
     let bytes = include_bytes!("../quantised.bin");
@@ -31,9 +26,6 @@ pub struct ValidPiece(pub u8);
 impl ValidPiece {
     pub const fn without_color(self) -> u8 {
         self.0 >> 1
-    }
-    const fn flip_color(self) -> Self {
-        Self(self.0 ^ 1) // Toggle bit 0
     }
     pub const fn promote_cap(self) -> Self {
         Self(self.0 | 4) // Set bit 2
@@ -381,7 +373,6 @@ impl Accumulator {
 pub struct NNUE6 {
     white: (Incremental, Incremental),
     black: (Incremental, Incremental),
-    pub(crate) tempo_offset: i32,
 }
 
 impl NNUE6 {
@@ -419,13 +410,6 @@ impl NNUE6 {
         }
         eval
     }
-    pub(crate) fn manual_eval(takboard: BoardData) -> i32 {
-        let (ours, theirs) = build_features(takboard);
-        let ours = Incremental::fresh_new(&NNUE, ours);
-        let theirs = Incremental::fresh_new(&NNUE, theirs);
-        let eval = NNUE.evaluate(&ours.vec, &theirs.vec, ours.state.clone().into_iter());
-        eval
-    }
 }
 
 impl Default for NNUE6 {
@@ -439,7 +423,6 @@ impl Default for NNUE6 {
                 Incremental::fresh_empty(&NNUE),
                 Incremental::fresh_empty(&NNUE),
             ),
-            tempo_offset: 100,
         }
     }
 }
@@ -523,16 +506,6 @@ impl Incremental {
         Self {
             state: inc,
             vec: acc,
-        }
-    }
-    fn fresh_new(net: &Network, data: IncrementalState) -> Self {
-        let mut acc = Accumulator::new(net);
-        for d in data.clone().into_iter() {
-            acc.add_feature(d as usize, net);
-        }
-        Self {
-            vec: acc,
-            state: data,
         }
     }
 }
@@ -662,15 +635,6 @@ impl IntoIterator for IncrementalState {
 impl IncrementalState {
     pub fn empty() -> Self {
         let bitset = [0; 16];
-        Self { bitset }
-    }
-    pub fn from_vec(vec: Vec<u16>) -> Self {
-        let mut bitset = [0; 16];
-        for val in vec {
-            let b_idx = (val / 64) as usize;
-            let b_val = 1 << (val % 64);
-            bitset[b_idx] |= b_val
-        }
         Self { bitset }
     }
     pub fn add_feature(&mut self, val: u16) {

@@ -602,14 +602,6 @@ pub fn rollout<const S: usize>(
 
         (game_result_for_us.score(), Some(game_result_for_us))
     } else if depth == 0 {
-        let centipawn_score = position.static_eval_with_params_and_data(
-            &group_data,
-            match settings.value_params.as_ref() {
-                Some(params) => params,
-                None => <Position<S>>::value_params(position.komi()),
-            },
-        );
-
         let centipawn_score = temp_vectors
             .topaz_evaluator
             .incremental_eval(BoardData::from(position.clone()))
