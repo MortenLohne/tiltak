@@ -10,6 +10,7 @@ use rand::Rng;
 use rand_distr::Distribution;
 
 use crate::evaluation::parameters::IncrementalPolicy;
+use crate::evaluation::topaz_eval::{BoardData, NNUE6};
 use crate::position::Move;
 /// This module contains the core of the MCTS search algorithm
 use crate::position::Position;
@@ -53,13 +54,13 @@ pub struct TreeEdge<const S: usize> {
 }
 
 /// Temporary vectors that are continually re-used during search to avoid unnecessary allocations
-#[derive(Debug)]
 pub struct TempVectors<const S: usize> {
     simple_moves: Vec<Move<S>>,
     moves: Vec<(Move<S>, f16)>,
     fcd_per_move: Vec<i8>,
     policy_feature_sets: Vec<IncrementalPolicy<S>>,
     unpacked_heuristic_scores: Vec<f32>,
+    topaz_evaluator: NNUE6,
 }
 
 impl<const S: usize> Default for TempVectors<S> {
@@ -70,6 +71,7 @@ impl<const S: usize> Default for TempVectors<S> {
             fcd_per_move: vec![],
             policy_feature_sets: vec![],
             unpacked_heuristic_scores: vec![0.0; 65536],
+            topaz_evaluator: NNUE6::default(),
         }
     }
 }
@@ -607,6 +609,12 @@ pub fn rollout<const S: usize>(
                 None => <Position<S>>::value_params(position.komi()),
             },
         );
+
+        let centipawn_score = temp_vectors
+            .topaz_evaluator
+            .incremental_eval(BoardData::from(position.clone()))
+            as f32;
+
         let static_eval = if let Some(static_eval_variance) = settings.static_eval_variance {
             let mut rng = rand::thread_rng();
             cp_to_win_percentage(
