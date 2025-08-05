@@ -100,15 +100,15 @@ impl<const S: usize> From<Position<S>> for BoardData {
                     position::Piece::WhiteCap => WHITE_FLAT,
                     position::Piece::BlackCap => BLACK_FLAT,
                 };
-                if position.top_stones()[square] == Some(position::Piece::WhiteCap) {
-                    caps[0] = square.into_inner();
-                }
-                if position.top_stones()[square] == Some(position::Piece::BlackCap) {
-                    caps[1] = square.into_inner();
-                }
                 data[data_len as usize] =
                     PieceSquare::new(square.into_inner() as usize, topaz_piece.0);
                 data_len += 1;
+            }
+            if position.top_stones()[square] == Some(position::Piece::WhiteCap) {
+                caps[0] = square.into_inner();
+            }
+            if position.top_stones()[square] == Some(position::Piece::BlackCap) {
+                caps[1] = square.into_inner();
             }
         }
         Self {
