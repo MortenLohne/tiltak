@@ -1,3 +1,4 @@
+use arrayvec::ArrayVec;
 use board_game_traits::{Color, Position as _};
 
 use crate::position::{self, squares_iterator, Position};
@@ -76,13 +77,14 @@ pub struct BoardData {
     pub white_to_move: bool,
 }
 
-impl<const S: usize> From<Position<S>> for BoardData {
-    fn from(position: Position<S>) -> Self {
+impl<const S: usize> From<&Position<S>> for BoardData {
+    fn from(position: &Position<S>) -> Self {
         let mut data = [PieceSquare(255); 62];
         let mut data_len: u8 = 0;
         let mut caps = [255; 2];
         for square in squares_iterator::<S>() {
-            let stack: Vec<position::Piece> = position.get_stack(square).into_iter().collect();
+            let stack: ArrayVec<position::Piece, 62> =
+                position.get_stack(square).into_iter().collect();
             for piece in stack.iter().rev().take(STACK_DEPTH) {
                 let topaz_piece = match piece {
                     position::Piece::WhiteFlat => WHITE_FLAT,

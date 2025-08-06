@@ -604,8 +604,7 @@ pub fn rollout<const S: usize>(
     } else if depth == 0 {
         let centipawn_score = temp_vectors
             .topaz_evaluator
-            .incremental_eval(BoardData::from(position.clone()))
-            as f32
+            .incremental_eval(BoardData::from(&*position)) as f32
             / 250.0;
 
         let static_eval = if let Some(static_eval_variance) = settings.static_eval_variance {
