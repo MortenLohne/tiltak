@@ -193,8 +193,8 @@ impl<const S: usize> MonteCarloTree<S> {
         self.tree.child = None;
         self.visits = 0;
         self.settings = settings;
-        self.position.clone_from(&position);
-        self.temp_position.clone_from(&position);
+        self.position.clone_from(position);
+        self.temp_position.clone_from(position);
         self.temp_vectors.clear();
         self.initialize_tree();
     }

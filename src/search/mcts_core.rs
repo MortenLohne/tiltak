@@ -362,8 +362,7 @@ impl<const S: usize> TreeBridge<S> {
         assert_eq!(heuristic_scores.len(), self.mean_action_values.len());
         assert_eq!(heuristic_scores.len(), self.visitss.len());
 
-        for i in 0..heuristic_scores.len() {
-            let heuristic_score = &mut heuristic_scores[i];
+        for (i, heuristic_score) in heuristic_scores.iter_mut().enumerate() {
             let mean_action_value = &self.mean_action_values[i];
             let child_visits = &self.visitss[i];
 
