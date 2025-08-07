@@ -202,8 +202,20 @@ fn features_for_move_colortr<Us: ColorTr, Them: ColorTr, P: PolicyApplier, const
     group_data: &GroupData<S>,
 ) {
     let indexes = policy_indexes::<S>();
-    // If it's the first move, give every move equal probability
-    if position.half_moves_played() < 2 {
+    // Special handling for the first two ply
+    let all_pieces = group_data.all_pieces();
+    if all_pieces.count() == 0 {
+        policy.eval_one(
+            indexes.first_ply_psqt,
+            lookup_square_symmetries::<S>(mv.destination_square()),
+        );
+        return;
+    }
+    if all_pieces.count() == 1 {
+        policy.eval_one(
+            indexes.second_ply_psqt,
+            lookup_square_symmetries::<S>(mv.destination_square()),
+        );
         return;
     }
 
