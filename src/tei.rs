@@ -283,7 +283,7 @@ impl<const S: usize> SearchPosition<S> {
 
     fn side_to_move(&self) -> Color {
         let root_side_to_move = self.root_position.side_to_move();
-        if self.moves.len() % 2 == 0 {
+        if self.moves.len().is_multiple_of(2) {
             root_side_to_move
         } else {
             !root_side_to_move

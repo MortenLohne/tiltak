@@ -134,7 +134,7 @@ fn main() {
                         }
                         let result = (opening, search::mcts(position, 100_000));
                         let total = evaled.fetch_add(1, atomic::Ordering::Relaxed);
-                        if total % 1000 == 0 {
+                        if total.is_multiple_of(1000) {
                             eprintln!(
                                 "Evaluted {} openings in {}s",
                                 total,

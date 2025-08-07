@@ -287,7 +287,7 @@ fn play_game_pair<const S: usize>(
         .add_value_params(last_value_params)
         .add_policy_params(last_policy_params)
         .add_dirichlet(0.2);
-    if i % 2 == 0 {
+    if i.is_multiple_of(2) {
         let game = play_game::<S>(
             &settings,
             &last_settings,
