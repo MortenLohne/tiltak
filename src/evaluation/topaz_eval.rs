@@ -387,18 +387,14 @@ impl NNUE6 {
         };
         // Ours
         let mut ours_acc = Accumulator::from_old(&old_ours.vec);
-        let (sub, add) = ours.diff(&old_ours.state);
-        ours_acc.remove_all(&sub, &NNUE);
-        ours_acc.add_all(&add, &NNUE);
+        ours.compute_diff(&old_ours.state, &mut ours_acc);
         let ours = Incremental {
             state: ours,
             vec: ours_acc,
         };
         // Theirs
         let mut theirs_acc = Accumulator::from_old(&old_theirs.vec);
-        let (sub, add) = theirs.diff(&old_theirs.state);
-        theirs_acc.remove_all(&sub, &NNUE);
-        theirs_acc.add_all(&add, &NNUE);
+        theirs.compute_diff(&old_theirs.state, &mut theirs_acc);
         let theirs = Incremental {
             state: theirs,
             vec: theirs_acc,
@@ -644,10 +640,8 @@ impl IncrementalState {
         let b_val = 1 << (val % 64);
         self.bitset[b_idx] |= b_val
     }
-    pub fn diff(&self, old: &Self) -> (Vec<u16>, Vec<u16>) {
-        // Todo in the real algorithm, do not allocate vecs. This is just to demonstrate the idea
-        let mut subtract_indices = Vec::new();
-        let mut add_indices = Vec::new();
+
+    pub fn compute_diff(&self, old: &Self, acc: &mut Accumulator) {
         for (idx, (n, o)) in self
             .bitset
             .iter()
@@ -656,20 +650,25 @@ impl IncrementalState {
             .enumerate()
         {
             let d = n ^ o; // Difference between bitsets
+
             if d != 0 {
                 let mut sub = d & o; // Difference and Old
+
                 let mut add = d & n; // Difference and New
+
                 while sub != 0 {
                     let bit_idx = pop_lowest(&mut sub);
-                    subtract_indices.push(idx as u16 * 64 + bit_idx as u16)
+
+                    acc.remove_feature(idx * 64 + bit_idx as usize, &NNUE);
                 }
+
                 while add != 0 {
                     let bit_idx = pop_lowest(&mut add);
-                    add_indices.push(idx as u16 * 64 + bit_idx as u16)
+
+                    acc.add_feature(idx * 64 + bit_idx as usize, &NNUE);
                 }
             }
         }
-        (subtract_indices, add_indices)
     }
 }
 
