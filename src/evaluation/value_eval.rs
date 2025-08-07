@@ -530,11 +530,14 @@ pub fn static_eval_game_phase<const S: usize, V: ValueApplier>(
             0,
             f16::from_u8(stack_height * (neighbors & group_data.black_walls).count()).unwrap(),
         );
-        white_value.eval(
-            indexes.cap_next_to_our_stack,
-            0,
-            f16::from_u8(stack_height * (neighbors & group_data.black_caps).count()).unwrap(),
-        );
+        let neighbor_caps = (neighbors & group_data.black_caps).count();
+        if neighbor_caps > 0 {
+            white_value.eval(
+                indexes.cap_next_to_our_stack,
+                0,
+                f16::from_u8(stack_height * neighbor_caps).unwrap(),
+            );
+        }
     }
 
     for square in group_data.black_flat_stones.into_iter() {
@@ -556,11 +559,14 @@ pub fn static_eval_game_phase<const S: usize, V: ValueApplier>(
             0,
             f16::from_u8(stack_height * (neighbors & group_data.white_walls).count()).unwrap(),
         );
-        black_value.eval(
-            indexes.cap_next_to_our_stack,
-            0,
-            f16::from_u8(stack_height * (neighbors & group_data.white_caps).count()).unwrap(),
-        );
+        let neighbor_caps = (neighbors & group_data.white_caps).count();
+        if neighbor_caps > 0 {
+            black_value.eval(
+                indexes.cap_next_to_our_stack,
+                0,
+                f16::from_u8(stack_height * neighbor_caps).unwrap(),
+            );
+        }
     }
 
     let mut num_ranks_occupied_white = 0;
