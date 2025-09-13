@@ -474,7 +474,7 @@ async fn parse_go_string<const S: usize, Out: Fn(&str), P: Platform>(
                     break;
                 };
                 nodes_searched += 1;
-                if nodes_searched.is_power_of_two() {
+                if nodes_searched.is_power_of_two() && tree.visits() > 1 {
                     output(&info_string::<S, P>(&start_time, nodes_searched, tree));
                 }
             }
