@@ -392,7 +392,8 @@ impl<const S: usize> MonteCarloTree<S> {
                 edge.mean_action_value * 100.0,
                 edge.policy.to_f32() * 100.0,
                 1.0 + edge.exploration_value((self.visits() as f32).sqrt(), dynamic_cpuct), // The +1.0 doesn't matter, but positive numbers are easier to read
-                if let Some(child) = edge.child { Pv::new(child.children.as_ref().unwrap())
+                if let Some(children) = edge.child.and_then(|c| c.children.as_ref()) {
+                    Pv::new(children)
                     .map(|mv| mv.to_string())
                     .collect::<Vec<_>>()
                     .join(" ")
