@@ -2,6 +2,7 @@
 //!
 //! This implementation does not use full Monte Carlo rollouts, relying on a heuristic evaluation when expanding new nodes instead.
 
+use arrayvec::ArrayVec;
 use board_game_traits::Position as _;
 use half::f16;
 #[cfg(feature = "serde")]
@@ -470,13 +471,72 @@ impl<const S: usize> MonteCarloTree<S> {
             ),
         }
     }
+
+    // returns an iterator of the (up to 16) best moves (by visits)
+    pub fn best_moves(&self) -> BestMoves<'_, S> {
+        let Some(child) = self.tree.child.as_ref().and_then(|c| c.children.as_ref()) else {
+            return BestMoves {
+                node: None,
+                best_indices: ArrayVec::new(),
+                next: 0,
+            };
+        };
+
+        match **child {
+            TreeChild::Small(ref bridge) => {
+                let mut best_indices: ArrayVec<_, _> = (0..bridge.children.len()).collect();
+                best_indices.sort_by_key(|&index| bridge.children[index].2);
+                best_indices.reverse();
+
+                BestMoves {
+                    node: Some(&**child),
+                    best_indices,
+                    next: 0,
+                }
+            }
+            TreeChild::Large(ref bridge) => {
+                let mut best_indices = ArrayVec::new();
+
+                for index in 0..bridge.visitss.len() {
+                    let visits = bridge.visitss[index];
+                    let is_new = if best_indices.is_full() {
+                        if bridge.visitss[*best_indices.last().unwrap()] < visits {
+                            *best_indices.last_mut().unwrap() = index;
+                            true
+                        } else {
+                            false
+                        }
+                    } else {
+                        best_indices.push(index);
+                        true
+                    };
+
+                    if is_new {
+                        for i in (0..best_indices.len() - 1).rev() {
+                            if bridge.visitss[best_indices[i]] < visits {
+                                best_indices.swap(i, i + 1);
+                            } else {
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                BestMoves {
+                    node: Some(&**child),
+                    best_indices,
+                    next: 0,
+                }
+            }
+        }
+    }
 }
 // More convenient edge representation, allowing them to be stored as array-of-structs rather than struct-of-arrays
 pub struct ShallowEdge<'a, const S: usize> {
-    visits: u32,
-    mv: Move<S>,
-    mean_action_value: f32,
-    child: Option<&'a Tree<S>>,
+    pub visits: u32,
+    pub mv: Move<S>,
+    pub mean_action_value: f32,
+    pub child: Option<&'a Tree<S>>,
     policy: f16,
 }
 
@@ -489,6 +549,52 @@ impl<const S: usize> ShallowEdge<'_, S> {
             parent_visits_sqrt,
             dynamic_cpuct,
         )
+    }
+
+    pub fn pv<'a>(&'a self) -> Option<Pv<'a, S>> {
+        self.child
+            .and_then(|child| child.children.as_ref())
+            .map(|child| Pv::new(&*child))
+    }
+}
+
+pub struct BestMoves<'a, const S: usize> {
+    node: Option<&'a TreeChild<S>>,
+    best_indices: ArrayVec<usize, 16>,
+    next: usize,
+}
+
+impl<'a, const S: usize> Iterator for BestMoves<'a, S> {
+    type Item = ShallowEdge<'a, S>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.next < self.best_indices.len() {
+            let index = self.best_indices[self.next];
+            self.next += 1;
+            self.node.and_then(|node| match *node {
+                TreeChild::Small(ref bridge) => {
+                    let (ref initialized_child, mv, visits) = bridge.children[index];
+                    let mean_action_value =
+                        initialized_child.total_action_value as f32 / visits as f32;
+                    Some(ShallowEdge {
+                        visits,
+                        mv,
+                        mean_action_value,
+                        child: Some(initialized_child),
+                        policy: f16::ZERO,
+                    })
+                }
+                TreeChild::Large(ref bridge) => bridge.moves[index].map(|mv| ShallowEdge {
+                    visits: bridge.visitss[index],
+                    mv,
+                    mean_action_value: bridge.mean_action_values[index],
+                    child: bridge.children[index].child.as_ref(),
+                    policy: f16::ZERO,
+                }),
+            })
+        } else {
+            None
+        }
     }
 }
 
