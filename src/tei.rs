@@ -23,13 +23,13 @@ async fn tei_game<const S: usize, Out: Fn(&str), P: Platform>(
     input: &async_channel::Receiver<String>,
     output: &Out,
     mcts_settings: MctsSetting<S>,
-    komi: &mut Komi,
+    options: &mut Options,
 ) -> TeiResult {
     let mut position: Option<SearchPosition<S>> = None;
 
-    let mut last_position_searched: SearchPosition<S> = SearchPosition::new(*komi);
+    let mut last_position_searched: SearchPosition<S> = SearchPosition::new(options.komi);
     let mut search_tree: MonteCarloTree<S> = MonteCarloTree::new(
-        Position::<S>::start_position_with_komi(*komi),
+        Position::<S>::start_position_with_komi(options.komi),
         mcts_settings.clone(),
     );
 
@@ -49,38 +49,19 @@ async fn tei_game<const S: usize, Out: Fn(&str), P: Platform>(
                 return TeiResult::SwitchSize(size);
             }
             "setoption" => {
-                if [
-                    words.next().unwrap_or_default(),
-                    words.next().unwrap_or_default(),
-                    words.next().unwrap_or_default(),
-                ]
-                .join(" ")
-                    == "name HalfKomi value"
-                {
-                    if let Some(k) = words
-                        .next()
-                        .and_then(|komi_string| komi_string.parse::<i8>().ok())
-                        .and_then(Komi::from_half_komi)
-                    {
-                        *komi = k;
-                    } else {
-                        panic!("Invalid komi setting \"{}\"", line);
-                    }
-                } else {
-                    panic!("Invalid setoption string \"{}\"", line);
-                }
+                options.parse(&line);
                 if let Some(p) = position.as_mut() {
-                    p.root_position.set_komi(*komi);
+                    p.root_position.set_komi(options.komi);
                 }
                 // If we receive a new komi, previous search is invalid
-                last_position_searched = SearchPosition::new(*komi);
+                last_position_searched = SearchPosition::new(options.komi);
                 search_tree = MonteCarloTree::new(
-                    Position::<S>::start_position_with_komi(*komi),
+                    Position::<S>::start_position_with_komi(options.komi),
                     mcts_settings.clone(),
                 );
             }
             "position" => {
-                position = Some(parse_position_string::<S>(&line, *komi));
+                position = Some(parse_position_string::<S>(&line, options.komi));
             }
             "go" => {
                 let Some(current_position) = position.as_ref() else {
@@ -149,7 +130,7 @@ pub async fn tei<Out: Fn(&str), P: Platform>(
     output("option name HalfKomi type combo default 0 var 0 var 4");
     output("teiok");
 
-    let mut komi = Komi::default();
+    let mut options = Options::default();
     while let Ok(line) = input.recv().await {
         let mut words = line.split_whitespace();
         match words.next().unwrap() {
@@ -164,7 +145,7 @@ pub async fn tei<Out: Fn(&str), P: Platform>(
                                 &input,
                                 output,
                                 mcts_settings(is_slatebot, is_cobblebot),
-                                &mut komi,
+                                &mut options,
                             )
                             .await
                         }
@@ -173,7 +154,7 @@ pub async fn tei<Out: Fn(&str), P: Platform>(
                                 &input,
                                 output,
                                 mcts_settings(is_slatebot, is_cobblebot),
-                                &mut komi,
+                                &mut options,
                             )
                             .await
                         }
@@ -182,7 +163,7 @@ pub async fn tei<Out: Fn(&str), P: Platform>(
                                 &input,
                                 output,
                                 mcts_settings(is_slatebot, is_cobblebot),
-                                &mut komi,
+                                &mut options,
                             )
                             .await
                         }
@@ -196,28 +177,7 @@ pub async fn tei<Out: Fn(&str), P: Platform>(
                     }
                 }
             }
-            "setoption" => {
-                if [
-                    words.next().unwrap_or_default(),
-                    words.next().unwrap_or_default(),
-                    words.next().unwrap_or_default(),
-                ]
-                .join(" ")
-                    == "name HalfKomi value"
-                {
-                    if let Some(k) = words
-                        .next()
-                        .and_then(|komi_string| komi_string.parse::<i8>().ok())
-                        .and_then(Komi::from_half_komi)
-                    {
-                        komi = k;
-                    } else {
-                        panic!("Invalid komi setting \"{}\"", line);
-                    }
-                } else {
-                    panic!("Invalid setoption string \"{}\"", line);
-                }
-            }
+            "setoption" => options.parse(&line),
             "quit" => {
                 process::exit(0);
             }
@@ -532,4 +492,47 @@ pub fn info_string<const S: usize, P: Platform>(
         }
     }
     info_string
+}
+
+struct Options {
+    komi: Komi,
+}
+
+impl Default for Options {
+    fn default() -> Self {
+        Options {
+            komi: Komi::default(),
+        }
+    }
+}
+
+impl Options {
+    fn parse(&mut self, line: &str) {
+        let mut words = line.split_whitespace();
+        let ("setoption", "name", Some(option_name), "value", Some(value_string), None) = (
+            words.next().unwrap_or_default(),
+            words.next().unwrap_or_default(),
+            words.next(),
+            words.next().unwrap_or_default(),
+            words.next(),
+            words.next(),
+        ) else {
+            panic!("Invalid setoption string \"{}\"", line);
+        };
+
+        match option_name {
+            "HalfKomi" => {
+                if let Some(k) = value_string
+                    .parse::<i8>()
+                    .ok()
+                    .and_then(Komi::from_half_komi)
+                {
+                    self.komi = k;
+                } else {
+                    panic!("Invalid komi setting \"{}\"", line);
+                }
+            }
+            _ => panic!("Unknown option \"{}\"", option_name),
+        }
+    }
 }
