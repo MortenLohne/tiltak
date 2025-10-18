@@ -1,6 +1,9 @@
 #![allow(clippy::uninlined_format_args)]
 
-use crate::position::{Komi, Move, Position};
+use crate::{
+    position::{Komi, Move, Position},
+    search::ShallowEdge,
+};
 use arrayvec::ArrayString;
 use async_channel::TryRecvError;
 use board_game_traits::{Color, Position as PositionTrait};
@@ -84,6 +87,7 @@ async fn tei_game<const S: usize, Out: Fn(&str), P: Platform>(
                     &line,
                     current_position,
                     &mut search_tree,
+                    options,
                 )
                 .await
                 {
@@ -128,6 +132,7 @@ pub async fn tei<Out: Fn(&str), P: Platform>(
     output("id name Tiltak");
     output("id author Morten Lohne");
     output("option name HalfKomi type combo default 0 var 0 var 4");
+    output("option name MultiPV type spin default 1 min 1 max 16");
     output("teiok");
 
     let mut options = Options::default();
@@ -311,6 +316,7 @@ async fn parse_go_string<const S: usize, Out: Fn(&str), P: Platform>(
     line: &str,
     position: &SearchPosition<S>,
     tree: &mut MonteCarloTree<S>,
+    options: &Options,
 ) -> Option<TeiResult> {
     let mut words = line.split_whitespace();
     words.next(); // go
@@ -363,9 +369,21 @@ async fn parse_go_string<const S: usize, Out: Fn(&str), P: Platform>(
                 }
 
                 // Must not allocate memory here, because we may be in an OOM situation
-                let info_string = info_string::<S, P>(&start_time, nodes_searched, tree);
+                if options.multi_pv > 1 {
+                    for (index, edge) in tree.best_moves().take(options.multi_pv).enumerate() {
+                        let info_string = info_string_from_shallow_edge::<S, P>(
+                            &start_time,
+                            nodes_searched,
+                            edge,
+                            index,
+                        );
 
-                output(&info_string);
+                        output(&info_string);
+                    }
+                } else {
+                    let info_string = info_string::<S, P>(&start_time, nodes_searched, &tree);
+                    output(&info_string);
+                }
 
                 if oom || should_stop {
                     let (best_move, _) = tree.best_move().unwrap();
@@ -496,12 +514,14 @@ pub fn info_string<const S: usize, P: Platform>(
 
 struct Options {
     komi: Komi,
+    multi_pv: usize,
 }
 
 impl Default for Options {
     fn default() -> Self {
         Options {
             komi: Komi::default(),
+            multi_pv: 1,
         }
     }
 }
@@ -532,7 +552,59 @@ impl Options {
                     panic!("Invalid komi setting \"{}\"", line);
                 }
             }
+            "MultiPV" => {
+                if let Some(pvs) = value_string
+                    .parse::<usize>()
+                    .ok()
+                    .filter(|&pvs| pvs >= 1 && pvs <= 16)
+                {
+                    self.multi_pv = pvs;
+                } else {
+                    panic!("Invalid MultiPV setting \"{}\"", line);
+                }
+            }
             _ => panic!("Unknown option \"{}\"", option_name),
         }
     }
+}
+
+pub fn info_string_from_shallow_edge<const S: usize, P: Platform>(
+    start_time: &P::Instant,
+    nodes_searched: u32,
+    edge: ShallowEdge<'_, S>,
+    pv_index: usize,
+) -> ArrayString<1024> {
+    let score = 1.0 - edge.mean_action_value;
+    let wdl = [score, 0.0, 1.0 - score];
+    let elapsed = P::elapsed_time(start_time).max(Duration::from_micros(1));
+
+    let pv_length = edge.pv().map(|pv| pv.count()).unwrap_or_default();
+
+    let mut info_string = ArrayString::new();
+
+    write!(info_string, "info multipv {} depth {} seldepth {} nodes {} visits {} score cp {} wdl {} {} {} time {} nps {:.0} pv {}",
+        pv_index + 1,
+        ((edge.visits as f64 / 10.0).log2()) as u64,
+        pv_length,
+        nodes_searched,
+        edge.visits,
+        (score * 200.0 - 100.0) as i64,
+        (wdl[0] * 1000.0).round() as i64,
+        (wdl[1] * 1000.0).round() as i64,
+        (wdl[2] * 1000.0).round() as i64,
+        elapsed.as_millis(),
+        nodes_searched as f32 / elapsed.as_secs_f32(),
+        edge.mv
+    ).unwrap();
+
+    if let Some(pv) = edge.pv() {
+        for mv in pv {
+            if write!(info_string, " {}", mv).is_err() {
+                // If the info string grows too large, truncate the PV and return
+                return info_string;
+            }
+        }
+    }
+
+    info_string
 }
