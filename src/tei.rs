@@ -381,7 +381,7 @@ async fn parse_go_string<const S: usize, Out: Fn(&str), P: Platform>(
                         output(&info_string);
                     }
                 } else {
-                    let info_string = info_string::<S, P>(&start_time, nodes_searched, &tree);
+                    let info_string = info_string::<S, P>(&start_time, nodes_searched, tree);
                     output(&info_string);
                 }
 
@@ -556,7 +556,7 @@ impl Options {
                 if let Some(pvs) = value_string
                     .parse::<usize>()
                     .ok()
-                    .filter(|&pvs| pvs >= 1 && pvs <= 16)
+                    .filter(|&pvs| (1..=16).contains(&pvs))
                 {
                     self.multi_pv = pvs;
                 } else {

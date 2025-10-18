@@ -166,7 +166,7 @@ impl<const S: usize> ValueIndexes<S> {
         let (winning_cap_spread_not_to_move, i) = IndexPair::next(i, 2 * capstones_factor);
         let (flat_next_to_our_stack, i) = IndexPair::next(i, 1);
         let (wall_next_to_our_stack, i) = IndexPair::next(i, 1);
-        let (cap_next_to_our_stack, i) = IndexPair::next(i, 1 * capstones_factor);
+        let (cap_next_to_our_stack, i) = IndexPair::next(i, capstones_factor);
         let (num_lines_occupied, i) = IndexPair::next(i, S + 1);
         let (line_control_empty, i) = IndexPair::next(i, S * num_line_symmetries::<S>());
         let (line_control_their_blocking_piece, i) =

@@ -554,7 +554,7 @@ impl<const S: usize> ShallowEdge<'_, S> {
     pub fn pv<'a>(&'a self) -> Option<Pv<'a, S>> {
         self.child
             .and_then(|child| child.children.as_ref())
-            .map(|child| Pv::new(&*child))
+            .map(|child| Pv::new(child))
     }
 }
 
