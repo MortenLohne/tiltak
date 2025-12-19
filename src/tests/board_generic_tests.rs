@@ -1,8 +1,11 @@
 use crate::evaluation::parameters::IncrementalPolicy;
 use crate::evaluation::parameters::PolicyApplier;
+use crate::position::position_gen::PositionEncoder;
 use crate::position::starting_capstones;
 use crate::position::Komi;
 use board_game_traits::{Color, EvalPosition, GameResult::*, Position as PositionTrait};
+use num_bigint::BigUint;
+use num_bigint::RandBigInt;
 use pgn_traits::PgnPosition;
 use rand::seq::SliceRandom;
 use rand::Rng;
@@ -80,6 +83,8 @@ fn play_random_games_prop<const S: usize>(num_games: usize) {
     let mut black_wins = 0;
     let mut draws = 0;
     let mut duration = 0;
+
+    let decoder = PositionEncoder::initialize();
 
     let mut rng = rand::thread_rng();
     for _ in 0..num_games {
@@ -184,6 +189,9 @@ fn play_random_games_prop<const S: usize>(num_games: usize) {
                 Color::White => assert_eq!(white_flat_lead_after, white_flat_lead_before + fcd),
                 Color::Black => assert_eq!(white_flat_lead_after, white_flat_lead_before - fcd),
             }
+
+            // Check that position encodes and decodes into itself
+            assert!(position.eq_board(&decoder.decode(decoder.encode(&position))));
 
             assert_ne!(hash_from_scratch, position.zobrist_hash_from_scratch());
 
@@ -546,5 +554,45 @@ fn square_rank_file_prop<const S: usize>() {
             assert_eq!(group_data.black_road_pieces().file::<S>(file_id).count(), 1);
             position.reverse_move(reverse_move);
         }
+    }
+}
+
+#[test]
+fn decode_random_positions_3s_test() {
+    decode_random_positions_prop::<3>(10_000);
+}
+
+#[test]
+fn decode_random_positions_4s_test() {
+    decode_random_positions_prop::<4>(10_000);
+}
+
+#[test]
+fn decode_random_positions_5s_test() {
+    decode_random_positions_prop::<5>(10_000);
+}
+
+#[test]
+fn decode_random_positions_6s_test() {
+    decode_random_positions_prop::<6>(10_000);
+}
+
+#[test]
+fn decode_random_positions_7s_test() {
+    decode_random_positions_prop::<7>(10_000);
+}
+
+#[test]
+fn decode_random_positions_8s_test() {
+    decode_random_positions_prop::<8>(10_000);
+}
+
+fn decode_random_positions_prop<const S: usize>(n: usize) {
+    let mut rng = rand::thread_rng();
+    let encoder = PositionEncoder::<S>::initialize();
+    let max_value = encoder.count_legal_positions();
+    for _ in 0..n {
+        let random: BigUint = rng.gen_biguint_below(&max_value);
+        assert_eq!(random, encoder.encode(&encoder.decode(random.clone())));
     }
 }
