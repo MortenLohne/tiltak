@@ -116,11 +116,13 @@ impl<const S: usize> TreeChild<S> {
         settings: &MctsSetting<S>,
         temp_vectors: &mut TempVectors<S>,
         our_visits: u32,
+        our_side: Color,
     ) -> Result<f32, Error> {
         match self {
             TreeChild::Small(small_bridge) => {
                 // If this select returns None, it failed, and we need to grow the bridge into a full one
-                let result = small_bridge.select(position, settings, temp_vectors, our_visits)?;
+                let result =
+                    small_bridge.select(position, settings, temp_vectors, our_visits, our_side)?;
                 if let Some(result) = result {
                     return Ok(result);
                 }
@@ -163,10 +165,10 @@ impl<const S: usize> TreeChild<S> {
 
                 *self = TreeChild::Large(tree_edge);
 
-                self.select(position, settings, temp_vectors, our_visits)
+                self.select(position, settings, temp_vectors, our_visits, our_side)
             }
             TreeChild::Large(tree_bridge) => {
-                tree_bridge.select(position, settings, temp_vectors, our_visits)
+                tree_bridge.select(position, settings, temp_vectors, our_visits, our_side)
             }
         }
     }
@@ -241,7 +243,12 @@ impl<const S: usize> SmallBridge<S> {
     }
 
     #[inline(never)]
-    pub fn best_child(&self, settings: &MctsSetting<S>, our_visits: u32) -> (usize, bool) {
+    pub fn best_child(
+        &self,
+        settings: &MctsSetting<S>,
+        our_visits: u32,
+        play_2nd_move: bool,
+    ) -> (usize, bool) {
         let visits_sqrt = (our_visits as f32).sqrt();
         let dynamic_cpuct = settings.c_puct_init()
             + fast_ln((1.0 + our_visits as f32 + settings.c_puct_base()) / settings.c_puct_base());
@@ -249,6 +256,12 @@ impl<const S: usize> SmallBridge<S> {
         let mut best_child_node_index = 0;
         let mut best_score = f32::NEG_INFINITY;
         let mut best_is_initialized = false;
+
+        let most_visited_child_move = self
+            .children
+            .iter()
+            .max_by_key(|(_, _, visits)| *visits)
+            .map(|(_, mv, _)| mv);
 
         for (i, (mv, heuristic_score)) in self
             .moves
@@ -268,7 +281,11 @@ impl<const S: usize> SmallBridge<S> {
                     visits_sqrt,
                     dynamic_cpuct,
                 );
-                if score > best_score {
+                if score > best_score
+                    && most_visited_child_move.is_none_or(|most_visited_child_move| {
+                        most_visited_child_move != mv || !play_2nd_move
+                    })
+                {
                     best_score = score;
                     best_child_node_index = i;
                     best_is_initialized = true;
@@ -281,7 +298,11 @@ impl<const S: usize> SmallBridge<S> {
                     visits_sqrt,
                     dynamic_cpuct,
                 );
-                if score > best_score {
+                if score > best_score
+                    && most_visited_child_move.is_none_or(|most_visited_child_move| {
+                        most_visited_child_move != mv || !play_2nd_move
+                    })
+                {
                     best_score = score;
                     best_child_node_index = i;
                     best_is_initialized = false;
@@ -298,8 +319,10 @@ impl<const S: usize> SmallBridge<S> {
         settings: &MctsSetting<S>,
         temp_vectors: &mut TempVectors<S>,
         our_visits: u32,
+        our_side: Color,
     ) -> Result<Option<f32>, Error> {
-        let (best_child_node_index, is_initialized) = self.best_child(settings, our_visits);
+        let (best_child_node_index, is_initialized) =
+            self.best_child(settings, our_visits, position.side_to_move() == our_side);
 
         let child_move = self.moves[best_child_node_index].unwrap();
 
@@ -332,7 +355,8 @@ impl<const S: usize> SmallBridge<S> {
 
         position.do_move(child_move);
 
-        let result = child_tree.select(position, settings, temp_vectors, *child_visits)?;
+        let result =
+            child_tree.select(position, settings, temp_vectors, *child_visits, our_side)?;
 
         *child_visits += 1;
 
@@ -347,6 +371,7 @@ impl<const S: usize> TreeBridge<S> {
         settings: &MctsSetting<S>,
         temp_vectors: &mut TempVectors<S>,
         our_visits: u32,
+        play_2nd_move: bool,
     ) -> usize {
         let visits_sqrt = (our_visits as f32).sqrt();
         let dynamic_cpuct = settings.c_puct_init()
@@ -362,17 +387,28 @@ impl<const S: usize> TreeBridge<S> {
         assert_eq!(heuristic_scores.len(), self.mean_action_values.len());
         assert_eq!(heuristic_scores.len(), self.visitss.len());
 
+        let (most_visits_index, _most_visits) = self
+            .visitss
+            .iter()
+            .enumerate()
+            .max_by_key(|(_, visits)| *visits)
+            .unwrap();
+
         for (i, heuristic_score) in heuristic_scores.iter_mut().enumerate() {
             let mean_action_value = &self.mean_action_values[i];
             let child_visits = &self.visitss[i];
 
-            *heuristic_score = exploration_value(
-                *mean_action_value,
-                *heuristic_score,
-                *child_visits,
-                visits_sqrt,
-                dynamic_cpuct,
-            )
+            if !play_2nd_move || i != most_visits_index {
+                *heuristic_score = exploration_value(
+                    *mean_action_value,
+                    *heuristic_score,
+                    *child_visits,
+                    visits_sqrt,
+                    dynamic_cpuct,
+                )
+            } else {
+                *heuristic_score = -1.0;
+            }
         }
 
         let mut indices = [0u32; SIMD_WIDTH];
@@ -416,6 +452,7 @@ impl<const S: usize> TreeBridge<S> {
         settings: &MctsSetting<S>,
         temp_vectors: &mut TempVectors<S>,
         our_visits: u32,
+        our_side: Color,
     ) -> Result<f32, Error> {
         assert_ne!(
             self.children.len(),
@@ -424,7 +461,12 @@ impl<const S: usize> TreeBridge<S> {
             position
         );
 
-        let best_child_node_index = self.best_child(settings, temp_vectors, our_visits);
+        let best_child_node_index = self.best_child(
+            settings,
+            temp_vectors,
+            our_visits,
+            position.side_to_move() == our_side,
+        );
 
         let child_edge = self.children.get_mut(best_child_node_index).unwrap();
         let child_visits = self.visitss.get_mut(best_child_node_index).unwrap();
@@ -441,7 +483,8 @@ impl<const S: usize> TreeBridge<S> {
 
         position.do_move(child_move);
 
-        let result = 1.0 - child_edge.select(position, settings, temp_vectors, *child_visits)?;
+        let result =
+            1.0 - child_edge.select(position, settings, temp_vectors, *child_visits, our_side)?;
 
         *self.visitss.get_mut(best_child_node_index).unwrap() += 1;
 
@@ -461,9 +504,10 @@ impl<const S: usize> TreeEdge<S> {
         settings: &MctsSetting<S>,
         temp_vectors: &mut TempVectors<S>,
         parent_visits: u32,
+        our_side: Color,
     ) -> Result<f32, Error> {
         if let Some(child) = self.child.as_mut() {
-            return child.select(position, settings, temp_vectors, parent_visits);
+            return child.select(position, settings, temp_vectors, parent_visits, our_side);
         }
 
         let (result, game_result) =
@@ -490,6 +534,7 @@ impl<const S: usize> Tree<S> {
         settings: &MctsSetting<S>,
         temp_vectors: &mut TempVectors<S>,
         parent_visits: u32,
+        our_side: Color,
     ) -> Result<f32, Error> {
         // TODO: Assume node has already had 1 visit before?
         if let Some(game_result) = self.game_result {
@@ -498,12 +543,12 @@ impl<const S: usize> Tree<S> {
             return Ok(result);
         }
         let Some(children) = self.children.as_mut() else {
-            let result = self.expand_child(position, settings, temp_vectors)?;
+            let result = self.expand_child(position, settings, temp_vectors, our_side)?;
             self.total_action_value += result as f64;
             return Ok(result);
         };
 
-        let result = children.select(position, settings, temp_vectors, parent_visits)?;
+        let result = children.select(position, settings, temp_vectors, parent_visits, our_side)?;
         self.total_action_value += result as f64;
         Ok(result)
     }
@@ -516,12 +561,13 @@ impl<const S: usize> Tree<S> {
         position: &mut Position<S>,
         settings: &MctsSetting<S>,
         temp_vectors: &mut TempVectors<S>,
+        our_side: Color,
     ) -> Result<f32, Error> {
         let mut small_bridge = SmallBridge::new(position, settings, temp_vectors)?;
 
         // Select child edge before writing the child node into the tree, in case we OOM inside this call
         let result = small_bridge
-            .select(position, settings, temp_vectors, 1)?
+            .select(position, settings, temp_vectors, 1, our_side)?
             .unwrap();
 
         self.children = Some(trybox::new(TreeChild::Small(small_bridge))?);

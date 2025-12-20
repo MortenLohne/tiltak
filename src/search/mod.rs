@@ -340,28 +340,60 @@ impl<const S: usize> MonteCarloTree<S> {
 
         match **root_child {
             TreeChild::Small(ref small_bridge) => {
-                let (grandchild, mv, visits) = small_bridge
+                let mut children: Vec<_> = small_bridge
                     .children
                     .iter()
                     .filter(|(_, _, visits)| *visits > 0)
-                    .max_by_key(|(_, _, visits)| *visits)?;
+                    .collect();
+
+                children.sort_by_key(|(_grandchild, _mv, visits)| visits);
+                children.reverse();
+                children.truncate(2);
+
+                let (next_best_grandchild, next_best_move, visits) = children
+                    .iter()
+                    .min_by_key(|(grandchild, _, visits)| {
+                        ((1.0 - grandchild.total_action_value as f32 / *visits as f32) * 1000000.0)
+                            as i64
+                    })
+                    .unwrap();
 
                 Some((
-                    *mv,
-                    1.0 - grandchild.total_action_value as f32 / *visits as f32,
+                    *next_best_move,
+                    1.0 - next_best_grandchild.total_action_value as f32 / *visits as f32,
                 ))
             }
             TreeChild::Large(ref tree_bridge) => {
-                let (best_index, _) = tree_bridge
-                    .visitss
+                let mut children: Vec<_> = tree_bridge
+                    .children
                     .iter()
-                    .enumerate()
-                    .filter(|(_, visits)| **visits > 0)
-                    .max_by_key(|(_, visits)| *visits)?;
+                    .zip(tree_bridge.moves.iter())
+                    .zip(tree_bridge.visitss.iter())
+                    .map(|((child, mv), visits)| (child, *mv, *visits))
+                    .collect();
+
+                children.sort_by_key(|(_grandchild, _mv, visits)| *visits);
+                children.reverse();
+                children.truncate(2);
+
+                let (next_best_grandchild, next_best_move, visits) = children
+                    .iter()
+                    .min_by_key(|(grandchild, _, visits)| {
+                        ((1.0
+                            - grandchild.child.as_ref().unwrap().total_action_value as f32
+                                / *visits as f32)
+                            * 1000000.0) as i64
+                    })
+                    .unwrap();
 
                 Some((
-                    tree_bridge.moves[best_index]?,
-                    1.0 - tree_bridge.mean_action_values[best_index],
+                    next_best_move.unwrap(),
+                    1.0 - next_best_grandchild
+                        .child
+                        .as_ref()
+                        .unwrap()
+                        .total_action_value as f32
+                        / *visits as f32,
                 ))
             }
         }
@@ -415,6 +447,7 @@ impl<const S: usize> MonteCarloTree<S> {
             &self.settings,
             &mut self.temp_vectors,
             self.visits,
+            self.position.side_to_move(),
         )?;
         self.visits += 1;
         Ok(result)
