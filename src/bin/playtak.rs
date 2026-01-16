@@ -412,6 +412,7 @@ pub fn main() -> Result<()> {
             io::ErrorKind::ConnectionAborted
             | io::ErrorKind::ConnectionReset
             | io::ErrorKind::HostUnreachable
+            | io::ErrorKind::NetworkUnreachable
             | io::ErrorKind::TimedOut => {
                 warn!("Server connection interrupted, caused by \"{}\". This may be due to a server restart, attempting to reconnect.", error);
                 thread::sleep(Duration::from_secs(2));
