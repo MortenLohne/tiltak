@@ -21,6 +21,7 @@ use crate::search::mcts_core::{SmallBridge, TempVectors, Tree, TreeBridge, TreeC
 /// This module contains the public-facing convenience API for the search.
 /// The implementation itself in in mcts_core.
 mod mcts_core;
+mod tt;
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug, PartialEq, Clone)]
