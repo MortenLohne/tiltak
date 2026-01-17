@@ -13,6 +13,7 @@ use crate::evaluation::parameters::IncrementalPolicy;
 use crate::position::Move;
 /// This module contains the core of the MCTS search algorithm
 use crate::position::Position;
+use crate::search::tt::TT;
 use crate::search::{cp_to_win_percentage, MctsSetting};
 
 use super::Error;
@@ -53,7 +54,6 @@ pub struct TreeEdge<const S: usize> {
 }
 
 /// Temporary vectors that are continually re-used during search to avoid unnecessary allocations
-#[derive(Debug)]
 pub struct TempVectors<const S: usize> {
     simple_moves: Vec<Move<S>>,
     moves: Vec<(Move<S>, f16)>,
@@ -113,6 +113,7 @@ impl<const S: usize> TreeChild<S> {
     pub fn select(
         &mut self,
         position: &mut Position<S>,
+        tt: &mut TT,
         settings: &MctsSetting<S>,
         temp_vectors: &mut TempVectors<S>,
         our_visits: u32,
@@ -120,7 +121,8 @@ impl<const S: usize> TreeChild<S> {
         match self {
             TreeChild::Small(small_bridge) => {
                 // If this select returns None, it failed, and we need to grow the bridge into a full one
-                let result = small_bridge.select(position, settings, temp_vectors, our_visits)?;
+                let result =
+                    small_bridge.select(position, tt, settings, temp_vectors, our_visits)?;
                 if let Some(result) = result {
                     return Ok(result);
                 }
@@ -163,10 +165,10 @@ impl<const S: usize> TreeChild<S> {
 
                 *self = TreeChild::Large(tree_edge);
 
-                self.select(position, settings, temp_vectors, our_visits)
+                self.select(position, tt, settings, temp_vectors, our_visits)
             }
             TreeChild::Large(tree_bridge) => {
-                tree_bridge.select(position, settings, temp_vectors, our_visits)
+                tree_bridge.select(position, tt, settings, temp_vectors, our_visits)
             }
         }
     }
@@ -295,6 +297,7 @@ impl<const S: usize> SmallBridge<S> {
     pub fn select(
         &mut self,
         position: &mut Position<S>,
+        tt: &mut TT,
         settings: &MctsSetting<S>,
         temp_vectors: &mut TempVectors<S>,
         our_visits: u32,
@@ -311,7 +314,7 @@ impl<const S: usize> SmallBridge<S> {
             position.do_move(child_move);
 
             let (result, game_result) =
-                rollout(position, settings, settings.rollout_depth, temp_vectors);
+                rollout(position, tt, settings, settings.rollout_depth, temp_vectors);
             self.children.push((
                 Tree {
                     total_action_value: result as f64,
@@ -332,7 +335,7 @@ impl<const S: usize> SmallBridge<S> {
 
         position.do_move(child_move);
 
-        let result = child_tree.select(position, settings, temp_vectors, *child_visits)?;
+        let result = child_tree.select(position, tt, settings, temp_vectors, *child_visits)?;
 
         *child_visits += 1;
 
@@ -413,6 +416,7 @@ impl<const S: usize> TreeBridge<S> {
     pub fn select(
         &mut self,
         position: &mut Position<S>,
+        tt: &mut TT,
         settings: &MctsSetting<S>,
         temp_vectors: &mut TempVectors<S>,
         our_visits: u32,
@@ -441,15 +445,24 @@ impl<const S: usize> TreeBridge<S> {
 
         position.do_move(child_move);
 
-        let result = 1.0 - child_edge.select(position, settings, temp_vectors, *child_visits)?;
+        let child_hash = position.zobrist_hash();
 
-        *self.visitss.get_mut(best_child_node_index).unwrap() += 1;
+        let result =
+            1.0 - child_edge.select(position, tt, settings, temp_vectors, *child_visits)?;
+
+        let child_visits = self.visitss.get_mut(best_child_node_index).unwrap();
+
+        *child_visits += 1;
+
+        let new_q =
+            child_edge.child.as_ref().unwrap().total_action_value as f32 / *child_visits as f32;
+
+        tt.insert(child_hash, new_q, *child_visits);
 
         *self
             .mean_action_values
             .get_mut(best_child_node_index)
-            .unwrap() = child_edge.child.as_ref().unwrap().total_action_value as f32
-            / *self.visitss.get_mut(best_child_node_index).unwrap() as f32;
+            .unwrap() = new_q;
         Ok(result)
     }
 }
@@ -458,16 +471,17 @@ impl<const S: usize> TreeEdge<S> {
     pub fn select(
         &mut self,
         position: &mut Position<S>,
+        tt: &mut TT,
         settings: &MctsSetting<S>,
         temp_vectors: &mut TempVectors<S>,
         parent_visits: u32,
     ) -> Result<f32, Error> {
         if let Some(child) = self.child.as_mut() {
-            return child.select(position, settings, temp_vectors, parent_visits);
+            return child.select(position, tt, settings, temp_vectors, parent_visits);
         }
 
         let (result, game_result) =
-            rollout(position, settings, settings.rollout_depth, temp_vectors);
+            rollout(position, tt, settings, settings.rollout_depth, temp_vectors);
         self.child = Some(Tree {
             total_action_value: result as f64,
             game_result,
@@ -487,6 +501,7 @@ impl<const S: usize> Tree<S> {
     pub fn select(
         &mut self,
         position: &mut Position<S>,
+        tt: &mut TT,
         settings: &MctsSetting<S>,
         temp_vectors: &mut TempVectors<S>,
         parent_visits: u32,
@@ -498,12 +513,12 @@ impl<const S: usize> Tree<S> {
             return Ok(result);
         }
         let Some(children) = self.children.as_mut() else {
-            let result = self.expand_child(position, settings, temp_vectors)?;
+            let result = self.expand_child(position, tt, settings, temp_vectors)?;
             self.total_action_value += result as f64;
             return Ok(result);
         };
 
-        let result = children.select(position, settings, temp_vectors, parent_visits)?;
+        let result = children.select(position, tt, settings, temp_vectors, parent_visits)?;
         self.total_action_value += result as f64;
         Ok(result)
     }
@@ -514,6 +529,7 @@ impl<const S: usize> Tree<S> {
     fn expand_child(
         &mut self,
         position: &mut Position<S>,
+        tt: &mut TT,
         settings: &MctsSetting<S>,
         temp_vectors: &mut TempVectors<S>,
     ) -> Result<f32, Error> {
@@ -521,7 +537,7 @@ impl<const S: usize> Tree<S> {
 
         // Select child edge before writing the child node into the tree, in case we OOM inside this call
         let result = small_bridge
-            .select(position, settings, temp_vectors, 1)?
+            .select(position, tt, settings, temp_vectors, 1)?
             .unwrap();
 
         self.children = Some(trybox::new(TreeChild::Small(small_bridge))?);
@@ -583,6 +599,7 @@ impl<const S: usize> Iterator for Pv<'_, S> {
 #[inline(never)]
 pub fn rollout<const S: usize>(
     position: &mut Position<S>,
+    tt: &mut TT,
     settings: &MctsSetting<S>,
     depth: u16,
     temp_vectors: &mut TempVectors<S>,
@@ -600,6 +617,9 @@ pub fn rollout<const S: usize>(
 
         (game_result_for_us.score(), Some(game_result_for_us))
     } else if depth == 0 {
+        if let Some(tt_value) = tt.get(position.zobrist_hash()) {
+            return (tt_value, None); // TODO: Add randomness here too
+        }
         let centipawn_score = position.static_eval_with_params_and_data(
             &group_data,
             match settings.value_params.as_ref() {
@@ -638,7 +658,7 @@ pub fn rollout<const S: usize>(
         position.do_move(best_move);
 
         temp_vectors.moves.clear();
-        let (score, _) = rollout(position, settings, depth - 1, temp_vectors);
+        let (score, _) = rollout(position, tt, settings, depth - 1, temp_vectors);
         (1.0 - score, None)
     }
 }

@@ -1,22 +1,28 @@
-struct TT {
+pub struct TT {
     buckets: Vec<Bucket>,
+    generation: u8,
 }
 
 impl TT {
-    fn new(size: usize) -> Self {
+    pub fn new(size: usize) -> Self {
         TT {
             buckets: vec![Bucket::default(); size],
+            generation: 1,
         }
     }
 
-    fn used_entries(&self) -> usize {
+    pub fn increment_generation(&mut self) {
+        self.generation = self.generation.saturating_add(1);
+    }
+
+    pub fn used_entries(&self) -> usize {
         self.buckets
             .iter()
             .flat_map(|bucket| bucket.entries.iter())
             .count()
     }
 
-    fn get(&self, hash: u64) -> Option<f32> {
+    pub fn get(&self, hash: u64) -> Option<f32> {
         let index = hash as usize % self.buckets.len();
         let bucket = &self.buckets[index];
         let upper_bits = (hash >> 32) as u32;
@@ -25,17 +31,17 @@ impl TT {
                 return Some(entry.value);
             }
         }
-        return None;
+        None
     }
 
-    fn insert(&mut self, hash: u64, value: f32, generation: u8, visits: u32) {
+    pub fn insert(&mut self, hash: u64, value: f32, visits: u32) {
         let index = hash as usize % self.buckets.len();
         let bucket = &mut self.buckets[index];
         let upper_bits = (hash >> 32) as u32;
 
         let log2_visits = visits.ilog2() as u8;
 
-        bucket.insert(upper_bits, value, generation, log2_visits);
+        bucket.insert(upper_bits, value, self.generation, log2_visits);
     }
 }
 
@@ -55,7 +61,7 @@ impl Bucket {
             .unwrap();
         if lowest_pri_entry
             .as_mut()
-            .is_none_or(|entry| entry.insertion_value() < new_entry.insertion_value())
+            .is_none_or(|entry| entry.insertion_value() <= new_entry.insertion_value())
         {
             *lowest_pri_entry = Some(new_entry);
         }
@@ -87,10 +93,9 @@ impl Entry {
 #[test]
 fn insert_4_values_test() {
     let mut tt = TT::new(1);
-    let generation = 1;
     for i in 0..4 {
         let hash = i << 32 + i;
-        tt.insert(hash, i as f32, generation, 1);
+        tt.insert(hash, i as f32, 1);
     }
     println!("Used entries: {}", tt.used_entries());
 
@@ -103,26 +108,28 @@ fn insert_4_values_test() {
 #[test]
 fn overwrite_values_test() {
     let mut tt = TT::new(1);
-    let generation = 1;
     for i in 0..4 {
         let hash = i << 32 + i;
-        tt.insert(hash, i as f32, generation, 1);
+        tt.insert(hash, i as f32, 1);
     }
 
+    tt.generation = 10;
     // Higher generation entries should be prioritized
     for i in 0..4 {
         let hash = i << 32 + i;
-        tt.insert(hash, i as f32 + 10.0, generation + 10, 1);
+        tt.insert(hash, i as f32 + 10.0, 1);
     }
     for i in 0..4 {
         let hash = i << 32 + i;
         assert_eq!(tt.get(hash), Some(i as f32 + 10.0));
     }
 
+    tt.generation = 9;
+
     // Slightly lower generation entries with very high visits counts should be prioritized even more
     for i in 0..4 {
         let hash = i << 32 + i;
-        tt.insert(hash, i as f32 + 100.0, generation + 9, 1_000_000);
+        tt.insert(hash, i as f32 + 100.0, 1_000_000);
     }
     for i in 0..4 {
         let hash = i << 32 + i;

@@ -17,6 +17,7 @@ use crate::position::Move;
 use crate::position::Position;
 pub use crate::search::mcts_core::best_move;
 use crate::search::mcts_core::{SmallBridge, TempVectors, Tree, TreeBridge, TreeChild, TreeEdge};
+use crate::search::tt::TT;
 
 /// This module contains the public-facing convenience API for the search.
 /// The implementation itself in in mcts_core.
@@ -149,6 +150,7 @@ impl std::error::Error for Error {}
 
 pub struct MonteCarloTree<const S: usize> {
     tree: TreeEdge<S>, // Fake edge to the root node
+    tt: TT,
     visits: u32,
     position: Position<S>,
     temp_position: Position<S>,
@@ -161,6 +163,8 @@ impl<const S: usize> MonteCarloTree<S> {
         let mut new_edge = self.tree;
         let mut new_visits = self.visits;
         let mut position = self.position;
+        let mut tt = self.tt;
+        tt.increment_generation();
         for mv in moves {
             let child = new_edge.child?.children?;
             let TreeChild::Large(mut bridge) = *child else {
@@ -181,6 +185,7 @@ impl<const S: usize> MonteCarloTree<S> {
 
         Some(Self {
             tree: new_edge,
+            tt,
             visits: new_visits,
             position,
             temp_position: new_temp_position,
@@ -247,6 +252,7 @@ impl<const S: usize> MonteCarloTree<S> {
     pub fn new(position: Position<S>, settings: MctsSetting<S>) -> MonteCarloTree<S> {
         let mut tree = MonteCarloTree {
             tree: TreeEdge { child: None },
+            tt: TT::new(1024 * 1024),
             visits: 0,
             position: position.clone(),
             temp_position: position,
@@ -413,6 +419,7 @@ impl<const S: usize> MonteCarloTree<S> {
         self.temp_position.clone_from(&self.position);
         let result = self.tree.select(
             &mut self.temp_position,
+            &mut self.tt,
             &self.settings,
             &mut self.temp_vectors,
             self.visits,
