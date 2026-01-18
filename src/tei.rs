@@ -283,7 +283,6 @@ fn update_search_tree<const S: usize>(
             .reroot(move_difference)
             .unwrap_or_else(|| MonteCarloTree::new(new_position.position(), mcts_settings.clone()))
     } else {
-        eprintln!("Failed to find move difference, creating new tree");
         MonteCarloTree::new(new_position.position(), mcts_settings.clone())
     }
 }
