@@ -334,10 +334,15 @@ impl<const S: usize> SmallBridge<S> {
             .unwrap();
 
         position.do_move(child_move);
+        let child_hash = position.zobrist_hash();
 
         let result = child_tree.select(position, tt, settings, temp_vectors, *child_visits)?;
 
         *child_visits += 1;
+        if *child_visits > 3 {
+            let new_q = child_tree.total_action_value as f32 / *child_visits as f32;
+            tt.insert(child_hash, new_q, *child_visits);
+        }
 
         Ok(Some(1.0 - result))
     }
