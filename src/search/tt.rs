@@ -1,12 +1,21 @@
+use std::mem;
+
 pub struct TT {
     buckets: Vec<Bucket>,
     generation: u8,
 }
 
 impl TT {
-    pub fn new(size: usize) -> Self {
+    pub fn new_with_buckets(size: usize) -> Self {
         TT {
             buckets: vec![Bucket::default(); size],
+            generation: 1,
+        }
+    }
+
+    pub fn new_with_bytes(size: usize) -> Self {
+        TT {
+            buckets: vec![Bucket::default(); size / mem::size_of::<Bucket>()],
             generation: 1,
         }
     }
@@ -69,7 +78,7 @@ impl Bucket {
 }
 
 #[derive(Debug, Clone)]
-struct Entry {
+pub struct Entry {
     hash_key_upper_bits: u32,
     value: f32,
     generation: u8,
@@ -92,7 +101,7 @@ impl Entry {
 
 #[test]
 fn insert_4_values_test() {
-    let mut tt = TT::new(1);
+    let mut tt = TT::new_with_buckets(1);
     for i in 0..4 {
         let hash = i << 32 + i;
         tt.insert(hash, i as f32, 1);
@@ -107,7 +116,7 @@ fn insert_4_values_test() {
 
 #[test]
 fn overwrite_values_test() {
-    let mut tt = TT::new(1);
+    let mut tt = TT::new_with_buckets(1);
     for i in 0..4 {
         let hash = i << 32 + i;
         tt.insert(hash, i as f32, 1);

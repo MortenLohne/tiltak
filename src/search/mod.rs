@@ -22,7 +22,7 @@ use crate::search::tt::TT;
 /// This module contains the public-facing convenience API for the search.
 /// The implementation itself in in mcts_core.
 mod mcts_core;
-mod tt;
+pub mod tt;
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug, PartialEq, Clone)]
@@ -39,6 +39,7 @@ pub struct MctsSetting<const S: usize> {
     dirichlet: Option<f32>,
     excluded_moves: Vec<Move<S>>,
     static_eval_variance: Option<f32>,
+    hash_megabytes: usize,
     rollout_depth: u16,
     rollout_temperature: Option<f64>,
 }
@@ -52,6 +53,7 @@ impl<const S: usize> Default for MctsSetting<S> {
             dirichlet: None,
             excluded_moves: vec![],
             static_eval_variance: None,
+            hash_megabytes: 16,
             rollout_depth: 0,
             rollout_temperature: None,
         }
@@ -99,6 +101,11 @@ impl<const S: usize> MctsSetting<S> {
     /// A value of 1.0 is highly random, values around 0.2 give low randomness
     pub fn add_rollout_temperature(mut self, temperature: f64) -> Self {
         self.rollout_temperature = Some(temperature);
+        self
+    }
+
+    pub fn add_hash_megabytes(mut self, hash_bytes: usize) -> Self {
+        self.hash_megabytes = hash_bytes;
         self
     }
 
@@ -252,7 +259,7 @@ impl<const S: usize> MonteCarloTree<S> {
     pub fn new(position: Position<S>, settings: MctsSetting<S>) -> MonteCarloTree<S> {
         let mut tree = MonteCarloTree {
             tree: TreeEdge { child: None },
-            tt: TT::new(1024 * 1024),
+            tt: TT::new_with_bytes(settings.hash_megabytes * 1024 * 1024),
             visits: 0,
             position: position.clone(),
             temp_position: position,
