@@ -731,7 +731,6 @@ impl<const S: usize> Position<S> {
         self.black_caps_left
     }
 
-    #[cfg(test)]
     pub fn zobrist_hash(&self) -> u64 {
         self.hash
     }

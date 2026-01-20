@@ -1084,6 +1084,11 @@ fn mem_usage<const S: usize>() {
         S,
         search::tree_child_mem_usage::<S>()
     );
+    println!(
+        "Hash table entry {}s: {} bytes",
+        S,
+        mem::size_of::<search::tt::Entry>()
+    );
     println!("f16: {} bytes", mem::size_of::<f16>());
     println!(
         "Zobrist keys 5s: {} bytes",

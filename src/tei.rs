@@ -53,6 +53,7 @@ async fn tei_game<const S: usize, Out: Fn(&str), P: Platform>(
             }
             "setoption" => {
                 options.parse(&line);
+
                 if let Some(p) = position.as_mut() {
                     p.root_position.set_komi(options.komi);
                 }
@@ -60,7 +61,7 @@ async fn tei_game<const S: usize, Out: Fn(&str), P: Platform>(
                 last_position_searched = SearchPosition::new(options.komi);
                 search_tree = MonteCarloTree::new(
                     Position::<S>::start_position_with_komi(options.komi),
-                    mcts_settings.clone(),
+                    mcts_settings.clone().add_hash_megabytes(options.hash),
                 );
             }
             "position" => {
@@ -129,13 +130,24 @@ pub async fn tei<Out: Fn(&str), P: Platform>(
         }
     }
 
+    let mut options = Options::default();
+
     output("id name Tiltak");
     output("id author Morten Lohne");
-    output("option name HalfKomi type combo default 0 var 0 var 4");
-    output("option name MultiPV type spin default 1 min 1 max 16");
+    output(&format!(
+        "option name HalfKomi type combo default {} var 0 var 4",
+        options.komi.half_komi()
+    ));
+    output(&format!(
+        "option name MultiPV type spin default {} min 1 max 16",
+        options.multi_pv
+    ));
+    output(&format!(
+        "option name Hash type spin default {} min 1 max 32768",
+        options.hash
+    ));
     output("teiok");
 
-    let mut options = Options::default();
     while let Ok(line) = input.recv().await {
         let mut words = line.split_whitespace();
         match words.next().unwrap() {
@@ -149,7 +161,7 @@ pub async fn tei<Out: Fn(&str), P: Platform>(
                             tei_game::<4, _, P>(
                                 &input,
                                 output,
-                                mcts_settings(is_slatebot, is_cobblebot),
+                                mcts_settings(is_slatebot, is_cobblebot, options.hash),
                                 &mut options,
                             )
                             .await
@@ -158,7 +170,7 @@ pub async fn tei<Out: Fn(&str), P: Platform>(
                             tei_game::<5, _, P>(
                                 &input,
                                 output,
-                                mcts_settings(is_slatebot, is_cobblebot),
+                                mcts_settings(is_slatebot, is_cobblebot, options.hash),
                                 &mut options,
                             )
                             .await
@@ -167,7 +179,7 @@ pub async fn tei<Out: Fn(&str), P: Platform>(
                             tei_game::<6, _, P>(
                                 &input,
                                 output,
-                                mcts_settings(is_slatebot, is_cobblebot),
+                                mcts_settings(is_slatebot, is_cobblebot, options.hash),
                                 &mut options,
                             )
                             .await
@@ -287,18 +299,24 @@ fn update_search_tree<const S: usize>(
     }
 }
 
-fn mcts_settings<const S: usize>(is_slatebot: bool, is_cobblebot: bool) -> MctsSetting<S> {
+fn mcts_settings<const S: usize>(
+    is_slatebot: bool,
+    is_cobblebot: bool,
+    hash_bytes: usize,
+) -> MctsSetting<S> {
     if is_slatebot {
         MctsSetting::default()
             .add_rollout_depth(200)
             .add_rollout_temperature(0.2)
+            .add_hash_megabytes(hash_bytes)
     } else if is_cobblebot {
         MctsSetting::default()
             .add_rollout_depth(200)
             .add_rollout_temperature(0.2)
             .add_dirichlet(0.25)
+            .add_hash_megabytes(hash_bytes)
     } else {
-        MctsSetting::default()
+        MctsSetting::default().add_hash_megabytes(hash_bytes)
     }
 }
 
@@ -514,6 +532,7 @@ pub fn info_string<const S: usize, P: Platform>(
 struct Options {
     komi: Komi,
     multi_pv: usize,
+    hash: usize,
 }
 
 impl Default for Options {
@@ -521,6 +540,7 @@ impl Default for Options {
         Options {
             komi: Komi::default(),
             multi_pv: 1,
+            hash: 16,
         }
     }
 }
@@ -560,6 +580,13 @@ impl Options {
                     self.multi_pv = pvs;
                 } else {
                     panic!("Invalid MultiPV setting \"{}\"", line);
+                }
+            }
+            "Hash" => {
+                if let Some(hash) = value_string.parse::<usize>().ok().filter(|&size| size > 0) {
+                    self.hash = hash;
+                } else {
+                    panic!("Invalid hash table size setting \"{}\"", line);
                 }
             }
             _ => panic!("Unknown option \"{}\"", option_name),
