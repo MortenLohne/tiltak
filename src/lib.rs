@@ -35,6 +35,8 @@ pub use search::mcts;
 
 #[cfg(feature = "aws-lambda-runtime")]
 pub mod aws;
+#[cfg(feature = "sqlite")]
+pub mod check_playtak_db;
 pub mod minmax;
 pub mod move_gen;
 #[cfg(feature = "sqlite")]

@@ -29,8 +29,6 @@ use rayon::prelude::*;
 use tiltak::evaluation::parameters::{
     self, IncrementalPolicy, PolicyIndexes, Value, ValueApplier, ValueIndexes,
 };
-#[cfg(feature = "sqlite")]
-use tiltak::policy_sqlite;
 use tiltak::position::Role;
 use tiltak::position::{
     squares_iterator, AbstractBoard, Direction, Komi, Move, Square, SquareCacheEntry,
@@ -38,6 +36,8 @@ use tiltak::position::{
 use tiltak::position::{Position, Stack};
 use tiltak::ptn::{Game, PtnMove};
 use tiltak::search::{cp_to_win_percentage, MctsSetting};
+#[cfg(feature = "sqlite")]
+use tiltak::{check_playtak_db, policy_sqlite};
 use tiltak::{minmax, ptn};
 use tiltak::{position, search};
 
@@ -163,6 +163,8 @@ fn main() {
             "analyze_openings" => analyze_openings::<6>(komi, 500_000),
             #[cfg(feature = "sqlite")]
             "test_policy" => policy_sqlite::check_all_games(),
+            #[cfg(feature = "sqlite")]
+            "analyze_playtak_db" => check_playtak_db::analyze_playtak_db::<4>("games_anon.db"),
             "game" => {
                 println!("Enter move list or a full PTN, then press enter followed by CTRL+D");
                 let mut input = String::new();
