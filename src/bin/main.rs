@@ -111,7 +111,6 @@ fn main() {
                 Some(s) => println!("Unsupported size {}", s),
                 None => perft_from_tps::<5>(),
             },
-            #[cfg(feature = "sqlite")]
             "tinue" => match words.get(1) {
                 Some(&"3") => tinue_from_tps::<3>(komi),
                 Some(&"4") => tinue_from_tps::<4>(komi),
@@ -961,10 +960,15 @@ pub fn tinue_from_tps<const S: usize>(komi: Komi) {
     io::stdin().read_line(&mut input).unwrap();
     let position: Position<S> = Position::from_fen_with_komi(&input, komi).unwrap();
 
+    let start_time = time::Instant::now();
     let mut proof_tree = ProofTree::new(position);
     for _ in 0..1_000_000 {
         if proof_tree.result().is_some() {
-            println!("Proof result: {:?}", proof_tree.result());
+            println!(
+                "Proof result: {:?} in {:.2}",
+                proof_tree.result(),
+                start_time.elapsed().as_secs_f32()
+            );
             println!(
                 "PV: {}",
                 proof_tree

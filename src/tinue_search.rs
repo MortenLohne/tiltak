@@ -1,6 +1,9 @@
 #[cfg(test)]
 use crate::position::Komi;
-use crate::position::{GroupData, Move, Position};
+use crate::{
+    evaluation::parameters::{Policy, PolicyApplier},
+    position::{GroupData, Move, Position},
+};
 use board_game_traits::{Color, GameResult, Position as _};
 
 pub struct ProofTree<const S: usize> {
@@ -111,6 +114,8 @@ impl<const S: usize> AndNode<S> {
         }
     }
 
+    // Never inline, for profiling purposes
+    #[inline(never)]
     fn select(&mut self, position: &mut Position<S>) {
         if self.children.is_empty() {
             return self.expand(position);
@@ -125,27 +130,17 @@ impl<const S: usize> AndNode<S> {
         child.select(position);
         position.reverse_move(reverse_move);
 
-        // println!(
-        //     "Selecting AND {} with proof numbers: {:?}",
-        //     mv, self.proof_numbers
-        // );
-
         self.proof_numbers = self
             .children
             .iter()
             .map(|(_, child)| child.proof_numbers.clone())
             .reduce(|e, acc| e.and(acc))
             .unwrap();
-        // println!(
-        //     "Finished selecting AND {} with proof numbers: {:?}",
-        //     mv, self.proof_numbers
-        // );
-        // println!();
     }
 
+    // Never inline, for profiling purposes
+    #[inline(never)]
     fn expand(&mut self, position: &mut Position<S>) {
-        println!("Expanding OR node");
-
         let mut legal_moves = vec![];
         position.generate_moves(&mut legal_moves);
         let mut child_nodes = Vec::with_capacity(legal_moves.len());
@@ -163,13 +158,9 @@ impl<const S: usize> AndNode<S> {
         let (best_move, best_child) = self
             .children
             .iter()
-            .min_by_key(|(_mv, child)| child.proof_numbers.disproof_number)
+            .max_by_key(|(_mv, child)| child.visits)
             .unwrap();
         pv.push(*best_move);
-        println!(
-            "PV AND proof numbers for {}: {:?}",
-            best_move, best_child.proof_numbers
-        );
         best_child.pv(pv);
     }
 }
@@ -177,6 +168,7 @@ impl<const S: usize> AndNode<S> {
 struct OrNode<const S: usize> {
     children: Box<[(Move<S>, AndNode<S>)]>,
     proof_numbers: ProofNumbers,
+    visits: u32,
 }
 
 impl<const S: usize> OrNode<S> {
@@ -184,18 +176,17 @@ impl<const S: usize> OrNode<S> {
         Self {
             children: Box::new([]),
             proof_numbers: ProofNumbers::new(),
+            visits: 0,
         }
     }
 
+    // Never inline, for profiling purposes
+    #[inline(never)]
     fn select(&mut self, position: &mut Position<S>) {
-        println!("Selecting OR node");
+        self.visits += 1;
         if self.children.is_empty() {
             return self.expand(position);
         }
-        println!(
-            "Fully selecting OR node, self-proof {:?}",
-            self.proof_numbers
-        );
 
         let (mv, child) = self
             .children
@@ -208,34 +199,20 @@ impl<const S: usize> OrNode<S> {
         child.select(position);
         position.reverse_move(reverse_move);
 
-        // println!(
-        //     "Selecting OR {} with proof numbers: {:?}",
-        //     mv, self.proof_numbers
-        // );
-
         self.proof_numbers = self
             .children
             .iter()
             .map(|(_, child)| child.proof_numbers.clone())
             .reduce(|e, acc| e.or(acc))
             .unwrap();
-        // println!(
-        //     "Finished selecting OR {} with proof numbers: {:?}",
-        //     mv, self.proof_numbers
-        // );
-        // println!();
-        println!(
-            "OR-selecting {}, self-proof now {:?}",
-            mv, self.proof_numbers
-        );
     }
 
+    // Never inline, for profiling purposes
+    #[inline(never)]
     fn expand(&mut self, position: &mut Position<S>) {
         assert!(self.children.is_empty());
         let mut moves = vec![];
         position.generate_moves(&mut moves);
-
-        println!("Expanding AND node");
 
         if moves.iter().any(|mv| {
             let reverse_move = position.do_move(*mv);
@@ -249,9 +226,7 @@ impl<const S: usize> OrNode<S> {
             self.proof_numbers = ProofNumbers::win();
             return;
         }
-        moves.clear();
-        // TODO: Re-use legal moves
-        position.tak_threat_moves(&mut moves);
+        position.filter_tak_threat_moves(&mut moves);
         if moves.is_empty() {
             self.proof_numbers = ProofNumbers::loss_draw();
             return;
@@ -274,10 +249,7 @@ impl<const S: usize> OrNode<S> {
             .iter()
             .min_by_key(|(_mv, child)| child.proof_numbers.proof_number)
             .unwrap();
-        println!(
-            "PV OR proof numbers for {}: {:?}",
-            best_move, best_child.proof_numbers
-        );
+
         pv.push(*best_move);
         best_child.pv(pv);
     }
@@ -307,8 +279,10 @@ impl<const S: usize> Position<S> {
         self.relative_result_with_group_data(&self.group_data())
     }
 
-    fn tak_threat_moves(&mut self, moves: &mut Vec<Move<S>>) {
-        self.generate_moves(moves);
+    // Never inline, for profiling purposes
+    #[inline(never)]
+    /// Vector must already be filled with all legal moves
+    fn filter_tak_threat_moves(&mut self, moves: &mut Vec<Move<S>>) {
         moves.retain(|mv| {
             let reverse_move = self.do_move(*mv);
             match self.relative_result() {
@@ -320,23 +294,58 @@ impl<const S: usize> Position<S> {
                 None => (),
             }
             self.null_move();
-            let mut child_moves = vec![];
-            self.generate_moves(&mut child_moves);
-            let makes_tak_threat = child_moves.into_iter().any(|child_move| {
-                let reverse_child_move = self.do_move(child_move);
-                let relative_result = self.relative_result();
-                let result = match relative_result {
-                    Some(RelativeResult::Win) => true,
-                    Some(RelativeResult::Draw | RelativeResult::Loss) => false,
-                    None => false,
-                };
-                self.reverse_move(reverse_child_move);
-                result
-            });
+
+            let makes_tak_threat = self.has_winning_move();
+
             self.null_move();
             self.reverse_move(reverse_move);
             makes_tak_threat
         });
+    }
+
+    // Never inline, for profiling purposes
+    #[inline(never)]
+    fn has_winning_move(&mut self) -> bool {
+        let mut simple_moves = vec![];
+        let mut moves = vec![];
+        let mut fcd_per_move = vec![];
+        let mut feature_sets = vec![];
+
+        self.generate_moves_with_probabilities::<Policy<S>>(
+            &self.group_data(),
+            &mut simple_moves,
+            &mut moves,
+            &mut fcd_per_move,
+            <Position<S>>::policy_params(self.komi()),
+            &mut feature_sets,
+        );
+
+        let applier = feature_sets[0].clone();
+        if applier.has_immediate_win() {
+            return true;
+        }
+
+        moves.sort_by(|(_, score), (_, score2)| score.partial_cmp(score2).unwrap().reverse());
+        let child_moves: Vec<Move<S>> = moves.into_iter().map(|(mv, _)| mv).collect();
+        // let mut child_moves = vec![];
+        // self.generate_moves(&mut child_moves);
+        child_moves
+            .into_iter()
+            .any(|child_move| self.move_wins(child_move))
+    }
+
+    // Never inline, for profiling purposes
+    #[inline(never)]
+    fn move_wins(&mut self, mv: Move<S>) -> bool {
+        let reverse_child_move = self.do_move(mv);
+        let relative_result = self.relative_result();
+        let result = match relative_result {
+            Some(RelativeResult::Win) => true,
+            Some(RelativeResult::Draw | RelativeResult::Loss) => false,
+            None => false,
+        };
+        self.reverse_move(reverse_child_move);
+        result
     }
 }
 
@@ -349,7 +358,8 @@ fn create_tak_threats_test() {
     .unwrap();
     let old_position = position.clone();
     let mut moves = Vec::new();
-    position.tak_threat_moves(&mut moves);
+    position.generate_moves(&mut moves);
+    position.filter_tak_threat_moves(&mut moves);
     assert_eq!(
         moves.len(),
         4,
