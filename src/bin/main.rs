@@ -2,6 +2,7 @@
 
 #[cfg(all(feature = "mimalloc", not(feature = "dhat-heap")))]
 use mimalloc::MiMalloc;
+use tiltak::tinue_search::ProofTree;
 
 #[cfg(all(feature = "mimalloc", not(feature = "dhat-heap")))]
 #[global_allocator]
@@ -109,6 +110,17 @@ fn main() {
                 Some(&"8") => perft_from_tps::<8>(),
                 Some(s) => println!("Unsupported size {}", s),
                 None => perft_from_tps::<5>(),
+            },
+            #[cfg(feature = "sqlite")]
+            "tinue" => match words.get(1) {
+                Some(&"3") => tinue_from_tps::<3>(komi),
+                Some(&"4") => tinue_from_tps::<4>(komi),
+                Some(&"5") => tinue_from_tps::<5>(komi),
+                Some(&"6") => tinue_from_tps::<6>(komi),
+                Some(&"7") => tinue_from_tps::<7>(komi),
+                Some(&"8") => tinue_from_tps::<8>(komi),
+                Some(s) => println!("Unsupported size {}", s),
+                None => tinue_from_tps::<5>(komi),
             },
             #[cfg(feature = "constant-tuning")]
             "openings" => {
@@ -940,6 +952,31 @@ fn play_human(mut position: Position<5>) {
         Some(GameResult::WhiteWin) => println!("White won! Board:\n{:?}", position),
         Some(GameResult::BlackWin) => println!("Black won! Board:\n{:?}", position),
         Some(GameResult::Draw) => println!("The game was drawn! Board:\n{:?}", position),
+    }
+}
+
+pub fn tinue_from_tps<const S: usize>(komi: Komi) {
+    println!("Enter TPS:");
+    let mut input = String::new();
+    io::stdin().read_line(&mut input).unwrap();
+    let position: Position<S> = Position::from_fen_with_komi(&input, komi).unwrap();
+
+    let mut proof_tree = ProofTree::new(position);
+    for _ in 0..1_000_000 {
+        if proof_tree.result().is_some() {
+            println!("Proof result: {:?}", proof_tree.result());
+            println!(
+                "PV: {}",
+                proof_tree
+                    .pv()
+                    .iter()
+                    .map(|mv| mv.to_string())
+                    .collect::<Vec<String>>()
+                    .join(" ")
+            );
+            break;
+        }
+        proof_tree.select();
     }
 }
 

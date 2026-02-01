@@ -45,6 +45,7 @@ pub mod position;
 pub mod search;
 #[cfg(test)]
 mod tests;
+pub mod tinue_search;
 #[cfg(feature = "constant-tuning")]
 pub mod tune;
 
